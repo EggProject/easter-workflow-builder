@@ -2,10 +2,11 @@ import { describe, expect, it, afterEach } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext, type WorkflowEdgeInput } from '@easter-workflow-builder/db';
 import { createEngine } from '@easter-workflow-builder/engine';
-import type { RouteId } from '@easter-workflow-builder/protocol';
 import { createServerLogger, type DestinationStream, type ServerLogger } from '@easter-workflow-builder/logger';
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
+import type { BinaryRouteHandler, BinaryRouteHandlerContext } from '../route-dispatch/binary-route-handler.ts';
 import type { RouteHandler, RouteHandlerContext } from '../route-dispatch/route-handler.ts';
+import type { RouteHandlers } from '../route-dispatch/route-handlers.ts';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
 import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
 import { buildEngineDependencies } from '../engine-assembly/build-engine-dependencies.ts';
@@ -15,6 +16,10 @@ import type { StreamConnectionDependencies } from '../stream-connection/handle-s
 import { createHttpServer, readLastEventIdHeader, type HttpServerOptions } from './create-http-server.ts';
 
 const DEFAULT_HANDLER: RouteHandler = () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } });
+const DEFAULT_BINARY_HANDLER: BinaryRouteHandler = {
+  maxBodyBytes: 0,
+  handle: () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } }),
+};
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -75,8 +80,8 @@ function buildCapturingLogger(): { logger: ServerLogger; sink: MemorySink } {
  * tesztben is előálljon, kézzel felsorolva - ugyanaz a minta, mint ahogy a
  * valós összeállítás (`route-registry` téma) is felépíti majd.
  */
-function buildHandlers(overrides: Partial<Record<RouteId, RouteHandler>>): Record<RouteId, RouteHandler> {
-  const base: Record<RouteId, RouteHandler> = {
+function buildHandlers(overrides: Partial<RouteHandlers>): RouteHandlers {
+  const base: RouteHandlers = {
     listWorkflows: DEFAULT_HANDLER,
     createWorkflow: DEFAULT_HANDLER,
     getWorkflow: DEFAULT_HANDLER,
@@ -103,12 +108,15 @@ function buildHandlers(overrides: Partial<Record<RouteId, RouteHandler>>): Recor
     setConcurrencyLimit: DEFAULT_HANDLER,
     clearConcurrencyLimit: DEFAULT_HANDLER,
     replaceStreamSubscriptions: DEFAULT_HANDLER,
+    listSkills: DEFAULT_HANDLER,
+    uploadSkill: DEFAULT_BINARY_HANDLER,
+    deleteSkill: DEFAULT_HANDLER,
   };
   return { ...base, ...overrides };
 }
 
 function buildOptions(
-  overrides: Partial<Record<RouteId, RouteHandler>>,
+  overrides: Partial<RouteHandlers>,
   developmentOrigin: string | undefined,
   logger: ServerLogger = buildCapturingLogger().logger,
 ): HttpServerOptions {
@@ -558,6 +566,78 @@ describe('createHttpServer', () => {
     expect(response.status).toBe(500);
     const payload: unknown = await response.json();
     expect(payload).toStrictEqual({ code: 'internal', message: 'Váratlan szerver hiba történt (internal).' });
+  });
+});
+
+function recordingBinaryHandler(maxBodyBytes: number, seen: BinaryRouteHandlerContext[]): BinaryRouteHandler {
+  return {
+    maxBodyBytes,
+    handle: (context) => {
+      seen.push(context);
+      return Promise.resolve({ kind: 'ok', value: { status: 200, body: { received: true } } });
+    },
+  };
+}
+
+describe('createHttpServer: nyers ZIP törzsű végpont (SPEC-009 5.1, O-36)', () => {
+  let closeServer: (() => Promise<void>) | undefined;
+
+  afterEach(async () => {
+    if (closeServer === undefined) {
+      return;
+    }
+    await closeServer();
+    closeServer = undefined;
+  });
+
+  it('a korlátig érkező bináris törzset JSON értelmezés nélkül, az útvonal paraméterrel adja a kezelőnek', async () => {
+    const seen: BinaryRouteHandlerContext[] = [];
+    const { baseUrl, close } = await startTestServer(
+      buildOptions({ uploadSkill: recordingBinaryHandler(4, seen) }, undefined),
+    );
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/skills/pdf`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/zip' },
+      body: Buffer.from([0x50, 0x4b, 0x7b, 0x00]),
+    });
+
+    expect(response.status).toBe(200);
+    expect(seen).toStrictEqual([
+      { parameters: { name: 'pdf' }, body: { kind: 'complete', bytes: Buffer.from([0x50, 0x4b, 0x7b, 0x00]) } },
+    ]);
+  });
+
+  it('a kezelő korlátját túllépő törzsből csak a túllépés ténye jut el a kezelőhöz', async () => {
+    const seen: BinaryRouteHandlerContext[] = [];
+    const { baseUrl, close } = await startTestServer(
+      buildOptions({ uploadSkill: recordingBinaryHandler(4, seen) }, undefined),
+    );
+    closeServer = close;
+
+    await fetch(`${baseUrl}/api/skills/pdf`, { method: 'PUT', body: Buffer.alloc(5) });
+
+    expect(seen).toStrictEqual([{ parameters: { name: 'pdf' }, body: { kind: 'too_large' } }]);
+  });
+
+  it('a bináris kezelő hibaágát a hibaosztály szerinti kódra és errorClass mezőre képezi', async () => {
+    const message = 'A csomag túl nagy (skill_archive_too_large).';
+    const failing: BinaryRouteHandler = {
+      maxBodyBytes: 1,
+      handle: () => Promise.resolve({ kind: 'error', message }),
+    };
+    const { baseUrl, close } = await startTestServer(buildOptions({ uploadSkill: failing }, undefined));
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/skills/pdf`, { method: 'PUT', body: Buffer.alloc(1) });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toStrictEqual({
+      code: 'unprocessable',
+      message,
+      errorClass: 'skill_archive_too_large',
+    });
   });
 });
 

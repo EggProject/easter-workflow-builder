@@ -1,14 +1,16 @@
 // Barrel: csak nevesített újraexport (SPEC-002 6.6 6. szabálya). A csomag téma mappánként
 // bővül, ahogy a SPEC-005 végrehajtási lépései elkészülnek.
 
-// http-route: az API_BASE_PATH és a STREAM_PATH konstans, a 26 végpont útvonal sablonja,
-// és a paraméter behelyettesítő tiszta függvény.
+// http-route: az API_BASE_PATH és a STREAM_PATH konstans, a 29 végpont útvonal sablonja,
+// a paraméter behelyettesítő tiszta függvény, és a nyers ZIP törzsű végpontok guardja.
 export { API_BASE_PATH } from './http-route/api-base-path.ts';
 export { STREAM_PATH } from './http-route/stream-path.ts';
 export type { HttpMethod, RouteDefinition, RouteId } from './http-route/route-table.ts';
 export { ROUTE_TABLE } from './http-route/route-table.ts';
 export { buildRoutePath } from './http-route/build-route-path.ts';
 export { isRouteId } from './http-route/is-route-id.ts';
+export type { ZipBodyRouteId } from './http-route/is-zip-body-route-id.ts';
+export { isZipBodyRouteId } from './http-route/is-zip-body-route-id.ts';
 
 // protocol-error: a ProtocolErrorCode szótár, a ProtocolErrorClass szótár, a
 // ProtocolErrorBody séma, a HTTP státusz leképezés, és a Zod hiba lista fordítása a boríték
@@ -218,3 +220,9 @@ export { REQUIRED_TEXT_FIELD_PATHS } from './node-config/required-text-field-pat
 // Az üres kötelező mező mondata: az apps/web az agents bejegyzés kötelező mezőire ugyanezt adja
 // (SPEC-008 5.4, O-38), a mentési sémán kívül.
 export { BLANK_FIELD_MESSAGE } from './node-config/blank-field-message.ts';
+
+// skill: a skill név szabálya és a skill könyvtár egy elemének alakja (SPEC-009 5.1, 5.3, 5.4 5. pont).
+export type { SkillName } from './skill/skill-name.ts';
+export { SkillNameSchema } from './skill/skill-name.ts';
+export type { SkillSummary } from './skill/skill-summary.ts';
+export { SkillSummarySchema } from './skill/skill-summary.ts';

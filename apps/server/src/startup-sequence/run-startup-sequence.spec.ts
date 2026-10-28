@@ -51,6 +51,7 @@ function baseEnvironment(port: number, logDirectory: string): EnvironmentReader 
     EASTER_LOG_RETAINED_FILE_COUNT: '5',
     EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS: '15000',
     EASTER_DB_FILE: ':memory:',
+    EASTER_SKILL_LIBRARY_DIRECTORY: path.join(logDirectory, 'skills'),
   };
 }
 

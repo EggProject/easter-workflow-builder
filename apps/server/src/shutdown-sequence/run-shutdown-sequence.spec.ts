@@ -14,6 +14,7 @@ import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uu
 import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { runShutdownSequence } from './run-shutdown-sequence.ts';
+import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -308,7 +309,7 @@ describe('runShutdownSequence', () => {
     const { sink, lines } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,
@@ -333,7 +334,7 @@ describe('runShutdownSequence', () => {
     const { sink } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,
@@ -385,7 +386,7 @@ describe('runShutdownSequence', () => {
     const { sink } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,
@@ -455,7 +456,7 @@ describe('runShutdownSequence', () => {
     const { sink } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,
@@ -548,7 +549,7 @@ describe('runShutdownSequence', () => {
     const { sink, lines } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
-      handlers: buildRouteHandlers(racyDatabase, engine, streamRegistry),
+      handlers: buildRouteHandlers(racyDatabase, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database: racyDatabase, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,

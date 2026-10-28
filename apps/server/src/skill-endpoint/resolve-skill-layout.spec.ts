@@ -14,11 +14,11 @@ describe('resolveSkillLayout', () => {
   });
 
   it('egyetlen legfelső mappa (könyvtár bejegyzéssel vagy anélkül) a lecsípendő előtag', () => {
-    expect(resolveSkillLayout([directory('pdf'), file('pdf/SKILL.md'), file('pdf/ref/a.md')])).toStrictEqual({
+    expect(resolveSkillLayout([directory('csomag'), file('csomag/SKILL.md'), file('csomag/ref/a.md')])).toStrictEqual({
       kind: 'ok',
-      value: 'pdf/',
+      value: 'csomag/',
     });
-    expect(resolveSkillLayout([file('pdf/SKILL.md')])).toStrictEqual({ kind: 'ok', value: 'pdf/' });
+    expect(resolveSkillLayout([file('csomag/SKILL.md')])).toStrictEqual({ kind: 'ok', value: 'csomag/' });
   });
 
   it.each([
@@ -32,13 +32,13 @@ describe('resolveSkillLayout', () => {
   });
 
   it('egyetlen mappa SKILL.md nélkül: hiányzó SKILL.md', () => {
-    const outcome = resolveSkillLayout([directory('pdf'), file('pdf/readme.md'), file('pdf/sub/SKILL.md')]);
+    const outcome = resolveSkillLayout([directory('csomag'), file('csomag/readme.md'), file('csomag/sub/SKILL.md')]);
     expect(outcome.kind === 'error' && outcome.message).toMatch(/\(skill_manifest_missing\)\.$/u);
   });
 
   it('két SKILL.md a skill gyökerében: többszörös példány, mindkét elrendezésben', () => {
     const root = resolveSkillLayout([file('SKILL.md'), file('SKILL.md')]);
-    const folder = resolveSkillLayout([file('pdf/SKILL.md'), file('pdf/SKILL.md')]);
+    const folder = resolveSkillLayout([file('csomag/SKILL.md'), file('csomag/SKILL.md')]);
     expect(root.kind === 'error' && root.message).toMatch(/2 SKILL\.md áll \(skill_manifest_duplicate\)\.$/u);
     expect(folder.kind === 'error' && folder.message).toMatch(/\(skill_manifest_duplicate\)\.$/u);
   });

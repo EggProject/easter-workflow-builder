@@ -299,9 +299,13 @@ részletek, a táblák és a mérő eszközök: `docs/research/2026-10-28-spec-0
 ### 5.1 A döntött alak
 
 - **Tárolás:** a szerver egy kezelt könyvtárában, a fájlrendszeren (O-9), mert az SDK skillt csak
-  fájlrendszerről tölt (2.2). A könyvtár útvonala kötelező szerver konfiguráció, alapérték nélkül (egy
-  új env változó, a neve a PLAN-012-ben rögzül; a `EASTER_*` névminta, SPEC-006 4. szekció). A könyvtár
-  egy plugin gyökér: `<gyökér>/skills/<név>/SKILL.md`.
+  fájlrendszerről tölt (2.2). A könyvtár útvonala kötelező szerver konfiguráció, alapérték nélkül: az
+  `EASTER_SKILL_LIBRARY_DIRECTORY` env változó (T-012-8; az `EASTER_*` névminta, SPEC-006 4. szekció).
+  Hiányában vagy üres értékénél a szerver nem indul (`missing_env_variable`); ez a SPEC-012 4.2 "minden
+  értéknek van alapértéke" szabályának kimondott, egyetlen kivétele. Relatív érték a szerver induló
+  könyvtárához képest abszolút útvonalra oldódik. A könyvtár egy plugin gyökér:
+  `<gyökér>/skills/<név>/SKILL.md`; a kicsomagolás ideiglenes mappái (`<gyökér>/.staging-*`) a `skills`
+  mappán kívül állnak.
 - **Betöltés:** a motor `plugins: [{ type: 'local', path: <gyökér> }]` opciót ad az agent lépésnek
   (O-10), mert ez a `settingSources` értékétől független út (Skills oldal: "or use the `plugins` option to
   load skills from a specific path"); az M-136 igazolja. A `plugins` csak akkor kerül az `Options`-ba,
@@ -315,7 +319,19 @@ részletek, a táblák és a mérő eszközök: `docs/research/2026-10-28-spec-0
   nyers bináris törzs (`Content-Type: application/zip`), a név az útvonal paramétere (O-36, lezárva):
   `PUT /api/skills/:name`; a törzs korlátja az 5.4 6. pontja. A sémák a `protocol` négy írási szabálya szerint (`z.strictObject`,
   nincs `.default()` és `.transform()`, `.readonly()` kimenet, `.safeParse()`; `.claude/CLAUDE.md` 5.
-  szekció).
+  szekció). A megvalósított alak (T-012-8, `protocol` `skill` téma, `ROUTE_TABLE` G csoport):
+  - `GET /api/skills` (`listSkills`): `200`, `SkillSummary` lista név szerint rendezve; a
+    `SkillSummary` mezői `name` (a tárolt, puszta név), `description` (a frontmatterből; kívülről elrontott
+    könyvtárnál üres szöveg), `sizeBytes` (a fájlok összmérete), `modifiedAtMs` (a skill könyvtár
+    módosítási ideje, epoch ezredmásodperc).
+  - `PUT /api/skills/:name` (`uploadSkill`, a route tábla sorában `requestBody: 'application/zip'`): a
+    törzs nyers ZIP; sikerre `200` és a feltöltött skill `SkillSummary` eleme, felülíráskor is (a
+    megerősítés a felület dolga, O-16); minden elutasítás `422` `unprocessable`, a törzs `errorClass`
+    mezőjében az 5.4 tábla osztályával. A `Content-Type` fejlécet a szerver nem ellenőrzi (a JSON
+    végpontok sem), a nem ZIP törzs `skill_archive_unreadable`.
+  - `DELETE /api/skills/:name` (`deleteSkill`): `204` üres törzzsel; nem létező skillre `404`
+    `not_found`; a névszabálynak meg nem felelő névre `422` `skill_name_invalid`.
+  - A név szabálya a `protocol` `SkillNameSchema` sémája, a felület ugyanezt használhatja.
 - **Törlés hivatkozott skillre:** a törlés **megengedett** (O-13), a futás indítása a hiányzó skillre
   megnevezett új indítási hibát ad, `skill_not_found` hibaosztállyal és saját magyar mondattal. A motor a
   skill könyvtár tartalmát egy **új porton** át kapja (a skillek nevei és a gyökér útvonal; az
@@ -392,7 +408,10 @@ bejegyzést), megnevezett hibával, és semmi nem marad a skill könyvtárban.
 6. **Méret és fájlszám** (O-34, lezárva; a források a research 7. szekciójában). A bejegyzés deklarált
    és tényleges kicsomagolt mérete egyezzen (a `yauzl` `validateEntrySizes` opciója, alapból
    bekapcsolva, zip bomba és hazudó fejléc ellen). A korlátok alapértéke a kódban áll (a SPEC-012 4.2
-   mintája: forrásolt alapérték, env változóval felülírható; a változók neve a PLAN-012-ben rögzül):
+   mintája: forrásolt alapérték, env változóval felülírható; T-012-8: `apps/server`
+   `server-config/default-server-config.ts`, a változók `EASTER_SKILL_MAX_UNPACKED_BYTES`,
+   `EASTER_SKILL_MAX_ARCHIVE_BYTES` és `EASTER_SKILL_MAX_ENTRY_COUNT`, pozitív egész, érvénytelen értékre
+   `invalid_env_variable`):
 
    | Korlát                                        | Alapérték               | Forrás                                                                                                                                                                                                                           |
    | --------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -402,7 +421,11 @@ bejegyzést), megnevezett hibával, és semmi nem marad a skill könyvtárban.
    | tömörítési arány                              | nincs külön korlát      | a kicsomagolás közben számolt összméret a kicsomagolást a korlátnál megállítja (CERT IDS04-J módszere); a Sonar arány küszöbét a Sonar maga "rather arbitrarily" választottnak mondja, és ép fájlokat is blokkolt (research 7.3) |
 
    A számolás a kicsomagolás közben, a ténylegesen kiírt bájtokon fut (nem a fejléc deklarált értékén),
-   és a korlát átlépésekor az egész feltöltés elutasítva.
+   és a korlát átlépésekor az egész feltöltés elutasítva. A bejegyzések száma a központi könyvtár
+   bejegyzésszámán dől el, kicsomagolás előtt. A törzs olvasó (`apps/server` `http-server`
+   `read-binary-request-body.ts`) a korlát fölötti bájtokat nem tartja meg, de a törzset végigolvassa,
+   hogy a kliens a `422` választ kapja meg, ne egy félbeszakított kapcsolatot; a memória a korlátnál nem
+   nő tovább (T-012-8).
 
 7. **Titkosított bejegyzés és nem támogatott tömörítési módszer** elutasítva.
 8. **Mód.** A zip Unix mód bitjei nem érvényesülnek: a fájlokat a szerver az alapértelmezett

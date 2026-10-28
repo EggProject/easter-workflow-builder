@@ -1,3 +1,4 @@
+import path from 'node:path';
 import process from 'node:process';
 import type { DatabaseContext } from '@easter-workflow-builder/db';
 import { createEngine, runStartupRecovery } from '@easter-workflow-builder/engine';
@@ -10,6 +11,7 @@ import { createHttpServer } from '../http-server/create-http-server.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { registerShutdownSignalHandlers } from '../shutdown-sequence/register-shutdown-signal-handlers.ts';
 import type { ServerConfig } from '../server-config/server-config.ts';
+import type { SkillLibrary } from '../skill-endpoint/skill-library.ts';
 
 /**
  * A szerver indulási sorrendjének 4 ... 7. lépése (SPEC-006 4.1, 4.2, 4.3):
@@ -48,9 +50,19 @@ export async function continueStartupWithDatabase(
   const streamRegistry = createStreamRegistry(idGenerator);
   const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, logger));
 
-  // 6. HTTP szerver összeállítása és a jelkezelők felvétele
+  // 6. HTTP szerver összeállítása és a jelkezelők felvétele. A skill könyvtár
+  // gyökere abszolút útvonalra oldódik (a folyamat induló könyvtárához képest),
+  // mert a motor plugin útként adja tovább (SPEC-009 5.1).
+  const skillLibrary: SkillLibrary = {
+    rootDirectory: path.resolve(config.skillLibraryDirectory),
+    limits: {
+      maxArchiveBytes: config.skillMaxArchiveBytes,
+      maxUnpackedBytes: config.skillMaxUnpackedBytes,
+      maxEntryCount: config.skillMaxEntryCount,
+    },
+  };
   const server = createHttpServer({
-    handlers: buildRouteHandlers(database, engine, streamRegistry),
+    handlers: buildRouteHandlers(database, engine, streamRegistry, skillLibrary),
     devOrigin: config.devOrigin,
     streamDependencies: {
       database,

@@ -1,29 +1,34 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { Outcome } from '@easter-workflow-builder/core';
 import {
   STREAM_PATH,
   httpStatusForErrorCode,
+  isZipBodyRouteId,
   type ProtocolErrorBody,
   type RouteId,
 } from '@easter-workflow-builder/protocol';
 import type { ServerLogger } from '@easter-workflow-builder/logger';
 import type { IdGeneratorPort } from '@easter-workflow-builder/engine';
 import { matchRoute } from '../route-dispatch/match-route.ts';
-import type { RouteHandler } from '../route-dispatch/route-handler.ts';
+import type { RouteHandlerResult } from '../route-dispatch/route-handler.ts';
+import type { RouteHandlers } from '../route-dispatch/route-handlers.ts';
 import { buildProtocolErrorBody } from '../error-mapping/build-protocol-error-body.ts';
 import {
   handleStreamConnection,
   type StreamConnectionDependencies,
 } from '../stream-connection/handle-stream-connection.ts';
 import { normalizeIncomingRequest } from './normalize-incoming-request.ts';
+import { readBinaryRequestBody } from './read-binary-request-body.ts';
 import { readJsonRequestBody } from './read-json-request-body.ts';
 import { resolveCorsHeaders } from './resolve-cors-headers.ts';
 import { wrapResponseAsStreamSink } from './wrap-response-as-stream-sink.ts';
 
 /**
  * A `node:http` szerver összeállításának bemenete (SPEC-006 `http-server`
- * téma). A `handlers` a `ROUTE_TABLE` mind a 26 azonosítójára kötelezően
- * kitöltött rekord: egy hiányzó bejegyzés fordítási hibát ad (SPEC-006 12.
- * elfogadási kritérium), nem futásidejű "nincs kezelő" ágat. A
+ * téma). A `handlers` a `ROUTE_TABLE` minden azonosítójára kötelezően
+ * kitöltött rekord (`RouteHandlers`: a nyers ZIP törzsű végpont bináris
+ * kezelőt kap, SPEC-009 5.1): egy hiányzó bejegyzés fordítási hibát ad
+ * (SPEC-006 12. elfogadási kritérium), nem futásidejű "nincs kezelő" ágat. A
  * `streamDependencies` a `STREAM_PATH` (`GET /events`) kiszolgálásához kell
  * - az a `ROUTE_TABLE`-ön kívül áll (SPEC-005 5.2 szekció), ezért külön ág
  * vezeti, a `matchRoute` elé.
@@ -37,7 +42,7 @@ import { wrapResponseAsStreamSink } from './wrap-response-as-stream-sink.ts';
  * generálása is injektálható/determinisztikus maradjon tesztben.
  */
 export interface HttpServerOptions {
-  readonly handlers: Readonly<Record<RouteId, RouteHandler>>;
+  readonly handlers: RouteHandlers;
   readonly devOrigin: string | undefined;
   readonly streamDependencies: StreamConnectionDependencies;
   readonly logger: ServerLogger;
@@ -57,6 +62,31 @@ function writeJson(
   }
   response.writeHead(status, { ...extraHeaders, 'Content-Type': 'application/json' });
   response.end(JSON.stringify(body));
+}
+
+/**
+ * A kezelő hívása a végpont törzs fajtája szerint: a nyers ZIP törzsű végpont
+ * (SPEC-009 5.1, O-36) a kezelő saját korlátjáig olvasott bináris törzset
+ * kapja, minden más a JSON törzset. A JSON törzs hibája `invalid_request`
+ * hibaágat ad, ugyanazzal az üzenettel, mint eddig (SPEC-006 16. kritérium).
+ */
+async function invokeHandler(
+  request: IncomingMessage,
+  routeId: RouteId,
+  parameters: Readonly<Record<string, string>>,
+  query: URLSearchParams,
+  handlers: RouteHandlers,
+): Promise<Outcome<RouteHandlerResult>> {
+  if (isZipBodyRouteId(routeId)) {
+    const handler = handlers[routeId];
+    const body = await readBinaryRequestBody(request, handler.maxBodyBytes);
+    return handler.handle({ parameters, body });
+  }
+  const bodyOutcome = await readJsonRequestBody(request);
+  if (bodyOutcome.kind === 'error') {
+    return bodyOutcome;
+  }
+  return handlers[routeId]({ parameters, query, body: bodyOutcome.value });
 }
 
 /**
@@ -82,18 +112,10 @@ async function serveMatchedRoute(
   parameters: Readonly<Record<string, string>>,
   query: URLSearchParams,
   corsHeaders: Readonly<Record<string, string>>,
-  handlers: Readonly<Record<RouteId, RouteHandler>>,
+  handlers: RouteHandlers,
   logger: ServerLogger,
 ): Promise<void> {
-  const bodyOutcome = await readJsonRequestBody(request);
-  if (bodyOutcome.kind === 'error') {
-    const body = { code: 'invalid_request', message: bodyOutcome.message } satisfies ProtocolErrorBody;
-    writeJson(response, httpStatusForErrorCode('invalid_request'), body, corsHeaders);
-    return;
-  }
-
-  const handler = handlers[routeId];
-  const result = await handler({ parameters, query, body: bodyOutcome.value });
+  const result = await invokeHandler(request, routeId, parameters, query, handlers);
 
   if (result.kind === 'error') {
     const body = buildProtocolErrorBody(result.message);

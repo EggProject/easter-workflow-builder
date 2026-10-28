@@ -130,7 +130,7 @@ A `protocol` `dependencies` mezője a jelen spec után: `@easter-workflow-builde
 - **Minden azonosító szöveg**, kivéve a `run_event.id` értékét, ami egész (F-18).
 - **Hibánál a válasz törzse egyetlen alak**, a 8. szekció `ProtocolErrorBody` sémája, a státusz kód pedig a 8.2 táblázat szerinti.
 
-### 4.2 A 26 REST végpont
+### 4.2 A 29 REST végpont
 
 A "Motor vagy repository" oszlop mondja meg, mire képződik le a végpont. Ahol a cél a motor, ott a hívás **nem** kerülheti meg a motort, mert a validáció, a provider feloldás és a pillanatkép a motor felelőssége (SPEC-004 4.8).
 
@@ -216,6 +216,16 @@ A 23. végpont válasza két, egyértelműen elkülönített mezőt hordoz provi
 |     | `GET /events`                               | query: `streamId`; fejléc: `Last-Event-ID`, ha a böngésző küldi                       | `text/event-stream` | 5.5                            |
 
 A 26. végpont **teljes cserét** végez, nem hozzáadást és nem törlést: a kérés a feliratkozás teljes, kívánt állapotát írja le. Ennek az oka ugyanaz, amiért a `replaceGraph` is teljes cserét végez (SPEC-003 9.2): egy hozzáadó és egy elvevő művelet két állapotot enged, amiből a kliens és a szerver külön nyilvántartást vezetne, és a kettő elcsúszhatna. Egy `PUT`, egy állapot, egy válasz.
+
+**G. Skill könyvtár (3 végpont, SPEC-009 5.1)**
+
+| #   | Metódus és útvonal          | Kérés                                         | Válasz               | Saját hibaágai                                                        |
+| --- | --------------------------- | --------------------------------------------- | -------------------- | --------------------------------------------------------------------- |
+| 27  | `GET /api/skills`           | nincs                                         | `SkillSummary` lista | nincs                                                                 |
+| 28  | `PUT /api/skills/{name}`    | nyers `application/zip` törzs (SPEC-009 O-36) | `SkillSummary`       | `unprocessable` a SPEC-009 5.4 tizenöt osztályával (8.5 `errorClass`) |
+| 29  | `DELETE /api/skills/{name}` | nincs                                         | üres törzs, 204      | `not_found`, `unprocessable` (`skill_name_invalid`)                   |
+
+A 28. végpont az egyetlen, amelynek törzse nem JSON: a `ROUTE_TABLE` sora `requestBody: 'application/zip'` mezőt hordoz, és az `apps/server` ezen a jelzésen a kezelő saját korlátjáig olvasott bináris törzset adja át (SPEC-009 5.1, 5.4 6. pont). A skill könyvtár a fájlrendszeren áll, nem a `db` csomagban (SPEC-009 O-9).
 
 ## 5. Az SSE protokoll
 

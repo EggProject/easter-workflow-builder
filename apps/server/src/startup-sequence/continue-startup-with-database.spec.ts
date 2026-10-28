@@ -20,6 +20,7 @@ import { createStreamRegistry } from '../stream-registry/create-stream-registry.
 import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
 import { createHttpServer } from '../http-server/create-http-server.ts';
 import { continueStartupWithDatabase } from './continue-startup-with-database.ts';
+import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -52,6 +53,10 @@ function baseConfig(port: number): ServerConfig {
     logRotationFrequency: 'daily',
     logRetainedFileCount: 5,
     streamKeepAliveIntervalMs: 15_000,
+    skillLibraryDirectory: '/nem-hasznalt-skill-konyvtar',
+    skillMaxArchiveBytes: 30_000_000,
+    skillMaxUnpackedBytes: 30_000_000,
+    skillMaxEntryCount: 1024,
   };
 }
 
@@ -172,7 +177,7 @@ describe('continueStartupWithDatabase', () => {
 
     const { sink } = collectingSink();
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
       logger: createServerLogger({ secretValues: [] }, sink),

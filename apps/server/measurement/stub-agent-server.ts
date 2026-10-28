@@ -28,6 +28,7 @@ import { createRealEventPublisher } from '../src/engine-assembly/create-real-eve
 import { createSystemClock } from '../src/engine-assembly/create-system-clock.ts';
 import { createHttpServer } from '../src/http-server/create-http-server.ts';
 import { buildRouteHandlers } from '../src/route-registry/build-route-handlers.ts';
+import { TEST_SKILL_LIBRARY } from '../src/skill-endpoint/test-skill-library.ts';
 import { registerShutdownSignalHandlers } from '../src/shutdown-sequence/register-shutdown-signal-handlers.ts';
 import { createStreamRegistry } from '../src/stream-registry/create-stream-registry.ts';
 
@@ -124,7 +125,7 @@ const engine = createEngine({
   processEnvironment: createProcessEnvironmentReader(),
 });
 const server = createHttpServer({
-  handlers: buildRouteHandlers(database, engine, streamRegistry),
+  handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
   devOrigin: undefined,
   streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
   logger,

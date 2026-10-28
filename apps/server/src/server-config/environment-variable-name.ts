@@ -31,3 +31,20 @@ export const ENV_LOG_LEVEL = 'EASTER_LOG_LEVEL';
  * (SPEC-012 4.2, research 10.1).
  */
 export const ENV_STREAM_KEEP_ALIVE_INTERVAL_MS = 'EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS';
+
+/**
+ * A skill könyvtár gyökere (SPEC-009 5.1, O-9): kötelező, alapérték nélkül
+ * (a SPEC-009 5.1 kimondott döntése, a SPEC-012 4.2 "minden értéknek van
+ * alapértéke" szabályának egyetlen kivétele). A gyökér egy plugin gyökér: a
+ * skillek a `<gyökér>/skills/<név>/` alatt állnak.
+ */
+export const ENV_SKILL_LIBRARY_DIRECTORY = 'EASTER_SKILL_LIBRARY_DIRECTORY';
+
+/**
+ * A ZIP feltöltés három korlátja (SPEC-009 5.4 6. pont, O-34): a feltöltött
+ * törzs mérete, a kicsomagolt összméret (mindkettő bájtban) és a bejegyzések
+ * száma. Alapértékük a `default-server-config.ts` fájlban áll, forrással.
+ */
+export const ENV_SKILL_MAX_ARCHIVE_BYTES = 'EASTER_SKILL_MAX_ARCHIVE_BYTES';
+export const ENV_SKILL_MAX_UNPACKED_BYTES = 'EASTER_SKILL_MAX_UNPACKED_BYTES';
+export const ENV_SKILL_MAX_ENTRY_COUNT = 'EASTER_SKILL_MAX_ENTRY_COUNT';
