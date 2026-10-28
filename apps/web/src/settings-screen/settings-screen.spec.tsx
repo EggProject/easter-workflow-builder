@@ -4,6 +4,7 @@ import {
   UpdateSettingsRequestSchema,
   type ConcurrencyLimitView,
   type SettingsRecord,
+  type SkillSummary,
 } from '@easter-workflow-builder/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -49,6 +50,9 @@ function createFetchFunction(initial: SettingsRecord): { readonly fetchFunction:
     }
     if (input.endsWith('/api/settings/concurrency-limits')) {
       return Promise.resolve(Response.json(LIMITS));
+    }
+    if (input.endsWith('/api/skills')) {
+      return Promise.resolve(Response.json([]));
     }
     if (method === 'PUT' && typeof init.body === 'string') {
       const body: unknown = JSON.parse(init.body);
@@ -97,14 +101,20 @@ describe('SettingsScreen', () => {
     );
   }
 
-  it('a kártyákat egymás alatt, a SPEC-009 3.1 sorrendjében rajzolja (Provider, Párhuzamossági korlát, Futás napló, majd a gráf szerkesztő)', async () => {
+  it('a kártyákat egymás alatt, a SPEC-009 3.1 sorrendjében rajzolja (Provider, Párhuzamossági korlát, Futás napló, Skill könyvtár, majd a gráf szerkesztő)', async () => {
     await render(createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false }).fetchFunction);
 
-    expect(headings()).toEqual(['Provider', 'Párhuzamossági korlát', 'Futás napló', 'Gráf szerkesztő']);
-    expect(container.querySelector('.settings-screen')?.children).toHaveLength(4);
+    expect(headings()).toEqual([
+      'Provider',
+      'Párhuzamossági korlát',
+      'Futás napló',
+      'Skill könyvtár',
+      'Gráf szerkesztő',
+    ]);
+    expect(container.querySelector('.settings-screen')?.children).toHaveLength(5);
   });
 
-  it('a provider listát, a beállítást és a korlátokat egyszer tölti be, kártyánként ismételt kérés nélkül', async () => {
+  it('a provider listát, a beállítást, a korlátokat és a skill listát egyszer tölti be, kártyánként ismételt kérés nélkül', async () => {
     const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
     await render(fetchFunction);
 
@@ -112,6 +122,7 @@ describe('SettingsScreen', () => {
       'GET /api/providers',
       'GET /api/settings',
       'GET /api/settings/concurrency-limits',
+      'GET /api/skills',
     ]);
   });
 
@@ -188,5 +199,49 @@ describe('SettingsScreen', () => {
 
     expect(requests).toContain('PUT /api/settings');
     expect(container.querySelector<HTMLInputElement>('input[role="switch"]')?.checked).toBe(true);
+  });
+
+  it('a skill feltöltése PUT /api/skills/:name hívással, nyers ZIP törzzsel megy, és a lista a válasz után a feltöltött skillt mutatja', async () => {
+    const uploaded: SkillSummary = { name: 'riport', description: 'Riport.', sizeBytes: 4, modifiedAtMs: 1 };
+    let skills: readonly SkillSummary[] = [];
+    let putBody: unknown;
+    let putContentType: string | undefined;
+    const base = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false }).fetchFunction;
+    const fetchFunction: FetchFunction = (input, init) => {
+      if (input.endsWith('/api/skills')) {
+        return Promise.resolve(Response.json(skills));
+      }
+      if (init.method === 'PUT' && input.endsWith('/api/skills/riport')) {
+        putBody = init.body;
+        putContentType = new Headers(init.headers).get('Content-Type') ?? undefined;
+        skills = [uploaded];
+        return Promise.resolve(Response.json(uploaded));
+      }
+      return base(input, init);
+    };
+    await render(fetchFunction);
+    const archive = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'riport.zip', { type: 'application/zip' });
+    const nameField = container.querySelector<HTMLInputElement>(':scope .skill-upload-form input.input');
+    const fileInput = container.querySelector<HTMLInputElement>(':scope .skill-upload-form input[type="file"]');
+    const valueDescriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    act(() => {
+      valueDescriptor?.set?.call(nameField, 'riport');
+      nameField?.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => {
+      Object.defineProperty(fileInput, 'files', { configurable: true, value: [archive] });
+      fileInput?.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(':scope .skill-upload-form button[type="submit"]')?.click();
+      await Promise.resolve();
+    });
+
+    expect(putBody).toBe(archive);
+    expect(putContentType).toBe('application/zip');
+    expect([...container.querySelectorAll('.preference-row__title')].map((title) => title.textContent)).toContain(
+      'riport',
+    );
   });
 });

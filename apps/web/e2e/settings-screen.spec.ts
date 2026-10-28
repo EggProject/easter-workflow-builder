@@ -253,6 +253,8 @@ test.beforeEach(async ({ page }) => {
     mockGated('readSettings', async (route) => route.fulfill(jsonBody(mockState.settings))),
     mockGated('listProviders', async (route) => route.fulfill(jsonBody(PROVIDERS))),
     mockGated('listConcurrencyLimits', async (route) => route.fulfill(jsonBody(mockState.limits))),
+    // A Skill könyvtár kártya betöltése (T-012-21): a forgatókönyvei a T-012-25 lépésben vannak, itt üres a könyvtár.
+    mockRoute('listSkills', async (route) => route.fulfill(jsonBody([]))),
     mockGated('setConcurrencyLimit', async (route, url) => {
       const providerId = lastPathSegment(url);
       const body: unknown = route.request().postDataJSON();
@@ -347,13 +349,19 @@ test('a topnav "Beállítások" linkje a /settings útvonalra visz, a morzsamen�
 // A Provider kártya (SPEC-009 3.1, O-4, O-5, O-8, AC1, AC2, AC3).
 const PROVIDER_LABEL = 'Globális alapértelmezett provider';
 
-test('a Provider kártya a Párhuzamossági korlát, a Futás napló és a Gráf szerkesztő kártya fölött áll, alapértelmezés nélkül warning Alertet mutat, "nincs" opció nélkül', async ({
+test('a Provider kártya a Párhuzamossági korlát, a Futás napló, a Skill könyvtár és a Gráf szerkesztő kártya fölött áll, alapértelmezés nélkül warning Alertet mutat, "nincs" opció nélkül', async ({
   page,
 }) => {
   await page.goto('/settings');
 
   const headings = page.getByRole('heading', { level: 3 });
-  await expect(headings).toHaveText(['Provider', 'Párhuzamossági korlát', 'Futás napló', 'Gráf szerkesztő']);
+  await expect(headings).toHaveText([
+    'Provider',
+    'Párhuzamossági korlát',
+    'Futás napló',
+    'Skill könyvtár',
+    'Gráf szerkesztő',
+  ]);
   const warning = page.getByRole('status').filter({ hasText: 'Nincs alapértelmezett provider' });
   await expect(warning).toHaveClass(/\balert--warning\b/);
 

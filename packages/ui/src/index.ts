@@ -64,6 +64,7 @@ export {
   type FileUploadProperties,
   type FileUploadSize,
 } from './file-upload/FileUpload.tsx';
+export { formatBytes } from './file-upload/format-bytes.ts';
 export { Checkbox, type CheckboxProperties } from './form-control/Checkbox.tsx';
 export { ProgressBar, type ProgressBarProperties, type ProgressBarSize } from './loading-indicator/ProgressBar.tsx';
 export { Menu, type MenuAlign, type MenuProperties, type MenuTriggerProperties } from './menu/Menu.tsx';

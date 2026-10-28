@@ -317,7 +317,7 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     expect(timeKeyOffenders.map((file) => file.relativePath)).toEqual([]);
   });
 
-  it('(9) a @xyflow/react import kizárólag a három engedett témára szűkül, és nincs SPEC-009 hatókörű fájl', () => {
+  it('(9) a @xyflow/react import kizárólag a három engedett témára szűkül', () => {
     // Tényleges import utasítás mintáját keresi, nem puszta részsztringet:
     // egy pusztán szöveges említés (pl. ennek a tesztnek a saját címe vagy
     // egy magyarázó komment) nem termékkód import. A SPEC-008 F3 fázisa óta
@@ -336,14 +336,8 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
     // A `graph-auto-layout` téma szándékosan NEM engedett (SPEC-008 5.7: "az
     // elrendezés tiszta függvény, és nem importál @xyflow/react szimbólumot").
-    // A `settings-screen` 2026-09-28 óta nem tiltott: a SPEC-008 5.11 (O-32)
-    // a Beállítások képernyőt a módosító választójával ide hozza (SPEC-007 16.
-    // szekció 3. kritériumának lazítása); a SPEC-009 többi eleme marad tiltva.
-    const outOfScopeThemeNames = new Set(['skill-upload', 'mcp-server-config']);
-    const themeDirectories = readdirSync(WEB_SRC, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
-    expect(themeDirectories.filter((name) => outOfScopeThemeNames.has(name))).toEqual([]);
+    // A `skill-upload` és az `mcp-server-config` téma tiltása SPEC-009
+    // 2026-10-28-i megvalósításával megszűnt (SPEC-009 8. szekció, AC25).
   });
 
   it('(10) a main.tsx elágazás nélküli: egyetlen import és egyetlen hívás', () => {
@@ -508,6 +502,8 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       // a szerkesztő panel két statikus figyelmeztetése
       [path.join('node-inspector', 'AgentDefinitionEntryFields.tsx')]: 1,
       [path.join('node-inspector', 'ScriptNodeFields.tsx')]: 1,
+      // a skill feltöltés hiányzó ZIP csomagjának mező alatti hibája (helyi ellenőrzés, a `TextField` hibájával azonos alak)
+      [path.join('skill-upload', 'SkillUploadForm.tsx')]: 1,
     };
     const alertCounts = Object.fromEntries(
       PRODUCT_FILES.map(

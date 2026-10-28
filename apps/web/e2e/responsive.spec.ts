@@ -176,6 +176,7 @@ test.beforeEach(async ({ page }) => {
     mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(EDITOR_GRAPH))),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(EDITOR_WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(EDITOR_SETTINGS))),
+    mockRoute('listSkills', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(RUN_STEP_RUNS))),
