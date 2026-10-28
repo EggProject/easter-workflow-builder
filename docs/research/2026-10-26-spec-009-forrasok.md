@@ -69,7 +69,7 @@ Ezt az M-136 második esete méri; a szabály, ami az eltérést kizárja, az O-
 
 | #   | Állítás                                                                                                                                                                     | Forrás                                                                                                                                                                         |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 4.1 | Az MCP eszköz neve `mcp__<szerver>__<eszköz>`; a szerver nevében a `.` és a szóköz `_`-re cserélődik (`my.server` -> `mcp__my_server__list_issues`)                         | <https://code.claude.com/docs/en/agent-sdk/mcp> ("Tool naming convention"); a "mely karakterek" teljes köre nem dokumentált: nem ellenőrzött                                   |
+| 4.1 | Az MCP eszköz neve `mcp__<szerver>__<eszköz>`; a szerver nevében a `.` és a szóköz `_`-re cserélődik (`my.server` -> `mcp__my_server__list_issues`)                         | <https://code.claude.com/docs/en/agent-sdk/mcp> ("Tool naming convention"); a teljes kör a 10.3 szekcióban lezárva                                                             |
 | 4.2 | A stdio szerver `env` mezője a folyamat környezetét adja (`env: { API_KEY: process.env.API_KEY }`); hogy az alfolyamat a CLI környezetét örökli-e mellé, a doksi nem mondja | ugyanott ("Pass credentials via environment variables"); az örökléshez az M-139                                                                                                |
 | 4.3 | A `${VAR}` kiterjesztés csak a `.mcp.json` fájlban működik, a kódban átadott `mcpServers` értékeit az alkalmazás állítja elő                                                | ugyanott                                                                                                                                                                       |
 | 4.4 | A claude.ai fiókhoz kötött MCP connectorokat a `settingSources: []` nem tiltja; a `strictMcpConfig: true` igen                                                              | <https://code.claude.com/docs/en/agent-sdk/claude-code-features> ("claude.ai MCP connectors"); megerősítés: <https://github.com/anthropics/claude-agent-sdk-python/issues/853> |
@@ -279,4 +279,92 @@ ez a mai viselkedés megtartása, nem új döntés.
 - Hogy a `skills` opció elhagyásakor a plugin úton betöltött skillek elérhetők-e a modellnek: az M-136.
 - A `yauzl` `Entry` mezőinek pontos bitkiosztása a szimbolikus link felismeréséhez: a PLAN-012 F0 a README
   `Entry` szakaszából olvassa.
-- Az MCP szerver név teljes karakterhalmaza (4.1).
+- Az MCP szerver név teljes karakterhalmaza (4.1): lezárva a 10.3 szekcióban.
+
+## 10. T-012-2: a SPEC-009 2.3 "nem ellenőrzött" soraira (2026-10-28)
+
+Módszer: Exa (`web_fetch_exa`, `web_search_exa`), a telepített `sdk.d.ts` (`0.3.245`) és `sdk.mjs` olvasása,
+valódi API hívás nélkül. A doksi a legfrissebb SDK-t írja le (a TS referencia és az unpkg példa `0.3.303`-ig
+hivatkozik), a pinelt `0.3.245`-re a telepített d.ts mérvadó. Minden tételnél: elsődleges forrás, megerősítések,
+ítélet.
+
+### 10.1 Skills oldal: "Invalid skill name error" és a plugin skill (2.3 első sor)
+
+- Elsődleges: <https://code.claude.com/docs/en/agent-sdk/skills> ("Invalid skill name error"): üres név, zárójel,
+  vessző vagy vezérlő karakter, szóközzel kiegészített név és joker (`*`, `:*` suffix) esetén a `query()` a
+  Claude Code folyamat indítása előtt hibát dob; a TS SDK `Error`-t (`Invalid skill name "docs:*": wildcard-suffix
+names are not allowed; list each skill by its exact name.`), a Python `ValueError`-t. Ez a SPEC-009 2.2 sorát
+  megerősíti (a 3.2 sor már idézte).
+- Ugyanaz az oldal: az `init` `skills` tömbje "lists the same skills whether or not they're in your `skills`
+  list", a felderítés a `settingSources` `user` és `project` forrásán megy, vagy a `plugins` opcióval ("use the
+  `plugins` option to load skills from a specific path"); a `skills` kihagyva: "discovered skills are enabled".
+- **Ítélet: a 2.3 első sora marad "nem ellenőrzött".** A doksi nem mondja ki, hogy `settingSources: []` mellett a
+  plugin úton betöltött skill megjelenik-e az `init` `skills` tömbjében, melyik nevet fogadja a lista, ha a
+  frontmatter `name` eltér a könyvtárnévtől, és hogy a `skills` elhagyásakor a plugin skill elérhető-e a
+  modellnek. Az M-136 (PLAN-012 T-012-3) méri.
+
+### 10.2 A TS referencia `Query` metódusai (2.2 sor)
+
+- Elsődleges: <https://code.claude.com/docs/en/agent-sdk/typescript> (`Query` objektum): `supportedModels():
+Promise<ModelInfo[]>` ("Returns available models with display info"), `mcpServerStatus():
+Promise<McpServerStatus[]>` ("Returns the status of connected MCP servers"); az MCP oldal is hivatkozza
+  (`mcpServerStatus()` "to poll ... in the TypeScript SDK").
+- Telepített d.ts: `sdk.d.ts:2528` (`supportedModels`), `:2540` (`mcpServerStatus`), a `McpServerStatus` típus
+  `status: 'connected' | 'failed' | 'needs-auth' | 'pending' | 'disabled'`, `error?`, `tools?`.
+- Megerősítés 1 (harmadik fél): <https://github.com/fcsouza/agent-skills/blob/main/skills/claude-agent-sdk/references/typescript-api.md>;
+  megerősítés 2: <https://github.com/bgauryy/open-docs/blob/505ade2c/research/AI/@anthropic-ai/claude-code/claude-code-architecture.md>;
+  a `McpServerStatus` alakot az unpkg `0.3.303` d.ts is mutatja
+  (<https://app.unpkg.com/@anthropic-ai/claude-agent-sdk@0.3.303/files/sdk.d.ts>).
+- **Ítélet: ellenőrzött** (a 2.2 sor "nem ellenőrzött (doksi)" jelölése "ellenőrzött"-re vált). A `ModelInfo`
+  mezőit a telepített `sdk.d.ts:1247` adja, az a kód olvasásakor mérvadó.
+
+### 10.3 Az MCP szerver név szabálya (2.3 harmadik sor)
+
+- Hivatalos doksi: <https://code.claude.com/docs/en/agent-sdk/mcp> ("Tool naming convention"): "Characters in the
+  server name such as `.` and spaces are replaced by `_`" (példa, nem kimerítő lista).
+- Elsődleges a teljes szabályra, a telepített `sdk.d.ts:3805` (`SDKControlMcpCallRequest.tool` megjegyzése):
+  "server names are normalized: non-[a-zA-Z0-9_-] becomes _".
+- Megerősítés 1 (harmadik fél, a Claude Code belső működését magyarázó oldal): <https://claude-code-explain.helmcode.com/mcp/>
+  ("Characters outside `[a-zA-Z0-9_-]` are replaced with `_`", példa: `My Server!` -> `mcp__My_Server___do_thing`).
+  Megerősítés 2 (harmadik fél kódmásolat): <https://github.com/LING71671/Open-ClaudeCode/blob/main/src/services/mcp/normalization.ts>
+  (`name.replace(/[^a-zA-Z0-9_-]/g, '_')`, "API pattern ^[a-zA-Z0-9_-]{1,64}$"). A két megerősítés nem hivatalos,
+  ezt a SPEC-009 2.2 sora kimondja.
+- Nem összetévesztendő: a `sdk.mjs` `/^[a-zA-Z0-9_-]+$/` mintája ("Server name can only contain letters,
+  numbers, hyphens, and underscores") egy másik mező (engedélyezett szerver név a konfigurációs sémában), nem
+  a csere szabálya.
+- **Ítélet: ellenőrzött** (telepített d.ts plusz két nem hivatalos megerősítés). A 64 karakteres plafon és a
+  `__` elválasztó ütközése (a név nem tartalmazhat `__`-t megbízhatóan) a harmadik fél forrásban szerepel, hivatalos
+  doksi nem mondja: **nem ellenőrzött**, a mentési szabály (6.1: ASCII betű, szám, `_`, `-`) úgyis szűk marad.
+
+### 10.4 Auto memory és `~/.claude.json` (2.2 "settingSources nem vezérli" sor)
+
+- Elsődleges: <https://code.claude.com/docs/en/agent-sdk/claude-code-features> ("What settingSources does not
+  control"): a `~/.claude.json` "Always read", kikapcsolás "Relocate with `CLAUDE_CONFIG_DIR` in `env`"; az auto
+  memory (`~/.claude/projects/<projekt>/memory/`) "Loaded into the system prompt at session start", kikapcsolás
+  "`autoMemoryEnabled: false` in settings, or `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in `env`"; a többszerzős
+  üzemhez "`settingSources: []` plus `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in `env`".
+- Auto memory megerősítései: a 8. szekció (<https://code.claude.com/docs/en/env-vars>,
+  <https://code.claude.com/docs/en/memory>).
+- `CLAUDE_CONFIG_DIR` megerősítései: <https://code.claude.com/docs/en/claude-directory> ("If you set
+  `CLAUDE_CONFIG_DIR`, every `~/.claude` path on this page lives under that directory instead");
+  <https://github.com/anthropics/claude-code/issues/25762> (Anthropic munkatárs: "set `CLAUDE_CONFIG_DIR` to
+  relocate the config directory. All settings, session history, plugins, and (on Linux/Windows) credentials live
+  under that path; on macOS credentials stay in the Keychain"); <https://github.com/anthropics/claude-code/issues/264>.
+  Az env-vars oldal szerint a projekt és a helyi `settings.json` nem állíthatja a `CLAUDE_CONFIG_DIR`-t, az `env`
+  opció (folyamat környezet) igen.
+- **Ítélet:** az auto memory kikapcsolása és a `CLAUDE_CONFIG_DIR` áthelyezés **ellenőrzött** (három-három forrás). A
+  "a `~/.claude.json` mindig beolvasódik, a `settingSources` nem érinti" állítás, a managed policy és a
+  `sandbox.credentials` sor **egy hivatalos forrásra** támaszkodik (a többi oldal ezt nem ismétli): a sor
+  "részben ellenőrzött". Az előfizetéses bejelentkezés `settingSources: []` mellett (2.3 negyedik sor) marad
+  "nem ellenőrzött", a PLAN-012 valódi próbája zárja.
+
+### 10.5 Összesítés
+
+| SPEC-009 sor                                        | Előtte                  | Utána                                                   |
+| --------------------------------------------------- | ----------------------- | ------------------------------------------------------- |
+| 2.3 plugin skill és `skills` lista (M-136)          | nem ellenőrzött         | marad (az M-136 méri)                                   |
+| 2.3 stdio MCP környezet öröklés (M-139)             | nem ellenőrzött         | marad (az M-139 méri)                                   |
+| 2.3 MCP szerver név karakterhalmaza                 | nem ellenőrzött         | ellenőrzött (telepített d.ts, két nem hivatalos forrás) |
+| 2.3 előfizetéses bejelentkezés `settingSources: []` | nem ellenőrzött         | marad (valódi próba, user engedéllyel)                  |
+| 2.2 `Query.supportedModels`, `mcpServerStatus`      | nem ellenőrzött (doksi) | ellenőrzött                                             |
+| 2.2 `settingSources` nem vezérli                    | egy hivatalos forrás    | részben ellenőrzött (auto memory, `CLAUDE_CONFIG_DIR`)  |
