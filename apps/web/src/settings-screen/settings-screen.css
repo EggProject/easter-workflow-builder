@@ -47,3 +47,19 @@
     align-items: stretch;
   }
 }
+
+/* SAJÁT KIEGÉSZÍTÉS, a forrásban nem létező szabályok (SPEC-009 3.1): a
+   képernyő kártyái egymás alatt állnak, `--ep-space-4` térközzel, a
+   teljes szélességen (a forrás oldal `.layout` szabálya `max-width:
+   1080px`, ami ütközne a "faltól falig" szabállyal, ezért nem került át).
+   A sor törzsének magyarázó szövege a design system `--ep-text-small`
+   tokenjével, a halk előtér színnel. */
+.settings-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-4);
+}
+.settings-screen__hint {
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}

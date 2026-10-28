@@ -29,7 +29,7 @@ describe('protocolErrorClassMessage', () => {
       'Egy Hibakezelő csomópont várakozási listája rövidebb, mint amit a próbálkozások száma megkövetel.',
     ],
     ['missing_required_input', 'A futás egy kötelező bemeneti mezője hiányzik.'],
-    ['no_default_provider', 'Nincs alapértelmezett provider beállítva.'],
+    ['no_default_provider', 'Nincs alapértelmezett provider beállítva, válassz egyet a Beállítások képernyőn.'],
     [
       'structured_output_strategy_unsupported',
       'Egy lépés strukturált kimenet stratégiáját a választott provider nem támogatja.',

@@ -1,16 +1,50 @@
+/* eslint-disable unicorn/no-null -- a SettingsRecord `defaultProviderId` mezője a dróton ténylegesen `null` értéket hordoz (packages/protocol/src/settings/settings-record.ts). */
+import type { FetchFunction } from '@easter-workflow-builder/core';
+import { UpdateSettingsRequestSchema, type SettingsRecord } from '@easter-workflow-builder/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { UNDO_MODIFIER_STORAGE_KEY } from '../graph-editor/undo-modifier-storage.ts';
 import { SettingsScreen } from './settings-screen.tsx';
 
-const ROW_LABEL = 'Visszavonás/újra billentyű módosítója';
-const AUTO_LABEL = 'Automatikus (macOS-en Cmd, máshol Ctrl)';
+const API_ORIGIN = 'https://api.example.test';
+
+const PROVIDERS = [
+  { id: 'claude-subscription', displayName: 'Claude előfizetés', models: [], requiredEnvNames: [] },
+  { id: 'minimax', displayName: 'MiniMax', models: [], requiredEnvNames: [['ANTHROPIC_AUTH_TOKEN']] },
+];
 
 function clickOn(target: Element): void {
   act(() => {
     target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
   });
+}
+
+/**
+ * Állapottartó szerver mock: a `PUT` a kapott részleges törzset olvassa a
+ * rekordra, és a teljes rekordot adja vissza (SPEC-005 4.2 E).
+ */
+function createFetchFunction(initial: SettingsRecord): { readonly fetchFunction: FetchFunction; requests: string[] } {
+  let record = initial;
+  const requests: string[] = [];
+  const fetchFunction: FetchFunction = (input, init) => {
+    const method = init.method ?? 'GET';
+    requests.push(`${method} ${new URL(input).pathname}`);
+    if (input.endsWith('/api/providers')) {
+      return Promise.resolve(Response.json(PROVIDERS));
+    }
+    if (method === 'PUT' && typeof init.body === 'string') {
+      const body: unknown = JSON.parse(init.body);
+      const parsed = UpdateSettingsRequestSchema.safeParse(body);
+      if (parsed.success) {
+        record = {
+          defaultProviderId: parsed.data.defaultProviderId ?? record.defaultProviderId,
+          persistStreamDeltas: parsed.data.persistStreamDeltas ?? record.persistStreamDeltas,
+        };
+      }
+    }
+    return Promise.resolve(Response.json(record));
+  };
+  return { fetchFunction, requests };
 }
 
 describe('SettingsScreen', () => {
@@ -32,117 +66,56 @@ describe('SettingsScreen', () => {
     globalThis.localStorage.clear();
   });
 
-  function render(): void {
-    act(() => {
-      root.render(<SettingsScreen />);
+  async function render(fetchFunction: FetchFunction): Promise<void> {
+    await act(async () => {
+      root.render(<SettingsScreen apiOrigin={API_ORIGIN} fetchFunction={fetchFunction} />);
+      await Promise.resolve();
     });
   }
 
-  /**
-   * A sor felirata a `<label for>` kötéssel a választó triggeréhez tartozik:
-   * a trigger a felirat `htmlFor` értékével azonos azonosítójú gomb.
-   */
-  function rowTrigger(): HTMLButtonElement {
-    const label = [...container.querySelectorAll('label')].find((candidate) => candidate.textContent === ROW_LABEL);
-    if (label === undefined) {
-      throw new Error('a teszt nem találta a sor feliratát');
-    }
-    const trigger = [...container.querySelectorAll('button')].find((candidate) => candidate.id === label.htmlFor);
-    if (trigger === undefined) {
-      throw new Error('a felirat nem a választó triggerére mutat');
-    }
-    return trigger;
+  function headings(): string[] {
+    return [...container.querySelectorAll(':scope section.card > .card__header > h3')].map(
+      (heading) => heading.textContent,
+    );
   }
 
-  function chooseOption(optionLabel: string): void {
-    const trigger = rowTrigger();
-    clickOn(trigger);
-    const panelId = trigger.getAttribute('aria-controls');
-    const panel = [...document.body.querySelectorAll<HTMLElement>('[role="listbox"]')].find(
-      (candidate) => candidate.id === panelId,
-    );
-    const option = [...(panel?.querySelectorAll<HTMLElement>('[role="option"]') ?? [])].find(
-      (candidate) => candidate.querySelector('.menu__text')?.textContent === optionLabel,
-    );
-    if (option === undefined) {
-      throw new Error(`a teszt nem talált "${optionLabel}" feliratú opciót`);
+  it('a kártyákat egymás alatt, a SPEC-009 3.1 sorrendjében rajzolja (Provider, majd a szerkesztő)', async () => {
+    await render(createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false }).fetchFunction);
+
+    expect(headings()).toEqual(['Provider', 'Szerkesztő']);
+    expect(container.querySelector('.settings-screen')?.children).toHaveLength(2);
+  });
+
+  it('a provider listát és a beállítást egyszer tölti be, kártyánként ismételt kérés nélkül', async () => {
+    const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
+    await render(fetchFunction);
+
+    expect(requests.toSorted((left, right) => left.localeCompare(right))).toEqual([
+      'GET /api/providers',
+      'GET /api/settings',
+    ]);
+  });
+
+  it('a provider választása PUT /api/settings hívással mentődik, és a válasz után a képernyő az új értéket mutatja', async () => {
+    const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
+    await render(fetchFunction);
+    expect(container.querySelector('.alert--warning')).not.toBeNull();
+
+    const trigger = container.querySelector<HTMLButtonElement>(':scope .settings-screen button.select');
+    if (trigger === null) {
+      throw new Error('a teszt nem találta a Provider választót');
     }
-    clickOn(option);
-  }
-
-  it('egy card szekciót rajzol, aminek a hozzáférhető nevét a fejléc címe adja', () => {
-    render();
-
-    const section = container.querySelector('section.card');
-    const heading = section?.querySelector(':scope > .card__header > h3');
-    expect(heading?.textContent).toBe('Szerkesztő');
-    expect(section?.getAttribute('aria-labelledby')).toBe(heading?.id);
-  });
-
-  it('a sor preference-row, a felirata a SelectField triggeréhez kötött label, a választó sm méretű', () => {
-    render();
-
-    const trigger = rowTrigger();
-    expect(trigger.getAttribute('role')).toBe('combobox');
-    expect(trigger.classList.contains('select--sm')).toBe(true);
-    expect(trigger.closest('.preference-row')?.querySelector('.preference-row__title')?.textContent).toBe(ROW_LABEL);
-  });
-
-  it('a három opció a döntés szövegével, ebben a sorrendben', () => {
-    render();
-
-    const trigger = rowTrigger();
     clickOn(trigger);
-    const panelId = trigger.getAttribute('aria-controls');
-    const panel = [...document.body.querySelectorAll<HTMLElement>('[role="listbox"]')].find(
-      (candidate) => candidate.id === panelId,
+    const option = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (candidate) => candidate.querySelector('.menu__text')?.textContent === 'MiniMax',
     );
-    const labels = [...(panel?.querySelectorAll(':scope [role="option"] .menu__text') ?? [])].map(
-      (element) => element.textContent,
-    );
-    expect(labels).toEqual([AUTO_LABEL, 'Ctrl', 'Cmd']);
+    await act(async () => {
+      option?.click();
+      await Promise.resolve();
+    });
+
+    expect(requests).toContain('PUT /api/settings');
+    expect(trigger.textContent).toBe('MiniMax');
+    expect(container.querySelector('.alert--warning')).toBeNull();
   });
-
-  it('üres tárolónál az alapértelmezett Automatikus értéket mutatja', () => {
-    render();
-
-    expect(rowTrigger().textContent).toBe(AUTO_LABEL);
-  });
-
-  it.each([
-    ['ctrl', 'Ctrl'],
-    ['meta', 'Cmd'],
-    ['auto', AUTO_LABEL],
-  ])('a tárolt "%s" értéket a "%s" felirattal mutatja', (stored, expectedLabel) => {
-    globalThis.localStorage.setItem(UNDO_MODIFIER_STORAGE_KEY, stored);
-    render();
-
-    expect(rowTrigger().textContent).toBe(expectedLabel);
-  });
-
-  it('ismeretlen tárolt értéknél az Automatikus értéket mutatja', () => {
-    globalThis.localStorage.setItem(UNDO_MODIFIER_STORAGE_KEY, 'cmd');
-    render();
-
-    expect(rowTrigger().textContent).toBe(AUTO_LABEL);
-  });
-
-  // Minden eset más tárolt értékről indul, tehát a beírt érték a választásból
-  // jön, nem a kiindulásból.
-  it.each([
-    ['Ctrl', 'ctrl', 'meta'],
-    ['Cmd', 'meta', 'ctrl'],
-    [AUTO_LABEL, 'auto', 'ctrl'],
-  ])(
-    'a(z) "%s" választása azonnal a tárolóba írja a(z) "%s" értéket, és a trigger is azt mutatja',
-    (label, value, initial) => {
-      globalThis.localStorage.setItem(UNDO_MODIFIER_STORAGE_KEY, initial);
-      render();
-
-      chooseOption(label);
-
-      expect(globalThis.localStorage.getItem(UNDO_MODIFIER_STORAGE_KEY)).toBe(value);
-      expect(rowTrigger().textContent).toBe(label);
-    },
-  );
 });

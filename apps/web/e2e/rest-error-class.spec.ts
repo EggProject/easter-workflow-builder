@@ -118,7 +118,7 @@ test('a futás indításának no_default_provider hibája a saját mondatával �
   await page.getByRole('button', { name: 'Futás indítása', exact: true }).click();
 
   const alert = page.locator('.page-footer').getByRole('alert');
-  await expect(alert).toHaveText('Nincs alapértelmezett provider beállítva.');
+  await expect(alert).toHaveText('Nincs alapértelmezett provider beállítva, válassz egyet a Beállítások képernyőn.');
   await expect(alert).toHaveClass(/\balert--danger\b/);
   await expectNoInternalText(page, 'no_default_provider');
 });

@@ -1,79 +1,48 @@
-import { SelectField, type SelectFieldOption } from '@easter-workflow-builder/ui';
-import { useId, useState, type ReactElement } from 'react';
-import { CLIENT_ROUTE_TABLE } from '../client-route/client-route-table.ts';
-import { UNDO_MODIFIER_PREFERENCES, type UndoModifierPreference } from '../graph-editor/undo-modifier-preference.ts';
-import {
-  getBrowserLocalStorage,
-  readUndoModifierPreference,
-  storeUndoModifierPreference,
-} from '../graph-editor/undo-modifier-storage.ts';
+import type { FetchFunction } from '@easter-workflow-builder/core';
+import { useMemo, type ReactElement } from 'react';
+import { createProviderConnectionTester } from '../provider-select/create-provider-connection-tester.ts';
+import { EditorSettingsCard } from './EditorSettingsCard.tsx';
+import { ProviderSettingsCard } from './ProviderSettingsCard.tsx';
+import { useProviderList } from './use-provider-list.ts';
+import { useSettingsRecord } from './use-settings-record.ts';
 import './settings-screen.css';
 
-/**
- * A három opció felirata a döntés szövegével (SPEC-008 5.10 "A választó",
- * O-31). A `Record` a beállítás uniójára kulcsolt, tehát egy új érték
- * felirat nélkül nem fordul le.
- */
-const UNDO_MODIFIER_PREFERENCE_LABELS = {
-  auto: 'Automatikus (macOS-en Cmd, máshol Ctrl)',
-  ctrl: 'Ctrl',
-  meta: 'Cmd',
-} as const satisfies Readonly<Record<UndoModifierPreference, string>>;
+export interface SettingsScreenProperties {
+  readonly apiOrigin: string;
+  readonly fetchFunction: FetchFunction;
+}
 
 /**
- * Az opciók a `UNDO_MODIFIER_PREFERENCES` sorrendjében: elöl az
- * alapértelmezés.
- */
-const UNDO_MODIFIER_OPTIONS: readonly SelectFieldOption<UndoModifierPreference>[] = UNDO_MODIFIER_PREFERENCES.map(
-  (value) => ({ value, label: UNDO_MODIFIER_PREFERENCE_LABELS[value] }),
-);
-
-/**
- * A Beállítások képernyő (SPEC-008 5.11, O-32): egyetlen `card` szekció,
- * benne egy `preference-row` sor a visszavonás/újra billentyű módosítójának
- * választójával. A design system admin `settings.html` mintáját követi; a
- * kártya a `packages/ui` `Card` komponensének szerkezete (`.card`,
- * `.card__header`, `<h3>`), mert a komponens a gyerekeit `<p>` elembe teszi,
- * amiben a választó `<div>` gyökere nem állhat.
+ * A Beállítások képernyő (SPEC-008 5.11, O-32; SPEC-009 3.1, O-8): kártyák
+ * egymás alatt egy oldalon, oldalsó navigáció nélkül, a teljes szélességen.
+ * Kártya a kártyában nincs (`.claude/CLAUDE.md` 11. szekció). A SPEC-009 3.1
+ * sorrendje: Provider, Párhuzamossági korlát, Futás napló, Skill könyvtár, MCP
+ * szerverek, gráf szerkesztő; a még nem megvalósult kártyák a saját
+ * lépésükben kerülnek a sorba, a helyükön.
  *
- * A kártya címe a szerkesztő útvonalának felirata, mert a beállítás a
- * szerkesztő billentyűire hat; a név így nem kerül második listába
- * (`.claude/CLAUDE.md` 5. szekció).
- *
- * A választás azonnal, hálózati kérés nélkül a tárolóba íródik (SPEC-008
- * 5.10); a szerkesztő a következő betöltésekor olvassa. Betöltéskor a
- * választó a tárolt értéket, hiányzó vagy hibás érték és dobó tároló esetén
- * az alapértelmezett Automatikus értéket mutatja.
+ * A képernyő tölti a több kártya által közösen olvasott adatot, hogy kártyánként
+ * ne ismétlődjön a kérés: a provider listát (`GET /api/providers`) és a
+ * beállítás rekordot (`GET`/`PUT /api/settings`). A "Kapcsolat teszt" hívása a
+ * provider választóé (SPEC-009 3.2).
  */
-export function SettingsScreen(): ReactElement {
-  const headingId = useId();
-  const selectId = useId();
-  const [preference, setPreference] = useState<UndoModifierPreference>(() =>
-    readUndoModifierPreference(getBrowserLocalStorage),
+export function SettingsScreen(properties: Readonly<SettingsScreenProperties>): ReactElement {
+  const { apiOrigin, fetchFunction } = properties;
+  const providersState = useProviderList(apiOrigin, fetchFunction);
+  const { state: settingsState, save: saveSettings } = useSettingsRecord(apiOrigin, fetchFunction);
+  const testConnection = useMemo(
+    () => createProviderConnectionTester(apiOrigin, fetchFunction),
+    [apiOrigin, fetchFunction],
   );
 
   return (
-    <section className="card" aria-labelledby={headingId}>
-      <div className="card__header">
-        <h3 id={headingId}>{CLIENT_ROUTE_TABLE.graphEditor.label}</h3>
-      </div>
-      <div className="preference-row">
-        <div className="preference-row__body">
-          <label className="preference-row__title" htmlFor={selectId}>
-            Visszavonás/újra billentyű módosítója
-          </label>
-        </div>
-        <SelectField
-          id={selectId}
-          size="sm"
-          options={UNDO_MODIFIER_OPTIONS}
-          value={preference}
-          onChange={(nextPreference) => {
-            storeUndoModifierPreference(getBrowserLocalStorage, nextPreference);
-            setPreference(nextPreference);
-          }}
-        />
-      </div>
-    </section>
+    <div className="settings-screen">
+      <ProviderSettingsCard
+        providersState={providersState}
+        settingsState={settingsState}
+        saveSettings={saveSettings}
+        testConnection={testConnection}
+      />
+      <EditorSettingsCard />
+    </div>
   );
 }

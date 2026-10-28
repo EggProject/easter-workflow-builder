@@ -153,7 +153,12 @@ describe('performRouteRequest', () => {
   // mezője dönt, a nyers `message` továbbra sem jut a felületre.
   it.each([
     [409, 'conflict', 'already_decided', 'Ezt a jóváhagyást már eldöntötték.'],
-    [422, 'unprocessable', 'no_default_provider', 'Nincs alapértelmezett provider beállítva.'],
+    [
+      422,
+      'unprocessable',
+      'no_default_provider',
+      'Nincs alapértelmezett provider beállítva, válassz egyet a Beállítások képernyőn.',
+    ],
     [
       422,
       'unprocessable',
