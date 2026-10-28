@@ -483,7 +483,7 @@ test('a téma váltó és a workflow sor műveletek menüje minden szélességen
       const trigger = page.getByRole('button', { name: /^Műveletek/ });
       await expect(trigger).toBeInViewport({ ratio: 1 });
       await trigger.click();
-      for (const label of ['Átnevezés', 'Törlés', 'Indítás']) {
+      for (const label of ['Szerkesztés', 'Törlés', 'Indítás']) {
         await expect(page.getByRole('menuitem', { name: label })).toBeInViewport({ ratio: 1 });
       }
       // Zárás billentyűzettel, hogy a következő iteráció (`page.goto`)
