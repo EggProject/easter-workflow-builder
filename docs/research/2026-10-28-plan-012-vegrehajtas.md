@@ -368,3 +368,105 @@ Minden commit előtt a kilenc kapu nulla kilépési kóddal futott (`format:chec
 változás kizárólag az `apps/server` csomagot érinti, az `apps/web` e2e tesztjei minden REST hívást
 `page.route()` mockkal szolgálnak ki (szabálykönyv 11. szekció), tehát a szerver kódja az e2e
 lefedettségben nem szerepel.
+
+### 4.5 MCP és izoláció: találatok, javítások, mérések
+
+Egy független átvizsgálás az MCP, a titok és az izoláció témában hat javítandó (A ... F) és három csak
+rögzítendő pontot (O-52, O-53, CSRF) adott. Minden javított bug mellett regressziós unit teszt áll, és
+mindegyik a javítás előtti kódon bukik (saját futtatás: a termékfájlok `HEAD` előtti változatával a felsorolt
+tesztek bukottak, a javítással zöldek). Valódi provider hívás nem futott.
+
+| #   | Találat                                                                                                                                                                                                                                                    | Javítás                                                                                                                                                                                                                                                                                                                                                           | Commit    | Teszt                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A   | a kapcsolat teszt `query()` hívása `settingSources` és `strictMcpConfig` nélkül futott, tehát minden beállítás forrás betöltődött (más hitelesítés, a gép MCP szerverei és hookjai)                                                                        | `testProviderConnection`: `settingSources: []`, `strictMcpConfig: true`; SPEC-009 7.1 és AC22 igazítva                                                                                                                                                                                                                                                            | `1bfe286` | `create-engine.spec.ts` › testProviderConnection › "a lépéssel azonos izolációval fut"                                                                                                                                                                                                                                                                                                                                                                       |
+| B   | a valódi env olvasó `process.env[name] ?? null` alakja a `constructor`, `toString`, `hasOwnProperty`, `__proto__`, `valueOf` névre függvényt vagy objektumot adott, nem `null`-t, így a `missing_mcp_server_env` elmaradt                                  | `Object.hasOwn(process.env, name) && isString(value)`; a komment a viselkedéshez igazítva (az üres érték nem hiányzó, SPEC-009 6.4, nyitott kérdés marad)                                                                                                                                                                                                         | `f48b204` | `create-process-environment-reader.spec.ts` › "a prototípus lánc %s neve hiányzó változó" (5 eset), "az üres érték nem hiányzó"                                                                                                                                                                                                                                                                                                                              |
+| C   | a `__proto__` MCP szerver nevet a névszabály elfogadta, az SDK eldobta                                                                                                                                                                                     | a mentési névszabály (`McpServerNameSaveSchema`) a mért három nevet tiltja; a `PUT /api/mcp-servers/:name` és a Beállítások űrlap ezt használja; SPEC-009 6.1 igazítva                                                                                                                                                                                            | `d9b8137` | `mcp-server-name-save-schema.spec.ts`; `save-mcp-server-definition.spec.ts` › "fenntartott név" (3 eset); `find-mcp-server-draft-errors.spec.ts` › "a fenntartott %s név"                                                                                                                                                                                                                                                                                    |
+| D   | a lépés hivatkozásának `envBindings` értéke és `authEnvName` mezője névszabály nélkül ment át, egy REST úton beírt érték (titok) a `missing_mcp_server_env` üzenetben visszaíródott volna                                                                  | a `NodeConfigSaveSchema` ötödik szabálya (`findInvalidMcpServerReferenceEnvironmentNames`, az `agent_step` és a `join` `ai_synthesis` `settings` mezőjén, a hiba a mező útvonalán, az érték nélkül); az agent definíción a motor `parseAgentDefinition` hívása (`isEnvironmentVariableName`, új általános guard a `typeguards` csomagban) `malformed_node_config` | `3995fc0` | `node-config-save-schema.spec.ts` › "az MCP hivatkozás szerver oldali nevei env változó nevek" (5 teszt); `find-invalid-mcp-server-reference-environment-names.spec.ts`; `replace-workflow-graph.spec.ts` › "nem név alakú szerver oldali neve invalid_request"; `parse-agent-definition.spec.ts` › "nem név alakú envBindings érték", "nem név alakú authEnvName"; `resolve-outgoing-agents.spec.ts` › "malformed_node_config, és az érték nem jelenik meg" |
+| E   | a sodródás védelem a hivatkozásra gyenge volt (az `isStringRecord` helyett `isRecord`, és az `authEnvName` ellenőrzés helyett `true` mindkét sodródás tesztet túlélte); a `{"envBindings":{"__proto__":"X"}}` alakot a zod eldobta, a `db` guard elfogadta | a futásidejű ág a `db` `isMcpServerReference` minden ágára egy-egy alakhiba esettel bővült (a központi definíció ágán is); a saját `__proto__` kulcs a hivatkozás rekordban és az `envBindings` rekordban mindkét oldalon elutasítva (`protocol` `recordWithoutPrototypeKey`, `db` `Object.hasOwn` vizsgálat)                                                     | `3995fc0` | `node-config-drift-protection.spec.ts` › "az alakhiba mindkét oldalon elbukik" (7 eset), "a név szabály csak a mentési sémán bukik" (2 eset); `mcp-server-definition-drift-protection.spec.ts` (4 új alakhiba eset); `is-mcp-server-reference.spec.ts`, `is-agent-step-config.spec.ts`, `mcp-server-reference.spec.ts`, `record-without-prototype-key.spec.ts`                                                                                               |
+| F   | egyetlen hibás definíció sor (`corrupt_mcp_server_definition`) minden agent lépést és futás indítást megállított, hivatkozás nélkül is                                                                                                                     | a központi lista olvasása csak akkor fut, ha a lépés vagy egy agent definíciója hivatkozik MCP szerverre (`hasMcpServerReferences`)                                                                                                                                                                                                                               | `037d9c0` | `has-mcp-server-references.spec.ts`; `run-agent-step.spec.ts` › "MCP hivatkozás nélkül a központi lista hibája nem állítja meg a lépést"; `create-engine.spec.ts` › "MCP hivatkozás nélkül a központi lista hibája nem állítja meg a futást"                                                                                                                                                                                                                 |
+
+**Az E rontások, saját futtatás.** A `db` `is-mcp-server-reference.ts` három rontása a javítás után a
+`node-config-drift-protection.spec.ts` futásán bukik: `isStringRecord` helyett `isRecord` (1 bukás: nem
+szöveg értékű `envBindings`), az `authEnvName` ellenőrzés helyett `true` (3 bukás: szám, objektum és hiányzó
+`authEnvName`), a `__proto__` vizsgálat törlése (1 bukás).
+
+**C, mérés (telepített `@anthropic-ai/claude-agent-sdk` `0.3.245` és a beágyazott CLI `2.1.245`, valódi API
+hívás nélkül).** (1) SDK oldal: a `query()` egy hamis `pathToClaudeCodeExecutable` szkripttel futott, ami a
+kapott argumentumokat fájlba írta. Az `Object.fromEntries` hívással épített `mcpServers` hat kulcsából
+(`__proto__`, `constructor`, `prototype`, `toString`, `hasOwnProperty`, `ok`) a `--mcp-config` JSON értékében
+öt maradt: a `__proto__` elveszett (az `sdk.mjs` `let sI={}` gyűjtése `sI[or]=Vr` értékadással a prototípust
+állítja). (2) CLI oldal: a beágyazott `claude` bináris `-p --output-format stream-json --verbose
+--mcp-config <JSON> --strict-mcp-config --setting-sources=` hívással, `ANTHROPIC_BASE_URL=http://127.0.0.1:9`
+(lezárt helyi port, nincs kimenő hívás) és üres `HOME` mellett, az első `system`/`init` üzenet `mcp_servers`
+mezőjét olvasva, nevenként egy szerverrel: a `constructor` kulccsal a CLI "Invalid MCP configuration:
+mcpServers: Invalid input: expected record, received object" hibával kilépett (egy másik szerverrel együtt
+is), a `prototype` kulcs csendben kimaradt (`mcp_servers: []`, egy másik szerverrel együtt csak az maradt),
+a CLI-nek közvetlenül átadott `__proto__` kulcs (egy másik szerverrel együtt) szintén csendben kimaradt
+(csak a másik szerver jelent meg), tehát az SDK nélkül is elveszne. A `toString`, `hasOwnProperty`,
+`valueOf`, `isPrototypeOf`, `__defineGetter__`, `__lookupSetter__`, `propertyIsEnumerable` és
+`toLocaleString` név megjelent (`failed` állapotban, mert a parancs `true`). A tiltás ezért pontosan a
+`__proto__`, a `constructor` és a `prototype`.
+
+**B, mérés (Node `26.7.0`).** `process.env[n]` típusa a `constructor`, `toString`, `hasOwnProperty`,
+`valueOf` névre `function`, a `__proto__` névre `object`; `Object.hasOwn(process.env, n)` mindegyikre
+`false`. A `process.env` saját tulajdonsága mindig szöveg: az értékadás szöveggé alakít, a
+`defineProperty` nem szöveg értékre kivételt dob, ezért az `isString` ág a javított kódban csak a típus
+szűkítése.
+
+**E, mérés (zod `4.4.3`).** `z.record(z.string(), z.string())` a `JSON.parse('{"__proto__":"X","b":"c"}')`
+bemenetből `{ b: 'c' }` eredményt ad, sikerrel; a kulcs sémájára tett `refine` vagy `regex` sem fut le a
+`__proto__` kulcsra. Az elutasításhoz ezért a nyers bemeneten futó ellenőrzés kell (`z.unknown().refine(...)
+.pipe(...)`).
+
+**O-52, forrás eredmény (telepített `sdk.mjs`, `sdk.d.ts`, beágyazott CLI `2.1.245`).**
+
+- Az `sdk.mjs` a nem `sdk` típusú `mcpServers` elemeket egy JSON értékké fűzi, és
+  `Y.push("--mcp-config",fe({mcpServers:W}))` hívással parancssori argumentumként adja át; a fenti hamis
+  végrehajtóval mérve a `http` szerver `Authorization` fejléc értéke a parancssorban szó szerint megjelent.
+- **Fájl alapú út van, forrásból és mérve.** A CLI `--help` kimenete: "`--mcp-config <configs...>` Load MCP
+  servers from JSON files or strings (space-separated)". Az SDK `Options.extraArgs` mezője (`sdk.d.ts`
+  1510-1515. sor: "Additional CLI arguments to pass to Claude Code. Keys are argument names (without --),
+  values are argument values") a hamis végrehajtóval mérve `extraArgs: { 'mcp-config': '<útvonal>' }`
+  alakban `--mcp-config <útvonal>` argumentumot ad, és a beágyazott CLI egy `0600` jogú fájlból betöltötte a
+  szervert (az `init` üzenet `mcp_servers` mezőjében megjelent, a fenti helyi, hívás nélküli módon).
+  Ekkor a parancssorban csak az útvonal látszik.
+- **Egy második út: a vezérlő csatorna.** A `Query.setMcpServers()` (`sdk.d.ts` 2645-2667. sor) a
+  szervereket a futó CLI-nek a vezérlő protokollon (`mcp_set_servers` kérés, a folyamat stdin csatornája)
+  adja át; ez a lépés indulása után fut, tehát a lépés első üzenete előtt a szerverek még nincsenek bent.
+  Ezt nem mértük.
+- **Az agent definíciók nem a parancssorban mennek.** Az `agents` opció az `initialize` vezérlő kérésben
+  (stdin) megy át, nem argumentumként: a hamis végrehajtóval mérve egy agent definíció stdio `env`
+  értéke nem jelent meg az argumentumok között, a lépés `mcpServers` `Authorization` értéke igen.
+- Nem ellenőrzött: hogy a CLI a `--mcp-config` fájlt csak induláskor olvassa-e (egy újracsatlakozás
+  újraolvashatja-e), tehát mikor törölhető a fájl; és hogy a `/proc/<pid>/cmdline` más felhasználó számára
+  olvasható-e a szerver gépén (a Linux alapértelmezés szerint igen, de a dokumentációt itt nem vetettük
+  össze két forrással).
+- A javaslat (O-52 (a)): a motor a lépés `mcpServers` értékét a SDK `mcpServers` opciója helyett egy
+  korlátozott jogú (`0600`), lépésenkénti ideiglenes fájlba írja, és az `extraArgs` `mcp-config`
+  kulcsával adja át; a fájl a lépés végén törlődik. Termékdöntés, a SPEC-009 14.9 O-52 sora.
+
+**O-53 és a CSRF.** A SPEC-009 14.9 O-53 sora és a 11. szekció kockázati sorai rögzítik; kód nem
+változott.
+
+### 4.6 MCP és izoláció: korlátok
+
+- **Név alakú titok.** A D javítás után is átmegy egy betűvel kezdődő, csak betűt, számot és aláhúzást
+  tartalmazó titok (például egy ilyen alakú token), és a `missing_mcp_server_env` üzenet visszaírja. A
+  javítás a gyakori alakokat (kötőjel, számmal kezdődő, üres) zárja ki, nem minden titkot.
+- **A régi gráf és pillanatkép.** Az olvasó séma és a `db` guard a nem név alakú hivatkozás értéket
+  változatlanul elfogadja (pillanatkép olvashatóság, szabálykönyv 10. szekció 2. pont), és a motor a lépés
+  hivatkozását indításkor név alakra nem ellenőrzi, tehát egy a javítás előtt mentett érték a
+  hibaüzenetben továbbra is megjelenhet.
+- **A központi definíció `envBindings` mezője.** A deklarált `__proto__` névre szóló hozzárendelést a
+  `protocol` `z.record` sémája eldobja, a `db` guard megtartaná; a HTTP út a séma kimenetét írja, tehát a
+  tárolt alak egységes. Az átvizsgálás ezt nem nevezte meg, nem változott.
+- **Régi, fenntartott nevű definíció sor.** A C javítás a mentést zárja; egy korábban mentett `constructor`
+  vagy `prototype` nevű definíciót az olvasó séma és a motor változatlanul kiad.
+- **Az e2e.** Az `apps/web` termékkódjában csak a Beállítások MCP űrlap névhiba mondata változott (új ág
+  nélkül); a `mcp-server-settings.spec.ts` e2e (14 teszt) zölden futott, a teljes e2e és a lefedettségi
+  riport nem futott újra.
+
+### 4.7 MCP és izoláció: kapuk
+
+Minden commit előtt a kilenc kapu nulla kilépési kóddal futott, a 4.4 szerinti módon. Az A, B és C javítás
+kapui egy közös munkafán futottak (a három változás fájlszinten független), utána három commitba kerültek.

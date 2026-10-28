@@ -1221,7 +1221,7 @@ dokumentál (11. szekció, gyökér `.claude/CLAUDE.md`).
   (SPEC-009 O-1, user döntés 2026-10-26). A befecskendezett `agentQueryRunner` port (3.3 szekció)
   nem hordoz külön "modell lista" metódust - az `AgentQuery` alakja `{ messages, interrupt() }`,
   ennyi -, ezért a teszt a leíróhoz tartozó env blokkal egyetlen minimális `query()` hívást
-  futtat, a `result` üzenet `subtype` értéke dönt. A `modelsEndpoint.calledBySdk` és a
+  futtat, a `result` üzenet `subtype` értéke dönt. A hívás a lépéssel azonos izolációval megy (`settingSources: []`, `strictMcpConfig: true`, SPEC-009 7.1, T-012-27). A `modelsEndpoint.calledBySdk` és a
   `directHttpReachable` mezőt a motor nem olvassa. Valódi `supportedModels()` ág nincs.
 - **A `ConcurrencyLimitLookup` hibaágát a `createEngine` "nincs korlát" (`null`) állapotra
   fordítja.** A `ConcurrencyLimitLookup` típusnak (`concurrency-gate/concurrency-limit-lookup.ts`)
