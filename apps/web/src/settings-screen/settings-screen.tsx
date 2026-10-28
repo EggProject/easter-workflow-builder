@@ -74,6 +74,7 @@ export function SettingsScreen(properties: Readonly<SettingsScreenProperties>): 
       />
       <McpServerSettingsCard
         serversState={mcpServerLibrary.state}
+        reloadState={mcpServerLibrary.reloadState}
         environmentNamesState={environmentNames}
         saveServer={mcpServerLibrary.saveServer}
         deleteServer={mcpServerLibrary.deleteServer}

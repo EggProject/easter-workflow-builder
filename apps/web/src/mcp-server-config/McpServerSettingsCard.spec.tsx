@@ -56,6 +56,7 @@ describe('McpServerSettingsCard', () => {
       root.render(
         <McpServerSettingsCard
           serversState={success([GITHUB, TAVOLI])}
+          reloadState={{ status: 'idle' }}
           environmentNamesState={{ status: 'success', value: ['GITHUB_TOKEN_CEG'] }}
           saveServer={vi.fn()}
           deleteServer={vi.fn()}
@@ -113,6 +114,23 @@ describe('McpServerSettingsCard', () => {
 
     expect(container.querySelector('.alert--danger')?.textContent).toContain('A szerver nem érhető el.');
     expect(container.querySelector('.preference-row')).toBeNull();
+  });
+
+  it('a mentés utáni újratöltés hibája danger Alert a lista és a Hozzáadás gomb között, a lista és a gomb megmarad', () => {
+    render({ reloadState: { status: 'failure', message: 'Az MCP szerver lista nem töltődött újra.' } });
+
+    const alert = container.querySelector('.alert--danger');
+    expect(alert?.textContent).toContain('Az MCP szerver lista nem töltődött újra.');
+    expect(container.querySelectorAll('.preference-row')).toHaveLength(2);
+    expect(alert?.nextElementSibling).toBe(button('MCP szerver hozzáadása'));
+  });
+
+  it('az újratöltés közbeni és sikeres állapotában nincs Alert', () => {
+    render({ reloadState: { status: 'pending' } });
+    expect(container.querySelector('.alert')).toBeNull();
+
+    render({ reloadState: success([GITHUB]) });
+    expect(container.querySelector('.alert')).toBeNull();
   });
 
   it('a Hozzáadás gomb üres szerkesztő modálist nyit a létező nevekkel, a Mégse bezárja', () => {

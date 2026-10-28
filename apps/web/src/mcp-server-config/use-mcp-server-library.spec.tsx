@@ -103,6 +103,47 @@ describe('useMcpServerLibrary', () => {
     expect(requests).toEqual(['GET /api/mcp-servers', 'PUT /api/mcp-servers/beta', 'GET /api/mcp-servers']);
     expect(savedBody).toEqual(BETA_DEFINITION);
     expect(current().state).toEqual({ status: 'success', value: [ALFA, BETA, GAMMA] });
+    expect(current().reloadState).toEqual({ status: 'success', value: [ALFA, BETA, GAMMA] });
+  });
+
+  it('siker után a PUT válasza azonnal a listában van, az újratöltés hibája pedig a reloadState hibája, a lista megmarad', async () => {
+    let isSaved = false;
+    await mount((_input, init) => {
+      if (init.method === 'PUT') {
+        isSaved = true;
+        return Promise.resolve(Response.json(BETA));
+      }
+      return isSaved
+        ? Promise.resolve(Response.json({ code: 'internal', message: 'belső hiba' }, { status: 500 }))
+        : Promise.resolve(Response.json([ALFA, GAMMA]));
+    });
+    expect(current().reloadState).toEqual({ status: 'idle' });
+
+    await act(async () => {
+      await current().saveServer('beta', BETA_DEFINITION);
+    });
+
+    expect(current().state).toEqual({ status: 'success', value: [ALFA, BETA, GAMMA] });
+    expect(current().reloadState.status).toBe('failure');
+  });
+
+  it('az azonos nevű mentés a régi sort cseréli a listában, az újratöltés hibája mellett is', async () => {
+    const replaced: McpServerDefinitionRecord = { name: 'alfa', definition: BETA_DEFINITION };
+    let isSaved = false;
+    await mount((_input, init) => {
+      if (init.method === 'PUT') {
+        isSaved = true;
+        return Promise.resolve(Response.json(replaced));
+      }
+      return isSaved ? Promise.reject(new Error('nincs hálózat')) : Promise.resolve(Response.json([ALFA, BETA]));
+    });
+
+    await act(async () => {
+      await current().saveServer('alfa', BETA_DEFINITION);
+    });
+
+    expect(current().state).toEqual({ status: 'success', value: [replaced, BETA] });
+    expect(current().reloadState.status).toBe('failure');
   });
 
   it('a sikertelen mentés hibaágat ad, és a lista változatlan marad, újratöltés nélkül', async () => {

@@ -12,6 +12,12 @@ import './mcp-server-config.css';
 export interface McpServerSettingsCardProperties {
   readonly serversState: RequestState<readonly McpServerDefinitionRecord[]>;
   /**
+   * A mentés utáni újratöltés állapota (`useMcpServerLibrary`): a hibája
+   * danger `Alert` a lista és a hozzáadás gomb között, a lista közben a `PUT`
+   * válaszával bővített állapotban marad.
+   */
+  readonly reloadState: RequestState<readonly McpServerDefinitionRecord[]>;
+  /**
    * A szerver gép környezeti változóinak nevei a hozzárendelés választóihoz
    * (O-32).
    */
@@ -38,11 +44,11 @@ interface EditTarget {
  * lépés hivatkozik a szerverre (O-43). A kártya kimondja, hogy a definíció
  * csak neveket tárol (a titok értéke a szerver környezetében marad), és hogy
  * a lépés a hozzárendelést felülírhatja. A betöltés alatt csontváz, a
- * betöltés hibája danger `Alert`, az üres lista `Empty`. Kártya a kártyában
- * nincs.
+ * betöltés és a mentés utáni újratöltés hibája danger `Alert`, az üres lista
+ * `Empty`. Kártya a kártyában nincs.
  */
 export function McpServerSettingsCard(properties: Readonly<McpServerSettingsCardProperties>): ReactElement {
-  const { serversState, environmentNamesState, saveServer, deleteServer } = properties;
+  const { serversState, reloadState, environmentNamesState, saveServer, deleteServer } = properties;
   const headingId = useId();
   const [editTarget, setEditTarget] = useState<EditTarget | undefined>(undefined);
   const [serverNameToDelete, setServerNameToDelete] = useState<string | undefined>(undefined);
@@ -80,6 +86,7 @@ export function McpServerSettingsCard(properties: Readonly<McpServerSettingsCard
             />
           ))
         )}
+        {reloadState.status === 'failure' && <Alert variant="danger">{reloadState.message}</Alert>}
         <Button
           type="button"
           size="sm"

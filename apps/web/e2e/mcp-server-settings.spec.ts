@@ -53,6 +53,8 @@ interface MockState {
   isSaveFailing: boolean;
   isEnvironmentFailing: boolean;
   isListFailing: boolean;
+  isReloadFailing: boolean;
+  listCalls: number;
   isDeleteFailing: boolean;
 }
 
@@ -63,6 +65,8 @@ const mockState: MockState = {
   isSaveFailing: false,
   isEnvironmentFailing: false,
   isListFailing: false,
+  isReloadFailing: false,
+  listCalls: 0,
   isDeleteFailing: false,
 };
 
@@ -86,6 +90,8 @@ test.beforeEach(async ({ page }) => {
   mockState.isSaveFailing = false;
   mockState.isEnvironmentFailing = false;
   mockState.isListFailing = false;
+  mockState.isReloadFailing = false;
+  mockState.listCalls = 0;
   mockState.isDeleteFailing = false;
   await mockIdleStream(page);
   await installApiMocks(page, [
@@ -99,11 +105,12 @@ test.beforeEach(async ({ page }) => {
         ? route.fulfill(jsonBody({ code: 'internal', message: 'belső hiba' }, 500))
         : route.fulfill(jsonBody(ENVIRONMENT_NAMES)),
     ),
-    mockRoute('listMcpServerDefinitions', async (route) =>
-      mockState.isListFailing
+    mockRoute('listMcpServerDefinitions', async (route) => {
+      mockState.listCalls += 1;
+      await (mockState.isListFailing || (mockState.isReloadFailing && mockState.listCalls > 1)
         ? route.fulfill(jsonBody({ code: 'internal', message: 'belső hiba' }, 500))
-        : route.fulfill(jsonBody(mockState.servers)),
-    ),
+        : route.fulfill(jsonBody(mockState.servers)));
+    }),
     mockRoute('saveMcpServerDefinition', async (route, url) => {
       const name = lastPathSegment(url);
       const body: unknown = route.request().postDataJSON();
@@ -304,6 +311,32 @@ test('a létező névre mentés figyelmeztet, és Felülírás gombbal menthető
   expect(mockState.puts[0]?.name).toBe('github');
   await expect(row(page, 'github')).toContainText('stdio: uj-parancs');
   await expect(card(page).getByRole('group')).toHaveCount(2);
+});
+
+test('a mentés utáni újratöltés hibája danger Alert a kártyán, az új szerver a PUT válaszából a listában marad, és az azonos nevű következő hozzáadás felülírás figyelmeztetést kap', async ({
+  page,
+}) => {
+  mockState.isReloadFailing = true;
+  const modal = await openAddModal(page);
+
+  await modal.getByRole('textbox', { name: 'Név', exact: true }).fill('harmadik');
+  await modal.getByRole('textbox', { name: 'Parancs', exact: true }).fill('npx');
+  await modal.getByRole('button', { name: 'Mentés', exact: true }).click();
+  await expect(modal).toBeHidden();
+
+  await expect(row(page, 'harmadik')).toContainText('stdio: npx');
+  await expect(card(page).getByRole('group')).toHaveText([/github/u, /harmadik/u, /tavoli/u]);
+  await expect(card(page).getByRole('alert')).toHaveClass(/\balert--danger\b/u);
+  expect(mockState.listCalls).toBe(2);
+
+  await card(page).getByRole('button', { name: 'MCP szerver hozzáadása', exact: true }).click();
+  const secondModal = dialog(page, 'MCP szerver hozzáadása');
+  await secondModal.getByRole('textbox', { name: 'Név', exact: true }).fill('harmadik');
+  await expect(secondModal.getByRole('status').filter({ hasText: 'Már van harmadik nevű MCP szerver' })).toHaveClass(
+    /\balert--warning\b/u,
+  );
+  await expect(secondModal.getByRole('button', { name: 'Mentés', exact: true })).toHaveCount(0);
+  expect(mockState.puts).toHaveLength(1);
 });
 
 test('a szerver elutasítása a modálisban danger Alert, a modális nyitva marad', async ({ page }) => {

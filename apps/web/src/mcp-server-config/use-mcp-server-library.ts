@@ -12,6 +12,7 @@ import { emptyResponseSchema } from '../rest-client/empty-response-schema.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import type { RouteOutcome } from '../rest-client/route-outcome.ts';
+import { mergeMcpServer } from './merge-mcp-server.ts';
 
 export interface UseMcpServerLibraryResult {
   /**
@@ -21,9 +22,19 @@ export interface UseMcpServerLibraryResult {
    */
   readonly state: RequestState<readonly McpServerDefinitionRecord[]>;
   /**
+   * A mentés utáni háttér újratöltés állapota: `failure`, ha a szerver
+   * sorrendjét hozó `GET` elbukott (a lista ilyenkor a `PUT` válaszával
+   * bővített, utolsó ismert állapot). Külön állapot, hogy az újratöltés ne
+   * váltsa csontvázra a listát.
+   */
+  readonly reloadState: RequestState<readonly McpServerDefinitionRecord[]>;
+  /**
    * `PUT /api/mcp-servers/{name}` (létrehozás vagy teljes csere, SPEC-009
-   * 6.2): siker után a lista újratöltődik, mert a szerver a név szerinti
-   * sorrendet adja.
+   * 6.2): siker után a `PUT` válasza azonnal a listába kerül (név szerint
+   * rendezve, azonos név cseréjével), utána a lista újratöltődik a szerver
+   * sorrendjéért. Az azonnali beillesztés nélkül egy elbukó újratöltés után az
+   * új szerver nem látszana, és az azonos nevű következő hozzáadás a
+   * felülírás figyelmeztetése nélkül menne ki.
    */
   readonly saveServer: (
     name: string,
@@ -44,8 +55,10 @@ export interface UseMcpServerLibraryResult {
  */
 export function useMcpServerLibrary(apiOrigin: string, fetchFunction: FetchFunction): UseMcpServerLibraryResult {
   const loadRequest = useRequestState<readonly McpServerDefinitionRecord[]>();
+  const reloadRequest = useRequestState<readonly McpServerDefinitionRecord[]>();
   const [servers, setServers] = useState<readonly McpServerDefinitionRecord[]>([]);
   const { run } = loadRequest;
+  const { run: runReload } = reloadRequest;
 
   const fetchServers = useCallback(async (): Promise<RouteOutcome<readonly McpServerDefinitionRecord[]>> => {
     const outcome = await requestRouteWithoutBody({
@@ -75,11 +88,13 @@ export function useMcpServerLibrary(apiOrigin: string, fetchFunction: FetchFunct
         apiOrigin,
       });
       if (outcome.kind === 'ok') {
-        await fetchServers();
+        const saved = outcome.value;
+        setServers((previous) => mergeMcpServer(previous, saved));
+        await runReload(fetchServers);
       }
       return outcome;
     },
-    [apiOrigin, fetchFunction, fetchServers],
+    [apiOrigin, fetchFunction, fetchServers, runReload],
   );
 
   const deleteServer = useCallback(
@@ -102,5 +117,5 @@ export function useMcpServerLibrary(apiOrigin: string, fetchFunction: FetchFunct
   const state: RequestState<readonly McpServerDefinitionRecord[]> =
     loadRequest.state.status === 'success' ? { status: 'success', value: servers } : loadRequest.state;
 
-  return { state, saveServer, deleteServer };
+  return { state, reloadState: reloadRequest.state, saveServer, deleteServer };
 }
