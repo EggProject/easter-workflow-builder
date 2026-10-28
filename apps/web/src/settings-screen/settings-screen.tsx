@@ -4,6 +4,7 @@ import { createProviderConnectionTester } from '../provider-select/create-provid
 import { ConcurrencyLimitsSettingsCard } from './ConcurrencyLimitsSettingsCard.tsx';
 import { EditorSettingsCard } from './EditorSettingsCard.tsx';
 import { ProviderSettingsCard } from './ProviderSettingsCard.tsx';
+import { RunLogSettingsCard } from './RunLogSettingsCard.tsx';
 import { useConcurrencyLimits } from './use-concurrency-limits.ts';
 import { useProviderList } from './use-provider-list.ts';
 import { useSettingsRecord } from './use-settings-record.ts';
@@ -53,6 +54,7 @@ export function SettingsScreen(properties: Readonly<SettingsScreenProperties>): 
         saveLimit={concurrencyLimits.saveLimit}
         clearLimit={concurrencyLimits.clearLimit}
       />
+      <RunLogSettingsCard settingsState={settingsState} saveSettings={saveSettings} />
       <EditorSettingsCard />
     </div>
   );

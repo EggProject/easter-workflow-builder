@@ -97,11 +97,11 @@ describe('SettingsScreen', () => {
     );
   }
 
-  it('a kártyákat egymás alatt, a SPEC-009 3.1 sorrendjében rajzolja (Provider, Párhuzamossági korlát, majd a szerkesztő)', async () => {
+  it('a kártyákat egymás alatt, a SPEC-009 3.1 sorrendjében rajzolja (Provider, Párhuzamossági korlát, Futás napló, majd a gráf szerkesztő)', async () => {
     await render(createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false }).fetchFunction);
 
-    expect(headings()).toEqual(['Provider', 'Párhuzamossági korlát', 'Gráf szerkesztő']);
-    expect(container.querySelector('.settings-screen')?.children).toHaveLength(3);
+    expect(headings()).toEqual(['Provider', 'Párhuzamossági korlát', 'Futás napló', 'Gráf szerkesztő']);
+    expect(container.querySelector('.settings-screen')?.children).toHaveLength(4);
   });
 
   it('a provider listát, a beállítást és a korlátokat egyszer tölti be, kártyánként ismételt kérés nélkül', async () => {
@@ -173,5 +173,20 @@ describe('SettingsScreen', () => {
 
     expect(requests).toContain('PUT limit');
     expect(claudeRow?.textContent).toContain('Beállított korlát: 5 egyszerre futó agent lépés.');
+  });
+
+  it('a delta kapcsoló váltása PUT /api/settings hívást küld a persistStreamDeltas mezővel, és a válasz után a kapcsoló az új értéket mutatja', async () => {
+    const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
+    await render(fetchFunction);
+    const toggle = container.querySelector<HTMLInputElement>('input[role="switch"]');
+    expect(toggle?.checked).toBe(false);
+
+    await act(async () => {
+      toggle?.click();
+      await Promise.resolve();
+    });
+
+    expect(requests).toContain('PUT /api/settings');
+    expect(container.querySelector<HTMLInputElement>('input[role="switch"]')?.checked).toBe(true);
   });
 });

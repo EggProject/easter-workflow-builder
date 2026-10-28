@@ -245,13 +245,13 @@ test('a topnav "Beállítások" linkje a /settings útvonalra visz, a morzsamen�
 // A Provider kártya (SPEC-009 3.1, O-4, O-5, O-8, AC1, AC2, AC3).
 const PROVIDER_LABEL = 'Globális alapértelmezett provider';
 
-test('a Provider kártya a Párhuzamossági korlát és a Gráf szerkesztő kártya fölött áll, alapértelmezés nélkül warning Alertet mutat, "nincs" opció nélkül', async ({
+test('a Provider kártya a Párhuzamossági korlát, a Futás napló és a Gráf szerkesztő kártya fölött áll, alapértelmezés nélkül warning Alertet mutat, "nincs" opció nélkül', async ({
   page,
 }) => {
   await page.goto('/settings');
 
   const headings = page.getByRole('heading', { level: 3 });
-  await expect(headings).toHaveText(['Provider', 'Párhuzamossági korlát', 'Gráf szerkesztő']);
+  await expect(headings).toHaveText(['Provider', 'Párhuzamossági korlát', 'Futás napló', 'Gráf szerkesztő']);
   const warning = page.getByRole('status').filter({ hasText: 'Nincs alapértelmezett provider' });
   await expect(warning).toHaveClass(/\balert--warning\b/);
 
