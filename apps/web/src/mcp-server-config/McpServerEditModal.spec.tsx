@@ -177,7 +177,7 @@ describe('McpServerEditModal', () => {
 
     expect(saveServer).not.toHaveBeenCalled();
     expect(fieldErrors()).toEqual([
-      'A név csak betűt, számot, aláhúzást és kötőjelet tartalmazhat, és nem lehet üres.',
+      'A név csak betűt, számot, aláhúzást és kötőjelet tartalmazhat, nem lehet üres, és nem lehet __proto__, constructor vagy prototype.',
       'A mező nem lehet üres.',
     ]);
     expect(inputByLabel('Név').getAttribute('aria-invalid')).toBe('true');

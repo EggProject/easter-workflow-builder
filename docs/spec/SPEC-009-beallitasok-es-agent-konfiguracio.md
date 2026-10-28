@@ -583,7 +583,14 @@ definíció mentésén áll (`envNames`, az `envBindings` kulcsa és értéke, `
 `envBindings` kulcsa csak deklarált név lehet. Az MCP szerver **neve** (a `mcpServers` kulcsa) az eszköznév előtagja
 (`mcp__<szerver>__<eszköz>`), és az SDK a `[a-zA-Z0-9_-]` halmazon kívüli jeleket `_`-re cseréli (2.2);
 a mentési szabály ezért szűk: a név kizárólag ASCII betűből, számból, `_` és
-`-` jelből áll, ami a cserét kizárja, és két különböző név sem ütközhet cserével.
+`-` jelből áll, ami a cserét kizárja, és két különböző név sem ütközhet cserével. A `__proto__`, a
+`constructor` és a `prototype` név a mentésen tiltott (`McpServerNameSaveSchema`, T-012-27), mert a
+névszabályon átmegy, de mérve elvész vagy hibát okoz: a `__proto__` kulcsot az SDK `mcpServers` gyűjtése
+eldobja, a `constructor` kulccsal a CLI a teljes `--mcp-config` értéket elutasítja ("Invalid MCP
+configuration"), a `prototype` kulcsot a CLI csendben kihagyja (telepített SDK `0.3.245`, CLI `2.1.245`,
+research `2026-10-28-plan-012-vegrehajtas.md` 4. szekció "MCP és izoláció"). Az `Object.prototype` többi
+tagjának neve (`toString`, `hasOwnProperty`, ...) mérve rendben átmegy, ezért nem tiltott. Az olvasó
+séma (`McpServerDefinitionRecordSchema`) a régi alakon marad.
 
 **Kötelező szöveg mezők (2026-10-28).** A központi definíció `stdio` ágának `command`, a `sse` és a
 `http` ágának `url` mezője nem lehet üres vagy csak szóközből álló, a node config kötelező szöveg mező

@@ -236,6 +236,7 @@ export type { EnvironmentVariableName } from './mcp-server-definition/environmen
 export { EnvironmentVariableNameSchema } from './mcp-server-definition/environment-variable-name.ts';
 export type { McpServerName } from './mcp-server-definition/mcp-server-name.ts';
 export { McpServerNameSchema } from './mcp-server-definition/mcp-server-name.ts';
+export { McpServerNameSaveSchema } from './mcp-server-definition/mcp-server-name-save-schema.ts';
 export type {
   HttpMcpServerDefinition,
   McpServerDefinition,

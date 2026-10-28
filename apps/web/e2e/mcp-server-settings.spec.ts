@@ -269,7 +269,7 @@ test('érvénytelen értékre a hiba a mező alatt jelenik meg, és a PUT nem me
   await modal.getByRole('button', { name: 'Mentés', exact: true }).click();
 
   await expect(modal.getByRole('alert')).toHaveText([
-    'A név csak betűt, számot, aláhúzást és kötőjelet tartalmazhat, és nem lehet üres.',
+    'A név csak betűt, számot, aláhúzást és kötőjelet tartalmazhat, nem lehet üres, és nem lehet __proto__, constructor vagy prototype.',
     'A mező nem lehet üres.',
   ]);
   // A hibaüzenet a `<label>` része, ezért a mező neve a hibával együtt áll.

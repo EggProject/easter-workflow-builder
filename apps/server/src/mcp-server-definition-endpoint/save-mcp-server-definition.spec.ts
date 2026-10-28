@@ -47,6 +47,9 @@ describe('createSaveMcpServerDefinitionHandler', () => {
 
   it.each([
     ['szabálytalan név', { name: 'git hub' }],
+    ['fenntartott név: __proto__', { name: '__proto__' }],
+    ['fenntartott név: constructor', { name: 'constructor' }],
+    ['fenntartott név: prototype', { name: 'prototype' }],
     ['hiányzó név paraméter', {}],
   ])('%s: invalid_request, semmi nem íródik', async (_label, parameters) => {
     const database = openMemoryDatabase();

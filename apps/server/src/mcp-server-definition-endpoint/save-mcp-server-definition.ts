@@ -1,6 +1,6 @@
 import {
   McpServerDefinitionSaveSchema,
-  McpServerNameSchema,
+  McpServerNameSaveSchema,
   zodErrorToProtocolErrorBody,
 } from '@easter-workflow-builder/protocol';
 import type { DatabaseContext } from '@easter-workflow-builder/db';
@@ -10,7 +10,8 @@ import type { RouteHandler } from '../route-dispatch/route-handler.ts';
  * `PUT /api/mcp-servers/:name` (SPEC-009 6.2): a központi definíció
  * létrehozása vagy teljes cseréje név szerint, a skill feltöltés `PUT`
  * mintájára; sikerre `200` a mentett `{ name, definition }` rekorddal. A név a
- * 6.1 névszabályon, a törzs a `McpServerDefinitionSchema` mentési szabályain
+ * 6.1 névszabályon (a fenntartott `__proto__`, `constructor`, `prototype` név
+ * tilalmával, `McpServerNameSaveSchema`), a törzs a `McpServerDefinitionSchema` mentési szabályain
  * megy át (env változó név alak, a hozzárendelés kulcsa deklarált név, a
  * `stdio` `command` és a `sse`, `http` `url` kötelező, nem üres szöveg:
  * `McpServerDefinitionSaveSchema`); bármelyik hibája `invalid_request`. A `db`
@@ -20,7 +21,7 @@ import type { RouteHandler } from '../route-dispatch/route-handler.ts';
 export function createSaveMcpServerDefinitionHandler(database: DatabaseContext): RouteHandler {
   return (context) => {
     const name = context.parameters['name'] ?? '';
-    if (!McpServerNameSchema.safeParse(name).success) {
+    if (!McpServerNameSaveSchema.safeParse(name).success) {
       return Promise.resolve({
         kind: 'error',
         message: `A(z) "${name}" MCP szerver név nem felel meg a névszabálynak (invalid_request).`,

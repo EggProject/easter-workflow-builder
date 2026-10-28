@@ -26,6 +26,13 @@ describe('findMcpServerDraftErrors', () => {
     expect(findMcpServerDraftErrors({ ...VALID, name: 'a.b' }).name).toBeDefined();
   });
 
+  it.each(['__proto__', 'constructor', 'prototype'])(
+    'a fenntartott %s név: hiba a névnél (PLAN-012 T-012-27)',
+    (name) => {
+      expect(findMcpServerDraftErrors({ ...VALID, name }).name).toContain('constructor vagy prototype');
+    },
+  );
+
   it('üres vagy csak szóközből álló parancs: hiba a parancsnál', () => {
     expect(findMcpServerDraftErrors({ ...VALID, command: '' })).toEqual({
       ...NO_ERRORS,
