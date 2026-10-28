@@ -37,6 +37,7 @@ import { NodeInspector } from '../node-inspector/NodeInspector.tsx';
 import { describeInheritedProvider } from '../node-inspector/describe-inherited-provider.ts';
 import type { ProviderOptions } from '../node-inspector/provider-options.ts';
 import { ProviderOptionsContext } from '../node-inspector/provider-options-context.ts';
+import { createProviderConnectionTester } from '../provider-select/create-provider-connection-tester.ts';
 import { arraySchema } from '../rest-client/array-schema.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
@@ -530,8 +531,9 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
         providersState.state.status === 'success'
           ? providersState.state.value.map((provider) => provider.id)
           : ProviderIdSchema.options,
+      testConnection: createProviderConnectionTester(apiOrigin, fetchFunction),
     }),
-    [providersState.state],
+    [providersState.state, apiOrigin, fetchFunction],
   );
 
   const handleGraphChange = useCallback(

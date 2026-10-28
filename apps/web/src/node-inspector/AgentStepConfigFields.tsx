@@ -7,6 +7,7 @@ import {
 import { Accordion, AccordionItem, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
 import { AgentsFieldEditor } from './AgentsFieldEditor.tsx';
+import { ProviderSelect } from '../provider-select/ProviderSelect.tsx';
 import { ProviderOptionsContext } from './provider-options-context.ts';
 import { SandboxField } from './SandboxField.tsx';
 import { StructuredOutputField } from './StructuredOutputField.tsx';
@@ -109,7 +110,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
           setField('systemPrompt', nextValue);
         }}
       />
-      <SelectField
+      <ProviderSelect
         size="sm"
         label="Provider felülírás"
         error={providerIdError}
@@ -117,15 +118,14 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         // (SPEC-008 9. szekció 4. async pontja, user döntés 2026-10-21).
         loading={providerOptions.isLoading}
         loadingLabel="Betöltés…"
-        options={[
-          { value: '', label: 'nincs felülírás (öröklés)' },
-          ...providerOptions.providerIds.map((option) => ({ value: option, label: option })),
-        ]}
+        emptyOptionLabel="nincs felülírás (öröklés)"
+        providers={providerOptions.providerIds.map((option) => ({ id: option, displayName: option }))}
         value={config.providerId ?? ''}
+        testConnection={providerOptions.testConnection}
         onChange={(nextValue) => {
-          // A `SelectField` az opciólista értéktípusát adja vissza, tehát a
-          // `nextValue` itt `'' | ProviderId`. A "nincs felülírás" opció
-          // értéke az üres string; a `.find` ezt szűri ki, más ága nincs.
+          // A `ProviderSelect` az opciólista értékét adja vissza (sztring). A
+          // "nincs felülírás" opció értéke az üres string; a `.find` ezt
+          // szűri ki, más ága nincs.
           const matched = ProviderIdSchema.options.find((option) => option === nextValue);
           // eslint-disable-next-line unicorn/no-null -- a `providerId: ProviderId | null` `null` értéke jelenti a "nincs felülírás" állapotot.
           setField('providerId', matched ?? null);

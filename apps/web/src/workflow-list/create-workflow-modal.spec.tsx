@@ -230,6 +230,50 @@ describe('CreateWorkflowModal', () => {
     expect(container.textContent).toContain('Ehhez a providerhez nem kell környezeti változó.');
   });
 
+  /**
+   * A "Kapcsolat teszt" gomb a provider választó része (SPEC-009 3.2, O-2):
+   * nincs választás, a gomb tiltott; választás után a kiválasztott providerre
+   * a törzs nélküli `connection-test` POST megy, az eredmény Alertben áll.
+   */
+  it('a Kapcsolat teszt gomb provider nélkül tiltott, választás után a kiválasztott providert hívja', async () => {
+    const connectionTestRequests: string[] = [];
+    const fetchFunction: FetchFunction = (input, init) => {
+      if (input.includes('/connection-test')) {
+        connectionTestRequests.push(`${init.method ?? ''} ${input}`);
+        return Promise.resolve(Response.json({ succeeded: true, errorMessage: null }));
+      }
+      return Promise.resolve(
+        Response.json([{ id: 'minimax', displayName: 'MiniMax', models: [], requiredEnvNames: [] }]),
+      );
+    };
+    await act(async () => {
+      root.render(
+        <CreateWorkflowModal
+          open
+          onClose={noop}
+          onCreated={noop}
+          apiOrigin={API_ORIGIN}
+          fetchFunction={fetchFunction}
+        />,
+      );
+      await Promise.resolve();
+    });
+    const testButton = [...container.querySelectorAll('button')].find((candidate) =>
+      candidate.textContent.includes('Kapcsolat teszt'),
+    );
+    expect(testButton?.disabled).toBe(true);
+
+    chooseOption(container, 'Provider', 'MiniMax');
+    expect(testButton?.disabled).toBe(false);
+    await act(async () => {
+      testButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(connectionTestRequests).toEqual([`POST ${API_ORIGIN}/api/providers/minimax/connection-test`]);
+    expect(container.querySelector('.alert--success')?.textContent).toContain('A kapcsolat teszt sikeres.');
+  });
+
   it('sikeres létrehozásra meghívja az onCreated és az onClose callbacket', async () => {
     let capturedBody: string | undefined;
     const fetchFunction: FetchFunction = (input, init) => {

@@ -5,8 +5,11 @@ import {
   type ProviderSummary,
   type WorkflowSummary,
 } from '@easter-workflow-builder/protocol';
-import { Alert, Button, Modal, SelectField, TextField } from '@easter-workflow-builder/ui';
-import { useEffect, useState, type ChangeEvent, type ReactElement, type SubmitEvent } from 'react';
+import { Alert, Button, Modal, TextField } from '@easter-workflow-builder/ui';
+import { useEffect, useMemo, useState, type ChangeEvent, type ReactElement, type SubmitEvent } from 'react';
+import { createProviderConnectionTester } from '../provider-select/create-provider-connection-tester.ts';
+import { describeRequiredEnvironment } from '../provider-select/describe-required-environment.ts';
+import { ProviderSelect } from '../provider-select/ProviderSelect.tsx';
 import { arraySchema } from '../rest-client/array-schema.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
@@ -81,7 +84,10 @@ export function CreateWorkflowModal(properties: Readonly<CreateWorkflowModalProp
   const isSubmitting = submitState.state.status === 'pending';
   const isProvidersLoading = providersState.state.status === 'pending';
   const loadedProviders = providersState.state.status === 'success' ? providersState.state.value : [];
-  const providerOptions = loadedProviders.map((provider) => ({ value: provider.id, label: provider.displayName }));
+  const testConnection = useMemo(
+    () => createProviderConnectionTester(apiOrigin, fetchFunction),
+    [apiOrigin, fetchFunction],
+  );
   const selectedProvider = loadedProviders.find((provider) => provider.id === providerId);
 
   return (
@@ -117,13 +123,15 @@ export function CreateWorkflowModal(properties: Readonly<CreateWorkflowModalProp
             setDescription(event.target.value);
           }}
         />
-        <SelectField
+        <ProviderSelect
           label="Provider"
-          options={[{ value: '', label: 'Nincs megadva' }, ...providerOptions]}
+          providers={loadedProviders}
+          emptyOptionLabel="Nincs megadva"
           placeholder="Nincs megadva"
           loading={isProvidersLoading}
           loadingLabel="betöltés"
           value={providerId}
+          testConnection={testConnection}
           onChange={(nextProviderId) => {
             setProviderId(nextProviderId);
           }}
@@ -132,16 +140,8 @@ export function CreateWorkflowModal(properties: Readonly<CreateWorkflowModalProp
           // A `ProviderSummary` env változó NEVET hordoz, értéket soha
           // (SPEC-005 4.2 D, `.claude/CLAUDE.md` 9.), és a felület is
           // kizárólag a nevet írja ki (SPEC-007 10.1, 16. szekció 49.
-          // kritérium): a felhasználó így látja, melyik változót kell
-          // beállítania a szerver környezetében. Egy követelmény több
-          // elfogadott neve " vagy " kötőszóval áll (SPEC-013 4.8).
-          <p>
-            {selectedProvider.requiredEnvNames.length === 0
-              ? 'Ehhez a providerhez nem kell környezeti változó.'
-              : `Szükséges környezeti változók: ${selectedProvider.requiredEnvNames
-                  .map((names) => names.join(' vagy '))
-                  .join(', ')}`}
-          </p>
+          // kritérium): a mondatot a `describeRequiredEnvironment` adja.
+          <p>{describeRequiredEnvironment(selectedProvider.requiredEnvNames)}</p>
         )}
       </form>
       {/* A REST hiba a design system `danger` `Alert` blokkja, a `<form>`

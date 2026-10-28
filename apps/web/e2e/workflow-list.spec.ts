@@ -159,6 +159,74 @@ test('a kiválasztott provider szükséges környezeti változóit a modális ki
   ).toBeVisible();
 });
 
+// A "Kapcsolat teszt" gomb a provider választó része (SPEC-009 3.2, O-2, AC4):
+// provider nélkül tiltott és megindokolt, választás után a kiválasztott
+// providerre a törzs nélküli POST megy, az eredmény design system Alertben áll.
+test('a létrehozó modális Kapcsolat teszt gombja provider nélkül tiltott, siker és hiba esetén Alerttel felel', async ({
+  page,
+}) => {
+  const testedProviders: string[] = [];
+  let isSuccessResponse = true;
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
+    mockRoute('listProviders', async (route) =>
+      route.fulfill(jsonBody([{ id: 'minimax', displayName: 'MiniMax', models: [], requiredEnvNames: [] }])),
+    ),
+    mockRoute('testProviderConnection', async (route) => {
+      testedProviders.push(new URL(route.request().url()).pathname);
+      await route.fulfill(
+        jsonBody({
+          succeeded: isSuccessResponse,
+          errorMessage: isSuccessResponse ? null : 'Hiányzik az ANTHROPIC_AUTH_TOKEN',
+        }),
+      );
+    }),
+  ]);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Új workflow' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Új workflow' });
+  const testButton = dialog.getByRole('button', { name: 'Kapcsolat teszt' });
+
+  await expect(testButton).toBeDisabled();
+  await expect(dialog.getByText('A kapcsolat teszthez válassz ki egy providert.')).toBeVisible();
+
+  await chooseSelectOption(page, dialog.getByRole('combobox', { name: 'Provider' }), 'MiniMax');
+  await expect(testButton).toBeEnabled();
+  await testButton.click();
+  await expect(dialog.getByRole('status')).toHaveText('A kapcsolat teszt sikeres.');
+  await expect(dialog.getByRole('status')).toHaveClass(/\balert--success\b/);
+
+  isSuccessResponse = false;
+  await testButton.click();
+  const failure = dialog.getByRole('alert');
+  await expect(failure).toContainText('A kapcsolat teszt sikertelen');
+  await expect(failure).toContainText('Hiányzik az ANTHROPIC_AUTH_TOKEN');
+  await expect(failure).toHaveClass(/\balert--danger\b/);
+  expect(testedProviders).toEqual(['/api/providers/minimax/connection-test', '/api/providers/minimax/connection-test']);
+});
+
+test('a Kapcsolat teszt hívásának hibája danger Alertben, a kódhoz rendelt mondattal jelenik meg', async ({ page }) => {
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
+    mockRoute('listProviders', async (route) =>
+      route.fulfill(jsonBody([{ id: 'minimax', displayName: 'MiniMax', models: [], requiredEnvNames: [] }])),
+    ),
+    mockRoute('testProviderConnection', async (route) =>
+      route.fulfill(jsonBody({ code: 'internal', message: 'A szerver hibát adott.' }, 500)),
+    ),
+  ]);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Új workflow' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Új workflow' });
+  await chooseSelectOption(page, dialog.getByRole('combobox', { name: 'Provider' }), 'MiniMax');
+  await dialog.getByRole('button', { name: 'Kapcsolat teszt' }).click();
+
+  await expect(dialog.getByRole('alert')).toHaveText('Váratlan szerver hiba történt.');
+  await expect(dialog.getByRole('alert')).toHaveClass(/\balert--danger\b/);
+});
+
 test('a létrehozás hibájára a modálison belül riasztás jelenik meg, a modális nyitva marad', async ({ page }) => {
   await installApiMocks(page, [
     mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),

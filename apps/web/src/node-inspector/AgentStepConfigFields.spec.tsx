@@ -5,7 +5,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
+import type { ProviderConnectionTester } from '../provider-select/provider-connection-tester.ts';
 import { FieldErrorsContext } from './field-errors-context.ts';
+import { ProviderOptionsContext } from './provider-options-context.ts';
 
 function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
@@ -131,6 +133,41 @@ describe('AgentStepConfigFields', () => {
   it('a `providerId` null értékére megjeleníti az örökölt provider leírását', () => {
     render(BASE_CONFIG, vi.fn(), 'a workflow saját providerét örökli: minimax');
     expect(container.textContent).toContain('a workflow saját providerét örökli: minimax');
+  });
+
+  it('a Kapcsolat teszt gomb örökölt választásnál tiltott, megadott providernél a kontextus tesztelőjét hívja', async () => {
+    const testConnection = vi.fn<ProviderConnectionTester>(() =>
+      Promise.resolve({ kind: 'ok', value: { succeeded: false, errorMessage: 'Hiányzik a kulcs' } }),
+    );
+    const providerOptions = { isLoading: false, providerIds: ['minimax'], testConnection };
+    function renderWith(config: AgentStepConfig): void {
+      act(() => {
+        root.render(
+          <ProviderOptionsContext.Provider value={providerOptions}>
+            <AgentStepConfigFields
+              fieldPathPrefix=""
+              config={config}
+              onChange={vi.fn()}
+              inheritedProviderDescription="nincs"
+            />
+          </ProviderOptionsContext.Provider>,
+        );
+      });
+    }
+    const findTestButton = (): HTMLButtonElement | undefined =>
+      [...container.querySelectorAll('button')].find((candidate) => candidate.textContent.includes('Kapcsolat teszt'));
+
+    renderWith(BASE_CONFIG);
+    expect(findTestButton()?.disabled).toBe(true);
+
+    renderWith({ ...BASE_CONFIG, providerId: 'minimax' });
+    await act(async () => {
+      findTestButton()?.click();
+      await Promise.resolve();
+    });
+
+    expect(testConnection).toHaveBeenCalledWith('minimax');
+    expect(container.querySelector('.alert--danger')?.textContent).toContain('Hiányzik a kulcs');
   });
 
   it('egy megadott `providerId`-ra nem jelenik meg az öröklés leírása', () => {
