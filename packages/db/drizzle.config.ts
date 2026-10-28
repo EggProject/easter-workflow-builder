@@ -26,6 +26,7 @@ export default defineConfig({
     './src/provider-concurrency/provider-concurrency.ts',
     './src/run-event/event-record/run-event.ts',
     './src/human-approval/human-approval.ts',
+    './src/mcp-server-definition/mcp-server-definition-table.ts',
   ],
   out: './drizzle',
 });

@@ -144,6 +144,22 @@ export type { AppSettingRepository, AppSettingsRecord } from './app-setting/app-
 // `WorkflowRepository`-nél (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció).
 export type { ProviderConcurrencyRepository } from './provider-concurrency/provider-concurrency-repository.ts';
 
+// mcp-server-definition: a központi MCP szerver lista (SPEC-009 6.2, PLAN-012
+// T-012-10). A factory függvényt nem exportáljuk, ugyanaz a minta, mint fent; az
+// `isMcpServerDefinition` guardot az `apps/server`
+// `mcp-server-definition-drift-protection` témája futtatja.
+export type {
+  McpServerDefinitionRepository,
+  McpServerDefinitionRecord,
+} from './mcp-server-definition/mcp-server-definition-repository.ts';
+export type {
+  McpServerDefinition,
+  StdioMcpServerDefinition,
+  SseMcpServerDefinition,
+  HttpMcpServerDefinition,
+} from './mcp-server-definition/mcp-server-definition.ts';
+export { isMcpServerDefinition } from './mcp-server-definition/is-mcp-server-definition.ts';
+
 // human-approval: a HumanApprovalRepository publikus felülete (T-003-22). A
 // factory függvényt (`createHumanApprovalRepository`) szándékosan nem
 // exportáljuk, csak a típust, ugyanaz a minta, mint a `WorkflowRepository`-nél
