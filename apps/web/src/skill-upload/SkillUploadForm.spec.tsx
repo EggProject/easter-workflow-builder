@@ -158,6 +158,9 @@ describe('SkillUploadForm', () => {
     const uploadSkill = vi.fn(() => Promise.resolve(OK));
     render({ uploadSkill });
     typeInto(nameField(), '  uj-skill  ');
+    act(() => {
+      nameField().dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
     chooseFile(fileInput(), [ARCHIVE]);
 
     await submit();

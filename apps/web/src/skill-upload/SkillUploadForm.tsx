@@ -53,6 +53,7 @@ export function SkillUploadForm(properties: Readonly<SkillUploadFormProperties>)
   const [file, setFile] = useState<File | undefined>(undefined);
   const [isSubmitAttempted, setIsSubmitAttempted] = useState(false);
   const [fieldGeneration, setFieldGeneration] = useState(0);
+  const [nameGeneration, setNameGeneration] = useState(0);
   const [pendingOverwrite, setPendingOverwrite] = useState<PendingOverwrite | undefined>(undefined);
   const request = useRequestState<SkillSummary>();
 
@@ -67,6 +68,7 @@ export function SkillUploadForm(properties: Readonly<SkillUploadFormProperties>)
         setFile(undefined);
         setIsSubmitAttempted(false);
         setFieldGeneration((generation) => generation + 1);
+        setNameGeneration((generation) => generation + 1);
       }
       return outcome;
     });
@@ -104,7 +106,10 @@ export function SkillUploadForm(properties: Readonly<SkillUploadFormProperties>)
         {/* `noValidate`: a beküldés ellenőrzése a saját szabályon megy (a
             hibaüzenet a MEZŐ ALATT áll, 11. szekció). */}
         <form className="skill-upload-form" noValidate onSubmit={handleSubmit}>
+          {/* A `key` siker után újraépíti a mezőt, hogy az "érintett" jelölés is
+              törlődjön: különben a kiürült név azonnal hibát mutatna. */}
           <TextField
+            key={nameGeneration}
             size="sm"
             label="Skill neve"
             autoComplete="off"
