@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { isOkOutcome } from '@easter-workflow-builder/core';
 import { openDatabase } from '@easter-workflow-builder/db';
 import { formatEngineErrorMessage } from '@easter-workflow-builder/engine';
+import { SKILL_UPLOAD_ERROR_CLASSES } from '../skill-endpoint/skill-upload-error-class.ts';
 import { mapOutcomeMessageToErrorCode } from './map-outcome-message-to-error-code.ts';
 
 describe('mapOutcomeMessageToErrorCode', () => {
@@ -20,6 +21,13 @@ describe('mapOutcomeMessageToErrorCode', () => {
   ])('a(z) %s hibaosztályt conflict kódra képezi', (errorClass) => {
     expect(mapOutcomeMessageToErrorCode(`hiba történt (${errorClass}).`)).toBe('conflict');
   });
+
+  it.each(SKILL_UPLOAD_ERROR_CLASSES)(
+    'a skill feltöltés %s hibaosztályát unprocessable kódra képezi (SPEC-009 5.4)',
+    (errorClass) => {
+      expect(mapOutcomeMessageToErrorCode(`A feltöltés elutasítva (${errorClass}).`)).toBe('unprocessable');
+    },
+  );
 
   it.each(['malformed_graph_document', 'unknown_graph_document_version', 'non_canonicalizable_value'])(
     'a(z) %s hibaosztályt unprocessable kódra képezi',

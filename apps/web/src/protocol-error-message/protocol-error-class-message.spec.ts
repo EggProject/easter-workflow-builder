@@ -47,6 +47,27 @@ describe('protocolErrorClassMessage', () => {
     ['template_render_failed', 'A workflow egyik sablonja hibás, ezért a futás nem indítható.'],
     ['expression_evaluation_failed', 'A workflow egyik kifejezése hibás, ezért a futás nem indítható.'],
     ['already_decided', 'Ezt a jóváhagyást már eldöntötték.'],
+    ['skill_archive_unreadable', 'A feltöltött fájl nem érvényes ZIP csomag.'],
+    [
+      'skill_archive_entry_type_unsupported',
+      'A csomag nem támogatott bejegyzést tartalmaz, például szimbolikus linket.',
+    ],
+    ['skill_archive_unsafe_path', 'A csomag egyik bejegyzésének útvonala tiltott.'],
+    [
+      'skill_archive_path_collision',
+      'A csomag két bejegyzésének útvonala azonos, vagy csak kis- és nagybetűben tér el.',
+    ],
+    ['skill_archive_layout_invalid', 'A csomag gyökerében nincs SKILL.md, és nem pontosan egy mappát tartalmaz.'],
+    ['skill_manifest_missing', 'Hiányzik a SKILL.md.'],
+    ['skill_manifest_duplicate', 'A skill gyökerében több SKILL.md áll.'],
+    ['skill_manifest_invalid', 'A SKILL.md fejléce hibás.'],
+    ['skill_name_invalid', 'A megadott skill név nem felel meg a névszabálynak.'],
+    ['skill_name_mismatch', 'A SKILL.md fejlécében álló név eltér a megadott névtől.'],
+    ['skill_archive_too_large', 'A csomag túl nagy.'],
+    ['skill_archive_too_many_entries', 'A csomag túl sok fájlt tartalmaz.'],
+    ['skill_archive_entry_size_mismatch', 'A csomag egyik bejegyzése sérült.'],
+    ['skill_archive_entry_encrypted', 'A csomag titkosított bejegyzést tartalmaz.'],
+    ['skill_archive_compression_unsupported', 'A csomag nem támogatott tömörítést használ.'],
   ];
 
   it.each(cases)('a(z) "%s" hibaosztályhoz a saját magyar mondatát rendeli', (errorClass, expected) => {
@@ -59,9 +80,11 @@ describe('protocolErrorClassMessage', () => {
   });
 
   // Ugyanaz az írásjel szabály, mint a kód mondatánál (SPEC-007 8.4 1. pont):
-  // egyetlen záró pont, kettőspont nélkül.
+  // egyetlen záró pont, kettőspont nélkül. A `SKILL.md` fájlnév pontja nem
+  // mondatvégi írásjel (a SPEC-009 5.4 tábla mondatai a fájlt megnevezik),
+  // ezért a fájlnév az ellenőrzés előtt pont nélküli alakra cserélődik.
   it.each(cases)('a(z) "%s" mondata egyetlen záró ponttal végződik, kettőspont nélkül', (errorClass) => {
-    expect(protocolErrorClassMessage(errorClass)).toMatch(/^[^.:]+\.$/u);
+    expect(protocolErrorClassMessage(errorClass).replaceAll('SKILL.md', 'SKILL')).toMatch(/^[^.:]+\.$/u);
   });
 
   it('egyik hibaosztály mondata sem azonos a saját hibakódja általános mondatával', () => {

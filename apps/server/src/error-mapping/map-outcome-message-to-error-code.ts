@@ -1,5 +1,6 @@
 import type { EngineErrorKind } from '@easter-workflow-builder/engine';
 import type { ProtocolErrorCode } from '@easter-workflow-builder/protocol';
+import { SKILL_UPLOAD_ERROR_CLASSES } from '../skill-endpoint/skill-upload-error-class.ts';
 import { extractTrailingErrorClass } from './extract-trailing-error-class.ts';
 
 /**
@@ -73,13 +74,15 @@ const ENGINE_VALIDATION_ERROR_CLASSES = [
 /**
  * Az `unprocessable` kódra képződő hibaosztályok (SPEC-005 8.3 táblázat 3.,
  * 5. és 7. sora): a tárolt/küldött gráf dokumentum feldolgozhatatlan hibái
- * (`packages/db`), és a motor validációs hibaosztályai.
+ * (`packages/db`), a motor validációs hibaosztályai, és a skill feltöltés
+ * tizenöt elutasítási oka (SPEC-009 5.4, O-41).
  */
 const UNPROCESSABLE_ERROR_CLASSES: ReadonlySet<string> = new Set([
   'malformed_graph_document',
   'unknown_graph_document_version',
   'non_canonicalizable_value',
   ...ENGINE_VALIDATION_ERROR_CLASSES,
+  ...SKILL_UPLOAD_ERROR_CLASSES,
 ]);
 
 /**
