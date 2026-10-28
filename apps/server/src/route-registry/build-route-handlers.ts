@@ -32,9 +32,12 @@ import { createDeleteSkillHandler } from '../skill-endpoint/delete-skill.ts';
 import { createListSkillsHandler } from '../skill-endpoint/list-skills.ts';
 import type { SkillLibrary } from '../skill-endpoint/skill-library.ts';
 import { createUploadSkillHandler } from '../skill-endpoint/upload-skill.ts';
+import { createDeleteMcpServerDefinitionHandler } from '../mcp-server-definition-endpoint/delete-mcp-server-definition.ts';
+import { createListMcpServerDefinitionsHandler } from '../mcp-server-definition-endpoint/list-mcp-server-definitions.ts';
+import { createSaveMcpServerDefinitionHandler } from '../mcp-server-definition-endpoint/save-mcp-server-definition.ts';
 
 /**
- * A `ROUTE_TABLE` mind a 29 azonosítójára kitöltött kezelő rekord
+ * A `ROUTE_TABLE` mind a 32 azonosítójára kitöltött kezelő rekord
  * (SPEC-006 `route-registry` téma, 12. elfogadási kritérium). A
  * `RouteHandlers` visszatérési típus miatt egy kimaradó `RouteId` (vagy a
  * nyers ZIP törzsű végpont nem bináris kezelője) fordítási hibát ad, nem
@@ -90,5 +93,10 @@ export function buildRouteHandlers(
     listSkills: createListSkillsHandler(skillLibrary),
     uploadSkill: createUploadSkillHandler(skillLibrary),
     deleteSkill: createDeleteSkillHandler(skillLibrary),
+
+    // H. Központi MCP szerver lista (3 végpont, SPEC-009 6.2)
+    listMcpServerDefinitions: createListMcpServerDefinitionsHandler(database),
+    saveMcpServerDefinition: createSaveMcpServerDefinitionHandler(database),
+    deleteMcpServerDefinition: createDeleteMcpServerDefinitionHandler(database),
   };
 }

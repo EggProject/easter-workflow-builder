@@ -130,7 +130,7 @@ A `protocol` `dependencies` mezője a jelen spec után: `@easter-workflow-builde
 - **Minden azonosító szöveg**, kivéve a `run_event.id` értékét, ami egész (F-18).
 - **Hibánál a válasz törzse egyetlen alak**, a 8. szekció `ProtocolErrorBody` sémája, a státusz kód pedig a 8.2 táblázat szerinti.
 
-### 4.2 A 29 REST végpont
+### 4.2 A 32 REST végpont
 
 A "Motor vagy repository" oszlop mondja meg, mire képződik le a végpont. Ahol a cél a motor, ott a hívás **nem** kerülheti meg a motort, mert a validáció, a provider feloldás és a pillanatkép a motor felelőssége (SPEC-004 4.8).
 
@@ -226,6 +226,18 @@ A 26. végpont **teljes cserét** végez, nem hozzáadást és nem törlést: a 
 | 29  | `DELETE /api/skills/{name}` | nincs                                         | üres törzs, 204      | `not_found`, `unprocessable` (`skill_name_invalid`)                   |
 
 A 28. végpont az egyetlen, amelynek törzse nem JSON: a `ROUTE_TABLE` sora `requestBody: 'application/zip'` mezőt hordoz, és az `apps/server` ezen a jelzésen a kezelő saját korlátjáig olvasott bináris törzset adja át (SPEC-009 5.1, 5.4 6. pont). A skill könyvtár a fájlrendszeren áll, nem a `db` csomagban (SPEC-009 O-9).
+
+**H. Központi MCP szerver lista (3 végpont, SPEC-009 6.2, PLAN-012 T-012-10)**
+
+| #   | Metódus és útvonal               | Kérés                                     | Válasz                                         | Saját hibaágai                              |
+| --- | -------------------------------- | ----------------------------------------- | ---------------------------------------------- | ------------------------------------------- |
+| 30  | `GET /api/mcp-servers`           | nincs                                     | `McpServerDefinitionRecord` lista, név szerint | nincs                                       |
+| 31  | `PUT /api/mcp-servers/{name}`    | `McpServerDefinition` (a három ág egyike) | `McpServerDefinitionRecord`                    | `invalid_request` (név szabály, törzs séma) |
+| 32  | `DELETE /api/mcp-servers/{name}` | nincs                                     | üres törzs, 204                                | `not_found`                                 |
+
+A 31. végpont létrehoz vagy teljesen lecserél név szerint (a skill feltöltés `PUT` mintája); a
+definíció csak env változó NEVEKET hordoz, értéket soha. A 32. végpont hivatkozó lépés mellett is töröl
+(SPEC-009 O-43 (a)); a hiányzó definícióra a futás indítása ad megnevezett hibát (SPEC-009 6.4).
 
 ## 5. Az SSE protokoll
 

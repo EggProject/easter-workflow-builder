@@ -197,6 +197,13 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   ágára és a beágyazott objektumokra egy ismeretlen kulcsot mindkét oldalon elutasít, a szabadon maradó
   mezők tetszőleges kulcsát mindkét oldalon elfogadja. Új, nyitott belsejű mező felvételekor a két
   oldal kulcslistája és ez a teszt együtt változik.
+- **A `protocol` a `db` központi MCP szerver definícióját is duplikálhatja, ugyanezzel a védelemmel.**
+  A három ágú `McpServerDefinition` (a `stdio` ágon a kötelező `envBindings` mezővel) és a nevét hordozó
+  rekord a `db` `mcp-server-definition` témájában és a `protocol` azonos nevű témájában is áll; a védelem
+  az `apps/server` `mcp-server-definition-drift-protection` témája (típusszintű kétirányú egyenlőség, plusz
+  futásidejű ág a `db` `isMcpServerDefinition` guardján). A név és az env változó név szabálya csak a
+  `protocol` sémáiban áll, a `db` alakot ellenőriz. A lépés `mcpServerReferences` mezője a `NodeConfig`
+  duplikáció része, a `node-config-drift-protection` őrzi (SPEC-009 6.1, 6.2, O-42, PLAN-012 T-012-10).
 
 **Fájlok és tesztek**
 

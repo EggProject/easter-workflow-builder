@@ -45,7 +45,7 @@ function buildHandlers(database: DatabaseContext) {
 }
 
 describe('buildRouteHandlers', () => {
-  it('a ROUTE_TABLE mind a 29 azonosítójára kitölt egy kezelőt, a nyers ZIP törzsű végpontra bináris kezelőt', () => {
+  it('a ROUTE_TABLE mind a 32 azonosítójára kitölt egy kezelőt, a nyers ZIP törzsű végpontra bináris kezelőt', () => {
     const handlers = buildHandlers(openMemoryDatabase());
     for (const routeId of Object.keys(ROUTE_TABLE)) {
       expect(isRouteId(routeId)).toBe(true);

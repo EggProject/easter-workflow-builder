@@ -100,6 +100,9 @@ function buildHandlers(database: DatabaseContext): RouteHandlers {
     listSkills: DEFAULT_HANDLER,
     uploadSkill: DEFAULT_BINARY_HANDLER,
     deleteSkill: DEFAULT_HANDLER,
+    listMcpServerDefinitions: DEFAULT_HANDLER,
+    saveMcpServerDefinition: DEFAULT_HANDLER,
+    deleteMcpServerDefinition: DEFAULT_HANDLER,
   };
   return {
     ...base,

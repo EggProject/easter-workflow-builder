@@ -1,7 +1,7 @@
 // Barrel: csak nevesített újraexport (SPEC-002 6.6 6. szabálya). A csomag téma mappánként
 // bővül, ahogy a SPEC-005 végrehajtási lépései elkészülnek.
 
-// http-route: az API_BASE_PATH és a STREAM_PATH konstans, a 29 végpont útvonal sablonja,
+// http-route: az API_BASE_PATH és a STREAM_PATH konstans, a 32 végpont útvonal sablonja,
 // a paraméter behelyettesítő tiszta függvény, és a nyers ZIP törzsű végpontok guardja.
 export { API_BASE_PATH } from './http-route/api-base-path.ts';
 export { STREAM_PATH } from './http-route/stream-path.ts';
@@ -228,3 +228,25 @@ export type { SkillName } from './skill/skill-name.ts';
 export { SkillNameSchema } from './skill/skill-name.ts';
 export type { SkillSummary } from './skill/skill-summary.ts';
 export { SkillSummarySchema } from './skill/skill-summary.ts';
+
+// mcp-server-definition: a központi MCP szerver lista sémái (SPEC-009 6.1, 6.2, PLAN-012 T-012-10), a
+// `packages/db` `mcp-server-definition` témájának szándékos mirror sémái; a sodródás védelmét az
+// `apps/server` `mcp-server-definition-drift-protection` tesztje adja.
+export type { EnvironmentVariableName } from './mcp-server-definition/environment-variable-name.ts';
+export { EnvironmentVariableNameSchema } from './mcp-server-definition/environment-variable-name.ts';
+export type { McpServerName } from './mcp-server-definition/mcp-server-name.ts';
+export { McpServerNameSchema } from './mcp-server-definition/mcp-server-name.ts';
+export type {
+  HttpMcpServerDefinition,
+  McpServerDefinition,
+  SseMcpServerDefinition,
+  StdioMcpServerDefinition,
+} from './mcp-server-definition/mcp-server-definition.ts';
+export {
+  HttpMcpServerDefinitionSchema,
+  McpServerDefinitionSchema,
+  SseMcpServerDefinitionSchema,
+  StdioMcpServerDefinitionSchema,
+} from './mcp-server-definition/mcp-server-definition.ts';
+export type { McpServerDefinitionRecord } from './mcp-server-definition/mcp-server-definition-record.ts';
+export { McpServerDefinitionRecordSchema } from './mcp-server-definition/mcp-server-definition-record.ts';
