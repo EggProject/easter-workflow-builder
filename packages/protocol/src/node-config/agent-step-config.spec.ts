@@ -1,6 +1,9 @@
 /* eslint-disable unicorn/no-null -- az AgentStepConfig nullázható mezői a dróton ténylegesen `null` értéket hordozzák, nem helyőrző `undefined`-et */
 import { describe, expect, it } from 'vitest';
+import { WorkflowGraphDocumentSchema } from '../workflow/workflow-graph-document.ts';
 import { AgentStepConfigSchema, PresetSystemPromptSchema, StructuredOutputConfigSchema } from './agent-step-config.ts';
+import { NodeConfigSaveSchema } from './node-config-save-schema.ts';
+import { NodeConfigSchema } from './node-config.ts';
 
 const VALID_AGENT_STEP_CONFIG = {
   promptTemplate: 'Foglald össze: {{input}}',
@@ -84,5 +87,68 @@ describe('AgentStepConfigSchema', () => {
     expect(StructuredOutputConfigSchema.safeParse({ strategy: 'sdk_output_format', schema: ['bármi'] }).success).toBe(
       true,
     );
+  });
+});
+
+/**
+ * A lépés hivatkozás mezője (SPEC-009 6.2, O-42 (b)) és a régi alak
+ * olvashatósága (AC20, `docs/research/2026-10-26-spec-009-forrasok.md` 9.5
+ * szekció 3. pont): a mező nélküli, nem üres régi `mcpServers` értékű config
+ * az olvasó, a mentési és a gráf dokumentum sémán is átmegy.
+ */
+describe('AgentStepConfigSchema: mcpServerReferences (O-42)', () => {
+  const LEGACY_AGENT_STEP_NODE_CONFIG = {
+    ...VALID_AGENT_STEP_CONFIG,
+    mcpServers: {
+      local: { type: 'stdio', command: 'node', args: ['server.js'], envNames: ['MCP_TOKEN'] },
+      remote: { type: 'sse', url: 'https://example.test/sse', authEnvName: 'MCP_AUTH' },
+      web: { type: 'http', url: 'https://example.test/mcp', authEnvName: null },
+    },
+    type: 'agent_step',
+    onUnhandledError: 'fail_run',
+  };
+
+  it('a hivatkozás mezővel és az üres rekorddal is elfogadja', () => {
+    const references = { github_ceg: { envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_CEG' }, authEnvName: null } };
+    const parsed = AgentStepConfigSchema.safeParse({ ...VALID_AGENT_STEP_CONFIG, mcpServerReferences: references });
+    expect(parsed.success ? parsed.data.mcpServerReferences : undefined).toStrictEqual(references);
+    expect(AgentStepConfigSchema.safeParse({ ...VALID_AGENT_STEP_CONFIG, mcpServerReferences: {} }).success).toBe(true);
+  });
+
+  it('a mező hiánya nem hiba, és a kimenetben sem jelenik meg', () => {
+    const parsed = AgentStepConfigSchema.safeParse(VALID_AGENT_STEP_CONFIG);
+    expect(parsed.success && Object.hasOwn(parsed.data, 'mcpServerReferences')).toBe(false);
+  });
+
+  it.each([
+    ['undefined érték', undefined],
+    ['nem rekord', []],
+    ['ismeretlen kulcsú bejegyzés', { s: { envBindings: {}, authEnvName: null, env: { A: 'titok' } } }],
+  ])('elutasítja: %s', (_label, value) => {
+    expect(AgentStepConfigSchema.safeParse({ ...VALID_AGENT_STEP_CONFIG, mcpServerReferences: value }).success).toBe(
+      false,
+    );
+  });
+
+  it('a mező nélküli régi alak az olvasó, a mentési és a gráf dokumentum sémán is átmegy (AC20)', () => {
+    expect(NodeConfigSchema.safeParse(LEGACY_AGENT_STEP_NODE_CONFIG).success).toBe(true);
+    expect(NodeConfigSaveSchema.safeParse(LEGACY_AGENT_STEP_NODE_CONFIG).success).toBe(true);
+    const document = {
+      nodes: [
+        {
+          id: 'regi',
+          type: 'agent_step',
+          label: 'Régi',
+          positionX: 0,
+          positionY: 0,
+          config: LEGACY_AGENT_STEP_NODE_CONFIG,
+          createdAtMs: 0,
+          updatedAtMs: 0,
+        },
+      ],
+      edges: [],
+    };
+    const parsed = WorkflowGraphDocumentSchema.safeParse(document);
+    expect(parsed.success ? parsed.data : undefined).toStrictEqual(document);
   });
 });

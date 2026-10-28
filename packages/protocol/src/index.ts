@@ -167,6 +167,8 @@ export type { SandboxConfig } from './node-config/sandbox-config.ts';
 export { SandboxConfigSchema } from './node-config/sandbox-config.ts';
 export type { ScriptConfig } from './node-config/script-config.ts';
 export { ScriptConfigSchema } from './node-config/script-config.ts';
+export type { McpServerReference } from './node-config/mcp-server-reference.ts';
+export { McpServerReferenceSchema } from './node-config/mcp-server-reference.ts';
 export type { AgentStepConfig, PresetSystemPrompt, StructuredOutputConfig } from './node-config/agent-step-config.ts';
 export {
   AgentStepConfigSchema,

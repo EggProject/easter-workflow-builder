@@ -68,6 +68,9 @@ export { REQUIRED_TEXT_FIELD_PATHS } from './workflow-graph/node-config/required
 // segédalakját (`PresetSystemPrompt`, `SandboxConfig`, ...) a motor indexelt
 // hozzáféréssel éri el, tehát azok nem duplikálódnak a barrelben.
 export type { AgentStepConfig } from './workflow-graph/agent-step-config/agent-step-config.ts';
+// A lépés hivatkozása a központi MCP definícióra (SPEC-009 6.2, O-42 (b)): az
+// `apps/server` `node-config-drift-protection` témája veti össze a `protocol` párjával.
+export type { McpServerReference } from './workflow-graph/agent-step-config/mcp-server-reference.ts';
 
 // graph-snapshot: a pillanatkép dokumentum alakja. A `readGraphSnapshot`-ot és
 // a lenyomat számítót szándékosan nem exportáljuk, csak a dokumentum típusait:

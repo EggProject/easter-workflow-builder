@@ -268,23 +268,24 @@ A `join` `ai_synthesis` módja **teljes értékű agent lépés**: az alobjektum
 
 Az agent lépés beállításai. Minden mező forrása az Agent SDK `Options` típusa, ahogy a research 1. szekciója felsorolja. Egyetlen mező sincs kitalálva.
 
-| Mező                              | Típus                                                      | Megjegyzés                                              |
-| --------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
-| `promptTemplate`                  | `string`                                                   | a lépés bemenete, sablonozva a futás kontextusából      |
-| `providerId`                      | `ProviderId \| null`                                       | lépés szintű provider felülírás                         |
-| `modelId`                         | `string \| null`                                           | a **wire** modellazonosító, lásd lent                   |
-| `effort`, `thinking`              | `string \| null`, `ThinkingMode \| null`                   | `Options.effort`, `Options.thinking`                    |
-| `allowedTools`, `disallowedTools` | `readonly string[]`                                        | `Options.allowedTools`, `Options.disallowedTools`       |
-| `permissionMode`                  | `string \| null`                                           | `Options.permissionMode`                                |
-| `maxTurns`, `maxBudgetUsd`        | `number \| null`                                           | `Options.maxTurns`, `Options.maxBudgetUsd`              |
-| `systemPrompt`                    | `string \| { preset, append?, ... } \| null`               | `Options.systemPrompt` két alakja                       |
-| `agents`                          | `Readonly<Record<string, AgentDefinition>>`                | `Options.agents`, programozott subagentek               |
-| `skills`                          | `readonly string[] \| 'all' \| null`                       | `Options.skills`                                        |
-| `mcpServers`                      | `Readonly<Record<string, StorableMcpServer>>`              | csak a szerializálható variánsok, lásd lent             |
-| `cwd`, `additionalDirectories`    | `string \| null`, `readonly string[]`                      | `Options.cwd`, `Options.additionalDirectories`          |
-| `sandbox`                         | `SandboxConfig \| null`                                    | `Options.sandbox` mezői a research 1. szekciója szerint |
-| `sessionMode`                     | `'isolated' \| 'continued'`                                | lásd 4.5                                                |
-| `structuredOutput`                | `{ strategy: StructuredOutputStrategyId, schema } \| null` | lásd 4.6                                                |
+| Mező                              | Típus                                                      | Megjegyzés                                                           |
+| --------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| `promptTemplate`                  | `string`                                                   | a lépés bemenete, sablonozva a futás kontextusából                   |
+| `providerId`                      | `ProviderId \| null`                                       | lépés szintű provider felülírás                                      |
+| `modelId`                         | `string \| null`                                           | a **wire** modellazonosító, lásd lent                                |
+| `effort`, `thinking`              | `string \| null`, `ThinkingMode \| null`                   | `Options.effort`, `Options.thinking`                                 |
+| `allowedTools`, `disallowedTools` | `readonly string[]`                                        | `Options.allowedTools`, `Options.disallowedTools`                    |
+| `permissionMode`                  | `string \| null`                                           | `Options.permissionMode`                                             |
+| `maxTurns`, `maxBudgetUsd`        | `number \| null`                                           | `Options.maxTurns`, `Options.maxBudgetUsd`                           |
+| `systemPrompt`                    | `string \| { preset, append?, ... } \| null`               | `Options.systemPrompt` két alakja                                    |
+| `agents`                          | `Readonly<Record<string, AgentDefinition>>`                | `Options.agents`, programozott subagentek                            |
+| `skills`                          | `readonly string[] \| 'all' \| null`                       | `Options.skills`                                                     |
+| `mcpServers`                      | `Readonly<Record<string, StorableMcpServer>>`              | csak a szerializálható variánsok, lásd lent                          |
+| `mcpServerReferences`             | elhagyható, `Readonly<Record<string, McpServerReference>>` | a központi MCP definícióra szóló hivatkozás (SPEC-009 6.2, O-42 (b)) |
+| `cwd`, `additionalDirectories`    | `string \| null`, `readonly string[]`                      | `Options.cwd`, `Options.additionalDirectories`                       |
+| `sandbox`                         | `SandboxConfig \| null`                                    | `Options.sandbox` mezői a research 1. szekciója szerint              |
+| `sessionMode`                     | `'isolated' \| 'continued'`                                | lásd 4.5                                                             |
+| `structuredOutput`                | `{ strategy: StructuredOutputStrategyId, schema } \| null` | lásd 4.6                                                             |
 
 **A `modelId` a wire azonosító.** A research 5.1 szekciója szerint a leíró két azonosítót tart külön: a dróton megjelenő `models[].id` és a kliensnek átadott `models[].clientModelIdentifier`. "A UI és a perzisztencia a wire azonosítót mutatja, a kliensnek a suffixes alak megy." A DB tehát a wire azonosítót tárolja, a suffixes alakot a provider leíróból oldja fel a motor.
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { McpServerReferenceSchema } from './mcp-server-reference.ts';
 import { ProviderIdSchema } from './provider-id.ts';
 import { SandboxConfigSchema } from './sandbox-config.ts';
 import { SessionModeSchema } from './session-mode.ts';
@@ -65,6 +66,9 @@ export const AgentStepConfigSchema = z
     agents: z.record(z.string(), z.unknown()).readonly(),
     skills: z.union([SkillsListSchema, z.literal('all')]).nullable(),
     mcpServers: z.record(z.string(), StorableMcpServerSchema).readonly(),
+    // Elhagyható (SPEC-009 6.2, O-42 (b)): a régi gráf és pillanatkép nem hordozza. Az
+    // `exactOptional` a `db` oldali `?:` mező pontos párja (`exactOptionalPropertyTypes`).
+    mcpServerReferences: z.record(z.string(), McpServerReferenceSchema).readonly().exactOptional(),
     cwd: z.string().nullable(),
     additionalDirectories: z.array(z.string()).readonly(),
     sandbox: SandboxConfigSchema.nullable(),

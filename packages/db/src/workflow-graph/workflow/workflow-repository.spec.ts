@@ -708,6 +708,37 @@ describe('createWorkflowRepository', () => {
       sqlite.close();
     });
 
+    /**
+     * Régi gráf (SPEC-009 AC20, O-42; research 9.5 2. pont): a hivatkozás mező
+     * előtti, nem üres régi `mcpServers` értékű agent lépés nyers SQL
+     * beszúrással áll a táblában, és a `readGraph` változatlanul visszaadja.
+     */
+    it('a hivatkozás mező nélküli, nem üres régi mcpServers értékű agent lépés olvasható (O-42)', () => {
+      const { sqlite, repository } = openRepository();
+      const workflow = okOrThrow(repository.createWorkflow({ name: 'Régi', description: null, providerId: null }));
+      const legacyConfig = {
+        ...agentStepSettings,
+        mcpServers: {
+          local: { type: 'stdio', command: 'node', args: ['server.js'], envNames: ['MCP_TOKEN'] },
+          remote: { type: 'sse', url: 'https://example.test/sse', authEnvName: 'MCP_AUTH' },
+          web: { type: 'http', url: 'https://example.test/mcp', authEnvName: null },
+        },
+        type: 'agent_step',
+        onUnhandledError: 'fail_run',
+      };
+      sqlite
+        .prepare(
+          'INSERT INTO workflow_node (id, workflow_id, type, label, position_x, position_y, config, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run('regi-node', workflow.id, 'agent_step', 'Régi', 0, 0, JSON.stringify(legacyConfig), 0, 0);
+
+      const graph = okOrThrow(repository.readGraph(workflow.id));
+      expect(graph.nodes.map((node) => node.config)).toStrictEqual([legacyConfig]);
+      expect(Object.hasOwn(legacyConfig, 'mcpServerReferences')).toBe(false);
+
+      sqlite.close();
+    });
+
     it('corrupt_node_config hibaágat ad, ha egy tárolt node config ismeretlen kulcsot hordoz (SPEC-011 5.2)', () => {
       const { sqlite, database, repository } = openRepository();
       const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));
