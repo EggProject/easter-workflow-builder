@@ -74,6 +74,10 @@ export type EngineErrorKind =
   | 'provider_descriptor_sdk_mismatch'
   // PLAN-005 T-005-14: a `provider-environment` téma, hiányzó kötelező env változó
   | 'missing_provider_env'
+  // SPEC-009 5.1 (O-13): a lépés a skill könyvtárban nem álló skillre
+  // hivatkozik (például törölték). A futás indításakor fut, mert az SDK a nem
+  // létező nevre nem ad indítási hibát (M-136 5a).
+  | 'skill_not_found'
   // 7.: a párhuzamossági szabályozó, ismeretlen azonosító felszabadítása
   | 'unknown_concurrency_slot'
   // 9. szekció zárómondat, PLAN-005 T-005-27: a `restartRun` művelet - az

@@ -16,6 +16,7 @@ import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import type { ProcessEnvironmentPort } from '../engine-port/process-environment-port.ts';
+import type { SkillLibraryPort } from '../engine-port/skill-library-port.ts';
 import type { TemplateRendererPort } from '../engine-port/template-renderer-port.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { AgentStepCapabilityDecisions } from './agent-step-capability-decisions.ts';
@@ -233,6 +234,7 @@ interface DependencyParts {
   readonly templateRenderer?: TemplateRendererPort;
   readonly processEnvironment?: ProcessEnvironmentPort;
   readonly eventPublisher?: EventPublisherPort;
+  readonly skillLibrary?: SkillLibraryPort;
 }
 
 function dependenciesOf(parts: DependencyParts): EngineDependencies {
@@ -255,6 +257,9 @@ function dependenciesOf(parts: DependencyParts): EngineDependencies {
     clock: { nowMs: () => 0, sleep: notCalled },
     idGenerator: { nextId: notCalled },
     processEnvironment: parts.processEnvironment ?? { read: () => null, readAll: () => ({}) },
+    skillLibrary: parts.skillLibrary ?? {
+      readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
+    },
   };
 }
 

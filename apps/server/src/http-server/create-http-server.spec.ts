@@ -14,6 +14,7 @@ import { createStartRunHandler } from '../run-endpoint/start-run.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import type { StreamConnectionDependencies } from '../stream-connection/handle-stream-connection.ts';
 import { createHttpServer, readLastEventIdHeader, type HttpServerOptions } from './create-http-server.ts';
+import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 
 const DEFAULT_HANDLER: RouteHandler = () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } });
 const DEFAULT_BINARY_HANDLER: BinaryRouteHandler = {
@@ -342,7 +343,13 @@ describe('createHttpServer', () => {
       const database = okOrThrow(openDatabase(':memory:'));
       const registry = createStreamRegistry(createRandomUuidIdGenerator());
       const engine = createEngine(
-        buildEngineDependencies(database, registry, createSystemClock(), buildCapturingLogger().logger),
+        buildEngineDependencies(
+          database,
+          registry,
+          createSystemClock(),
+          buildCapturingLogger().logger,
+          TEST_SKILL_LIBRARY.rootDirectory,
+        ),
       );
       const workflowId = seedFanOutWorkflow(database, fields);
       const { baseUrl, close } = await startTestServer(

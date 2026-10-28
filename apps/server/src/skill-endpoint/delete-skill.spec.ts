@@ -23,11 +23,11 @@ function remove(parameters: Readonly<Record<string, string>>) {
 
 describe('createDeleteSkillHandler', () => {
   it('a skill könyvtárát teljesen eltávolítja, 204 üres törzzsel', async () => {
-    const directory = path.join(workspace.root, 'skills', 'pdf');
+    const directory = path.join(workspace.root, 'skills', 'jelentes');
     await mkdir(path.join(directory, 'ref'), { recursive: true });
     await writeFile(path.join(directory, 'ref', 'a.md'), 'x');
 
-    expect(await remove({ name: 'pdf' })).toStrictEqual({ kind: 'ok', value: { status: 204, body: undefined } });
+    expect(await remove({ name: 'jelentes' })).toStrictEqual({ kind: 'ok', value: { status: 204, body: undefined } });
     expect(existsSync(directory)).toBe(false);
   });
 

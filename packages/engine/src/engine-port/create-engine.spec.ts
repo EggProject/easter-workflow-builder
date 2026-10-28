@@ -379,6 +379,7 @@ interface HarnessOptions {
   readonly descriptorLookup?: (providerId: ProviderId) => ProviderCapabilityDescriptor<string, string>;
   readonly database?: DatabaseContext;
   readonly processEnvironment?: EngineDependencies['processEnvironment'];
+  readonly skillLibrary?: EngineDependencies['skillLibrary'];
   readonly expressionEvaluator?: EngineDependencies['expressionEvaluator'];
   readonly templateRenderer?: EngineDependencies['templateRenderer'];
   readonly clock?: EngineDependencies['clock'];
@@ -432,6 +433,9 @@ function openHarness(options: HarnessOptions = {}): Harness {
       },
     },
     processEnvironment: options.processEnvironment ?? { read: () => null, readAll: () => ({}) },
+    skillLibrary: options.skillLibrary ?? {
+      readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
+    },
   };
   return { database, dependencies, engine: createEngine(dependencies), published };
 }
@@ -479,6 +483,9 @@ function agentNode(
   onUnhandledError: UnhandledErrorPolicy = 'fail_run',
 ): WorkflowNodeInput {
   return nodeOf(id, { type: 'agent_step', onUnhandledError, ...agentStepConfig(promptTemplate) });
+}
+function skillAgentNode(id: string, skills: AgentStepConfig['skills']): WorkflowNodeInput {
+  return nodeOf(id, { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig('sikeres'), skills });
 }
 function approvalNode(id: string, timeoutMs: number | null): WorkflowNodeInput {
   return nodeOf(id, {
@@ -1041,6 +1048,70 @@ describe('createEngine', () => {
       expect(text).not.toContain(providerSecret);
       expect(text).not.toContain(otherSecret);
     }
+  });
+
+  describe('skill könyvtár (SPEC-009 5.1, 5.3)', () => {
+    const library: EngineDependencies['skillLibrary'] = {
+      readSkillLibrary: () => ({ rootDirectory: '/var/skillek', pluginName: 'skillek', skillNames: ['alfa', 'beta'] }),
+    };
+
+    it('a törölt, de hivatkozott skillre a futás indítása skill_not_found hibát ad, és nem hoz létre futást (AC14)', async () => {
+      let runCalls = 0;
+      const harness = openHarness({
+        skillLibrary: library,
+        agentQueryRunner: {
+          run: () => {
+            runCalls += 1;
+            return { kind: 'error', message: 'nem hívható' };
+          },
+        },
+      });
+      const workflowId = createWorkflow(
+        harness.database,
+        'skill-hianyzik',
+        [startNode('start'), skillAgentNode('a1', ['alfa', 'torolt'])],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      const started = await harness.engine.startRun({ workflowId, input: {} });
+
+      expect(started).toStrictEqual({
+        kind: 'error',
+        message: 'A(z) a1 csomópont a(z) "torolt" skillre hivatkozik, ami nincs a skill könyvtárban (skill_not_found).',
+      });
+      expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+      expect(runCalls).toBe(0);
+    });
+
+    it('a lépés plugins és minősített skills opcióval fut, ha a skills lista nem null (AC13)', async () => {
+      const captured: Readonly<Record<string, unknown>>[] = [];
+      const harness = openHarness({
+        skillLibrary: library,
+        agentQueryRunner: {
+          run: (request) => {
+            captured.push(request.options);
+            return {
+              kind: 'ok',
+              value: { messages: messageIterable(successMessages(1)), interrupt: () => Promise.resolve() },
+            };
+          },
+        },
+      });
+      const workflowId = createWorkflow(
+        harness.database,
+        'skill-lista',
+        [startNode('start'), skillAgentNode('a1', ['beta'])],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(status).toBe('succeeded');
+      expect(captured.map((options) => [options['plugins'], options['skills']])).toStrictEqual([
+        [[{ type: 'local', path: '/var/skillek' }], ['skillek:beta']],
+      ]);
+    });
   });
 
   describe('decideApproval', () => {

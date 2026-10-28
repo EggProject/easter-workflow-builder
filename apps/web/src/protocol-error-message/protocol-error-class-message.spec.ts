@@ -46,6 +46,7 @@ describe('protocolErrorClassMessage', () => {
     ['provider_descriptor_sdk_mismatch', 'A provider leírója nem a telepített Agent SDK verzióhoz készült.'],
     ['template_render_failed', 'A workflow egyik sablonja hibás, ezért a futás nem indítható.'],
     ['expression_evaluation_failed', 'A workflow egyik kifejezése hibás, ezért a futás nem indítható.'],
+    ['skill_not_found', 'Egy lépés olyan skillre hivatkozik, ami nincs a skill könyvtárban.'],
     ['already_decided', 'Ezt a jóváhagyást már eldöntötték.'],
     ['skill_archive_unreadable', 'A feltöltött fájl nem érvényes ZIP csomag.'],
     [

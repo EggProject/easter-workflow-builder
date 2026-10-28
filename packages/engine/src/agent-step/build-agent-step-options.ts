@@ -3,20 +3,23 @@ import type { AgentStepCapabilityDecisions } from './agent-step-capability-decis
 import type { ThinkingMode } from '@easter-workflow-builder/provider-capability';
 import type { AgentStepOptions } from './agent-step-options.ts';
 import type { SessionBinding } from './session-binding.ts';
+import type { SkillLibrarySnapshot } from '../engine-port/skill-library-snapshot.ts';
 
 /**
- * A `buildAgentStepOptions` bemenete. A négy mező négy, egymástól független
- * forrásból jön, és mind a négy **készen** érkezik: a lépés tárolt configja,
+ * A `buildAgentStepOptions` bemenete. Az öt mező öt, egymástól független
+ * forrásból jön, és mind az öt **készen** érkezik: a lépés tárolt configja,
  * a leírótól függő döntések (`validateAgentStepCapabilities`), a kimenő env
- * blokk (`buildOutgoingEnvironment`, a `processEnvironment` porton át) és
- * a session kötés (`resolveSessionBinding`). Így az összeállítás maga tiszta
- * függvény marad: sem portot, sem adatbázist nem érint.
+ * blokk (`buildOutgoingEnvironment`, a `processEnvironment` porton át),
+ * a session kötés (`resolveSessionBinding`) és a skill könyvtár állapota (a
+ * `skillLibrary` porton át). Így az összeállítás maga tiszta függvény marad:
+ * sem portot, sem adatbázist nem érint.
  */
 export interface BuildAgentStepOptionsInput {
   readonly config: AgentStepConfig;
   readonly decisions: AgentStepCapabilityDecisions;
   readonly environmentBlock: Readonly<Record<string, string>>;
   readonly sessionBinding: SessionBinding;
+  readonly skillLibrary: SkillLibrarySnapshot;
 }
 
 /**
@@ -28,6 +31,35 @@ function sessionFields(
   binding: SessionBinding,
 ): Record<string, never> | { readonly resume: string; readonly forkSession: boolean } {
   return binding.mode === 'isolated' ? {} : { resume: binding.resume, forkSession: binding.forkSession };
+}
+
+/**
+ * A skill mezők (SPEC-009 5.1, 5.3): a `skills: null` lépésen sem `plugins`,
+ * sem `skills` nem megy ki (O-40 (a)). Különben a `plugins` a skill könyvtár
+ * gyökerére mutat, a `skills` pedig `<plugin>:<név>` alakú lista: a tárolt
+ * puszta név a plugin névvel minősítve, mert a puszta név egy azonos nevű CLI
+ * beépített skillt is engedélyezne (M-136 6a), a tárolt `'all'` pedig a
+ * könyvtár aktuális neveinek explicit listája, mert az SDK `'all'` értéke a
+ * beépítetteket is engedélyezné (M-136 2c, 4a; research
+ * `2026-10-28-spec-009-blokkolo-meresek.md` 2. szekció).
+ */
+function skillFields(
+  skills: AgentStepConfig['skills'],
+  library: SkillLibrarySnapshot,
+):
+  | Record<string, never>
+  | {
+      readonly plugins: NonNullable<AgentStepOptions['plugins']>;
+      readonly skills: NonNullable<AgentStepOptions['skills']>;
+    } {
+  if (skills === null) {
+    return {};
+  }
+  const names = skills === 'all' ? library.skillNames : skills;
+  return {
+    plugins: [{ type: 'local', path: library.rootDirectory }],
+    skills: names.map((name) => `${library.pluginName}:${name}`),
+  };
 }
 
 /**
@@ -86,7 +118,8 @@ function thinkingFields(
  * 2. **A lépés configjából átemelt, elhagyható mezők.** Mindegyik tárolt alakja
  *    `null`-lal jelzi a hiányt (SPEC-003 4.4), és a `null` érték itt nem
  *    kiküldött `null`-t, hanem **hiányzó mezőt** jelent.
- * 3. **A session és a strukturált kimenet mezői**, a két segédfüggvény szerint.
+ * 3. **A session, a skill és a strukturált kimenet mezői**, a segédfüggvények
+ *    szerint.
  *
  * **Ami szándékosan kimarad: az `mcpServers`.** A tárolt `StorableMcpServer`
  * alak titok helyett env változó **nevet** hordoz; a mező bekötése a SPEC-009
@@ -112,7 +145,7 @@ export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentS
     ...(config.maxTurns !== null && { maxTurns: config.maxTurns }),
     ...(config.maxBudgetUsd !== null && { maxBudgetUsd: config.maxBudgetUsd }),
     ...(config.systemPrompt !== null && { systemPrompt: config.systemPrompt }),
-    ...(config.skills !== null && { skills: config.skills }),
+    ...skillFields(config.skills, input.skillLibrary),
     ...(config.cwd !== null && { cwd: config.cwd }),
     ...(config.sandbox !== null && { sandbox: config.sandbox }),
     ...sessionFields(input.sessionBinding),

@@ -274,6 +274,7 @@ export async function runAgentStep(
       decisions: request.decisions,
       environmentBlock: environmentBlock.value,
       sessionBinding: sessionBinding.value,
+      skillLibrary: dependencies.skillLibrary.readSkillLibrary(),
     }),
   });
   if (query.kind === 'error') {

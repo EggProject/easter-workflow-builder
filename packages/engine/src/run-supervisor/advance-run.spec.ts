@@ -498,6 +498,9 @@ function openFixture(options: FixtureOptions = {}): Fixture {
     clock,
     idGenerator: { nextId: notCalled },
     processEnvironment: { read: () => null, readAll: () => ({}) },
+    skillLibrary: {
+      readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
+    },
   };
   const dependencies: NodeExecutorDependencies = {
     ports,

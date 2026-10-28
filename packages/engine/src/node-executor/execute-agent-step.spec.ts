@@ -284,6 +284,9 @@ function dependenciesOf(
     })(),
     idGenerator: { nextId: notCalled },
     processEnvironment: { read: () => null, readAll: () => ({}) },
+    skillLibrary: {
+      readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
+    },
   };
 }
 

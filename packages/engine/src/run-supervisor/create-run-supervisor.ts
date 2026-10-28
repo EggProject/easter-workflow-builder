@@ -9,6 +9,7 @@ import { resolveEffectiveProvider } from '../provider-resolution/resolve-effecti
 import { cancelActiveRunTree } from '../run-interrupt/cancel-active-run-tree.ts';
 import { validateLanguageFields } from '../run-validation/validate-language-fields.ts';
 import { validateRun } from '../run-validation/validate-run.ts';
+import { validateSkillReferences } from '../run-validation/validate-skill-references.ts';
 import { createSchedulerState } from '../scheduling/create-scheduler-state.ts';
 import { enqueueStartInstance } from '../scheduling/enqueue-start-instance.ts';
 import type { ActiveRunHandle } from './active-run-registry.ts';
@@ -165,6 +166,16 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
     const languageFields = validateLanguageFields(validated.value.nodeConfigsById, ports);
     if (languageFields.kind === 'error') {
       return languageFields;
+    }
+
+    // 3. (a lépések skill hivatkozásai, SPEC-009 5.1, O-13): a skill könyvtár
+    //    a `skillLibrary` porton át, az indítás pillanatának állapotában.
+    const skillReferences = validateSkillReferences(
+      validated.value.nodeConfigsById,
+      ports.skillLibrary.readSkillLibrary().skillNames,
+    );
+    if (skillReferences.kind === 'error') {
+      return skillReferences;
     }
 
     // 3. (provider validáció, 11.2) és 4. (a bemenet ellenőrzése).

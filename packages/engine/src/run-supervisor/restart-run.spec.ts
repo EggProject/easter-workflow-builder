@@ -271,6 +271,9 @@ function createTrivialSupervisor(database: DatabaseContext): RunSupervisor {
     clock: { nowMs: () => 0, sleep: () => Promise.resolve() },
     idGenerator: { nextId: () => 'id-1' },
     processEnvironment: { read: () => null, readAll: () => ({}) },
+    skillLibrary: {
+      readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
+    },
   };
   return createRunSupervisor({
     ports,

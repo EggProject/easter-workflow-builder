@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { EngineErrorKind } from './engine-error-kind.ts';
 import { isEngineErrorKind } from './is-engine-error-kind.ts';
 
-// Az `engine-error-kind.ts` mind a negyvenhét értéke, ugyanabban a
+// Az `engine-error-kind.ts` mind a negyvennyolc értéke, ugyanabban a
 // sorrendben. Az `EngineErrorKind[]` annotáció fordítási idejű állítás is: ha
 // az unió bővül vagy szűkül, ez a lista nem maradhat érintetlenül.
 const allEngineErrorKinds: readonly EngineErrorKind[] = [
@@ -48,6 +48,7 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
   'effort_unsupported',
   'provider_descriptor_sdk_mismatch',
   'missing_provider_env',
+  'skill_not_found',
   'unknown_concurrency_slot',
   'run_execution_failed',
   'malformed_restart_source_input',
@@ -56,9 +57,9 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
 ];
 
 describe('isEngineErrorKind', () => {
-  it('mind a negyvenhét ágra igazat ad', () => {
+  it('mind a negyvennyolc ágra igazat ad', () => {
     expect(allEngineErrorKinds.every((kind) => isEngineErrorKind(kind))).toBe(true);
-    expect(allEngineErrorKinds).toHaveLength(47);
+    expect(allEngineErrorKinds).toHaveLength(48);
   });
 
   it('hamisat ad ismeretlen szövegre', () => {

@@ -75,7 +75,9 @@ describe('registerShutdownSignalHandlers', () => {
     const database = openMemoryDatabase();
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, silentLogger()));
+    const engine = createEngine(
+      buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
+    );
     const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
@@ -97,7 +99,9 @@ describe('registerShutdownSignalHandlers', () => {
     const database = openMemoryDatabase();
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, silentLogger()));
+    const engine = createEngine(
+      buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
+    );
     const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
@@ -119,7 +123,9 @@ describe('registerShutdownSignalHandlers', () => {
     const database = openMemoryDatabase();
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, silentLogger()));
+    const engine = createEngine(
+      buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
+    );
     const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),

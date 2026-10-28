@@ -305,7 +305,9 @@ describe('runShutdownSequence', () => {
     const database = openMemoryDatabase();
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, silentLogger()));
+    const engine = createEngine(
+      buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
+    );
     const { sink, lines } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
@@ -330,7 +332,9 @@ describe('runShutdownSequence', () => {
     // A valódi összeállítás, eltérés nélkül: a `human_approval` lépés a
     // szállított Mustache renderelővel várakozó futást ad, amit a leállás
     // megszakíthat.
-    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, silentLogger()));
+    const engine = createEngine(
+      buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
+    );
     const { sink } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
@@ -378,7 +382,7 @@ describe('runShutdownSequence', () => {
     // gazdagép env változói ne döntsenek). A sablon renderelő a szállított
     // Mustache port.
     const engine = createEngine({
-      ...buildEngineDependencies(database, streamRegistry, clock, silentLogger()),
+      ...buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
       agentQueryRunner: agent.runner,
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
       processEnvironment: { read: () => null, readAll: () => ({}) },
@@ -448,7 +452,7 @@ describe('runShutdownSequence', () => {
     // Ugyanaz a két, tesztelhetőségi eltérés, mint az indító kérés
     // regressziós tesztjében.
     const engine = createEngine({
-      ...buildEngineDependencies(database, streamRegistry, clock, silentLogger()),
+      ...buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
       agentQueryRunner: agent.runner,
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
       processEnvironment: { read: () => null, readAll: () => ({}) },
@@ -545,7 +549,9 @@ describe('runShutdownSequence', () => {
     };
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    const engine = createEngine(buildEngineDependencies(racyDatabase, streamRegistry, clock, silentLogger()));
+    const engine = createEngine(
+      buildEngineDependencies(racyDatabase, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
+    );
     const { sink, lines } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({

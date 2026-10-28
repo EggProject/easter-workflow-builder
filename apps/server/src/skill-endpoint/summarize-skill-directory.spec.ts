@@ -21,10 +21,10 @@ describe('summarizeSkillDirectory', () => {
     await mkdir(path.join(workspace.directory, 'ref', 'mely'), { recursive: true });
     await writeFile(path.join(workspace.directory, 'ref', 'mely', 'a.md'), '12345');
 
-    const summary = await summarizeSkillDirectory(workspace.directory, 'pdf');
+    const summary = await summarizeSkillDirectory(workspace.directory, 'jelentes');
 
     expect(summary).toMatchObject({
-      name: 'pdf',
+      name: 'jelentes',
       description: 'PDF kezelés',
       sizeBytes: Buffer.byteLength(manifest) + 5,
     });
@@ -32,9 +32,9 @@ describe('summarizeSkillDirectory', () => {
   });
 
   it('kívülről elrontott könyvtárnál (nincs SKILL.md, vagy hibás) a leírás üres, a lista nem bukik', async () => {
-    const withoutManifest = await summarizeSkillDirectory(workspace.directory, 'pdf');
+    const withoutManifest = await summarizeSkillDirectory(workspace.directory, 'jelentes');
     await writeFile(path.join(workspace.directory, 'SKILL.md'), '# nincs fejléc');
-    const withBrokenManifest = await summarizeSkillDirectory(workspace.directory, 'pdf');
+    const withBrokenManifest = await summarizeSkillDirectory(workspace.directory, 'jelentes');
     expect(withoutManifest.description).toBe('');
     expect(withBrokenManifest.description).toBe('');
   });

@@ -6,7 +6,8 @@ import { z } from 'zod';
  * saját mondat"). A tagok a szerver hibaosztályainak szándékos részhalmaza:
  * a futás indításának minden validációs hibaosztálya (SPEC-004 4.2, 4.5,
  * 4.6, 4.7, 4.8, 8.2 és 11.3, a motor `validateRun` és `prepareRun` útja,
- * plusz a SPEC-010 9.2 sablon és kifejezés fordítási ellenőrzése),
+ * plusz a SPEC-010 9.2 sablon és kifejezés fordítási ellenőrzése és a
+ * SPEC-009 5.1 skill hivatkozás ellenőrzése),
  * plusz a jóváhagyás `already_decided` ága (`packages/db`
  * `human-approval-repository.ts`), plusz a skill feltöltés tizenöt szerver
  * oldali elutasítási osztálya (SPEC-009 5.4, O-41, user döntés 2026-10-28;
@@ -51,6 +52,8 @@ export const ProtocolErrorClassSchema = z.enum([
   'thinking_mode_unsupported',
   'effort_unsupported',
   'provider_descriptor_sdk_mismatch',
+  // SPEC-009 5.1 (O-13): a lépés skill hivatkozása nincs a skill könyvtárban
+  'skill_not_found',
   // SPEC-005 4.2 18. végpont: a jóváhagyás már el van döntve
   'already_decided',
   // SPEC-009 5.4: a skill feltöltés elutasítási okai (O-41)

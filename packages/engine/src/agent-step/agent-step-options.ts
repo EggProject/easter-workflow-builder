@@ -15,8 +15,10 @@ import type { SdkThinkingConfig } from './sdk-thinking-config.ts';
  * **Minden mező forrása az F-2 tény**, tehát a research 1. szekciójában
  * névvel felsorolt `Options` mező; kitalált mező nincs. A típusok több
  * helyen indexelt hozzáféréssel jönnek a tárolt `AgentStepConfig` alakból
- * (`systemPrompt`, `skills`, `sandbox`, `agents`), mert a motor ezeket
- * változatlanul adja tovább, tehát a két alaknak együtt kell mozognia.
+ * (`systemPrompt`, `sandbox`, `agents`), mert a motor ezeket
+ * változatlanul adja tovább, tehát a két alaknak együtt kell mozognia. A
+ * `skills` kimenő alakja a tárolttól eltér (`<plugin>:<név>` lista, SPEC-009
+ * 5.3), a `plugins` az SDK `SdkPluginConfig` `local` ága (SPEC-009 5.1).
  *
  * **Az opcionális mezők a "nincs kiküldve" esetet jelentik**, nem az
  * `undefined` értéket: az `exactOptionalPropertyTypes` mellett a hiányzó mező
@@ -44,7 +46,8 @@ export type AgentStepOptions = {
   readonly maxTurns?: number;
   readonly maxBudgetUsd?: number;
   readonly systemPrompt?: NonNullable<AgentStepConfig['systemPrompt']>;
-  readonly skills?: NonNullable<AgentStepConfig['skills']>;
+  readonly plugins?: readonly { readonly type: 'local'; readonly path: string }[];
+  readonly skills?: readonly string[];
   readonly cwd?: string;
   readonly sandbox?: NonNullable<AgentStepConfig['sandbox']>;
   readonly resume?: string;

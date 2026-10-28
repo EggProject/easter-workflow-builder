@@ -48,11 +48,9 @@ export async function continueStartupWithDatabase(
   const clock = createSystemClock();
   const idGenerator = createRandomUuidIdGenerator();
   const streamRegistry = createStreamRegistry(idGenerator);
-  const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, logger));
-
-  // 6. HTTP szerver összeállítása és a jelkezelők felvétele. A skill könyvtár
-  // gyökere abszolút útvonalra oldódik (a folyamat induló könyvtárához képest),
-  // mert a motor plugin útként adja tovább (SPEC-009 5.1).
+  // A skill könyvtár gyökere abszolút útvonalra oldódik (a folyamat induló
+  // könyvtárához képest), mert a motor plugin útként adja tovább, és a skill
+  // végpontok ugyanezt kezelik (SPEC-009 5.1).
   const skillLibrary: SkillLibrary = {
     rootDirectory: path.resolve(config.skillLibraryDirectory),
     limits: {
@@ -61,6 +59,11 @@ export async function continueStartupWithDatabase(
       maxEntryCount: config.skillMaxEntryCount,
     },
   };
+  const engine = createEngine(
+    buildEngineDependencies(database, streamRegistry, clock, logger, skillLibrary.rootDirectory),
+  );
+
+  // 6. HTTP szerver összeállítása és a jelkezelők felvétele.
   const server = createHttpServer({
     handlers: buildRouteHandlers(database, engine, streamRegistry, skillLibrary),
     devOrigin: config.devOrigin,

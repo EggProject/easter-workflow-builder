@@ -31,7 +31,9 @@ const CONFLICT_ERROR_CLASSES: ReadonlySet<string> = new Set([
  * 4.6, 4.7, 4.8 és 8.2 gráf, config és bemenet ellenőrzései, a 11.1 provider
  * feloldás és a 11.3 leíró alapú ellenőrzések, plusz a SPEC-010 9.2 sablon és
  * kifejezés fordítási ellenőrzése (`template_render_failed`,
- * `expression_evaluation_failed`, SPEC-010 9.3). A két utóbbi osztály a REST
+ * `expression_evaluation_failed`, SPEC-010 9.3), plusz a SPEC-009 5.1 skill
+ * hivatkozás ellenőrzése (`skill_not_found`, O-13). A sablon és a kifejezés
+ * osztálya a REST
  * válaszban csak a futás indításából érkezhet, mert a lépés futásának hibája
  * a futás eseményein megy ki. A kiértékelő hiányát jelző korábbi hibaosztály a
  * SPEC-010 9.4 döntésével megszűnt. A `satisfies` a sodródás
@@ -69,6 +71,7 @@ const ENGINE_VALIDATION_ERROR_CLASSES = [
   'provider_descriptor_sdk_mismatch',
   'template_render_failed',
   'expression_evaluation_failed',
+  'skill_not_found',
 ] satisfies readonly EngineErrorKind[];
 
 /**

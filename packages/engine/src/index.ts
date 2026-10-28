@@ -1,7 +1,7 @@
 // Barrel: csak nevesített újraexport. A csomag téma mappánként bővül, ahogy a
 // PLAN-005 végrehajtási lépései elkészülnek.
 
-// engine-port: a kilenc befecskendezett port típusa és az összefogó
+// engine-port: a tíz befecskendezett port típusa és az összefogó
 // `EngineDependencies` (SPEC-004 3.2, 3.3).
 export type { DatabaseContext } from './engine-port/database-port.ts';
 export type { AgentQueryRunner } from './engine-port/agent-query-runner-port.ts';
@@ -12,6 +12,8 @@ export type { EventPublisherPort } from './engine-port/event-publisher-port.ts';
 export type { ClockPort } from './engine-port/clock-port.ts';
 export type { IdGeneratorPort } from './engine-port/id-generator-port.ts';
 export type { ProcessEnvironmentPort } from './engine-port/process-environment-port.ts';
+export type { SkillLibraryPort } from './engine-port/skill-library-port.ts';
+export type { SkillLibrarySnapshot } from './engine-port/skill-library-snapshot.ts';
 export type { EngineDependencies } from './engine-port/engine-dependencies.ts';
 // A motor teljes felülete és a `createEngine` összeállítás (SPEC-004 3.1
 // szekció, PLAN-005 T-005-28): az `Engine` interfész, a négy eredmény típus

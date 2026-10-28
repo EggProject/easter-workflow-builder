@@ -40,7 +40,7 @@ function failingSecondRename(): DirectoryReplaceOperations {
 describe('replaceSkillDirectory', () => {
   it('új skillnél az ideiglenes könyvtár a helyére kerül', async () => {
     const source = await directoryWith('staging', 'új');
-    const destination = path.join(workspace.root, 'skills', 'pdf');
+    const destination = path.join(workspace.root, 'skills', 'jelentes');
     await mkdir(path.dirname(destination), { recursive: true });
 
     await replaceSkillDirectory(source, destination, path.join(workspace.root, 'previous'));
@@ -50,7 +50,7 @@ describe('replaceSkillDirectory', () => {
   });
 
   it('felülíráskor a régi teljesen kicserélődik, a félrerakott régi törlődik', async () => {
-    const destination = await directoryWith('skills/pdf', 'régi');
+    const destination = await directoryWith('skills/jelentes', 'régi');
     await writeFile(path.join(destination, 'csak-a-reginel.txt'), 'x');
     const source = await directoryWith('staging', 'új');
 
@@ -62,7 +62,7 @@ describe('replaceSkillDirectory', () => {
   });
 
   it('ha az új nem kerülhet a helyére, a régi skill érintetlenül visszakerül, és a hiba továbbmegy (5.4 9. pont)', async () => {
-    const destination = await directoryWith('skills/pdf', 'régi');
+    const destination = await directoryWith('skills/jelentes', 'régi');
     const source = await directoryWith('staging', 'új');
 
     await expect(
@@ -80,7 +80,7 @@ describe('replaceSkillDirectory', () => {
     };
 
     await expect(
-      replaceSkillDirectory(source, path.join(workspace.root, 'skills', 'pdf'), 'nem-hasznalt', operations),
+      replaceSkillDirectory(source, path.join(workspace.root, 'skills', 'jelentes'), 'nem-hasznalt', operations),
     ).rejects.toThrow('első hiba');
   });
 });
