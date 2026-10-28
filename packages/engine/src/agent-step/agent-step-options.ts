@@ -29,6 +29,10 @@ import type { SdkThinkingConfig } from './sdk-thinking-config.ts';
  * lépésnél explicit `true` értéket ad (SPEC-004 6.3, 32. elfogadási
  * kritérium), tehát a hamis érték típusszinten sem állítható be. A
  * `sessionStore` opciót a motor nem használja (F-14).
+ *
+ * **A `settingSources` üres tuple, a `strictMcpConfig` `true` literál típusú**
+ * (SPEC-009 7.1, O-20 (a)): minden lépés a gép saját Claude beállításai és
+ * MCP konfigurációja nélkül fut, tehát más érték típusszinten sem állítható be.
  */
 /* eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- itt szándékosan objektum literál típusalias áll, nem `interface`: az `AgentQueryRequest.options` mező típusa `Readonly<Record<string, unknown>>`, amire egy `interface` alakú objektum nem hozzárendelhető (nincs implicit index szignatúrája, mert az interfész később kiterjeszthető), egy típusalias viszont igen. Interfésszel az adapter felé `as` kényszerítés kellene, ami tiltott (`.claude/CLAUDE.md` 5.) */
 export type AgentStepOptions = {
@@ -40,6 +44,8 @@ export type AgentStepOptions = {
   readonly env: Readonly<Record<string, string>>;
   readonly includePartialMessages: boolean;
   readonly persistSession: true;
+  readonly settingSources: readonly [];
+  readonly strictMcpConfig: true;
   readonly thinking?: SdkThinkingConfig;
   readonly effort?: string;
   readonly permissionMode?: string;

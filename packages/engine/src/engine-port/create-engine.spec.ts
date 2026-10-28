@@ -1038,6 +1038,7 @@ describe('createEngine', () => {
       PATH: '/usr/bin',
       ANTHROPIC_AUTH_TOKEN: providerSecret,
       MASIK_TITOK: otherSecret,
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
     });
 
     const publishedText = JSON.stringify(harness.published);
@@ -1241,7 +1242,11 @@ describe('createEngine', () => {
 
       okOrThrow(await harness.engine.testProviderConnection('minimax'));
 
-      expect(capturedOptions?.['env']).toStrictEqual({ PATH: '/usr/bin', HOME: '/home/teszt' });
+      expect(capturedOptions?.['env']).toStrictEqual({
+        PATH: '/usr/bin',
+        HOME: '/home/teszt',
+        CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
+      });
     });
 
     it('az agentQueryRunner.run hibaágát succeeded: false eredménnyé alakítja', async () => {

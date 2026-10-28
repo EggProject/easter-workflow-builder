@@ -62,7 +62,7 @@ function optionsFor(skills: AgentStepConfig['skills']): ReturnType<typeof buildA
 }
 
 describe('buildAgentStepOptions', () => {
-  it('a minimális lépés csak a kötelező mezőket küldi ki, persistSession: true értékkel', () => {
+  it('a minimális lépés csak a kötelező mezőket küldi ki, persistSession: true értékkel és az izolációs mezőkkel (SPEC-009 O-20, AC22)', () => {
     const options = buildAgentStepOptions({
       config: agentStepConfig(),
       decisions: decisions(),
@@ -80,6 +80,8 @@ describe('buildAgentStepOptions', () => {
       env: { PROVIDER_BASE_URL: 'https://pelda' },
       includePartialMessages: true,
       persistSession: true,
+      settingSources: [],
+      strictMcpConfig: true,
     });
   });
 

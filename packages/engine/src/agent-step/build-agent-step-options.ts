@@ -114,7 +114,13 @@ function thinkingFields(
  *    `includePartialMessages` a 13. sor, az `env` a
  *    `provider-environment` téma blokkja (10. és 11. sor), a
  *    `persistSession` pedig minden lépésnél `true` (6.3, 32. elfogadási
- *    kritérium).
+ *    kritérium). A `settingSources: []` és a `strictMcpConfig: true` az
+ *    izoláció (SPEC-009 7.1, O-20 (a)): a lépés nem olvassa a szerver gép
+ *    user, project és local beállítás forrását (`~/.claude/settings.json`, a
+ *    `cwd` alatti `.claude/` és `CLAUDE.md`, az ott felfedezett skillek), és
+ *    csak a kimenő `mcpServers` MCP szervereit látja. Az auto memory
+ *    kikapcsolása nem itt, hanem a kimenő `env` blokkban áll
+ *    (`buildOutgoingEnvironment`, O-39).
  * 2. **A lépés configjából átemelt, elhagyható mezők.** Mindegyik tárolt alakja
  *    `null`-lal jelzi a hiányt (SPEC-003 4.4), és a `null` érték itt nem
  *    kiküldött `null`-t, hanem **hiányzó mezőt** jelent.
@@ -139,6 +145,8 @@ export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentS
     env: input.environmentBlock,
     includePartialMessages: decisions.includePartialMessages,
     persistSession: true,
+    settingSources: [],
+    strictMcpConfig: true,
     ...thinkingFields(decisions.thinking),
     ...(decisions.effort !== undefined && { effort: decisions.effort }),
     ...(config.permissionMode !== null && { permissionMode: config.permissionMode }),

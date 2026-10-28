@@ -691,6 +691,12 @@ változó a SPEC-012 3.1 összeállítás ráírás lépése után kerül a blok
 álló más érték nem nyer. A managed policy beállítás és a `~/.claude.json` továbbra is érvényes (a
 doksi szerint ezeket a `settingSources` sem vezérli); erre forrásolt kapcsoló nincs.
 
+**Megvalósítva (T-012-12):** a `settingSources: []` és a `strictMcpConfig: true` a motor
+`buildAgentStepOptions` függvényének mindig kimenő mezője, az `AgentStepOptions` típusban literál típussal
+(üres tuple, `true`); az auto memory változója a `buildOutgoingEnvironment` negyedik lépése, a
+`requiredEnv[]` ráírása után, ezért a lépés és a kapcsolat teszt (`testProviderConnection`) blokkjában is
+áll.
+
 ### 7.2 A kimenő `Options.env` (O-21, H-40): a SPEC-012 végrehajtotta
 
 **Döntés (user döntés 2026-10-26, "Teljes környezet, tiltott változók nélkül"):** a kimenő `env` = a szerver

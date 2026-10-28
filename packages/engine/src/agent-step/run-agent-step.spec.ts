@@ -583,7 +583,11 @@ describe('runAgentStep', () => {
 
     okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry));
 
-    expect(captured.request?.options['env']).toStrictEqual({ PATH: '/usr/bin', HOME: '/home/teszt' });
+    expect(captured.request?.options['env']).toStrictEqual({
+      PATH: '/usr/bin',
+      HOME: '/home/teszt',
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
+    });
 
     database.close();
   });

@@ -110,3 +110,50 @@ describe('a motor skill mezői az SDK Options alakjai', () => {
     expect([plugin, skill]).toStrictEqual([{ type: 'local', path: '/skillek' }, 'skillek:alfa']);
   });
 });
+
+/**
+ * Az izolációs mezők (SPEC-009 7.1, O-20 (a), AC22) a pinelt SDK `Options` típusának felelnek meg: a
+ * `settingSources` üres listája `SettingSource[]`, a `strictMcpConfig` `boolean`.
+ */
+describe('a motor izolációs mezői az SDK Options alakjai', () => {
+  it('a settingSources üres lista, a strictMcpConfig true', () => {
+    const options = buildAgentStepOptions({
+      config: {
+        promptTemplate: 'prompt',
+        providerId: null,
+        modelId: 'modell',
+        effort: null,
+        thinking: null,
+        allowedTools: [],
+        disallowedTools: [],
+        permissionMode: null,
+        maxTurns: null,
+        maxBudgetUsd: null,
+        systemPrompt: null,
+        agents: {},
+        skills: null,
+        mcpServers: {},
+        cwd: null,
+        additionalDirectories: [],
+        sandbox: null,
+        sessionMode: 'isolated',
+        structuredOutput: null,
+      },
+      decisions: {
+        model: { outgoingModel: 'modell', modelIdentifierUnproven: false },
+        structuredOutput: undefined,
+        thinking: undefined,
+        effort: undefined,
+        disallowedServerTools: { disallowedTools: [], serverToolAvailabilityUnproven: false },
+        includePartialMessages: false,
+      },
+      environmentBlock: {},
+      sessionBinding: { mode: 'isolated' },
+      skillLibrary: { rootDirectory: '/skillek', pluginName: 'skillek', skillNames: [] },
+    });
+
+    const settingSources: Options['settingSources'] = [...options.settingSources];
+    const strictMcpConfig: Options['strictMcpConfig'] = options.strictMcpConfig;
+    expect([settingSources, strictMcpConfig]).toStrictEqual([[], true]);
+  });
+});
