@@ -1,0 +1,199 @@
+/* ============================================================
+   EggProject: File upload
+   Forrás: eggproject-design-components/components/file-upload/file-upload.css,
+   bájtra azonos a forrás @import sora (design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével.
+   Átemelés dátuma: 2026-10-28. Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ File upload / Dropzone ============
+   .dropzone                — wrapper dropzone (dashed, paper bg)
+   .dropzone.is-dragging    — drag-over state
+   .dropzone__icon          — leading large icon
+   .dropzone__copy          — main text
+   .dropzone__hint          — small secondary text
+   .dropzone__separator           — "or"
+   .dropzone__file          — single file row (when files present)
+============================================ */
+.dropzone {
+  position: relative;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 6px;
+  padding: 32px 24px;
+  border: 1.5px dashed var(--ep-paper-300);
+  border-radius: var(--ep-radius-lg);
+  background: var(--ep-paper-100);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--ep-dur-base) var(--ep-ease-out),
+              background-color var(--ep-dur-base) var(--ep-ease-out),
+              transform var(--ep-dur-base) var(--ep-ease-out);
+}
+.dropzone:hover { border-color: var(--ep-accent); background: var(--ep-accent-bg); }
+.dropzone.is-dragging {
+  border-color: var(--ep-accent);
+  background: var(--ep-accent-bg);
+  transform: scale(1.005);
+}
+/* Keyboard focus lands on the visually-hidden native input; surface it on the
+   wrapping label so the file picker's focus is never invisible. The house-style
+   --ep-shadow-focus is an outset ring; the dropzone is not clipped, so it shows
+   in full. The ring itself is never transitioned. */
+.dropzone:focus-within {
+  border-color: var(--ep-accent);
+  box-shadow: var(--ep-shadow-focus);
+}
+
+.dropzone__input {
+  position: absolute; inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dropzone__icon {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--ep-bg-elevated);
+  border: 1px solid var(--ep-border-subtle);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ep-accent);
+  margin-bottom: 4px;
+}
+.dropzone__icon svg { width: 20px; height: 20px; }
+
+.dropzone__copy {
+  font: 600 15px var(--ep-font-sans);
+  color: var(--ep-fg);
+}
+.dropzone__copy em { font-family: var(--ep-font-display); font-weight: 700; color: var(--ep-accent); }
+.dropzone__hint {
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}
+.dropzone__separator { font: var(--ep-text-meta); color: var(--ep-fg-subtle); margin: 2px 0; }
+.dropzone__browse {
+  font: 600 13px var(--ep-font-sans);
+  color: var(--ep-accent);
+  border-bottom: 1px solid currentColor;
+}
+
+/* ---- File rows (after files added) ---- */
+.dropzone-files {
+  display: flex; flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.dropzone-file {
+  display: flex; align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--ep-bg-elevated);
+  border: 1px solid var(--ep-border-subtle);
+  border-radius: var(--ep-radius-md);
+}
+.dropzone-file__icon {
+  width: 32px; height: 32px;
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-hover);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ep-fg-muted);
+  flex-shrink: 0;
+}
+.dropzone-file__icon svg { width: 16px; height: 16px; }
+.dropzone-file__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dropzone-file__name {
+  font: 500 13px var(--ep-font-sans);
+  color: var(--ep-fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dropzone-file__meta {
+  font: var(--ep-text-meta);
+  font-family: var(--ep-font-mono);
+  color: var(--ep-fg-subtle);
+}
+.dropzone-file__bar {
+  width: 80px;
+  height: 4px;
+  background: var(--ep-bg-pressed);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.dropzone-file__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--ep-accent);
+  border-radius: 2px;
+  transition: width var(--ep-dur-base) var(--ep-ease-out);
+}
+.dropzone-file__status {
+  font: 500 11px var(--ep-font-mono);
+  color: var(--ep-success-fg);
+}
+.dropzone-file__status--error { color: var(--ep-danger); }
+.dropzone-file__remove {
+  width: 26px; height: 26px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0;
+  color: var(--ep-fg-subtle);
+  cursor: pointer;
+  border-radius: var(--ep-radius-sm);
+}
+.dropzone-file__remove:hover { background: var(--ep-bg-hover); color: var(--ep-fg); }
+.dropzone-file__remove:focus-visible {
+  outline: none;
+  box-shadow: var(--ep-shadow-focus);
+}
+.dropzone-file__remove svg { width: 14px; height: 14px; }
+
+/* Visually-hidden text carrying the file-named status sentence for the
+   role="status" live region (the visible ✓/failed glyph stays aria-hidden). */
+.dropzone-file__sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Compact variant */
+.dropzone--small { padding: 18px 16px; gap: 4px; }
+.dropzone--small .dropzone__icon { width: 32px; height: 32px; }
+.dropzone--small .dropzone__copy { font-size: 13px; }
+
+/* Forced colors (Windows High Contrast): token-tinted border, drag state,
+   focus ring, progress track/fill, status and remove control are flattened by
+   the UA, so re-express them with system colors. System colors only. */
+@media (forced-colors: active) {
+  .dropzone { border-color: CanvasText; }
+  .dropzone.is-dragging { border-color: Highlight; }
+  .dropzone:focus-within {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+  .dropzone-file { border-color: CanvasText; }
+  .dropzone-file__bar { border: 1px solid CanvasText; }
+  .dropzone-file__bar > span { background: Highlight; }
+  .dropzone-file__status { color: CanvasText; }
+  .dropzone-file__status--error { color: CanvasText; }
+  .dropzone-file__remove { color: ButtonText; }
+  .dropzone-file__remove:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}
+
+/* Reduced motion: drop the dropzone border/background/scale micro-transition,
+   the drag-active scale, and the progress-fill width animation so no motion
+   plays. The focus ring is a static box-shadow, never animated. */
+@media (prefers-reduced-motion: reduce) {
+  .dropzone { transition: none; }
+  .dropzone.is-dragging { transform: none; }
+  .dropzone-file__bar > span { transition: none; }
+  .dropzone-file__remove { transition: none; }
+}

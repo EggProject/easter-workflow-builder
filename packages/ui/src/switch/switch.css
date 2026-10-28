@@ -1,0 +1,88 @@
+/* ============================================================
+   EggProject: Switch
+   Forrás: eggproject-design-components/components/form-controls/form-controls.css,
+   kizárólag a Switch szakasz (.ctrl__switch, .ctrl__switch--sm) bájtra
+   azonosan, a "Switch" nyitó kommenttől az utolsó Switch szabályig.
+   A megosztott .ctrl váz (.ctrl, .ctrl__input, .ctrl__text,
+   .ctrl__label, .ctrl__hint) a form-control.css-ben áll, a Switch
+   komponens azt is betölti. Kihagyva a forrás @import sora, a Checkbox,
+   a Radio és a kártya alakú választó szakasz. A forced-colors és a
+   reduced-motion blokk csak a Switch szelektorait viszi tovább (a
+   form-control témában követett eljárás), ezért ezek nem fedik le a
+   bájtazonossági tesztet.
+   Átemelés dátuma: 2026-10-28. Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ Switch ============ */
+.ctrl__switch {
+  width: 36px; height: 22px;
+  border-radius: 999px;
+  background: var(--ep-bg-control);
+  position: relative;
+  flex-shrink: 0;
+  transition: background var(--ep-dur-base) var(--ep-ease-out);
+  margin-top: 0;
+}
+.ctrl__switch::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--ep-bg-elevated);
+  box-shadow: var(--ep-shadow-sm);
+  transition: transform var(--ep-dur-base) var(--ep-ease-out);
+}
+.ctrl__input:checked + .ctrl__switch { background: var(--ep-accent); }
+.ctrl__input:checked + .ctrl__switch::after { transform: translateX(14px); }
+.ctrl__input:focus-visible + .ctrl__switch { box-shadow: var(--ep-shadow-focus); }
+
+.ctrl__switch--sm { width: 30px; height: 18px; }
+.ctrl__switch--sm::after { width: 14px; height: 14px; }
+.ctrl__input:checked + .ctrl__switch--sm::after { transform: translateX(12px); }
+
+/* ============ Forced colors, Switch ============
+   A forrás forced-colors blokkjából a Switch szelektorai, a forrás
+   sorrendjében és szövegével. A .ctrl[disabled] opacity: 1 szabály a
+   form-control.css-ben áll (megosztott .ctrl váz). */
+@media (forced-colors: active) {
+  /* Idle: recognizable shape — Canvas fill, CanvasText border + glyph. */
+  .ctrl__switch {
+    forced-color-adjust: none;
+    background: Canvas;
+    border: 1.5px solid CanvasText;
+  }
+  /* Switch off-track + thumb must read apart: CanvasText thumb on a Canvas track. */
+  .ctrl__switch::after { background: CanvasText; box-shadow: none; }
+
+  /* Checked / indeterminate: Highlight surface, HighlightText glyph. */
+  .ctrl__input:checked + .ctrl__switch {
+    background: Highlight;
+    border-color: Highlight;
+  }
+  .ctrl__input:checked + .ctrl__switch::after { background: HighlightText; }
+
+  /* Focus: box-shadow rings drop out in forced colors — use a real outline.
+     :focus-visible still gates it, so mouse clicks keep the normal model. */
+  .ctrl__input:focus-visible + .ctrl__switch {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* Disabled: GrayText. Placed after checked so checked+disabled reads as a grayed (not Highlight) state. */
+  .ctrl__input:disabled + .ctrl__switch {
+    background: Canvas;
+    border-color: GrayText;
+  }
+  .ctrl__input:disabled + .ctrl__switch::after { background: GrayText; }
+}
+
+/* ============ Reduced motion, Switch ============
+   A forrás reduced-motion blokkjának Switch szelektorai: a track
+   háttér átmenete és a gomb elmozdulása azonnali. */
+@media (prefers-reduced-motion: reduce) {
+  .ctrl__switch,
+  .ctrl__switch::after {
+    transition: none;
+  }
+}

@@ -1,0 +1,136 @@
+/* ============================================================
+   EggProject: EmptyState
+   Forrás: eggproject-design-components/components/empty/empty.css,
+   bájtra azonos a forrás @import sora (design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével.
+   Átemelés dátuma: 2026-10-28. Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ EmptyState ============
+   .empty                — wrapper, centered
+   .empty__art           — large display glyph / icon / illustration slot
+   .empty__title         — Roboto display title
+   .empty__message           — secondary text
+   .empty__actions       — primary + secondary CTAs
+============================================ */
+.empty {
+  display: flex; flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 56px 32px;
+  gap: 6px;
+  color: var(--ep-fg);
+  max-width: 480px;
+  margin: 0 auto;
+}
+.empty--card {
+  background: var(--ep-bg-elevated);
+  border: 1px solid var(--ep-border-subtle);
+  border-radius: var(--ep-radius-lg);
+}
+
+.empty__art {
+  width: 96px; height: 96px;
+  border-radius: 50%;
+  background: var(--ep-bg-hover);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+  color: var(--ep-accent);
+}
+.empty__art svg { width: 36px; height: 36px; }
+.empty__art--ink     { background: var(--ep-ink-900); color: var(--ep-yolk-400); }
+.empty__art--blue    { background: var(--ep-accent-bg); color: var(--ep-accent); }
+.empty__art--success { background: var(--ep-success-bg); color: var(--ep-success); }
+.empty__art--warning { background: var(--ep-warning-bg); color: var(--ep-warning-fg); }
+
+.empty__art--square {
+  border-radius: var(--ep-radius-lg);
+  width: 64px; height: 64px;
+}
+
+.empty__eyebrow {
+  font: var(--ep-text-overline);
+  letter-spacing: var(--ep-track-overline);
+  text-transform: uppercase;
+  color: var(--ep-fg-subtle);
+  margin-bottom: 4px;
+}
+
+.empty__title {
+  font: 400 28px/1.15 var(--ep-font-display);
+  letter-spacing: var(--ep-track-tight);
+  color: var(--ep-fg);
+}
+.empty__title em { font-weight: 700; }
+
+.empty__message {
+  font: var(--ep-text-body);
+  color: var(--ep-fg-muted);
+  margin-top: 6px;
+}
+
+.empty__actions {
+  display: flex; gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap; justify-content: center;
+}
+
+/* ---- Inline / compact version ---- */
+.empty--inline {
+  flex-direction: row;
+  text-align: left;
+  padding: 20px 24px;
+  max-width: none;
+  align-items: center;
+  gap: 16px;
+}
+.empty--inline .empty__art { width: 48px; height: 48px; margin-bottom: 0; }
+.empty--inline .empty__art svg { width: 22px; height: 22px; }
+.empty--inline .empty__title { font: var(--ep-text-h4); }
+.empty--inline .empty__message { margin-top: 2px; font: var(--ep-text-small); }
+.empty--inline .empty__actions { margin-top: 0; margin-left: auto; }
+.empty--inline > .empty__body { display: flex; flex-direction: column; }
+
+/* ============================================================
+   Forced colors (Windows High Contrast): the card's tinted token border, the
+   art slot's tinted token background and every per-tone art surface are
+   flattened, so a card could lose its edge and the art disc its shape. Pin the
+   text to system colours, give the card a real system border, and rebuild the
+   art slot as a system-coloured disc with a real border so its currentColor
+   icon stays visible. The art is decorative (aria-hidden in the JSX) — it never
+   fakes a per-tone meaning here; the meaning lives in the real <h3> title and
+   <p> message, which stay legible. Layout-only wrappers carry no colour rule:
+   .empty--inline (flex direction/padding), .empty__actions (flex row; the
+   native button/link inside keeps its own forced-colors + focus contract),
+   .empty__art--square (radius/size only — inherits the base .empty__art system
+   colours), .empty__body (flex column). System colours only; no
+   token/hex/rgb/hsl; no forced-color-adjust; no motion introduced. Live
+   emulation not run — source/CSSOM-verified.
+   ============================================================ */
+@media (forced-colors: active) {
+  .empty { color: CanvasText; }
+  .empty--card {
+    background: Canvas;
+    border-color: CanvasText;
+  }
+  .empty__eyebrow { color: GrayText; }
+  .empty__title { color: CanvasText; }
+  .empty__message { color: CanvasText; }
+  .empty__art {
+    background: ButtonFace;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  .empty__art--blue,
+  .empty__art--success,
+  .empty__art--warning {
+    background: ButtonFace;
+    color: CanvasText;
+    border-color: CanvasText;
+  }
+  .empty__art--ink {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+  }
+}
