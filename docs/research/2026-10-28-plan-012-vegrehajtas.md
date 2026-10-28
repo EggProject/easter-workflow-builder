@@ -470,3 +470,68 @@ változott.
 
 Minden commit előtt a kilenc kapu nulla kilépési kóddal futott, a 4.4 szerinti módon. Az A, B és C javítás
 kapui egy közös munkafán futottak (a három változás fájlszinten független), utána három commitba kerültek.
+
+### 4.8 Felület: találatok, javítások, tesztek
+
+Kiinduló fej: `2fcdfad`. Minden javítás külön, a kilenc kapun zöld commit. Az e2e nevek a fájl
+`test(...)` címei.
+
+| #   | Találat                                                                                          | Commit    | Teszt (régi kódon bukik)                                                                                                                                                                                                                                              |
+| --- | ------------------------------------------------------------------------------------------------ | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | A skill feltöltés utáni újratöltés hibája némán elnyelődött, az új skill nem látszott a listában | `b1896bb` | `merge-skill.spec.ts` (4), `use-skill-library.spec.tsx` (3), `SkillLibrarySettingsCard.spec.tsx` (2), e2e `skill-library-settings.spec.ts`: a feltöltés utáni újratöltés hibája danger Alert, az új skill a listában marad, az azonos nevű feltöltés megerősítést kér |
+| 2   | Az MCP hivatkozás e2e `toMatchObject` állítása egy megmaradt `envBindings` felülírást átengedett | `dd55617` | `graph-node-mcp-references.spec.ts`: `toEqual` a mentett lépés konfigurációra                                                                                                                                                                                         |
+| 3   | Az elrendezés mátrix nem fedte a Skill könyvtár és az MCP szerverek kártyát                      | `aa30d3f` | e2e `settings-screen.spec.ts`: a hat kártya, hosszú nevekkel, két téma, 320 és 1440 pixel, átfedés és túllógás nélkül, kifestve (kontraszt állítás nincs, lásd O-54)                                                                                                  |
+| 4   | A hiányzó skill fájl és a deklarált változó nevek hibája nem volt a mezőhöz kötve                | `f8a0d71` | `FileUpload.spec.tsx`, `TagInput.spec.tsx` (a prop), `SkillUploadForm.spec.tsx`, `McpServerEditModal.spec.tsx`, e2e `skill-library-settings.spec.ts` és `mcp-server-settings.spec.ts` (`toHaveAccessibleDescription`, `aria-invalid`)                                 |
+| 5   | A workflow szerkesztő Mentés gombja nem jelzett betöltést                                        | `ceddf2c` | `edit-workflow-modal.spec.tsx` (aria-busy, tiltott, a felirat nem változik), e2e `workflow-list.spec.ts`                                                                                                                                                              |
+| 6   | A mező hibája alatt a gomb elmozdul                                                              | nincs     | nincs javítás, lásd az alábbi megfigyelést                                                                                                                                                                                                                            |
+| 7   | A SPEC-009 AC9 grep mintája a dokumentumokat is találta                                          | `7e8de1a` | a minta hatóköre `-- packages apps tooling`; futtatva nulla találat                                                                                                                                                                                                   |
+| 8   | A `ProviderSelect` kommentje szerint az `errorMessage` mindig a motor magyar szövege             | `d436f18` | csak komment, teszt nincs                                                                                                                                                                                                                                             |
+
+**Az 1. találat.** A `uploadSkill` a PUT válaszát `mergeSkill` hívással azonnal a listába illeszti
+(név szerinti, UTF-16 kódegység sorrend, azonos név esetén csere), és csak utána tölt újra egy külön
+`reloadRequest` állapottal. Az újratöltés hibája a kártyán danger `Alert`, a lista és az űrlap megmarad.
+
+**A 2. találat árnyalata.** A termékkód már helyes volt. A `''` tárolására irányuló rontást a mentési
+séma mindkét teszt alakban megfogja, tehát az nem mutat különbséget. Kimutatható rés a "megmaradt régi
+hozzárendelés" rontás: a régi `toMatchObject` zölden maradt, az új `toEqual` elbukik.
+
+**Az 5. találat és a létrehozás.** A `create-workflow-modal.tsx` "Létrehozás..." felirata ugyanezt a
+mintát tartalmazza. Nem a találat része, nem változott.
+
+**A 6. találat: megfigyelés, javítás nélkül.** Nincs dokumentált design system megoldás a hibaüzenet
+megjelenése miatti elmozdulásra (sem az `eggproject-design*` skillekben, sem a projekt precedensei között),
+ezért terméket nem változtattam. Mérés egy ideiglenes, azóta törölt Playwright szkripttel, a hiba
+megjelenésekor a gomb függőleges elmozdulása: 22,8 pixel 1440 pixel szélességen, 90 pixel 320 pixel
+szélességen, és 320 pixelen a kattintás elveszett. A lehetséges javítás (a hiba helyének fenntartása) elrendezés döntés, a usert illeti.
+
+**Nyitott pontok, amelyeket nem javítottam.** A SPEC-009 14.9 új sorai "addig" viselkedéssel: O-54 (a
+FileUpload dropzone sötét témában olvashatatlan), O-55 (a kapcsolat teszt nyers `errorMessage` szöveget
+mutat), O-56 (card in card a FileUpload körül).
+
+**Ugyanaz a hiba a `use-mcp-server-library.ts` fájlban.** Az MCP szerver lista újratöltés hibája ott is
+elnyelődhet; a találat a skill felületre szólt, nem változott.
+
+### 4.9 Felület: a teljes e2e és a lefedettség
+
+Módszer: az 1.5 szerint, tiszta nyers könyvtárral (`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e
+apps/web/test-results`), nyolc shard egymás után ugyanabba a nyers könyvtárba, `flock` alatt, majd a
+gyökérből `bun run coverage:e2e:report`. Fej: `d436f18`.
+
+- Tesztszám: 738 (56 fájl), mind zöld; a shardok 93, 93, 92, 92, 92, 92, 92, 92. A `playwright test
+--list` ugyanezt az összeget adja.
+- A `coverage:e2e:report` kilépési kódja nulla, a küszöb változatlan.
+
+| Metrika    | Fedett | Összes | Fedetlen |
+| ---------- | ------ | ------ | -------- |
+| statements | 2674   | 2684   | 10       |
+| branches   | 1317   | 1327   | 10       |
+| functions  | 937    | 938    | 1        |
+| lines      | 2561   | 2571   | 10       |
+
+A fedetlen tételek száma egyetlen metrikán sem nőtt (kiinduló: 10, 10, 1, 10). A statements, a branches és
+a lines számokat a nyers adatból újra előállított `json-summary` riport adja, a functions és a többi az
+`lcov.info` összesítésével egyezik.
+
+### 4.10 Felület: kapuk
+
+Minden commit előtt a kilenc kapu nulla kilépési kóddal futott, a 4.4 szerinti módon.
