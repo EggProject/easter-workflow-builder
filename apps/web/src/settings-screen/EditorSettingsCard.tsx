@@ -1,6 +1,5 @@
 import { SelectField, type SelectFieldOption } from '@easter-workflow-builder/ui';
 import { useId, useState, type ReactElement } from 'react';
-import { CLIENT_ROUTE_TABLE } from '../client-route/client-route-table.ts';
 import { UNDO_MODIFIER_PREFERENCES, type UndoModifierPreference } from '../graph-editor/undo-modifier-preference.ts';
 import {
   getBrowserLocalStorage,
@@ -35,9 +34,9 @@ const UNDO_MODIFIER_OPTIONS: readonly SelectFieldOption<UndoModifierPreference>[
  * (`.card`, `.card__header`, `<h3>`), mert a komponens a gyerekeit `<p>`
  * elembe teszi, amiben a választó `<div>` gyökere nem állhat.
  *
- * A kártya címe a szerkesztő útvonalának felirata, mert a beállítás a
- * szerkesztő billentyűire hat; a név így nem kerül második listába
- * (`.claude/CLAUDE.md` 5. szekció).
+ * A kártya címe a SPEC-009 3.1 6. pontja szerint "Gráf szerkesztő". Nem az
+ * útvonal felirata (az "Szerkesztő", a topnav és a morzsasor szövege): a kártya
+ * a Beállítások többi kártyájától a tárgya szerint különül el.
  *
  * A választás azonnal, hálózati kérés nélkül a tárolóba íródik (SPEC-008
  * 5.10); a szerkesztő a következő betöltésekor olvassa. Betöltéskor a
@@ -54,7 +53,7 @@ export function EditorSettingsCard(): ReactElement {
   return (
     <section className="card" aria-labelledby={headingId}>
       <div className="card__header">
-        <h3 id={headingId}>{CLIENT_ROUTE_TABLE.graphEditor.label}</h3>
+        <h3 id={headingId}>Gráf szerkesztő</h3>
       </div>
       <div className="preference-row">
         <div className="preference-row__body">

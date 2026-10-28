@@ -75,7 +75,7 @@ describe('EditorSettingsCard', () => {
 
     const section = container.querySelector('section.card');
     const heading = section?.querySelector(':scope > .card__header > h3');
-    expect(heading?.textContent).toBe('Szerkesztő');
+    expect(heading?.textContent).toBe('Gráf szerkesztő');
     expect(section?.getAttribute('aria-labelledby')).toBe(heading?.id);
   });
 

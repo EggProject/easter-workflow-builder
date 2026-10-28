@@ -8,6 +8,7 @@
 // ügynök is úgy van rögzítve, hogy a kiinduló érték a másik módosítót adná:
 // így a mért viselkedés csak a választásból jöhet.
 import type {
+  ConcurrencyLimitView,
   ConnectionTestResponse,
   ProviderSummary,
   SettingsRecord,
@@ -60,6 +61,19 @@ const PROVIDERS: readonly ProviderSummary[] = [
     displayName: 'MiniMax',
     models: [],
     requiredEnvNames: [['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY'], ['ANTHROPIC_BASE_URL']],
+  },
+];
+
+const CONCURRENCY_LIMITS: readonly ConcurrencyLimitView[] = [
+  {
+    providerId: 'claude-subscription',
+    configuredMaxConcurrentSteps: null,
+    suggestion: { suggestedLimit: null, note: 'Erre a providerre nincs mért párhuzamossági javaslat.' },
+  },
+  {
+    providerId: 'minimax',
+    configuredMaxConcurrentSteps: null,
+    suggestion: { suggestedLimit: 3, note: 'A javasolt érték mérési ALSÓ KORLÁT.' },
   },
 ];
 
@@ -162,6 +176,7 @@ test.beforeEach(async ({ page }) => {
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(mockState.settings))),
     mockRoute('listProviders', async (route) => route.fulfill(jsonBody(PROVIDERS))),
+    mockRoute('listConcurrencyLimits', async (route) => route.fulfill(jsonBody(CONCURRENCY_LIMITS))),
     mockRoute('updateSettings', async (route) => {
       const body: unknown = route.request().postDataJSON();
       mockState.updateBodies.push(body);
@@ -223,20 +238,20 @@ test('a topnav "Beállítások" linkje a /settings útvonalra visz, a morzsamen�
   await expect(
     page.getByRole('navigation', { name: 'Morzsamenü' }).getByText('Beállítások', { exact: true }),
   ).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('region', { name: 'Szerkesztő' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Gráf szerkesztő' })).toBeVisible();
   await expect(page.getByLabel(ROW_LABEL)).toBeVisible();
 });
 
 // A Provider kártya (SPEC-009 3.1, O-4, O-5, O-8, AC1, AC2, AC3).
 const PROVIDER_LABEL = 'Globális alapértelmezett provider';
 
-test('a Provider kártya a Szerkesztő kártya fölött áll, alapértelmezés nélkül warning Alertet mutat, "nincs" opció nélkül', async ({
+test('a Provider kártya a Párhuzamossági korlát és a Gráf szerkesztő kártya fölött áll, alapértelmezés nélkül warning Alertet mutat, "nincs" opció nélkül', async ({
   page,
 }) => {
   await page.goto('/settings');
 
   const headings = page.getByRole('heading', { level: 3 });
-  await expect(headings).toHaveText(['Provider', 'Szerkesztő']);
+  await expect(headings).toHaveText(['Provider', 'Párhuzamossági korlát', 'Gráf szerkesztő']);
   const warning = page.getByRole('status').filter({ hasText: 'Nincs alapértelmezett provider' });
   await expect(warning).toHaveClass(/\balert--warning\b/);
 

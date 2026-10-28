@@ -1,6 +1,10 @@
 /* eslint-disable unicorn/no-null -- a SettingsRecord `defaultProviderId` mezője a dróton ténylegesen `null` értéket hordoz (packages/protocol/src/settings/settings-record.ts). */
 import type { FetchFunction } from '@easter-workflow-builder/core';
-import { UpdateSettingsRequestSchema, type SettingsRecord } from '@easter-workflow-builder/protocol';
+import {
+  UpdateSettingsRequestSchema,
+  type ConcurrencyLimitView,
+  type SettingsRecord,
+} from '@easter-workflow-builder/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -11,6 +15,17 @@ const API_ORIGIN = 'https://api.example.test';
 const PROVIDERS = [
   { id: 'claude-subscription', displayName: 'Claude előfizetés', models: [], requiredEnvNames: [] },
   { id: 'minimax', displayName: 'MiniMax', models: [], requiredEnvNames: [['ANTHROPIC_AUTH_TOKEN']] },
+];
+
+const CLAUDE_LIMIT: ConcurrencyLimitView = {
+  providerId: 'claude-subscription',
+  configuredMaxConcurrentSteps: null,
+  suggestion: { suggestedLimit: null, note: 'Nincs mért javaslat.' },
+};
+
+const LIMITS: readonly ConcurrencyLimitView[] = [
+  CLAUDE_LIMIT,
+  { providerId: 'minimax', configuredMaxConcurrentSteps: 2, suggestion: { suggestedLimit: 3, note: 'Alsó korlát.' } },
 ];
 
 function clickOn(target: Element): void {
@@ -31,6 +46,9 @@ function createFetchFunction(initial: SettingsRecord): { readonly fetchFunction:
     requests.push(`${method} ${new URL(input).pathname}`);
     if (input.endsWith('/api/providers')) {
       return Promise.resolve(Response.json(PROVIDERS));
+    }
+    if (input.endsWith('/api/settings/concurrency-limits')) {
+      return Promise.resolve(Response.json(LIMITS));
     }
     if (method === 'PUT' && typeof init.body === 'string') {
       const body: unknown = JSON.parse(init.body);
@@ -79,20 +97,21 @@ describe('SettingsScreen', () => {
     );
   }
 
-  it('a kártyákat egymás alatt, a SPEC-009 3.1 sorrendjében rajzolja (Provider, majd a szerkesztő)', async () => {
+  it('a kártyákat egymás alatt, a SPEC-009 3.1 sorrendjében rajzolja (Provider, Párhuzamossági korlát, majd a szerkesztő)', async () => {
     await render(createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false }).fetchFunction);
 
-    expect(headings()).toEqual(['Provider', 'Szerkesztő']);
-    expect(container.querySelector('.settings-screen')?.children).toHaveLength(2);
+    expect(headings()).toEqual(['Provider', 'Párhuzamossági korlát', 'Gráf szerkesztő']);
+    expect(container.querySelector('.settings-screen')?.children).toHaveLength(3);
   });
 
-  it('a provider listát és a beállítást egyszer tölti be, kártyánként ismételt kérés nélkül', async () => {
+  it('a provider listát, a beállítást és a korlátokat egyszer tölti be, kártyánként ismételt kérés nélkül', async () => {
     const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
     await render(fetchFunction);
 
     expect(requests.toSorted((left, right) => left.localeCompare(right))).toEqual([
       'GET /api/providers',
       'GET /api/settings',
+      'GET /api/settings/concurrency-limits',
     ]);
   });
 
@@ -117,5 +136,42 @@ describe('SettingsScreen', () => {
     expect(requests).toContain('PUT /api/settings');
     expect(trigger.textContent).toBe('MiniMax');
     expect(container.querySelector('.alert--warning')).toBeNull();
+  });
+
+  it('a korlát mentése a sor providerére küld PUT hívást, és a válasz után a sor az új értéket mutatja', async () => {
+    const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
+    const limitFetchFunction: FetchFunction = (input, init) => {
+      if (init.method === 'PUT' && input.endsWith('/api/settings/concurrency-limits/claude-subscription')) {
+        requests.push('PUT limit');
+        return Promise.resolve(
+          Response.json({ ...CLAUDE_LIMIT, configuredMaxConcurrentSteps: 5 } satisfies ConcurrencyLimitView),
+        );
+      }
+      return fetchFunction(input, init);
+    };
+    await render(limitFetchFunction);
+
+    const claudeRow = [...container.querySelectorAll('[role="group"]')].find(
+      (group) => group.querySelector('.preference-row__title')?.textContent === 'Claude előfizetés',
+    );
+    const input = claudeRow?.querySelector('input');
+    const saveButton = [...(claudeRow?.querySelectorAll('button') ?? [])].find(
+      (button) => button.textContent === 'Mentés',
+    );
+    if (input === null || input === undefined || saveButton === undefined) {
+      throw new Error('a teszt nem találta a Claude sor mezőjét és Mentés gombját');
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    act(() => {
+      descriptor?.set?.call(input, '5');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      saveButton.click();
+      await Promise.resolve();
+    });
+
+    expect(requests).toContain('PUT limit');
+    expect(claudeRow?.textContent).toContain('Beállított korlát: 5 egyszerre futó agent lépés.');
   });
 });

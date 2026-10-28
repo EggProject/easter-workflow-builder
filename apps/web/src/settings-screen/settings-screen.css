@@ -63,3 +63,17 @@
   font: var(--ep-text-small);
   color: var(--ep-fg-muted);
 }
+
+/* SAJÁT KIEGÉSZÍTÉS, a forrásban nem létező szabályok (SPEC-009 3.1 2.
+   pont): a párhuzamossági korlát sorának szám mezője és két gombja egy
+   sorban, keskeny kijelzőn tördelve; a mező a szám beírásához elég
+   szűk, hogy a gombok mellett elférjen. */
+.concurrency-limit-row__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--ep-space-2);
+}
+.concurrency-limit-row__form .field {
+  width: 120px;
+}
