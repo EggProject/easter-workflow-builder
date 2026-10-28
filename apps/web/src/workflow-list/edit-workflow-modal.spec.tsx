@@ -105,6 +105,10 @@ function clickOn(target: Element): void {
   });
 }
 
+function findSaveButton(container: HTMLElement): HTMLButtonElement | undefined {
+  return [...container.querySelectorAll('button')].find((candidate) => candidate.textContent === 'Mentés');
+}
+
 function providerTrigger(container: HTMLElement): HTMLButtonElement {
   const button = [...container.querySelectorAll<HTMLButtonElement>('button.select')].find(
     (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === 'Provider',
@@ -312,6 +316,28 @@ describe('EditWorkflowModal', () => {
 
     expect(container.querySelector('.alert--danger[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+  });
+
+  it('a mentés alatt a Mentés gomb tiltott és betöltést jelez (aria-busy), a felirata nem változik', async () => {
+    const pendingPatch = Promise.withResolvers<Response>();
+    await render(WORKFLOW, (_input, init) =>
+      init.method === 'PATCH' ? pendingPatch.promise : Promise.resolve(Response.json(PROVIDERS)),
+    );
+    expect(findSaveButton(container)?.getAttribute('aria-busy')).toBeNull();
+
+    await act(async () => {
+      submitForm(container);
+      await Promise.resolve();
+    });
+
+    expect(findSaveButton(container)?.disabled).toBe(true);
+    expect(findSaveButton(container)?.getAttribute('aria-busy')).toBe('true');
+    expect(findSaveButton(container)?.classList.contains('is-loading')).toBe(true);
+
+    await act(async () => {
+      pendingPatch.resolve(Response.json({ ...WORKFLOW, name: 'Alfa módosítva' }));
+      await Promise.resolve();
+    });
   });
 
   it('a Mentés gomb üres név mellett le van tiltva', async () => {

@@ -548,7 +548,7 @@ test('a provider lista betöltési hibája danger Alert a modálison belül', as
   await expect(dialog.getByRole('alert')).toHaveClass(/\balert--danger\b/);
 });
 
-test('a szerkesztés mentése alatt a Mentés gomb "Mentés..." feliratú és tiltott, a Mégse is tiltott; üres névvel a Mentés tiltott', async ({
+test('a szerkesztés mentése alatt a Mentés gomb tiltott és betöltést jelez, a Mégse is tiltott; üres névvel a Mentés tiltott', async ({
   page,
 }) => {
   const updateGate = createRequestGate();
@@ -561,7 +561,9 @@ test('a szerkesztés mentése alatt a Mentés gomb "Mentés..." feliratú és ti
   await nameField.fill('Alfa módosítva');
   await dialog.getByRole('button', { name: 'Mentés', exact: true }).click();
 
-  await expect(dialog.getByRole('button', { name: 'Mentés...', exact: true })).toBeDisabled();
+  const savingButton = dialog.getByRole('button', { name: 'Mentés', exact: true });
+  await expect(savingButton).toBeDisabled();
+  await expect(savingButton).toHaveAttribute('aria-busy', 'true');
   await expect(dialog.getByRole('button', { name: 'Mégse' })).toBeDisabled();
   expect(calls.updates).toEqual([]);
 

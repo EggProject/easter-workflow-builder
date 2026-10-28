@@ -117,8 +117,13 @@ export function EditWorkflowModal(properties: Readonly<EditWorkflowModalProperti
           <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
             Mégse
           </Button>
-          <Button type="submit" form="edit-workflow-form" disabled={isSubmitting || name.trim() === ''}>
-            {isSubmitting ? 'Mentés...' : 'Mentés'}
+          <Button
+            type="submit"
+            form="edit-workflow-form"
+            isLoading={isSubmitting}
+            disabled={isSubmitting || name.trim() === ''}
+          >
+            Mentés
           </Button>
         </>
       }
