@@ -12,9 +12,11 @@ import {
   UpdateSettingsRequestSchema,
   type ConcurrencyLimitView,
   type ConnectionTestResponse,
+  type McpServerDefinitionRecord,
   type ProviderSummary,
   type RouteId,
   type SettingsRecord,
+  type SkillSummary,
   type WorkflowDetail,
   type WorkflowGraphDocument,
 } from '@easter-workflow-builder/protocol';
@@ -92,6 +94,22 @@ const CONCURRENCY_LIMITS: readonly ConcurrencyLimitView[] = [CLAUDE_LIMIT, MINIM
 function withoutConfiguredLimit(limit: ConcurrencyLimitView): ConcurrencyLimitView {
   return { ...limit, configuredMaxConcurrentSteps: null };
 }
+
+/**
+ * Az elrendezés mátrix hosszú nevei: a legfeljebb 64 karakteres skill név és
+ * egy hosszú MCP szerver név, szóköz nélkül, hogy a törés hiánya a kártyából
+ * való túllógásként látszódjon.
+ */
+const LONG_SKILL: SkillSummary = {
+  name: `skill-${'a'.repeat(58)}`,
+  description: `Hosszú leírás ${'szó '.repeat(30)}`,
+  sizeBytes: 2048,
+  modifiedAtMs: 1,
+};
+const LONG_MCP_SERVER: McpServerDefinitionRecord = {
+  name: `mcp-${'x'.repeat(60)}`,
+  definition: { type: 'http', url: `https://mcp.example.test/${'utvonal/'.repeat(10)}`, authEnvName: null },
+};
 
 /* eslint-enable unicorn/no-null */
 
@@ -175,6 +193,12 @@ interface ServerMockState {
   settings: SettingsRecord;
   connectionResult: ConnectionTestResponse;
   limits: readonly ConcurrencyLimitView[];
+  /**
+   * A Skill könyvtár és az MCP szerverek kártya listája: alapból üres, az
+   * elrendezés mátrix tölti fel hosszú nevekkel.
+   */
+  skills: readonly SkillSummary[];
+  mcpServers: readonly McpServerDefinitionRecord[];
   readonly updateBodies: unknown[];
   readonly testedPaths: string[];
   /**
@@ -204,6 +228,8 @@ const mockState: ServerMockState = {
   settings: SETTINGS,
   connectionResult: CONNECTION_OK,
   limits: CONCURRENCY_LIMITS,
+  skills: [],
+  mcpServers: [],
   updateBodies: [],
   testedPaths: [],
   limitPuts: [],
@@ -237,6 +263,8 @@ test.beforeEach(async ({ page }) => {
   mockState.settings = SETTINGS;
   mockState.connectionResult = CONNECTION_OK;
   mockState.limits = CONCURRENCY_LIMITS;
+  mockState.skills = [];
+  mockState.mcpServers = [];
   mockState.updateBodies.length = 0;
   mockState.testedPaths.length = 0;
   mockState.limitPuts.length = 0;
@@ -253,10 +281,10 @@ test.beforeEach(async ({ page }) => {
     mockGated('readSettings', async (route) => route.fulfill(jsonBody(mockState.settings))),
     mockGated('listProviders', async (route) => route.fulfill(jsonBody(PROVIDERS))),
     mockGated('listConcurrencyLimits', async (route) => route.fulfill(jsonBody(mockState.limits))),
-    // A Skill könyvtár kártya betöltése (T-012-21): a forgatókönyvei a T-012-25 lépésben vannak, itt üres a könyvtár.
-    mockRoute('listSkills', async (route) => route.fulfill(jsonBody([]))),
-    // Az MCP szerverek kártya betöltése (T-012-23): a forgatókönyvei az `mcp-server-settings.spec.ts` fájlban vannak, itt üres a lista.
-    mockRoute('listMcpServerDefinitions', async (route) => route.fulfill(jsonBody([]))),
+    // A Skill könyvtár kártya betöltése (T-012-21): a forgatókönyvei a `skill-library-settings.spec.ts` fájlban vannak, itt alapból üres a könyvtár.
+    mockRoute('listSkills', async (route) => route.fulfill(jsonBody(mockState.skills))),
+    // Az MCP szerverek kártya betöltése (T-012-23): a forgatókönyvei az `mcp-server-settings.spec.ts` fájlban vannak, itt alapból üres a lista.
+    mockRoute('listMcpServerDefinitions', async (route) => route.fulfill(jsonBody(mockState.mcpServers))),
     mockRoute('listServerEnvironmentNames', async (route) => route.fulfill(jsonBody([]))),
     mockGated('setConcurrencyLimit', async (route, url) => {
       const providerId = lastPathSegment(url);
@@ -942,10 +970,12 @@ for (const theme of ['light', 'dark'] as const) {
         await page.setViewportSize({ width, height: 900 });
       });
 
-      test('mind a négy kártya és a vezérlői a nézetablakban állnak, átfedés és túllógás nélkül, kifestve', async ({
+      test('mind a hat kártya és a vezérlői a nézetablakban állnak, átfedés és túllógás nélkül, kifestve', async ({
         page,
       }) => {
         mockState.limits = [CLAUDE_LIMIT, { ...MINIMAX_LIMIT, configuredMaxConcurrentSteps: 2 }];
+        mockState.skills = [LONG_SKILL];
+        mockState.mcpServers = [LONG_MCP_SERVER];
         await page.goto('/settings');
         if (theme === 'dark') {
           await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -953,7 +983,14 @@ for (const theme of ['light', 'dark'] as const) {
           await expect(page.locator('html')).not.toHaveAttribute('data-theme');
         }
 
-        const cardNames = ['Provider', 'Párhuzamossági korlát', 'Futás napló', 'Gráf szerkesztő'];
+        const cardNames = [
+          'Provider',
+          'Párhuzamossági korlát',
+          'Futás napló',
+          'Skill könyvtár',
+          'MCP szerverek',
+          'Gráf szerkesztő',
+        ];
         for (const cardName of cardNames) {
           const card = page.getByRole('region', { name: cardName, exact: true });
           await expect(card).toBeVisible();
@@ -1000,6 +1037,26 @@ for (const theme of ['light', 'dark'] as const) {
         const onBackground = await backgroundOf(track);
         expect(onBackground).not.toBe(TRANSPARENT);
         expect(onBackground).not.toBe(offBackground);
+
+        const skillCard = page.getByRole('region', { name: 'Skill könyvtár', exact: true });
+        const skillRow = skillCard.getByRole('group', { name: LONG_SKILL.name, exact: true });
+        const skillName = skillCard.getByRole('textbox', { name: /^Skill neve/u });
+        const skillUpload = skillCard.getByRole('button', { name: 'Feltöltés', exact: true });
+        const skillDelete = skillRow.getByRole('button', { name: `Törlés: ${LONG_SKILL.name}`, exact: true });
+        for (const control of [skillRow, skillName, skillUpload, skillDelete]) {
+          await expectHorizontallyInside(page, control);
+        }
+        await expectNoOverlap(skillName, skillUpload);
+
+        const mcpCard = page.getByRole('region', { name: 'MCP szerverek', exact: true });
+        const mcpRow = mcpCard.getByRole('group', { name: LONG_MCP_SERVER.name, exact: true });
+        const mcpAdd = mcpCard.getByRole('button', { name: 'MCP szerver hozzáadása', exact: true });
+        const mcpEdit = mcpRow.getByRole('button', { name: `Szerkesztés: ${LONG_MCP_SERVER.name}`, exact: true });
+        const mcpDelete = mcpRow.getByRole('button', { name: `Törlés: ${LONG_MCP_SERVER.name}`, exact: true });
+        for (const control of [mcpRow, mcpAdd, mcpEdit, mcpDelete]) {
+          await expectHorizontallyInside(page, control);
+        }
+        await expectNoOverlap(mcpEdit, mcpDelete);
 
         const editorSelect = page.getByLabel(ROW_LABEL);
         await expectHorizontallyInside(page, editorSelect);
