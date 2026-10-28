@@ -5,14 +5,14 @@
  * mindkettőben, hogy a kapcsoló önmagában mért hatása látszódjon.
  */
 import type { MeasurementCase } from '../harness/types.ts';
-import { buildBaseOptions, DEFAULT_PROMPT, executeQuery } from '../harness/runner.ts';
+import { buildBaseOptionsWithoutEffort, DEFAULT_PROMPT, executeQuery } from '../harness/runner.ts';
 
 export const M26: MeasurementCase = {
   id: 'M-26',
   title: 'CLAUDE_CODE_ALWAYS_ENABLE_EFFORT hatása',
   question: 'user env: CLAUDE_CODE_ALWAYS_ENABLE_EFFORT',
   async run(context) {
-    const base = buildBaseOptions(context);
+    const base = buildBaseOptionsWithoutEffort(context);
     const a = await executeQuery({
       ctx: context,
       caseId: 'M-26',

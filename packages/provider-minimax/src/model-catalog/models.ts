@@ -21,7 +21,7 @@ export const minimaxModels: readonly ModelDescriptor<MiniMaxModelId, MiniMaxFami
   {
     id: 'MiniMax-M3.1-Flash',
     family: 'M3.1-Flash',
-    // A Claude Code kliensnek a suffixes alakot kell átadni: a MiniMax Claude Code lapjai és két független megerősítés szerint.
+    // A Claude Code kliensnek a suffixes alakot kell átadni: a MiniMax Claude Code lapjai, két független megerősítés és a mérés szerint (a kliens a dróton levágja).
     clientModelIdentifier: {
       state: 'known',
       value: 'MiniMax-M3.1-Flash[1m]',
@@ -31,6 +31,7 @@ export const minimaxModels: readonly ModelDescriptor<MiniMaxModelId, MiniMaxFami
         { kind: 'doc', url: DOC_CLAUDE_CODE_TOOLS_ALT_PROVIDERS },
         { kind: 'doc', url: DOC_DIGITALAPPLIED_MINIMAX_FLASH_CLAUDE_CODE },
         { kind: 'research', section: RESEARCH_MINIMAX_FLASH },
+        { kind: 'measurement', id: 'M-11-flash' },
       ],
     },
     contextWindow: {
@@ -63,13 +64,21 @@ export const minimaxModels: readonly ModelDescriptor<MiniMaxModelId, MiniMaxFami
       ],
     },
     maxOutputTokensWireCeiling: notMeasuredOnFlash(['M-22']),
-    // A dokumentáció támogatottnak írja, az előző modellre végzett mérés az ellenkezőjét adta.
-    imageInput: notMeasuredOnFlash(['M-23', 'M-16']),
+    // A Flash a 256x256 pixeles piros kép színét megnevezte.
+    imageInput: {
+      state: 'known',
+      value: true,
+      evidence: [{ kind: 'measurement', id: 'M-23-flash' }],
+    },
     videoInput: {
       state: 'unknown',
       reason: 'A blokkoló a telepített SDK típusfelülete: a ContentBlockParam unió nem tartalmaz videó variánst.',
       blockedBy: ['M-16', 'M-23'],
     },
-    listedByModelsEndpoint: notMeasuredOnFlash(['M-35']),
+    listedByModelsEndpoint: {
+      state: 'known',
+      value: true,
+      evidence: [{ kind: 'measurement', id: 'M-35-flash' }],
+    },
   },
 ];
