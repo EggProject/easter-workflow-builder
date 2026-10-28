@@ -132,6 +132,38 @@ test('kitöltött leírással és provider nélkül a létrehozás törzse a le�
     .toEqual({ name: 'Delta workflow', description: 'A delta leírása', providerId: null });
 });
 
+test('a létrehozás alatt a Létrehozás gomb tiltott és betöltést jelez, a felirata nem változik, a Mégse is tiltott', async ({
+  page,
+}) => {
+  const creationGate = createRequestGate();
+  const created: { count: number } = { count: 0 };
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
+    mockRoute('listProviders', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('createWorkflow', async (route) => {
+      await creationGate.passed;
+      created.count += 1;
+      await route.fulfill(jsonBody({ ...ALFA, id: 'w-epszilon', name: 'Epszilon workflow' }));
+    }),
+  ]);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Új workflow' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Új workflow' });
+  await dialog.getByLabel('Név').fill('Epszilon workflow');
+  await dialog.getByRole('button', { name: 'Létrehozás', exact: true }).click();
+
+  const creatingButton = dialog.getByRole('button', { name: 'Létrehozás', exact: true });
+  await expect(creatingButton).toBeDisabled();
+  await expect(creatingButton).toHaveAttribute('aria-busy', 'true');
+  await expect(dialog.getByRole('button', { name: 'Mégse' })).toBeDisabled();
+  expect(created.count).toBe(0);
+
+  creationGate.open();
+  await expect(dialog).toBeHidden();
+  expect(created.count).toBe(1);
+});
+
 test('a kiválasztott provider szükséges környezeti változóit a modális kiírja', async ({ page }) => {
   await installApiMocks(page, [
     mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),

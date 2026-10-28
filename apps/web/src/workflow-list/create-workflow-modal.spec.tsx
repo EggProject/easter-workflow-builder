@@ -406,6 +406,48 @@ describe('CreateWorkflowModal', () => {
     expect(closeCallCount).toBe(0);
   });
 
+  it('a létrehozás alatt a Létrehozás gomb tiltott és betöltést jelez (aria-busy), a felirata nem változik', async () => {
+    const pendingCreate = Promise.withResolvers<Response>();
+    const fetchFunction: FetchFunction = (_input, init) =>
+      init.method === 'POST' ? pendingCreate.promise : Promise.resolve(Response.json([]));
+    await act(async () => {
+      root.render(
+        <CreateWorkflowModal
+          open
+          onClose={noop}
+          onCreated={noop}
+          apiOrigin={API_ORIGIN}
+          fetchFunction={fetchFunction}
+        />,
+      );
+      await Promise.resolve();
+    });
+    const nameInput = container.querySelector('input');
+    if (nameInput === null) {
+      throw new Error('a teszt nem talált input mezőt');
+    }
+    act(() => {
+      typeInto(nameInput, 'Alfa');
+    });
+    const submitButton = (): HTMLButtonElement | null => container.querySelector('button[type="submit"]');
+    expect(submitButton()?.getAttribute('aria-busy')).toBeNull();
+
+    await act(async () => {
+      submitForm(container);
+      await Promise.resolve();
+    });
+
+    expect(submitButton()?.disabled).toBe(true);
+    expect(submitButton()?.getAttribute('aria-busy')).toBe('true');
+    expect(submitButton()?.classList.contains('is-loading')).toBe(true);
+    expect(submitButton()?.textContent).toBe('Létrehozás');
+
+    await act(async () => {
+      pendingCreate.resolve(Response.json(WORKFLOW));
+      await Promise.resolve();
+    });
+  });
+
   it('a Létrehozás gomb üres név mellett le van tiltva', async () => {
     await act(async () => {
       root.render(

@@ -101,8 +101,13 @@ export function CreateWorkflowModal(properties: Readonly<CreateWorkflowModalProp
           <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
             Mégse
           </Button>
-          <Button type="submit" form="create-workflow-form" disabled={isSubmitting || name.trim() === ''}>
-            {isSubmitting ? 'Létrehozás...' : 'Létrehozás'}
+          <Button
+            type="submit"
+            form="create-workflow-form"
+            isLoading={isSubmitting}
+            disabled={isSubmitting || name.trim() === ''}
+          >
+            Létrehozás
           </Button>
         </>
       }
