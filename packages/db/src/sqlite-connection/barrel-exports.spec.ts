@@ -60,7 +60,7 @@ function readExportStatements(): { names: readonly string[]; moduleSpecifiers: r
 }
 
 describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritérium)', () => {
-  it('futásidőben pontosan a tizenkét nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
+  it('futásidőben pontosan a tizenhárom nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
     expect(new Set(Object.keys(barrel))).toStrictEqual(
       new Set([
         'ENV_EASTER_DB_FILE',
@@ -91,6 +91,11 @@ describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritér
         // `agent-definition` témája az agent definíciók `mcpServerReferences`
         // mezőjét ezzel olvassa (SPEC-009 6.2).
         'isMcpServerReference',
+        // A tizenharmadik ugyanebből a tervből: az `apps/server`
+        // `mcp-server-definition-drift-protection` témája a központi MCP
+        // definíció kötelező szöveg mező tábláját veti össze a `protocol`
+        // mentési sémájának táblájával (SPEC-009 6.1).
+        'MCP_SERVER_DEFINITION_REQUIRED_TEXT_FIELDS',
       ]),
     );
   });

@@ -61,6 +61,9 @@ describe('createSaveMcpServerDefinitionHandler', () => {
     ['érték rekordot hordozó env mező', { ...github, env: { GITHUB_TOKEN: 'titok' } }],
     ['nem deklarált névre szóló hozzárendelés', { ...github, envBindings: { OTHER: 'GITHUB_TOKEN_CEG' } }],
     ['szabálytalan env változó név', { ...github, envNames: ['GITHUB-TOKEN'], envBindings: {} }],
+    ['üres stdio command', { ...github, command: '  ' }],
+    // eslint-disable-next-line unicorn/no-null -- az authEnvName a dróton valódi `null` értéket hordoz
+    ['üres http url', { type: 'http', url: '', authEnvName: null }],
   ])('%s: invalid_request a mező útvonalával', async (_label, body) => {
     const database = openMemoryDatabase();
 

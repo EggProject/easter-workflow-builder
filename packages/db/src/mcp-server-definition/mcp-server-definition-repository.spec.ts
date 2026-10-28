@@ -60,6 +60,31 @@ describe('McpServerDefinitionRepository', () => {
     database.close();
   });
 
+  it('az üres kötelező szöveg mező blank_required_text_field, írás nélkül (a meglévő definíció megmarad)', () => {
+    const database = okOrThrow(openDatabase(':memory:'));
+    okOrThrow(database.mcpServerDefinitions.saveDefinition({ name: 'github', definition: githubDefinition }));
+
+    expect(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'github',
+        definition: { ...githubDefinition, command: ' ' },
+      }),
+    ).toStrictEqual({
+      kind: 'error',
+      message: 'A(z) "github" MCP szerver definíció "command" kötelező szöveg mezője üres (blank_required_text_field).',
+    });
+    expect(
+      database.mcpServerDefinitions.saveDefinition({ name: 'remote', definition: { ...remoteDefinition, url: '' } }),
+    ).toStrictEqual({
+      kind: 'error',
+      message: 'A(z) "remote" MCP szerver definíció "url" kötelező szöveg mezője üres (blank_required_text_field).',
+    });
+    expect(okOrThrow(database.mcpServerDefinitions.listDefinitions())).toStrictEqual([
+      { name: 'github', definition: githubDefinition },
+    ]);
+    database.close();
+  });
+
   it('a törlés eltávolítja a sort, a nem létező név not_found', () => {
     const database = okOrThrow(openDatabase(':memory:'));
     okOrThrow(database.mcpServerDefinitions.saveDefinition({ name: 'github', definition: githubDefinition }));

@@ -155,7 +155,11 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   az üres mezőt továbbra is elfogadja, mert a pillanatkép megváltoztathatatlan (10. szekció 2. pont), és
   egy régi, üres mezőt hordozó gráfnak és futásnak olvashatónak kell maradnia (user döntés 2026-09-28,
   SPEC-008 5.4, O-21). Az ismeretlen kulcs szabálya viszont az olvasó utat is szigorítja (lásd a
-  "minden ismeretlen kulcsot elutasít" pontot lejjebb).
+  "minden ismeretlen kulcsot elutasít" pontot lejjebb). **Ugyanez a minta a központi MCP szerver
+  definíción** (SPEC-009 6.1): a `stdio` `command` és a `sse`, `http` `url` kötelező, nem üres szöveg, a
+  `protocol` `McpServerDefinitionSaveSchema` és a `db` `saveDefinition` (`blank_required_text_field`)
+  `MCP_SERVER_DEFINITION_REQUIRED_TEXT_FIELDS` táblája szerint; a védelem az `apps/server`
+  `mcp-server-definition-drift-protection` témája, az olvasó séma és guard változatlan.
   **Az `onUnhandledError` és a `join` `mode` mentési szabálya ezzel szemben nem duplikátum:**
   kizárólag a `protocol` `NodeConfigSaveSchema` `superRefine` hívásában áll, a kötelező szöveg mezők
   szabálya mellett: mind a tíz típusnál a `null` `onUnhandledError`, `join` típusnál a `null` `mode`

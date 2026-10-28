@@ -248,6 +248,8 @@ export {
   SseMcpServerDefinitionSchema,
   StdioMcpServerDefinitionSchema,
 } from './mcp-server-definition/mcp-server-definition.ts';
+export { McpServerDefinitionSaveSchema } from './mcp-server-definition/mcp-server-definition-save-schema.ts';
+export { MCP_SERVER_DEFINITION_REQUIRED_TEXT_FIELDS } from './mcp-server-definition/mcp-server-definition-required-text-fields.ts';
 export type { McpServerDefinitionRecord } from './mcp-server-definition/mcp-server-definition-record.ts';
 export { McpServerDefinitionRecordSchema } from './mcp-server-definition/mcp-server-definition-record.ts';
 

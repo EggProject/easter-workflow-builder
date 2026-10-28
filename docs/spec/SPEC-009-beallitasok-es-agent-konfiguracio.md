@@ -556,6 +556,14 @@ definíció mentésén áll (`envNames`, az `envBindings` kulcsa és értéke, `
 a mentési szabály ezért szűk: a név kizárólag ASCII betűből, számból, `_` és
 `-` jelből áll, ami a cserét kizárja, és két különböző név sem ütközhet cserével.
 
+**Kötelező szöveg mezők (2026-10-28).** A központi definíció `stdio` ágának `command`, a `sse` és a
+`http` ágának `url` mezője nem lehet üres vagy csak szóközből álló, a node config kötelező szöveg mező
+szabályának mintájára (`.claude/CLAUDE.md` 5. szekció): a `protocol` `McpServerDefinitionSaveSchema`
+(a `PUT /api/mcp-servers/:name` törzse, a hiba a mező útvonalán, `invalid_request`) és a `db`
+`saveDefinition` (`blank_required_text_field`) ugyanazt a táblát tartja
+(`MCP_SERVER_DEFINITION_REQUIRED_TEXT_FIELDS`), a sodródás védelem az `apps/server`
+`mcp-server-definition-drift-protection` témája. Az olvasó séma és guard nem szigorodik.
+
 ### 6.2 A szerkesztés helye (O-31)
 
 **Döntés (user döntés 2026-10-26: "nem lehet a feluleten megadni mcp-hez es ahol hasznaljuk ott felul

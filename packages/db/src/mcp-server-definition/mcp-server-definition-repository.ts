@@ -1,6 +1,7 @@
 import { asc, eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { Outcome } from '@easter-workflow-builder/core';
+import { findBlankMcpServerDefinitionField } from './find-blank-mcp-server-definition-field.ts';
 import { isMcpServerDefinition } from './is-mcp-server-definition.ts';
 import type { McpServerDefinition } from './mcp-server-definition.ts';
 import { mcpServerDefinitionTable } from './mcp-server-definition-table.ts';
@@ -61,9 +62,19 @@ export function createMcpServerDefinitionRepository(
 
   /**
    * Létrehozás vagy teljes csere a név szerint (`INSERT ... ON CONFLICT(name)
-   * DO UPDATE`): a REST `PUT` szemantikája, a skill feltöltés mintájára.
+   * DO UPDATE`): a REST `PUT` szemantikája, a skill feltöltés mintájára. Az
+   * üres kötelező szöveg mező (`stdio` `command`, `sse` és `http` `url`)
+   * `blank_required_text_field` hibát ad, a mező nevével, írás nélkül (a
+   * `replaceGraph` mintája).
    */
   function saveDefinition(record: McpServerDefinitionRecord): Outcome<void> {
+    const blankField = findBlankMcpServerDefinitionField(record.definition);
+    if (blankField !== undefined) {
+      return {
+        kind: 'error',
+        message: `A(z) "${record.name}" MCP szerver definíció "${blankField}" kötelező szöveg mezője üres (blank_required_text_field).`,
+      };
+    }
     return transaction(() => {
       database
         .insert(mcpServerDefinitionTable)

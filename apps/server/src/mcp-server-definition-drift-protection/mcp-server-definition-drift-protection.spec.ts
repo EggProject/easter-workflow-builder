@@ -2,10 +2,14 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   isMcpServerDefinition,
+  MCP_SERVER_DEFINITION_REQUIRED_TEXT_FIELDS as DATABASE_REQUIRED_TEXT_FIELDS,
+  openDatabase,
   type McpServerDefinition as DatabaseMcpServerDefinition,
   type McpServerDefinitionRecord as DatabaseMcpServerDefinitionRecord,
 } from '@easter-workflow-builder/db';
 import {
+  MCP_SERVER_DEFINITION_REQUIRED_TEXT_FIELDS as PROTOCOL_REQUIRED_TEXT_FIELDS,
+  McpServerDefinitionSaveSchema,
   McpServerDefinitionSchema,
   type McpServerDefinition as ProtocolMcpServerDefinition,
   type McpServerDefinitionRecord as ProtocolMcpServerDefinitionRecord,
@@ -63,4 +67,52 @@ describe('a protokoll és a db futásidőben is ugyanúgy dönt', () => {
     expect(McpServerDefinitionSchema.safeParse(definition).success).toBe(false);
     expect(isMcpServerDefinition(definition)).toBe(false);
   });
+});
+
+/**
+ * A kötelező szöveg mező szabály (SPEC-009 6.1; a `node-config-drift-protection`
+ * kötelező szöveg mező ágának mintája): a két tábla típusszinten egyenlő, és
+ * mezőnként mindkét írási oldal (a `protocol` mentési sémája és a `db`
+ * `saveDefinition`) ugyanazt az üres értéket utasítja el, a kitöltöttet
+ * átengedi.
+ */
+describe('a kötelező szöveg mező tábla és a két írási oldal ugyanúgy dönt', () => {
+  it('a két tábla típusszinten és értékre egyenlő', () => {
+    expectTypeOf<typeof PROTOCOL_REQUIRED_TEXT_FIELDS>().toEqualTypeOf<typeof DATABASE_REQUIRED_TEXT_FIELDS>();
+    expect(PROTOCOL_REQUIRED_TEXT_FIELDS).toStrictEqual(DATABASE_REQUIRED_TEXT_FIELDS);
+  });
+
+  const blankCases: readonly (readonly [DatabaseMcpServerDefinition, string])[] = [
+    [{ type: 'stdio', command: ' ', args: [], envNames: [], envBindings: {} }, 'command'],
+    [{ type: 'sse', url: '', authEnvName: null }, 'url'],
+    [{ type: 'http', url: '  ', authEnvName: null }, 'url'],
+  ];
+
+  it.each(blankCases)('az üres mezőt mindkét oldal elutasítja: %j', (definition, field) => {
+    const parsed = McpServerDefinitionSaveSchema.safeParse(definition);
+    expect(parsed.success ? [] : parsed.error.issues.map((issue) => issue.path)).toStrictEqual([[field]]);
+    const database = openDatabase(':memory:');
+    if (database.kind !== 'ok') {
+      throw new Error(database.message);
+    }
+    const saved = database.value.mcpServerDefinitions.saveDefinition({ name: 'proba', definition });
+    expect(saved.kind === 'error' ? saved.message : '').toContain(`"${field}" kötelező szöveg mezője üres`);
+    database.value.close();
+  });
+
+  it.each(VALID_DEFINITIONS.filter(isMcpServerDefinition).map((definition) => [definition]))(
+    'a kitöltött mezőt mindkét oldal átengedi: %j',
+    (definition) => {
+      expect(McpServerDefinitionSaveSchema.safeParse(definition).success).toBe(true);
+      const database = openDatabase(':memory:');
+      if (database.kind !== 'ok') {
+        throw new Error(database.message);
+      }
+      expect(database.value.mcpServerDefinitions.saveDefinition({ name: 'proba', definition })).toStrictEqual({
+        kind: 'ok',
+        value: undefined,
+      });
+      database.value.close();
+    },
+  );
 });

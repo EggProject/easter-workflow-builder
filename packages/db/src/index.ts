@@ -165,6 +165,9 @@ export type {
   HttpMcpServerDefinition,
 } from './mcp-server-definition/mcp-server-definition.ts';
 export { isMcpServerDefinition } from './mcp-server-definition/is-mcp-server-definition.ts';
+// A kötelező szöveg mezők táblája (SPEC-009 6.1): a `saveDefinition` ebből dolgozik, az `apps/server`
+// `mcp-server-definition-drift-protection` témája a `protocol` mentési sémájának táblájával veti össze.
+export { MCP_SERVER_DEFINITION_REQUIRED_TEXT_FIELDS } from './mcp-server-definition/mcp-server-definition-required-text-fields.ts';
 
 // human-approval: a HumanApprovalRepository publikus felülete (T-003-22). A
 // factory függvényt (`createHumanApprovalRepository`) szándékosan nem
