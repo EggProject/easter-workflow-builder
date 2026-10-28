@@ -37,9 +37,12 @@ export interface ProviderSelectProperties extends Pick<
 /**
  * A kapcsolat teszt eredményének jelzése a design system `Alert` blokkjával
  * (SPEC-009 3.2): siker `success`, sikertelen teszt vagy a hívás hibája
- * `danger`. A sikertelen teszt `errorMessage` mezője a motor magyar szövege,
- * amit a protokoll a felületnek szán (`ConnectionTestResult` doksi); a hívás
- * hibája a REST réteg magyar mondata.
+ * `danger`. A sikertelen teszt `errorMessage` mezője a motor szövege
+ * (`ConnectionTestResult`): a motor saját magyar mondata (hiányzó env, hiányzó
+ * vagy nem `success` result), de az SDK vagy a folyam olvasása közben dobott
+ * kivétel szövege is lehet (`describeError`), ezért nyers, nem feltétlenül
+ * magyar szöveg; a megjelenítése termékdöntésre vár (SPEC-009 14.9 O-55). A
+ * hívás hibája a REST réteg magyar mondata.
  */
 function renderTestResult(state: RequestState<ConnectionTestResponse>): ReactElement | undefined {
   if (state.status === 'failure') {
