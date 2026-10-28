@@ -73,7 +73,7 @@ function findButtonByLabel(scope: ParentNode, label: string): HTMLButtonElement 
 
 /**
  * A sor műveletek hárompontos triggerét nyitja meg egy adott workflow
- * névre, hogy a benne álló `MenuItem` gombok (Átnevezés/Törlés/Indítás)
+ * névre, hogy a benne álló `MenuItem` gombok (Szerkesztés/Törlés/Indítás)
  * elérhetőek legyenek - ugyanaz a két lépés, amit egy valódi felhasználó
  * tenne (trigger megnyitása, utána a kívánt művelet kiválasztása).
  */
@@ -212,10 +212,10 @@ describe('WorkflowListScreen', () => {
     expect(menu).not.toBeNull();
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     const itemLabels = [...(menu?.querySelectorAll('[role="menuitem"]') ?? [])].map((item) => item.textContent);
-    expect(itemLabels).toEqual(['Átnevezés', 'Törlés', 'Indítás']);
+    expect(itemLabels).toEqual(['Szerkesztés', 'Törlés', 'Indítás']);
   });
 
-  it('az "Átnevezés" gomb megnyitja az átnevező modálist a sor adataival', async () => {
+  it('a "Szerkesztés" gomb megnyitja a szerkesztő modálist a sor adataival', async () => {
     render(oneWorkflowFetchFunction);
     await act(async () => {
       await Promise.resolve();
@@ -223,10 +223,10 @@ describe('WorkflowListScreen', () => {
 
     openActionsMenu(container, 'Alfa');
     act(() => {
-      findButtonByText(document.body, 'Átnevezés').click();
+      findButtonByText(document.body, 'Szerkesztés').click();
     });
 
-    expect(container.textContent).toContain('Workflow átnevezése');
+    expect(container.textContent).toContain('Workflow szerkesztése');
   });
 
   it('a "Törlés" gomb megnyitja a törlő modálist', async () => {
@@ -359,7 +359,7 @@ describe('WorkflowListScreen', () => {
     expect(listCallCount).toBe(2);
   });
 
-  it('az "Átnevezés" modális "Mégse" gombja bezárja, hívás nélkül', async () => {
+  it('a "Workflow szerkesztése" modális "Mégse" gombja bezárja, hívás nélkül', async () => {
     render(oneWorkflowFetchFunction);
     await act(async () => {
       await Promise.resolve();
@@ -367,7 +367,7 @@ describe('WorkflowListScreen', () => {
 
     openActionsMenu(container, 'Alfa');
     act(() => {
-      findButtonByText(document.body, 'Átnevezés').click();
+      findButtonByText(document.body, 'Szerkesztés').click();
     });
     const dialog = findDialog(container);
 
@@ -378,11 +378,14 @@ describe('WorkflowListScreen', () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it('sikeres átnevezés után újratölti a listát', async () => {
+  it('sikeres szerkesztés után újratölti a listát', async () => {
     let listCallCount = 0;
-    const fetchFunction: FetchFunction = (_input, init) => {
+    const fetchFunction: FetchFunction = (input, init) => {
       if (init.method === 'PATCH') {
         return Promise.resolve(jsonResponse({ ...WORKFLOW_ROW, name: 'Béta' }));
+      }
+      if (input.endsWith('/api/providers')) {
+        return Promise.resolve(jsonResponse([]));
       }
       listCallCount += 1;
       return Promise.resolve(jsonResponse([WORKFLOW_ROW]));
@@ -395,7 +398,7 @@ describe('WorkflowListScreen', () => {
 
     openActionsMenu(container, 'Alfa');
     act(() => {
-      findButtonByText(document.body, 'Átnevezés').click();
+      findButtonByText(document.body, 'Szerkesztés').click();
     });
 
     const dialog = findDialog(container);

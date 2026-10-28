@@ -230,6 +230,50 @@ describe('CreateWorkflowModal', () => {
     expect(container.textContent).toContain('Ehhez a providerhez nem kell környezeti változó.');
   });
 
+  /**
+   * A "Kapcsolat teszt" gomb a provider választó része (SPEC-009 3.2, O-2):
+   * nincs választás, a gomb tiltott; választás után a kiválasztott providerre
+   * a törzs nélküli `connection-test` POST megy, az eredmény Alertben áll.
+   */
+  it('a Kapcsolat teszt gomb provider nélkül tiltott, választás után a kiválasztott providert hívja', async () => {
+    const connectionTestRequests: string[] = [];
+    const fetchFunction: FetchFunction = (input, init) => {
+      if (input.includes('/connection-test')) {
+        connectionTestRequests.push(`${init.method ?? ''} ${input}`);
+        return Promise.resolve(Response.json({ succeeded: true, errorMessage: null }));
+      }
+      return Promise.resolve(
+        Response.json([{ id: 'minimax', displayName: 'MiniMax', models: [], requiredEnvNames: [] }]),
+      );
+    };
+    await act(async () => {
+      root.render(
+        <CreateWorkflowModal
+          open
+          onClose={noop}
+          onCreated={noop}
+          apiOrigin={API_ORIGIN}
+          fetchFunction={fetchFunction}
+        />,
+      );
+      await Promise.resolve();
+    });
+    const testButton = [...container.querySelectorAll('button')].find((candidate) =>
+      candidate.textContent.includes('Kapcsolat teszt'),
+    );
+    expect(testButton?.disabled).toBe(true);
+
+    chooseOption(container, 'Provider', 'MiniMax');
+    expect(testButton?.disabled).toBe(false);
+    await act(async () => {
+      testButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(connectionTestRequests).toEqual([`POST ${API_ORIGIN}/api/providers/minimax/connection-test`]);
+    expect(container.querySelector('.alert--success')?.textContent).toContain('A kapcsolat teszt sikeres.');
+  });
+
   it('sikeres létrehozásra meghívja az onCreated és az onClose callbacket', async () => {
     let capturedBody: string | undefined;
     const fetchFunction: FetchFunction = (input, init) => {
@@ -360,6 +404,48 @@ describe('CreateWorkflowModal', () => {
 
     expect(container.querySelector('.alert--danger[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
     expect(closeCallCount).toBe(0);
+  });
+
+  it('a létrehozás alatt a Létrehozás gomb tiltott és betöltést jelez (aria-busy), a felirata nem változik', async () => {
+    const pendingCreate = Promise.withResolvers<Response>();
+    const fetchFunction: FetchFunction = (_input, init) =>
+      init.method === 'POST' ? pendingCreate.promise : Promise.resolve(Response.json([]));
+    await act(async () => {
+      root.render(
+        <CreateWorkflowModal
+          open
+          onClose={noop}
+          onCreated={noop}
+          apiOrigin={API_ORIGIN}
+          fetchFunction={fetchFunction}
+        />,
+      );
+      await Promise.resolve();
+    });
+    const nameInput = container.querySelector('input');
+    if (nameInput === null) {
+      throw new Error('a teszt nem talált input mezőt');
+    }
+    act(() => {
+      typeInto(nameInput, 'Alfa');
+    });
+    const submitButton = (): HTMLButtonElement | null => container.querySelector('button[type="submit"]');
+    expect(submitButton()?.getAttribute('aria-busy')).toBeNull();
+
+    await act(async () => {
+      submitForm(container);
+      await Promise.resolve();
+    });
+
+    expect(submitButton()?.disabled).toBe(true);
+    expect(submitButton()?.getAttribute('aria-busy')).toBe('true');
+    expect(submitButton()?.classList.contains('is-loading')).toBe(true);
+    expect(submitButton()?.textContent).toBe('Létrehozás');
+
+    await act(async () => {
+      pendingCreate.resolve(Response.json(WORKFLOW));
+      await Promise.resolve();
+    });
   });
 
   it('a Létrehozás gomb üres név mellett le van tiltva', async () => {

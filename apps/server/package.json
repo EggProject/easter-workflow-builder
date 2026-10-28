@@ -20,10 +20,13 @@
     "@easter-workflow-builder/typeguards": "workspace:*",
     "@easter-workflow-builder/workflow-language": "workspace:*",
     "pino": "10.3.1",
-    "pino-roll": "4.0.0"
+    "pino-roll": "4.0.0",
+    "yaml": "2.9.1",
+    "yauzl": "3.4.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/yauzl": "3.4.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -28,7 +28,7 @@ describe('createTestProviderConnectionHandler', () => {
       testProviderConnection: (providerId) => {
         seenProviderId = providerId;
         // eslint-disable-next-line unicorn/no-null -- a ConnectionTestResult.errorMessage mezője valódi string | null
-        return Promise.resolve({ kind: 'ok', value: { succeeded: true, mode: 'minimal_query', errorMessage: null } });
+        return Promise.resolve({ kind: 'ok', value: { succeeded: true, errorMessage: null } });
       },
     });
     const handler = createTestProviderConnectionHandler(engine);
@@ -43,7 +43,7 @@ describe('createTestProviderConnectionHandler', () => {
     expect(result).toStrictEqual({
       kind: 'ok',
       // eslint-disable-next-line unicorn/no-null -- lásd fent
-      value: { status: 200, body: { succeeded: true, mode: 'minimal_query', errorMessage: null } },
+      value: { status: 200, body: { succeeded: true, errorMessage: null } },
     });
   });
 

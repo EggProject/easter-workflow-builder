@@ -29,10 +29,12 @@ import { buildProviderDescriptorLookup } from '../engine-assembly/build-provider
 import { createRealEventPublisher } from '../engine-assembly/create-real-event-publisher.ts';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
 import { createProcessEnvironmentReader } from '../engine-assembly/create-process-environment-reader.ts';
+import { createSkillLibraryReader } from '../engine-assembly/create-skill-library-reader.ts';
 import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
 import { createHttpServer } from '../http-server/create-http-server.ts';
+import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 
 /**
  * SPEC-010 12.3, 16. szekció 48 ... 50. kritérium (PLAN-010 T-010-16):
@@ -158,9 +160,10 @@ async function startServer(agentQueryRunner: AgentQueryRunner): Promise<RunningS
     clock,
     idGenerator,
     processEnvironment: createProcessEnvironmentReader(),
+    skillLibrary: createSkillLibraryReader(TEST_SKILL_LIBRARY.rootDirectory),
   });
   const server = createHttpServer({
-    handlers: buildRouteHandlers(database, engine, streamRegistry),
+    handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
     devOrigin: undefined,
     streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
     logger: createServerLogger({ secretValues: [] }, collectingSink().sink),

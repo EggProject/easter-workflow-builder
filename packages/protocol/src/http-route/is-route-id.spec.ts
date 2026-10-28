@@ -3,9 +3,9 @@ import { ROUTE_TABLE } from './route-table.ts';
 import { isRouteId } from './is-route-id.ts';
 
 describe('isRouteId', () => {
-  it('a ROUTE_TABLE mind a 26 kulcsára igazat ad', () => {
+  it('a ROUTE_TABLE mind a 33 kulcsára igazat ad', () => {
     const routeIds = Object.keys(ROUTE_TABLE);
-    expect(routeIds).toHaveLength(26);
+    expect(routeIds).toHaveLength(33);
     expect(routeIds.every((routeId) => isRouteId(routeId))).toBe(true);
   });
 

@@ -23,11 +23,13 @@ import {
 } from '@easter-workflow-builder/workflow-language';
 import { buildProviderDescriptorLookup } from '../src/engine-assembly/build-provider-descriptor-lookup.ts';
 import { createProcessEnvironmentReader } from '../src/engine-assembly/create-process-environment-reader.ts';
+import { createSkillLibraryReader } from '../src/engine-assembly/create-skill-library-reader.ts';
 import { createRandomUuidIdGenerator } from '../src/engine-assembly/create-random-uuid-id-generator.ts';
 import { createRealEventPublisher } from '../src/engine-assembly/create-real-event-publisher.ts';
 import { createSystemClock } from '../src/engine-assembly/create-system-clock.ts';
 import { createHttpServer } from '../src/http-server/create-http-server.ts';
 import { buildRouteHandlers } from '../src/route-registry/build-route-handlers.ts';
+import { TEST_SKILL_LIBRARY } from '../src/skill-endpoint/test-skill-library.ts';
 import { registerShutdownSignalHandlers } from '../src/shutdown-sequence/register-shutdown-signal-handlers.ts';
 import { createStreamRegistry } from '../src/stream-registry/create-stream-registry.ts';
 
@@ -122,9 +124,10 @@ const engine = createEngine({
   clock,
   idGenerator,
   processEnvironment: createProcessEnvironmentReader(),
+  skillLibrary: createSkillLibraryReader(TEST_SKILL_LIBRARY.rootDirectory),
 });
 const server = createHttpServer({
-  handlers: buildRouteHandlers(database, engine, streamRegistry),
+  handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
   devOrigin: undefined,
   streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
   logger,

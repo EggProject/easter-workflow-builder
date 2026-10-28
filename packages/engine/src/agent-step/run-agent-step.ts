@@ -1,12 +1,15 @@
 import type { AgentQuery, SdkResultMessage } from '@easter-workflow-builder/agent';
 import { hasStructuredOutput, isSdkResultMessage, isSdkSystemInitMessage } from '@easter-workflow-builder/agent';
-import type { AgentStepConfig } from '@easter-workflow-builder/db';
+import type { AgentStepConfig, McpServerDefinitionRecord } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { describeError } from '@easter-workflow-builder/core';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import { buildOutgoingEnvironment } from '../provider-environment/build-outgoing-environment.ts';
+import { hasMcpServerReferences } from '../mcp-server-resolution/has-mcp-server-references.ts';
+import { resolveMcpServers } from '../mcp-server-resolution/resolve-mcp-servers.ts';
+import { resolveOutgoingAgents } from '../agent-definition/resolve-outgoing-agents.ts';
 import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { AgentStepExecution } from './agent-step-execution.ts';
 import type { AgentStepOutcome } from './agent-step-outcome.ts';
@@ -256,6 +259,39 @@ export async function runAgentStep(
     return preStreamFailure('missing_provider_env', environmentBlock.message);
   }
 
+  // A futás indítási ellenőrzése (`validateMcpServerReferences`) ugyanezt
+  // futtatta, de a definíció és a szerver környezete azóta változhatott
+  // (törlés, O-43), ezért a lépés a saját pillanatának állapotát oldja fel, a
+  // lépés és az agent definíciói hivatkozásait egyaránt (SPEC-009 6.2, M-147).
+  // A központi listát csak hivatkozás mellett olvassa: egy hibás definíció sor
+  // így nem állítja meg az MCP szervert nem használó lépést (T-012-27).
+  const mcpServerDefinitions: Outcome<readonly McpServerDefinitionRecord[]> = hasMcpServerReferences(request.config)
+    ? dependencies.database.mcpServerDefinitions.listDefinitions()
+    : { kind: 'ok', value: [] };
+  if (mcpServerDefinitions.kind === 'error') {
+    return mcpServerDefinitions;
+  }
+  const mcpServers = resolveMcpServers(
+    `A(z) ${request.instance.nodeId} csomópont`,
+    request.config.mcpServerReferences,
+    mcpServerDefinitions.value,
+    dependencies.processEnvironment,
+  );
+  if (mcpServers.kind === 'error') {
+    return preStreamFailure(mcpServers.errorKind, mcpServers.message);
+  }
+  const skillLibrary = dependencies.skillLibrary.readSkillLibrary();
+  const agents = resolveOutgoingAgents(
+    request.instance.nodeId,
+    request.config.agents,
+    skillLibrary,
+    mcpServerDefinitions.value,
+    dependencies.processEnvironment,
+  );
+  if (agents.kind === 'error') {
+    return preStreamFailure(agents.errorKind, agents.message);
+  }
+
   const sessionBinding = resolveSessionBinding({
     graph: request.graph,
     sessionSourceNodes: request.sessionSourceNodes,
@@ -273,7 +309,10 @@ export async function runAgentStep(
       config: request.config,
       decisions: request.decisions,
       environmentBlock: environmentBlock.value,
+      mcpServers: mcpServers.value,
+      agents: agents.value,
       sessionBinding: sessionBinding.value,
+      skillLibrary,
     }),
   });
   if (query.kind === 'error') {

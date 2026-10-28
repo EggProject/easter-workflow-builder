@@ -388,6 +388,56 @@ describe('createWorkflowRunRepository', () => {
   });
 
   describe('getRun / listRuns / listRunsForWorkflow', () => {
+    /**
+     * Régi pillanatkép (SPEC-009 AC20, O-42; research 9.5 2. pont): a
+     * hivatkozás mező előtti agent lépés config, nem üres régi `mcpServers`
+     * értékkel, a pillanatkép olvasásán változatlanul átmegy.
+     */
+    it('a hivatkozás mező nélküli régi agent lépést hordozó pillanatkép olvasható (O-42)', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      const document: GraphSnapshotDocument = {
+        ...minimalDocument('w1', 'Regi'),
+        nodes: [
+          {
+            id: 'regi-agent',
+            type: 'agent_step',
+            label: 'Régi',
+            position: { x: 0, y: 0 },
+            config: {
+              type: 'agent_step',
+              onUnhandledError: 'fail_run',
+              promptTemplate: 'x',
+              providerId: null,
+              modelId: null,
+              effort: null,
+              thinking: null,
+              allowedTools: [],
+              disallowedTools: [],
+              permissionMode: null,
+              maxTurns: null,
+              maxBudgetUsd: null,
+              systemPrompt: null,
+              agents: {},
+              skills: null,
+              mcpServers: { local: { type: 'stdio', command: 'node', args: [], envNames: ['MCP_TOKEN'] } },
+              cwd: null,
+              additionalDirectories: [],
+              sandbox: null,
+              sessionMode: 'isolated',
+              structuredOutput: null,
+            },
+            effectiveProviderId: 'minimax',
+          },
+        ],
+      };
+      const run = startWithDocument(repository, 'w1', document);
+
+      expect(okOrThrow(repository.readSnapshot(run.id))).toStrictEqual(document);
+
+      sqlite.close();
+    });
+
     it('not_found hibaágat ad ismeretlen runId-ra', () => {
       const { sqlite, repository } = openRepository();
       expect(errorOrThrow(repository.getRun('nincs-ilyen'))).toContain('not_found');

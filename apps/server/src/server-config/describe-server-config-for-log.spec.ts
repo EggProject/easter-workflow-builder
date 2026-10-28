@@ -9,6 +9,10 @@ const BASE_CONFIG: ServerConfig = {
   logRotationFrequency: 'daily',
   logRetainedFileCount: 5,
   streamKeepAliveIntervalMs: 15_000,
+  skillLibraryDirectory: '/srv/skills',
+  skillMaxArchiveBytes: 30_000_000,
+  skillMaxUnpackedBytes: 30_000_000,
+  skillMaxEntryCount: 1024,
 };
 
 describe('describeServerConfigForLog', () => {
@@ -16,6 +20,15 @@ describe('describeServerConfigForLog', () => {
     const described = describeServerConfigForLog(BASE_CONFIG);
     expect(described['port']).toBe(4000);
     expect(described['logDirectory']).toBe('/var/log/easter');
+  });
+
+  it('a skill könyvtár útvonalát és a három skill korlátot is viszi (nem titok, SPEC-009 5.4 6. pont)', () => {
+    expect(describeServerConfigForLog(BASE_CONFIG)).toMatchObject({
+      skillLibraryDirectory: '/srv/skills',
+      skillMaxArchiveBytes: 30_000_000,
+      skillMaxUnpackedBytes: 30_000_000,
+      skillMaxEntryCount: 1024,
+    });
   });
 
   it('a devOrigin és a logLevel értékét sosem viszi, csak a "be van állítva" tényt', () => {

@@ -208,6 +208,9 @@ async function installEditorMocks(page: Page, options: EditorMockOptions = {}): 
     }),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
+    mockRoute('listSkills', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listMcpServerDefinitions', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listServerEnvironmentNames', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('replaceWorkflowGraph', async (route) => {
       const body = route.request().postData() ?? '';
       traffic.savedBodies.push(body);
@@ -563,8 +566,8 @@ for (const operation of OPERATION_CASES) {
     // A betöltés utáni állapot a viszonyítási pont: nincs várakozás jelzés, és a
     // betöltés kérései a lap egyetlen REST kérései.
     const loadedRequestCount = restRequestCount(traffic);
-    // A betöltés négy kérése: gráf, workflow, beállítások, provider lista.
-    expect(loadedRequestCount).toBe(4);
+    // A betöltés hét kérése: gráf, workflow, beállítások, provider lista, skill könyvtár, MCP szerver lista, szerver környezeti nevek.
+    expect(loadedRequestCount).toBe(7);
     await expectNoAsyncActivity(page, traffic, loadedRequestCount);
     // Horgony: a mentés törzse a betöltött gráf, tehát a törzs olvasása pontos.
     expect(await readSavedDocument(page, traffic)).toEqual(LOADED_DOCUMENT);

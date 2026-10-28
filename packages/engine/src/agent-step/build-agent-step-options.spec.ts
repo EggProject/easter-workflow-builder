@@ -4,6 +4,8 @@ import type { AgentStepConfig } from '@easter-workflow-builder/db';
 import type { AgentStepCapabilityDecisions } from './agent-step-capability-decisions.ts';
 import { buildAgentStepOptions } from './build-agent-step-options.ts';
 import type { SessionBinding } from './session-binding.ts';
+import type { SkillLibrarySnapshot } from '../engine-port/skill-library-snapshot.ts';
+import type { OutgoingAgents } from '../agent-definition/outgoing-agents.ts';
 
 function agentStepConfig(overrides: Partial<AgentStepConfig> = {}): AgentStepConfig {
   return {
@@ -44,13 +46,36 @@ function decisions(overrides: Partial<AgentStepCapabilityDecisions> = {}): Agent
 
 const isolated: SessionBinding = { mode: 'isolated' };
 
+const NO_AGENTS: OutgoingAgents = { definitions: {}, hasSkillReferences: false };
+
+const LIBRARY: SkillLibrarySnapshot = {
+  rootDirectory: '/var/skillek',
+  pluginName: 'skillek',
+  skillNames: ['alfa', 'beta'],
+};
+
+function optionsFor(skills: AgentStepConfig['skills']): ReturnType<typeof buildAgentStepOptions> {
+  return buildAgentStepOptions({
+    config: agentStepConfig({ skills }),
+    decisions: decisions(),
+    environmentBlock: {},
+    mcpServers: {},
+    agents: NO_AGENTS,
+    sessionBinding: isolated,
+    skillLibrary: LIBRARY,
+  });
+}
+
 describe('buildAgentStepOptions', () => {
-  it('a minimális lépés csak a kötelező mezőket küldi ki, persistSession: true értékkel', () => {
+  it('a minimális lépés csak a kötelező mezőket küldi ki, persistSession: true értékkel és az izolációs mezőkkel (SPEC-009 O-20, AC22)', () => {
     const options = buildAgentStepOptions({
       config: agentStepConfig(),
       decisions: decisions(),
       environmentBlock: { PROVIDER_BASE_URL: 'https://pelda' },
+      mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
+      skillLibrary: LIBRARY,
     });
 
     expect(options).toStrictEqual({
@@ -62,6 +87,8 @@ describe('buildAgentStepOptions', () => {
       env: { PROVIDER_BASE_URL: 'https://pelda' },
       includePartialMessages: true,
       persistSession: true,
+      settingSources: [],
+      strictMcpConfig: true,
     });
   });
 
@@ -70,7 +97,10 @@ describe('buildAgentStepOptions', () => {
       config: agentStepConfig(),
       decisions: decisions(),
       environmentBlock: {},
+      mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
+      skillLibrary: LIBRARY,
     });
 
     expect(Object.hasOwn(options, 'resume')).toBe(false);
@@ -82,7 +112,10 @@ describe('buildAgentStepOptions', () => {
       config: agentStepConfig({ sessionMode: 'continued' }),
       decisions: decisions(),
       environmentBlock: {},
+      mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: { mode: 'continued', resume: 'session-1', forkSession: true },
+      skillLibrary: LIBRARY,
     });
 
     expect(options.resume).toBe('session-1');
@@ -99,7 +132,6 @@ describe('buildAgentStepOptions', () => {
         skills: 'all',
         cwd: '/munka',
         additionalDirectories: ['/adat'],
-        agents: { elemzo: {} },
         sandbox: {
           enabled: true,
           failIfUnavailable: false,
@@ -110,14 +142,19 @@ describe('buildAgentStepOptions', () => {
       }),
       decisions: decisions({ thinking: 'adaptive', effort: 'high' }),
       environmentBlock: {},
+      mcpServers: {},
+      // Az `agents` a `resolveOutgoingAgents` kész kimenete, a config rekordja nem bemenet.
+      agents: { definitions: { elemzo: {} }, hasSkillReferences: false },
       sessionBinding: isolated,
+      skillLibrary: LIBRARY,
     });
 
     expect(options.permissionMode).toBe('default');
     expect(options.maxTurns).toBe(5);
     expect(options.maxBudgetUsd).toBe(2);
     expect(options.systemPrompt).toBe('rendszer');
-    expect(options.skills).toBe('all');
+    expect(options.skills).toStrictEqual(['skillek:alfa', 'skillek:beta']);
+    expect(options.plugins).toStrictEqual([{ type: 'local', path: '/var/skillek' }]);
     expect(options.cwd).toBe('/munka');
     expect(options.additionalDirectories).toStrictEqual(['/adat']);
     expect(options.agents).toStrictEqual({ elemzo: {} });
@@ -133,7 +170,10 @@ describe('buildAgentStepOptions', () => {
       config: agentStepConfig(),
       decisions: decisions({ thinking: 'disabled' }),
       environmentBlock: {},
+      mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
+      skillLibrary: LIBRARY,
     });
 
     expect(options.thinking).toStrictEqual({ type: 'disabled' });
@@ -144,7 +184,10 @@ describe('buildAgentStepOptions', () => {
       config: agentStepConfig(),
       decisions: decisions({ thinking: 'always_on' }),
       environmentBlock: {},
+      mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
+      skillLibrary: LIBRARY,
     });
 
     expect(Object.hasOwn(options, 'thinking')).toBe(false);
@@ -157,7 +200,10 @@ describe('buildAgentStepOptions', () => {
         disallowedServerTools: { disallowedTools: ['KliensKereses'], serverToolAvailabilityUnproven: false },
       }),
       environmentBlock: {},
+      mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
+      skillLibrary: LIBRARY,
     });
 
     expect(options.disallowedTools).toStrictEqual(['Bash', 'KliensKereses']);
@@ -170,7 +216,10 @@ describe('buildAgentStepOptions', () => {
       }),
       decisions: decisions(),
       environmentBlock: {},
+      mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
+      skillLibrary: LIBRARY,
     });
 
     expect(options.outputFormat).toStrictEqual({ type: 'json_schema', schema: { type: 'object' } });
@@ -183,7 +232,10 @@ describe('buildAgentStepOptions', () => {
       config,
       decisions: decisions(),
       environmentBlock: { KULCS_NEVE: 'ertek-1' },
+      mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
+      skillLibrary: LIBRARY,
     });
     const masodik = buildAgentStepOptions({
       config,
@@ -193,7 +245,10 @@ describe('buildAgentStepOptions', () => {
         disallowedServerTools: { disallowedTools: ['KliensKereses'], serverToolAvailabilityUnproven: false },
       }),
       environmentBlock: { MASIK_KULCS: 'ertek-2' },
+      mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
+      skillLibrary: LIBRARY,
     });
 
     expect(elso).not.toStrictEqual(masodik);
@@ -201,5 +256,86 @@ describe('buildAgentStepOptions', () => {
     expect(masodik.includePartialMessages).toBe(false);
     expect(masodik.disallowedTools).toStrictEqual(['Bash', 'KliensKereses']);
     expect(masodik.env).toStrictEqual({ MASIK_KULCS: 'ertek-2' });
+  });
+  // SPEC-009 5.1, 5.3, AC13 (M-136, research `2026-10-28-spec-009-blokkolo-meresek.md` 2. szekció).
+  describe('skill mezők', () => {
+    it('a null skills mellett sem plugins, sem skills mező nem megy ki (O-40 (a))', () => {
+      const options = optionsFor(null);
+
+      expect(Object.hasOwn(options, 'plugins')).toBe(false);
+      expect(Object.hasOwn(options, 'skills')).toBe(false);
+    });
+
+    it('a lista puszta nevei <plugin>:<név> alakban mennek ki, a plugins a gyökérre mutat', () => {
+      const options = optionsFor(['beta']);
+
+      expect(options.plugins).toStrictEqual([{ type: 'local', path: '/var/skillek' }]);
+      expect(options.skills).toStrictEqual(['skillek:beta']);
+    });
+
+    it('az all a könyvtár neveinek explicit listájára fordul, nem az SDK all értékére', () => {
+      expect(optionsFor('all').skills).toStrictEqual(['skillek:alfa', 'skillek:beta']);
+    });
+
+    it('az üres lista üres skills listát ad, a plugins mezővel', () => {
+      const options = optionsFor([]);
+
+      expect(options.plugins).toStrictEqual([{ type: 'local', path: '/var/skillek' }]);
+      expect(options.skills).toStrictEqual([]);
+    });
+
+    it('null skills mellett a plugins kimegy, ha egy agent definíció skillre hivatkozik, a skills mező nem (M-147 A3)', () => {
+      const definitions = { segito: { description: 'd', prompt: 'p', skills: ['skillek:alfa'] } };
+      const options = buildAgentStepOptions({
+        config: agentStepConfig({ skills: null }),
+        decisions: decisions(),
+        environmentBlock: {},
+        mcpServers: {},
+        agents: { definitions, hasSkillReferences: true },
+        sessionBinding: isolated,
+        skillLibrary: LIBRARY,
+      });
+
+      expect(options.plugins).toStrictEqual([{ type: 'local', path: '/var/skillek' }]);
+      expect(Object.hasOwn(options, 'skills')).toBe(false);
+      expect(options.agents).toBe(definitions);
+    });
+  });
+  it('a feloldott MCP szervereket változatlanul átadja, a régi mcpServers mezőt nem (SPEC-009 6.4, research 9.5 5. pont)', () => {
+    const mcpServers = {
+      github: { type: 'stdio', command: 'github-mcp', args: [], env: { GITHUB_TOKEN: 'ertek' } },
+      docs: { type: 'http', url: 'https://127.0.0.1:4100/mcp', headers: { Authorization: 'Bearer x' } },
+    } as const;
+    const config = agentStepConfig({
+      mcpServers: { regi: { type: 'stdio', command: 'regi', args: [], envNames: [] } },
+    });
+
+    const options = buildAgentStepOptions({
+      config,
+      decisions: decisions(),
+      environmentBlock: {},
+      mcpServers,
+      agents: NO_AGENTS,
+      sessionBinding: isolated,
+      skillLibrary: LIBRARY,
+    });
+
+    expect(options.mcpServers).toBe(mcpServers);
+  });
+
+  it('üres feloldásnál nincs mcpServers mező, akkor sem, ha a régi mező nem üres', () => {
+    const options = buildAgentStepOptions({
+      config: agentStepConfig({
+        mcpServers: { regi: { type: 'http', url: 'https://regi.example', authEnvName: null } },
+      }),
+      decisions: decisions(),
+      environmentBlock: {},
+      mcpServers: {},
+      agents: NO_AGENTS,
+      sessionBinding: isolated,
+      skillLibrary: LIBRARY,
+    });
+
+    expect(Object.hasOwn(options, 'mcpServers')).toBe(false);
   });
 });

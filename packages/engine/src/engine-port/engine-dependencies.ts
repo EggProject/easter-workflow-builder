@@ -7,9 +7,10 @@ import type { EventPublisherPort } from './event-publisher-port.ts';
 import type { ClockPort } from './clock-port.ts';
 import type { IdGeneratorPort } from './id-generator-port.ts';
 import type { ProcessEnvironmentPort } from './process-environment-port.ts';
+import type { SkillLibraryPort } from './skill-library-port.ts';
 
 /**
- * A motorba befecskendezett kilenc port, a `createEngine(dependencies)`
+ * A motorba befecskendezett tíz port, a `createEngine(dependencies)`
  * paramétere (SPEC-004 3.1, 3.2). Egyik mező sem opcionális és egyiknek
  * sincs alapértelmezett értéke: a motorban nincs olyan függőség, ami
  * "magától előkerül".
@@ -24,4 +25,5 @@ export interface EngineDependencies {
   readonly clock: ClockPort;
   readonly idGenerator: IdGeneratorPort;
   readonly processEnvironment: ProcessEnvironmentPort;
+  readonly skillLibrary: SkillLibraryPort;
 }

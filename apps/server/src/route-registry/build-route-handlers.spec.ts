@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
-import { isRouteId, ROUTE_TABLE } from '@easter-workflow-builder/protocol';
+import { isRouteId, isZipBodyRouteId, ROUTE_TABLE } from '@easter-workflow-builder/protocol';
 import type { Engine } from '@easter-workflow-builder/engine';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
+import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 import { buildRouteHandlers } from './build-route-handlers.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
@@ -35,18 +36,28 @@ function buildFakeEngine(): Engine {
 }
 
 function buildHandlers(database: DatabaseContext) {
-  return buildRouteHandlers(database, buildFakeEngine(), createStreamRegistry(createRandomUuidIdGenerator()));
+  return buildRouteHandlers(
+    database,
+    buildFakeEngine(),
+    createStreamRegistry(createRandomUuidIdGenerator()),
+    TEST_SKILL_LIBRARY,
+  );
 }
 
 describe('buildRouteHandlers', () => {
-  it('a ROUTE_TABLE mind a 26 azonosítójára kitölt egy kezelő függvényt', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('a ROUTE_TABLE mind a 33 azonosítójára kitölt egy kezelőt, a nyers ZIP törzsű végpontra bináris kezelőt', () => {
     const handlers = buildHandlers(openMemoryDatabase());
     for (const routeId of Object.keys(ROUTE_TABLE)) {
       expect(isRouteId(routeId)).toBe(true);
       if (isRouteId(routeId)) {
-        expect(typeof handlers[routeId]).toBe('function');
+        expect(typeof handlers[routeId]).toBe(isZipBodyRouteId(routeId) ? 'object' : 'function');
       }
     }
+    expect(handlers.uploadSkill.maxBodyBytes).toBe(TEST_SKILL_LIBRARY.limits.maxArchiveBytes);
     expect(Object.keys(handlers)).toHaveLength(Object.keys(ROUTE_TABLE).length);
   });
 
@@ -64,5 +75,18 @@ describe('buildRouteHandlers', () => {
     const handlers = buildHandlers(openMemoryDatabase());
     const result = await handlers.readSettings({ parameters: {}, query: new URLSearchParams(), body: undefined });
     expect(result.kind).toBe('ok');
+  });
+  it('a listServerEnvironmentNames a folyamat valódi környezetének neveit adja, értéket nem (SPEC-009 6.2, O-32)', async () => {
+    vi.stubEnv('EASTER_T01211_PROBA_NEV', 'proba-titok-ertek');
+    const handlers = buildHandlers(openMemoryDatabase());
+
+    const result = await handlers.listServerEnvironmentNames({
+      parameters: {},
+      query: new URLSearchParams(),
+      body: undefined,
+    });
+
+    expect(result.kind === 'ok' && result.value.body).toContain('EASTER_T01211_PROBA_NEV');
+    expect(JSON.stringify(result)).not.toContain('proba-titok-ertek');
   });
 });

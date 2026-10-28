@@ -11,6 +11,7 @@ import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uu
 import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { createIdempotentShutdownHandler } from './create-idempotent-shutdown-handler.ts';
+import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -51,10 +52,12 @@ describe('createIdempotentShutdownHandler', () => {
     const database = openMemoryDatabase();
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, silentLogger()));
+    const engine = createEngine(
+      buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
+    );
     const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,

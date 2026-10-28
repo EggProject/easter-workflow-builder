@@ -113,7 +113,7 @@ Az SDK oldali tények (az `SDKMessage` unió, a session kezelés, a hookok, a `u
 
 ## 3. Entitás áttekintés
 
-Tíz saját tábla, plusz a drizzle-kit által kezelt `__drizzle_migrations` (F-18), ami nem a mi sémánk része.
+Tizenegy saját tábla (a tizenegyedik, a `mcp_server_definition` a SPEC-009 6.2 bővítése, 4.16), plusz a drizzle-kit által kezelt `__drizzle_migrations` (F-18), ami nem a mi sémánk része.
 
 Az alábbi Mermaid `erDiagram` a korábbi ASCII vázlatot váltja fel, nem egészíti ki: pontosan ugyanazt a kapcsolatrendszert írja le, de kardinalitással, kulcsokkal és törlési viselkedéssel együtt, így egyetlen forrás marad a kapcsolatok leírására, és a kettő nem futhat szét egymástól. A `__drizzle_migrations` tábla nem szerepel rajta: nincs idegen kulcsa sem befelé, sem kifelé (3. szekció fenti mondata), tehát a kapcsolati rajzon nem hordozna kapcsolati információt, csak zajt.
 
@@ -181,13 +181,16 @@ erDiagram
     provider_concurrency_limit {
         text provider_id PK
     }
+    mcp_server_definition {
+        text name PK
+    }
 ```
 
 **Mit mutat a rajz.** A folytonos vonal _azonosító_ kapcsolat: a gyerek sor nem létezhet a hivatkozott szülő sor nélkül, mert a mutató idegen kulcs kötelező (`NOT NULL`). A szaggatott vonal _nem azonosító_: a mutató mező opcionális, a gyerek sor a hivatkozás nélkül is létezhet. Négy kapcsolat szaggatott, mindegyik opcionális mezőn áll: a `workflow_run.restarted_from_run_id` (önhivatkozás, az újraindítás származása), a `step_run.parent_step_run_id` (önhivatkozás, a végrehajtási fa), a `workflow_run` felől a `step_run.sub_workflow_run_id` (az al-workflow hívást indító lépés) és a `run_event.step_run_id` (futás szintű eseménynél NULL, 6.2). A többi tizenegy kapcsolat folytonos. Minden kapcsolat címkéje a hordozó oszlop nevét és a törlési viselkedést adja meg, a 4.15 szekció lánca szerint. A `graph_snapshot` és a `workflow_run` közötti kapcsolat iránya szándékosan a pillanatképtől a futás felé mutat: minden `workflow_run` pontosan egy `graph_snapshot` sorra hivatkozik (a `graph_snapshot` oldali "pontosan egy" jelölés), egy `graph_snapshot` sorra viszont tetszőleges sok `workflow_run` hivatkozhat (a `workflow_run` oldali "nulla vagy több" jelölés). Ez a **megosztott pillanatkép**, az 5. döntés lényege.
 
 **Mely mezők kerültek a rajzra.** Kizárólag az elsődleges kulcsok, az idegen kulcsok, és két kivétel, ami a kapcsolat megértéséhez kell: a `step_run.node_id`, mert szándékosan **nem** idegen kulcs (4.10), és ezt a rajzon külön meg kell jegyezni, nehogy valaki tévesen kapcsolatnak olvassa; valamint a `graph_snapshot.hash`, ahol a megjegyzés a lenyomat alakját mondja ki. A teljes mezőlista a 4. szekcióban áll; minden más leíró mező (név, státusz, időbélyeg, JSON konfiguráció) szándékosan hiányzik a rajzról, mert a célja a kapcsolatok bemutatása, nem a teljes séma megismétlése.
 
-**Az `app_setting` és a `provider_concurrency_limit` a rajzon kapcsolat nélkül áll.** Egyik táblának sincs idegen kulcsa, és egyik táblára sem mutat idegen kulcs máshonnan (4.13, 4.14). A Mermaid megengedi kapcsolat nélküli entitás felvételét; ez itt szándékos, a teljesség kedvéért szerepelnek, a rajz nem állít róluk mást, mint hogy önállóak.
+**Az `app_setting`, a `provider_concurrency_limit` és a `mcp_server_definition` a rajzon kapcsolat nélkül áll.** Egyik táblának sincs idegen kulcsa, és egyik táblára sem mutat idegen kulcs máshonnan (4.13, 4.14, 4.16). A Mermaid megengedi kapcsolat nélküli entitás felvételét; ez itt szándékos, a teljesség kedvéért szerepelnek, a rajz nem állít róluk mást, mint hogy önállóak.
 
 **Az irány egyirányú.** A `workflow_run` táblának nincs idegen kulcsa a `step_run` felé, a kapcsolatot a `step_run.sub_workflow_run_id` hordozza. Ez azért fontos, mert így a tábla létrehozási sorrend egyértelmű, és nem kell az F-12 szerinti előre hivatkozásra támaszkodni.
 
@@ -268,23 +271,24 @@ A `join` `ai_synthesis` módja **teljes értékű agent lépés**: az alobjektum
 
 Az agent lépés beállításai. Minden mező forrása az Agent SDK `Options` típusa, ahogy a research 1. szekciója felsorolja. Egyetlen mező sincs kitalálva.
 
-| Mező                              | Típus                                                      | Megjegyzés                                              |
-| --------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
-| `promptTemplate`                  | `string`                                                   | a lépés bemenete, sablonozva a futás kontextusából      |
-| `providerId`                      | `ProviderId \| null`                                       | lépés szintű provider felülírás                         |
-| `modelId`                         | `string \| null`                                           | a **wire** modellazonosító, lásd lent                   |
-| `effort`, `thinking`              | `string \| null`, `ThinkingMode \| null`                   | `Options.effort`, `Options.thinking`                    |
-| `allowedTools`, `disallowedTools` | `readonly string[]`                                        | `Options.allowedTools`, `Options.disallowedTools`       |
-| `permissionMode`                  | `string \| null`                                           | `Options.permissionMode`                                |
-| `maxTurns`, `maxBudgetUsd`        | `number \| null`                                           | `Options.maxTurns`, `Options.maxBudgetUsd`              |
-| `systemPrompt`                    | `string \| { preset, append?, ... } \| null`               | `Options.systemPrompt` két alakja                       |
-| `agents`                          | `Readonly<Record<string, AgentDefinition>>`                | `Options.agents`, programozott subagentek               |
-| `skills`                          | `readonly string[] \| 'all' \| null`                       | `Options.skills`                                        |
-| `mcpServers`                      | `Readonly<Record<string, StorableMcpServer>>`              | csak a szerializálható variánsok, lásd lent             |
-| `cwd`, `additionalDirectories`    | `string \| null`, `readonly string[]`                      | `Options.cwd`, `Options.additionalDirectories`          |
-| `sandbox`                         | `SandboxConfig \| null`                                    | `Options.sandbox` mezői a research 1. szekciója szerint |
-| `sessionMode`                     | `'isolated' \| 'continued'`                                | lásd 4.5                                                |
-| `structuredOutput`                | `{ strategy: StructuredOutputStrategyId, schema } \| null` | lásd 4.6                                                |
+| Mező                              | Típus                                                      | Megjegyzés                                                                                                       |
+| --------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `promptTemplate`                  | `string`                                                   | a lépés bemenete, sablonozva a futás kontextusából                                                               |
+| `providerId`                      | `ProviderId \| null`                                       | lépés szintű provider felülírás                                                                                  |
+| `modelId`                         | `string \| null`                                           | a **wire** modellazonosító, lásd lent                                                                            |
+| `effort`, `thinking`              | `string \| null`, `ThinkingMode \| null`                   | `Options.effort`, `Options.thinking`                                                                             |
+| `allowedTools`, `disallowedTools` | `readonly string[]`                                        | `Options.allowedTools`, `Options.disallowedTools`                                                                |
+| `permissionMode`                  | `string \| null`                                           | `Options.permissionMode`                                                                                         |
+| `maxTurns`, `maxBudgetUsd`        | `number \| null`                                           | `Options.maxTurns`, `Options.maxBudgetUsd`                                                                       |
+| `systemPrompt`                    | `string \| { preset, append?, ... } \| null`               | `Options.systemPrompt` két alakja                                                                                |
+| `agents`                          | `Readonly<Record<string, AgentDefinition>>`                | `Options.agents`, programozott subagentek                                                                        |
+| `skills`                          | `readonly string[] \| 'all' \| null`                       | a feltöltött skillek puszta nevei (SPEC-009 5.2, 5.3); a motor `<plugin>:<név>` alakban adja át                  |
+| `mcpServers`                      | `Readonly<Record<string, StorableMcpServer>>`              | a régi, lépésenkénti alak: a futás nem használja, a mentés változatlanul megőrzi (SPEC-009 6.2, O-42), lásd lent |
+| `mcpServerReferences`             | elhagyható, `Readonly<Record<string, McpServerReference>>` | a központi MCP definícióra szóló hivatkozás (SPEC-009 6.2, O-42 (b))                                             |
+| `cwd`, `additionalDirectories`    | `string \| null`, `readonly string[]`                      | `Options.cwd`, `Options.additionalDirectories`                                                                   |
+| `sandbox`                         | `SandboxConfig \| null`                                    | `Options.sandbox` mezői a research 1. szekciója szerint                                                          |
+| `sessionMode`                     | `'isolated' \| 'continued'`                                | lásd 4.5                                                                                                         |
+| `structuredOutput`                | `{ strategy: StructuredOutputStrategyId, schema } \| null` | lásd 4.6                                                                                                         |
 
 **A `modelId` a wire azonosító.** A research 5.1 szekciója szerint a leíró két azonosítót tart külön: a dróton megjelenő `models[].id` és a kliensnek átadott `models[].clientModelIdentifier`. "A UI és a perzisztencia a wire azonosítót mutatja, a kliensnek a suffixes alak megy." A DB tehát a wire azonosítót tárolja, a suffixes alakot a provider leíróból oldja fel a motor.
 
@@ -512,6 +516,26 @@ DELETE FROM graph_snapshot
 **A felületnek meg kell erősítést kérnie**, és a megerősítésnek meg kell neveznie, mi vész el: a workflow nevét, a futások számát, az események számát és a törlendő pillanatképek számát. A repository ezt támogatja: a törlés előtt lekérdezhető összesítés, a törlés után pedig a ténylegesen törölt sorok száma áll rendelkezésre (9.2).
 
 A kaszkádot a lánc végigviteléhez **kötelező** a `PRAGMA foreign_keys = ON` (F-1). Enélkül a törlés csendben árva sorokat hagy. Ezért a pragma alkalmazása az adatbázis megnyitás elválaszthatatlan része (10.2), és külön elfogadási kritérium méri (15. szekció, 12. pont).
+
+### 4.16 `mcp_server_definition`
+
+A központi MCP szerver lista (SPEC-009 6.1, 6.2, O-31): a Beállításokon szerkesztett definíciók, amikre a
+lépés (és az agent definíció) név szerint hivatkozik az `mcpServerReferences` mezőn (4.4).
+
+| Oszlop       | Típus | Kötelező | Megjegyzés                                                                                                              |
+| ------------ | ----- | -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `name`       | text  | igen     | elsődleges kulcs, a lépés hivatkozásának kulcsa (a névszabály: SPEC-009 6.1)                                            |
+| `definition` | JSON  | igen     | `McpServerDefinition`: `stdio` (`command`, `args`, `envNames`, `envBindings`), `sse` vagy `http` (`url`, `authEnvName`) |
+
+A tábla **üresen indul**, a migráció egyetlen sort sem szúr be. Idegen kulcs nincs, és nem is mutat rá
+idegen kulcs: a hivatkozás a node config JSON dokumentumában áll, a definíció törlése pedig hivatkozó
+lépés mellett is megengedett (SPEC-009 O-43), a hiányzó definícióra a futás indítása ad megnevezett hibát
+(`mcp_server_not_found`). A `definition` oszlop a séma szintjén `unknown`, a szűkítés az
+`isMcpServerDefinition` guarddal történik a repository határon. **Titok nincs benne**: a három ág csak env
+változó NEVET hordoz, értéket soha (9.3 "nincs titok az adatbázisban"). A `McpServerDefinitionRepository`
+(`listDefinitions`, `saveDefinition`, `deleteDefinition`) a `DatabaseContext.mcpServerDefinitions` mezőn
+áll (9.1), a `saveDefinition` az üres kötelező szöveg mezőre (`stdio` `command`, `sse` és `http` `url`)
+`blank_required_text_field` hibát ad.
 
 ## 5. A gráf pillanatkép és a séma verziózás
 
@@ -888,25 +912,27 @@ packages/db/
     human-approval/
     app-setting/
     provider-concurrency/
+    mcp-server-definition/
     run-recovery/
 ```
 
-Kilenc téma mappa és három tárgykör mappa, a tárgykörök alatt összesen tíz témával. Témánként (illetve tárgykörönként):
+Tíz téma mappa és három tárgykör mappa, a tárgykörök alatt összesen tíz témával. Témánként (illetve tárgykörönként):
 
-| Téma                   | Mi kerül bele                                                                                                                                                                                      |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `database-file`        | az adatbázis fájl helyének feloldása: env változó **neve**, alapértelmezett útvonal, a könyvtár létrehozása                                                                                        |
-| `sqlite-connection`    | a `better-sqlite3` példány nyitása, a pragmák alkalmazása, a `drizzle()` bekötése, a zárás                                                                                                         |
-| `migration`            | a migrációs mappa útvonala és a `migrate()` hívás burkolása `Outcome` hibaágra                                                                                                                     |
-| `workflow-graph`       | `workflow`, `workflow_node`, `workflow_edge` tábla, a `NodeType` unió, a node config unió és typeguardjai, a workflow repository                                                                   |
-| `graph-snapshot`       | `graph_snapshot` tábla, a dokumentum típusa, a `GRAPH_DOCUMENT_VERSION` konstans, a kanonizáló, a lenyomat képzés, az újrafelhasználás döntő függvénye, a verziódiszpécser olvasó és a typeguardok |
-| `workflow-run`         | `workflow_run` tábla, `RunStatus`, az átmeneti szabály, a futás repository                                                                                                                         |
-| `step-run`             | `step_run` tábla, `StepRunStatus`, az átmeneti szabály, a lépés futás repository                                                                                                                   |
-| `run-event`            | `run_event` tábla, `RunEventKind`, az SDK üzenet normalizálása, az esemény repository                                                                                                              |
-| `human-approval`       | `human_approval` tábla, `ApprovalDecision`, a jóváhagyás repository                                                                                                                                |
-| `app-setting`          | `app_setting` tábla és a hozzá tartozó repository                                                                                                                                                  |
-| `provider-concurrency` | `provider_concurrency_limit` tábla és a hozzá tartozó repository                                                                                                                                   |
-| `run-recovery`         | az indulási helyreállítás (7.4), ami a `workflow_run` és a `step_run` táblát együtt érinti, ezért egyik témába sem tartozik                                                                        |
+| Téma                    | Mi kerül bele                                                                                                                                                                                      |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `database-file`         | az adatbázis fájl helyének feloldása: env változó **neve**, alapértelmezett útvonal, a könyvtár létrehozása                                                                                        |
+| `sqlite-connection`     | a `better-sqlite3` példány nyitása, a pragmák alkalmazása, a `drizzle()` bekötése, a zárás                                                                                                         |
+| `migration`             | a migrációs mappa útvonala és a `migrate()` hívás burkolása `Outcome` hibaágra                                                                                                                     |
+| `workflow-graph`        | `workflow`, `workflow_node`, `workflow_edge` tábla, a `NodeType` unió, a node config unió és typeguardjai, a workflow repository                                                                   |
+| `graph-snapshot`        | `graph_snapshot` tábla, a dokumentum típusa, a `GRAPH_DOCUMENT_VERSION` konstans, a kanonizáló, a lenyomat képzés, az újrafelhasználás döntő függvénye, a verziódiszpécser olvasó és a typeguardok |
+| `workflow-run`          | `workflow_run` tábla, `RunStatus`, az átmeneti szabály, a futás repository                                                                                                                         |
+| `step-run`              | `step_run` tábla, `StepRunStatus`, az átmeneti szabály, a lépés futás repository                                                                                                                   |
+| `run-event`             | `run_event` tábla, `RunEventKind`, az SDK üzenet normalizálása, az esemény repository                                                                                                              |
+| `human-approval`        | `human_approval` tábla, `ApprovalDecision`, a jóváhagyás repository                                                                                                                                |
+| `app-setting`           | `app_setting` tábla és a hozzá tartozó repository                                                                                                                                                  |
+| `provider-concurrency`  | `provider_concurrency_limit` tábla és a hozzá tartozó repository                                                                                                                                   |
+| `mcp-server-definition` | `mcp_server_definition` tábla, a definíció három ágú uniója, az `isMcpServerDefinition` guard és a hozzá tartozó repository (SPEC-009 6.2)                                                         |
+| `run-recovery`          | az indulási helyreállítás (7.4), ami a `workflow_run` és a `step_run` táblát együtt érinti, ezért egyik témába sem tartozik                                                                        |
 
 A táblázat a `workflow-graph`, a `graph-snapshot` és a `run-event` sorát a tárgykör szintjén írja le; a tíz téma szerinti finom bontást a PLAN-004 4. szekciója és a `packages/db/CLAUDE.md` `## Fájlok` táblázata adja.
 
@@ -939,6 +965,7 @@ DatabaseContext {
   approvals: HumanApprovalRepository
   settings: AppSettingRepository
   concurrencyLimits: ProviderConcurrencyRepository
+  mcpServerDefinitions: McpServerDefinitionRepository
   recovery: RunRecovery
   transaction<TValue>(work: () => Outcome<TValue>): Outcome<TValue>
   close(): void
@@ -972,6 +999,7 @@ Minden művelet `Outcome<T>` értéket ad vissza a `@easter-workflow-builder/cor
 | `HumanApprovalRepository`       | `requestApproval`, `decideApproval`, `getApproval`, `getApprovalForStep`, `listPendingApprovals`                             | a `decideApproval` és a lépés állapotváltás egy tranzakcióban fut                                                                                                                              |
 | `AppSettingRepository`          | `readSettings`, `setDefaultProvider`, `setPersistStreamDeltas`                                                               | a `readSettings` sor hiányában is hamis `persistStreamDeltas` értéket ad (4.13)                                                                                                                |
 | `ProviderConcurrencyRepository` | `readLimit(providerId)`, `readAllLimits`, `setLimit`, `clearLimit`                                                           |                                                                                                                                                                                                |
+| `McpServerDefinitionRepository` | `listDefinitions`, `saveDefinition(record)`, `deleteDefinition(name)`                                                        | a központi MCP lista (4.16); a törlés hivatkozó lépés mellett is megy (SPEC-009 O-43)                                                                                                          |
 | `RunRecovery`                   | `recoverInterruptedRuns()`                                                                                                   | indulási helyreállítás (7.4), egy tranzakcióban                                                                                                                                                |
 
 ### 9.3 Hogyan nem kerülhetők meg a séma garanciák
@@ -1146,7 +1174,7 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 2. A `packages/db` csomagban `CLAUDE.md` kizárólag a csomag gyökerében van, és a `## Fájlok` táblázata mind a tizenkilenc témát felsorolja (kilenc önálló mappaként, tíz a három tárgykör alatt), felelősség leírással. A `bun run docs:check` nulla kilépési kóddal fut.
 3. A `packages/db/src/index.ts` csak nevesített újraexportot tartalmaz, `export *` nélkül, és az `IS_DB_PLACEHOLDER` konstans megszűnt.
 4. A barrel **nem** exportál Drizzle tábla objektumot, `drizzle()` példányt, `BetterSQLite3Database` típust vagy `better-sqlite3` szimbólumot. Ezt egy `.spec.ts` mechanikusan igazolja a barrel exportált kulcsainak listáján.
-5. A séma pontosan 10 saját táblát definiál: `workflow`, `workflow_node`, `workflow_edge`, `workflow_run`, `graph_snapshot`, `step_run`, `run_event`, `human_approval`, `app_setting`, `provider_concurrency_limit`. A migrált adatbázis `sqlite_master` tartalma ezt igazolja, a `__drizzle_migrations` táblával, valamint a `run_event.id` `AUTOINCREMENT` oszlopa miatt automatikusan létrejövő `sqlite_sequence` táblával együtt (https://sqlite.org/autoinc.html, https://www.sqlite.org/fileformat2.html 2.6.3 szekció); más táblát a séma nem tartalmazhat.
+5. A séma pontosan 11 saját táblát definiál: `workflow`, `workflow_node`, `workflow_edge`, `workflow_run`, `graph_snapshot`, `step_run`, `run_event`, `human_approval`, `app_setting`, `provider_concurrency_limit`, `mcp_server_definition` (az utóbbi a SPEC-009 bővítése). A migrált adatbázis `sqlite_master` tartalma ezt igazolja, a `__drizzle_migrations` táblával, valamint a `run_event.id` `AUTOINCREMENT` oszlopa miatt automatikusan létrejövő `sqlite_sequence` táblával együtt (https://sqlite.org/autoinc.html, https://www.sqlite.org/fileformat2.html 2.6.3 szekció); más táblát a séma nem tartalmazhat.
 6. Minden idegen kulcs a 4.15 szekció lánca szerinti `ON DELETE` viselkedéssel áll, és a migrált adatbázis `PRAGMA foreign_key_list` kimenete ezt igazolja táblánként.
 7. Egy `workflow` sor törlése után a hozzá tartozó `workflow_node`, `workflow_edge`, `workflow_run`, `step_run`, `run_event` és `human_approval` sorok száma nulla, beleértve az al-workflow futásait is, és a 4.15 árva söprése után egyetlen olyan `graph_snapshot` sor sem marad, ami ehhez a workflow-hoz tartozott. Ezt futtatott teszt igazolja, nem érvelés.
 8. A séma egyetlen táblájában sincs `deleted_at`, `archived`, `is_deleted` vagy hasonló oszlop, és a repository nem ad soft delete műveletet.

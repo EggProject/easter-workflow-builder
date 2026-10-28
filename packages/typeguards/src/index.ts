@@ -17,6 +17,8 @@ export { isObject } from './is-object/is-object.ts';
 export { isPlainObject } from './is-plain-object/is-plain-object.ts';
 export { isString } from './is-string/is-string.ts';
 export { isStringArray } from './is-string-array/is-string-array.ts';
+export { isStringRecord } from './is-string-record/is-string-record.ts';
+export { isEnvironmentVariableName } from './is-environment-variable-name/is-environment-variable-name.ts';
 export { isUnknownArray } from './is-unknown-array/is-unknown-array.ts';
 export { isStringResolver } from './is-string-resolver/is-string-resolver.ts';
 export { isValidDate } from './is-valid-date/is-valid-date.ts';

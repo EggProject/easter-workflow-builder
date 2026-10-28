@@ -5,6 +5,7 @@ import type {
 } from '@easter-workflow-builder/provider-capability';
 import type { SandboxConfig } from './sandbox-config.ts';
 import type { SessionMode } from './session-mode.ts';
+import type { McpServerReference } from './mcp-server-reference.ts';
 import type { StorableMcpServer } from './storable-mcp-server.ts';
 
 /**
@@ -69,7 +70,15 @@ export interface AgentStepConfig {
   readonly systemPrompt: string | PresetSystemPrompt | null;
   readonly agents: Readonly<Record<string, unknown>>;
   readonly skills: readonly string[] | 'all' | null;
+  /**
+  Régi, csak olvasható mező (SPEC-009 6.2, O-42): a motor nem képezi le, a mentés változatlanul visszaküldi.
+  */
   readonly mcpServers: Readonly<Record<string, StorableMcpServer>>;
+  /**
+  A központi MCP definíciókra szóló hivatkozások, kulcs a definíció neve (O-42 (b)). Elhagyható:
+  a régi gráf és pillanatkép nem hordozza, a hiánya és az üres rekord ugyanazt jelenti.
+  */
+  readonly mcpServerReferences?: Readonly<Record<string, McpServerReference>>;
   readonly cwd: string | null;
   readonly additionalDirectories: readonly string[];
   readonly sandbox: SandboxConfig | null;

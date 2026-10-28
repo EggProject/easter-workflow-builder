@@ -5,7 +5,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
+import type { ProviderConnectionTester } from '../provider-select/provider-connection-tester.ts';
 import { FieldErrorsContext } from './field-errors-context.ts';
+import { McpServerLibraryContext } from './mcp-server-library-context.ts';
+import { ProviderOptionsContext } from './provider-options-context.ts';
 
 function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
@@ -98,6 +101,10 @@ const BASE_CONFIG: AgentStepConfig = {
   structuredOutput: null,
 };
 
+const LEGACY_MCP_SERVERS: AgentStepConfig['mcpServers'] = {
+  regi: { type: 'stdio', command: 'regi-parancs', args: [], envNames: [] },
+};
+
 describe('AgentStepConfigFields', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -131,6 +138,50 @@ describe('AgentStepConfigFields', () => {
   it('a `providerId` null értékére megjeleníti az örökölt provider leírását', () => {
     render(BASE_CONFIG, vi.fn(), 'a workflow saját providerét örökli: minimax');
     expect(container.textContent).toContain('a workflow saját providerét örökli: minimax');
+  });
+
+  it('a Kapcsolat teszt gomb örökölt választásnál tiltott, megadott providernél a kontextus tesztelőjét hívja', async () => {
+    const testConnection = vi.fn<ProviderConnectionTester>(() =>
+      Promise.resolve({ kind: 'ok', value: { succeeded: false, errorMessage: 'Hiányzik a kulcs' } }),
+    );
+    const providerOptions = { isLoading: false, providerIds: ['minimax'], testConnection };
+    function renderWith(config: AgentStepConfig): void {
+      act(() => {
+        root.render(
+          <ProviderOptionsContext.Provider value={providerOptions}>
+            <AgentStepConfigFields
+              fieldPathPrefix=""
+              config={config}
+              onChange={vi.fn()}
+              inheritedProviderDescription="nincs"
+            />
+          </ProviderOptionsContext.Provider>,
+        );
+      });
+    }
+    const findTestButton = (): HTMLButtonElement | undefined =>
+      [...container.querySelectorAll('button')].find((candidate) => candidate.textContent.includes('Kapcsolat teszt'));
+
+    renderWith(BASE_CONFIG);
+    expect(findTestButton()?.disabled).toBe(true);
+
+    renderWith({ ...BASE_CONFIG, providerId: 'minimax' });
+    await act(async () => {
+      findTestButton()?.click();
+      await Promise.resolve();
+    });
+
+    expect(testConnection).toHaveBeenCalledWith('minimax');
+    expect(container.querySelector('.alert--danger')?.textContent).toContain('Hiányzik a kulcs');
+  });
+
+  it('szolgáltató nélkül (a kontextus alapértéke) megadott providernél is tiltott a Kapcsolat teszt gomb', () => {
+    render({ ...BASE_CONFIG, providerId: 'minimax' }, vi.fn());
+
+    const button = [...container.querySelectorAll('button')].find((candidate) =>
+      candidate.textContent.includes('Kapcsolat teszt'),
+    );
+    expect(button?.disabled).toBe(true);
   });
 
   it('egy megadott `providerId`-ra nem jelenik meg az öröklés leírása', () => {
@@ -307,10 +358,57 @@ describe('AgentStepConfigFields', () => {
     );
   });
 
-  it('a `skills` és az `mcpServers` mező olvasható, megnevezi a SPEC-009 okot', () => {
-    render({ ...BASE_CONFIG, skills: ['a', 'b'] }, vi.fn());
-    expect(container.textContent).toContain('["a","b"]');
-    expect(container.textContent).toContain('SPEC-009');
+  it('a `skills` mező a módválasztón szerkeszthető, és a teljes konfigot frissíti', () => {
+    const onChange = vi.fn();
+    render({ ...BASE_CONFIG, skills: ['a', 'b'] }, onChange);
+    expect(selectTrigger(container, 'Skillek használata').textContent).toBe('kiválasztott skillek');
+    chooseOption(container, 'Skillek használata', 'minden feltöltött skill');
+    expect(onChange).toHaveBeenLastCalledWith({ ...BASE_CONFIG, skills: 'all' });
+  });
+
+  it('a régi `mcpServers` mező olvasható, és a régi alakot nevezi meg', () => {
+    render({ ...BASE_CONFIG, mcpServers: {} }, vi.fn());
+    expect(container.textContent).toContain('Régi mcpServers mező');
+    expect(container.textContent).toContain('{}');
+    expect(container.textContent).toContain('a régi, lépésenkénti alak');
+    expect(container.textContent).not.toContain('SPEC-009');
+  });
+
+  it('az MCP hivatkozás a központi listából választ, és a teljes konfigot frissíti, a régi `mcpServers` változatlanul', () => {
+    const onChange = vi.fn();
+    act(() => {
+      root.render(
+        <McpServerLibraryContext.Provider
+          value={{
+            servers: {
+              status: 'success',
+              value: [
+                {
+                  name: 'github',
+                  definition: { type: 'stdio', command: 'npx', args: [], envNames: [], envBindings: {} },
+                },
+              ],
+            },
+            environmentNames: { status: 'success', value: [] },
+          }}
+        >
+          <AgentStepConfigFields
+            fieldPathPrefix=""
+            config={{ ...BASE_CONFIG, mcpServers: LEGACY_MCP_SERVERS }}
+            onChange={onChange}
+            inheritedProviderDescription="nincs"
+          />
+        </McpServerLibraryContext.Provider>,
+      );
+    });
+    act(() => {
+      checkboxByLabel(container, 'github').click();
+    });
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...BASE_CONFIG,
+      mcpServers: LEGACY_MCP_SERVERS,
+      mcpServerReferences: { github: { envBindings: {}, authEnvName: null } },
+    });
   });
 
   it('az `agents` szerkesztő jelen van, és a szerkesztése a teljes konfigot frissíti', () => {

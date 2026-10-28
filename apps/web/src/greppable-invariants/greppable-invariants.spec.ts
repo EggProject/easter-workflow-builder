@@ -1,4 +1,4 @@
-// Huszonöt, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
+// Huszonhat, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
 // csoportban (T-008-31, SPEC-002 6.2 5. pont mintája: konfigurációs
 // invariáns saját téma mappában, a mappa neve annak a dolognak a neve, amit
 // őriz). Mindegyik a forrásfát olvassa vissza nyers szövegként, statikus
@@ -20,7 +20,8 @@
 // (25) a PLAN-010 T-010-20 lépésével érkezett (SPEC-010 6.1, 16. szekció 31.): a React nyers HTML
 // beszúró prop neve sem az `apps/web/src`, sem a `packages/ui/src` alatt nem áll. A (8) a SPEC-012
 // 4.2 szerint egyetlen fájlra, a `frontend-config/default-frontend-config.ts` fájlra nem vonatkozik
-// (user döntés 2026-10-26: forrásolt alapérték).
+// (user döntés 2026-10-26: forrásolt alapérték). A (26) a PLAN-012 T-012-16 lépésével érkezett
+// (SPEC-009 12. szekció AC6): a párhuzamossági korlát mezőjének nincs szám alapértéke.
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -191,6 +192,34 @@ function findOriginLiteralOffenders(files: readonly SourceFile[]): readonly stri
 }
 
 /**
+ * A (26) tiltott alakjai a párhuzamossági korlát fájljaiban (SPEC-009 3.1 2.
+ * pont, AC6): a mező üresen indul, szám alapérték sehonnan nem jöhet. A
+ * `min` és `step` megkötések nem alapértékek, ezért nem illeszkednek.
+ */
+const CONCURRENCY_LIMIT_DEFAULT_PATTERNS: readonly RegExp[] = [
+  /maxConcurrentSteps\s*(?::|=|\?\?|\|\|)\s*(?:\.?\d|['"`]\d)/,
+  /\buseState\s*(?:<[^>]*>)?\(\s*['"`][^'"`]/,
+  /\bdefaultValue\b/,
+  /(?:\?\?|\|\|)\s*(?:\.?\d|['"`]\d)/,
+  /\bvalue=\{?\s*['"`]?\d/,
+  /\bplaceholder=\{?\s*['"`][^'"`]*\d/,
+];
+
+function isConcurrencyLimitFile(relativePath: string): boolean {
+  return /concurrency-?limit/i.test(relativePath);
+}
+
+function findConcurrencyLimitDefaultOffenders(files: readonly SourceFile[]): readonly string[] {
+  return files
+    .filter((file) => isConcurrencyLimitFile(file.relativePath))
+    .filter((file) => {
+      const content = stripCommentLines(file.content);
+      return CONCURRENCY_LIMIT_DEFAULT_PATTERNS.some((pattern) => pattern.test(content));
+    })
+    .map((file) => file.relativePath);
+}
+
+/**
  * A (11) és a (12) hatókörének pozitív oldala: a bejárás ténylegesen eléri
  * a workspace csomagjait.
  */
@@ -288,7 +317,7 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     expect(timeKeyOffenders.map((file) => file.relativePath)).toEqual([]);
   });
 
-  it('(9) a @xyflow/react import kizárólag a három engedett témára szűkül, és nincs SPEC-009 hatókörű fájl', () => {
+  it('(9) a @xyflow/react import kizárólag a három engedett témára szűkül', () => {
     // Tényleges import utasítás mintáját keresi, nem puszta részsztringet:
     // egy pusztán szöveges említés (pl. ennek a tesztnek a saját címe vagy
     // egy magyarázó komment) nem termékkód import. A SPEC-008 F3 fázisa óta
@@ -307,14 +336,8 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
     // A `graph-auto-layout` téma szándékosan NEM engedett (SPEC-008 5.7: "az
     // elrendezés tiszta függvény, és nem importál @xyflow/react szimbólumot").
-    // A `settings-screen` 2026-09-28 óta nem tiltott: a SPEC-008 5.11 (O-32)
-    // a Beállítások képernyőt a módosító választójával ide hozza (SPEC-007 16.
-    // szekció 3. kritériumának lazítása); a SPEC-009 többi eleme marad tiltva.
-    const outOfScopeThemeNames = new Set(['skill-upload', 'mcp-server-config']);
-    const themeDirectories = readdirSync(WEB_SRC, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
-    expect(themeDirectories.filter((name) => outOfScopeThemeNames.has(name))).toEqual([]);
+    // A `skill-upload` és az `mcp-server-config` téma tiltása SPEC-009
+    // 2026-10-28-i megvalósításával megszűnt (SPEC-009 8. szekció, AC25).
   });
 
   it('(10) a main.tsx elágazás nélküli: egyetlen import és egyetlen hívás', () => {
@@ -479,6 +502,10 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       // a szerkesztő panel két statikus figyelmeztetése
       [path.join('node-inspector', 'AgentDefinitionEntryFields.tsx')]: 1,
       [path.join('node-inspector', 'ScriptNodeFields.tsx')]: 1,
+      // a skill feltöltés hiányzó ZIP csomagjának mező alatti hibája (helyi ellenőrzés, a `TextField` hibájával azonos alak)
+      [path.join('skill-upload', 'SkillUploadForm.tsx')]: 1,
+      // az MCP szerver deklarált változó neveinek mező alatti hibája (helyi ellenőrzés, a `TagInput`-nak nincs saját hibaága)
+      [path.join('mcp-server-config', 'McpServerEditModal.tsx')]: 1,
     };
     const alertCounts = Object.fromEntries(
       PRODUCT_FILES.map(
@@ -686,5 +713,49 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       expect(scannedFiles.some((file) => file.label.startsWith(scanRoot))).toBe(true);
     }
     expect(scannedFiles.filter((file) => file.content.includes(forbiddenName)).map((file) => file.label)).toEqual([]);
+  });
+  it('(26) a párhuzamossági korlát mezőjének nincs szám alapértéke: a korlát fájljaiban nincs kezdőérték, tartalék érték és helyőrző szám (SPEC-009 12. szekció AC6)', () => {
+    // Pozitív oldal: a vizsgált fájlkör nem üres, és a kártya, a sor és a hook mind benne van.
+    const scopedPaths = PRODUCT_FILES.filter((file) => isConcurrencyLimitFile(file.relativePath)).map((file) =>
+      path.basename(file.relativePath),
+    );
+    expect(scopedPaths).toEqual(
+      expect.arrayContaining([
+        'ConcurrencyLimitRow.tsx',
+        'ConcurrencyLimitsSettingsCard.tsx',
+        'use-concurrency-limits.ts',
+      ]),
+    );
+    expect(findConcurrencyLimitDefaultOffenders(PRODUCT_FILES)).toEqual([]);
+    // Negatív oldal: a minták tényleg elkapják a tiltott alakokat, és a megengedett megkötéseket nem.
+    const scopedPath = path.join('settings-screen', 'ConcurrencyLimitRow.tsx');
+    const offendingContents = [
+      "const [draft, setDraft] = useState('3');",
+      'const maxConcurrentSteps = 3;',
+      'const limit = { maxConcurrentSteps: 2 };',
+      'const draft = stored ?? 4;',
+      '<TextField defaultValue={3} />',
+      '<TextField value={3} />',
+      '<TextField placeholder="pl. 4" />',
+    ];
+    for (const content of offendingContents) {
+      expect(findConcurrencyLimitDefaultOffenders([{ relativePath: scopedPath, content }]), content).toEqual([
+        scopedPath,
+      ]);
+    }
+    const allowedContents = [
+      "const [draft, setDraft] = useState('');",
+      'const [generation, setGeneration] = useState(0);',
+      '<TextField type="number" min={1} step={1} value={draft} />',
+    ];
+    for (const content of allowedContents) {
+      expect(findConcurrencyLimitDefaultOffenders([{ relativePath: scopedPath, content }]), content).toEqual([]);
+    }
+    // A fájlkörön kívüli fájl nem vizsgált.
+    expect(
+      findConcurrencyLimitDefaultOffenders([
+        { relativePath: path.join('graph-editor', 'x.ts'), content: 'const maxConcurrentSteps = 3;' },
+      ]),
+    ).toEqual([]);
   });
 });

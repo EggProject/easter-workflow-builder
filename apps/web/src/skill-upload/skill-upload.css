@@ -1,0 +1,22 @@
+/* SAJÁT KIEGÉSZÍTÉS, a forrásban nem létező szabályok (SPEC-009 3.1 4.
+   pont): a feltöltés űrlapja a kártya törzsében, a lista alatt, mezők
+   egymás alatt `--ep-space-3` térközzel; a "Feltöltés" gomb a saját
+   szélességén marad (nem nyúlik a sor teljes szélességére). */
+.skill-upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-3);
+  padding-top: var(--ep-space-3);
+}
+.skill-upload-form__submit {
+  align-self: flex-start;
+}
+
+/* SAJÁT KIEGÉSZÍTÉS, a forrásban nem létező szabály (SPEC-009 3.1 4. pont): a
+   skill neve legfeljebb 64 szóköz nélküli karakter, a leírás tetszőleges
+   szöveg; keskeny kijelzőn bárhol törhetnek, hogy a sor ne lógjon ki a
+   kártyából. */
+.skill-row .preference-row__title,
+.skill-row .settings-screen__hint {
+  overflow-wrap: anywhere;
+}

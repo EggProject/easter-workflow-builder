@@ -8,6 +8,7 @@ import { createStreamRegistry } from '../stream-registry/create-stream-registry.
 import { createRandomUuidIdGenerator } from './create-random-uuid-id-generator.ts';
 import { createSystemClock } from './create-system-clock.ts';
 import { buildEngineDependencies } from './build-engine-dependencies.ts';
+import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -145,7 +146,7 @@ const OVER_LIMIT_DOUBLING_COUNT = 24;
 const JOIN_BYPASS_ITEMS_EXPRESSION = `${longStringItemExpression(22)}.map(s, [s, s, s])[0]`;
 
 describe('buildEngineDependencies', () => {
-  it('a kapott database és clock referenciát változatlanul adja tovább, a nyolc portot pedig felépíti', () => {
+  it('a kapott database és clock referenciát változatlanul adja tovább, a többi portot pedig felépíti', () => {
     const database = openMemoryDatabase();
     const clock = createSystemClock();
     const dependencies = buildEngineDependencies(
@@ -153,6 +154,7 @@ describe('buildEngineDependencies', () => {
       createStreamRegistry(createRandomUuidIdGenerator()),
       clock,
       silentLogger(),
+      TEST_SKILL_LIBRARY.rootDirectory,
     );
 
     expect(dependencies.database).toBe(database);
@@ -165,6 +167,7 @@ describe('buildEngineDependencies', () => {
     expect(typeof dependencies.idGenerator.nextId).toBe('function');
     expect(typeof dependencies.processEnvironment.read).toBe('function');
     expect(typeof dependencies.processEnvironment.readAll).toBe('function');
+    expect(dependencies.skillLibrary.readSkillLibrary().rootDirectory).toBe(TEST_SKILL_LIBRARY.rootDirectory);
   });
 
   it('a bekötött sablon és kifejezés port érvényes sablonra és kifejezésre ok eredményt ad (SPEC-010 3.1)', () => {
@@ -173,6 +176,7 @@ describe('buildEngineDependencies', () => {
       createStreamRegistry(createRandomUuidIdGenerator()),
       createSystemClock(),
       silentLogger(),
+      TEST_SKILL_LIBRARY.rootDirectory,
     );
 
     expect(dependencies.templateRenderer.compile('Szia {{input.nev}}!')).toStrictEqual({
@@ -197,6 +201,7 @@ describe('buildEngineDependencies', () => {
       createStreamRegistry(createRandomUuidIdGenerator()),
       clock,
       silentLogger(),
+      TEST_SKILL_LIBRARY.rootDirectory,
     );
     const watched = publisherWithRunFinished(dependencies.eventPublisher);
     const engine = createEngine({ ...dependencies, eventPublisher: watched.publisher });
@@ -223,6 +228,7 @@ describe('buildEngineDependencies', () => {
       createStreamRegistry(createRandomUuidIdGenerator()),
       clock,
       silentLogger(),
+      TEST_SKILL_LIBRARY.rootDirectory,
     );
     const watched = publisherWithRunFinished(dependencies.eventPublisher);
     const engine = createEngine({ ...dependencies, eventPublisher: watched.publisher });
@@ -252,6 +258,7 @@ describe('buildEngineDependencies', () => {
       createStreamRegistry(createRandomUuidIdGenerator()),
       createSystemClock(),
       logger,
+      TEST_SKILL_LIBRARY.rootDirectory,
     );
     const throwingProxy: unknown = new Proxy(
       {},
@@ -290,6 +297,7 @@ describe('buildEngineDependencies', () => {
       createStreamRegistry(createRandomUuidIdGenerator()),
       createSystemClock(),
       silentLogger(),
+      TEST_SKILL_LIBRARY.rootDirectory,
     );
     const engine = createEngine(dependencies);
 

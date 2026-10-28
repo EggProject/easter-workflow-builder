@@ -6,6 +6,7 @@ import {
   openDatabase,
   type DatabaseContext,
   type JoinUnselectedNodeConfig as DatabaseJoinUnselectedNodeConfig,
+  type McpServerReference as DatabaseMcpServerReference,
   type NodeConfig as DatabaseNodeConfig,
   type REQUIRED_TEXT_FIELD_PATHS as DATABASE_REQUIRED_TEXT_FIELD_PATHS,
 } from '@easter-workflow-builder/db';
@@ -14,8 +15,13 @@ import {
   NodeConfigSchema,
   REQUIRED_TEXT_FIELD_PATHS as PROTOCOL_REQUIRED_TEXT_FIELD_PATHS,
   type JoinUnselectedNodeConfig as ProtocolJoinUnselectedNodeConfig,
+  type McpServerReference as ProtocolMcpServerReference,
   type NodeConfig as ProtocolNodeConfig,
 } from '@easter-workflow-builder/protocol';
+
+// A `JSON.parse` saját `__proto__` tulajdonságot hoz létre (egy objektum literál a prototípust állítaná).
+const OWN_PROTO_KEY_1: unknown = JSON.parse('{"s":{"envBindings":{"__proto__":"X"},"authEnvName":null}}');
+const OWN_PROTO_KEY_2: unknown = JSON.parse('{"__proto__":{"envBindings":{},"authEnvName":null}}');
 
 /**
  * A `workflow_node.config` tíz ágú `NodeConfig` uniójának sodródás elleni
@@ -748,4 +754,86 @@ describe('a szabadon maradó mezők tetszőleges kulcsa mindkét oldalon átmegy
       expect(isNodeConfig(config)).toBe(true);
     });
   }
+});
+
+/**
+ * A lépés hivatkozás mezőjének sodródás elleni védelme (SPEC-009 6.1, 6.2,
+ * O-42 (b); `docs/research/2026-10-26-spec-009-forrasok.md` 9.5 szekció 4.
+ * pont). A típusszintű ág az `McpServerReference` két oldalának egyenlősége;
+ * az elhagyható mező pontos deklarációja (`db` `?:`, `protocol`
+ * `.exactOptional()`) a `NodeConfig` egyenlőségén is átmegy. A futásidejű ág
+ * a régi alakot (mező nélkül, nem üres régi `mcpServers` értékkel) és az új
+ * alakot mindkét oldalon átengedi, egy ismeretlen kulcsú bejegyzést mindkét
+ * oldalon elutasít.
+ */
+describe('a lépés mcpServerReferences mezője kétirányban és futásidőben is egyezik (O-42)', () => {
+  it('McpServerReference', () => {
+    expectTypeOf<ProtocolMcpServerReference>().toEqualTypeOf<DatabaseMcpServerReference>();
+  });
+
+  const legacyStep = {
+    ...SAVABLE_AGENT_STEP,
+    mcpServers: {
+      local: { type: 'stdio', command: 'node', args: [], envNames: ['MCP_TOKEN'] },
+      remote: { type: 'sse', url: 'https://example.test/sse', authEnvName: 'MCP_AUTH' },
+      web: { type: 'http', url: 'https://example.test/mcp', authEnvName: null },
+    },
+  };
+  const referencingStep = {
+    ...SAVABLE_AGENT_STEP,
+    mcpServerReferences: {
+      github_ceg: { envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_CEG' }, authEnvName: null },
+      remote: { envBindings: {}, authEnvName: 'REMOTE_AUTH_SAJAT' },
+    },
+  };
+
+  it.each([
+    ['a régi alak, mező nélkül, nem üres régi mcpServers értékkel', legacyStep],
+    ['az új alak, hivatkozásokkal', referencingStep],
+    ['az üres hivatkozás rekord', { ...SAVABLE_AGENT_STEP, mcpServerReferences: {} }],
+  ])('mindkét oldalon átmegy: %s', (_label, config) => {
+    expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
+    expect(isNodeConfig(config)).toBe(true);
+  });
+
+  // A db `isMcpServerReference` minden ágát egy-egy eset buktatja: egy rontás (például
+  // `isStringRecord` helyett `isRecord`, vagy az `authEnvName` ellenőrzése helyett `true`)
+  // itt eltérést ad a két oldal között (T-012-27).
+  it.each([
+    ['nem szöveg értékű envBindings', { s: { envBindings: { GITHUB_TOKEN: 1 }, authEnvName: null } }],
+    ['nem rekord envBindings', { s: { envBindings: ['GITHUB_TOKEN'], authEnvName: null } }],
+    ['szám authEnvName', { s: { envBindings: {}, authEnvName: 7 } }],
+    ['objektum authEnvName', { s: { envBindings: {}, authEnvName: { name: 'A' } } }],
+    ['hiányzó authEnvName', { s: { envBindings: {} } }],
+    ['saját __proto__ kulcsú envBindings', OWN_PROTO_KEY_1],
+    ['saját __proto__ kulcsú hivatkozás rekord', OWN_PROTO_KEY_2],
+  ])('az alakhiba mindkét oldalon elbukik: %s', (_label, mcpServerReferences) => {
+    const config = { ...SAVABLE_AGENT_STEP, mcpServerReferences };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(false);
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
+    expect(isNodeConfig(config)).toBe(false);
+  });
+
+  // Az env változó név szabálya (SPEC-009 6.1) kizárólag a protokoll mentési sémáján áll, a
+  // központi MCP definíció mintájára: az olvasó séma és a db guard a régi alakot elfogadja.
+  it.each([
+    ['nem név alakú envBindings érték', { s: { envBindings: { GITHUB_TOKEN: 'ghp-titok' }, authEnvName: null } }],
+    ['üres authEnvName', { s: { envBindings: {}, authEnvName: '' } }],
+  ])('a név szabály csak a mentési sémán bukik: %s', (_label, mcpServerReferences) => {
+    const config = { ...SAVABLE_AGENT_STEP, mcpServerReferences };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+    expect(isNodeConfig(config)).toBe(true);
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
+  });
+
+  it('egy ismeretlen kulcsú hivatkozás bejegyzés mindkét oldalon elbukik', () => {
+    const config = {
+      ...SAVABLE_AGENT_STEP,
+      mcpServerReferences: { s: { envBindings: {}, authEnvName: null, [UNKNOWN_KEY]: 1 } },
+    };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(false);
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
+    expect(isNodeConfig(config)).toBe(false);
+  });
 });

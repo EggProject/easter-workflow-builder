@@ -261,8 +261,8 @@ function expectBoxInsideBox(inner: Box, outer: Box): void {
 }
 
 /**
- * Az API origin kérései: a felvétel helyi művelet, tehát a betöltés négy
- * kérése (gráf, workflow, beállítások, provider lista) után egy sem jöhet (SPEC-008 78. kritérium, 9. szekció 4. pont).
+ * Az API origin kérései: a felvétel helyi művelet, tehát a betöltés öt
+ * kérése (gráf, workflow, beállítások, provider lista, skill könyvtár) után egy sem jöhet (SPEC-008 78. kritérium, 9. szekció 4. pont).
  */
 function recordApiRequests(page: Page): readonly string[] {
   const requests: string[] = [];
@@ -306,6 +306,9 @@ test.beforeEach(async ({ page }) => {
     mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(GRAPH))),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
+    mockRoute('listSkills', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listMcpServerDefinitions', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listServerEnvironmentNames', async (route) => route.fulfill(jsonBody([]))),
   ]);
   await page.setViewportSize({ width: 1440, height: 900 });
 });
@@ -315,7 +318,7 @@ test('a "Hozzáadás" gomb útján az új kártya közepe a látható vászon k�
 }) => {
   const apiRequests = recordApiRequests(page);
   await openEditor(page);
-  await expect.poll(() => apiRequests.length).toBe(4);
+  await expect.poll(() => apiRequests.length).toBe(7);
   const knownIds = await readNodeIds(page);
 
   await page.getByRole('button', { name: 'Hozzáadás', exact: true }).click();
@@ -359,7 +362,7 @@ test('a "Hozzáadás" gomb útján az új kártya közepe a látható vászon k�
     })
     .toBeLessThan(canvasBox.width);
   expectBoxInsideBox(await requireBoundingBox(node), await requireBoundingBox(page.getByTestId('rf__wrapper')));
-  expect(apiRequests).toHaveLength(4);
+  expect(apiRequests).toHaveLength(7);
 });
 
 test('a jobb klikk útján az új kártya bal felső sarka a kattintás pontja (screenToFlowPosition a valós vásznon), a menü a választás után bezárul, a csomópont kiválasztva, kérés nélkül', async ({
@@ -367,7 +370,7 @@ test('a jobb klikk útján az új kártya bal felső sarka a kattintás pontja (
 }) => {
   const apiRequests = recordApiRequests(page);
   await openEditor(page);
-  await expect.poll(() => apiRequests.length).toBe(4);
+  await expect.poll(() => apiRequests.length).toBe(7);
   const knownIds = await readNodeIds(page);
   const canvasBox = await requireBoundingBox(page.getByTestId('rf__wrapper'));
   const geometry = await readCanvasGeometry(page);
@@ -396,7 +399,7 @@ test('a jobb klikk útján az új kártya bal felső sarka a kattintás pontja (
   expect(cardBox.y).toBeCloseTo(clickPoint.y, 0);
   expect(clickPoint.x).toBeLessThan(cardBox.x + cardBox.width);
   expect(clickPoint.y).toBeLessThan(cardBox.y + cardBox.height);
-  expect(apiRequests).toHaveLength(4);
+  expect(apiRequests).toHaveLength(7);
 });
 
 // 75. kritérium, mindkét témában: a böngésző saját menüje helyett a felvételi

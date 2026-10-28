@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/no-null -- a teszt a hivatkozás `authEnvName` mezőjének `null` értékét (nincs felülírás) vizsgálja (SPEC-009 6.2). */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -5,6 +6,7 @@ import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import { AgentDefinitionEntryFields } from './AgentDefinitionEntryFields.tsx';
 import { UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS } from './agent-definition-field-table.ts';
 import { FieldErrorsContext } from './field-errors-context.ts';
+import { McpServerLibraryContext } from './mcp-server-library-context.ts';
 
 function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
@@ -282,13 +284,76 @@ describe('AgentDefinitionEntryFields', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ memory: '' }));
   });
 
-  it('a `skills` és az `mcpServers` mező olvasható, és megnevezi a SPEC-009 okot', () => {
+  it('a régi `mcpServers` mező olvasható, és a régi alakot nevezi meg', () => {
     act(() => {
       root.render(
         <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={vi.fn()} />,
       );
     });
-    expect(container.textContent).toContain('SPEC-009');
+    expect(container.textContent).toContain('a régi, lépésenkénti alak');
+    expect(container.textContent).not.toContain('SPEC-009');
+  });
+
+  it('az MCP hivatkozás a központi listából választ, és a bejegyzés többi kulcsa változatlanul megmarad', () => {
+    const onChange = vi.fn();
+    act(() => {
+      root.render(
+        <McpServerLibraryContext.Provider
+          value={{
+            servers: {
+              status: 'success',
+              value: [
+                {
+                  name: 'github',
+                  definition: { type: 'stdio', command: 'npx', args: [], envNames: [], envBindings: {} },
+                },
+              ],
+            },
+            environmentNames: { status: 'success', value: [] },
+          }}
+        >
+          <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={onChange} />
+        </McpServerLibraryContext.Provider>,
+      );
+    });
+    const checkbox = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+      (candidate) => candidate.parentElement?.textContent === 'github',
+    );
+    if (checkbox === undefined) {
+      throw new Error('a teszt nem talált github jelölőnégyzetet');
+    }
+    act(() => {
+      checkbox.click();
+    });
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...FULL_ENTRY,
+      mcpServerReferences: { github: { envBindings: {}, authEnvName: null } },
+    });
+  });
+
+  it('a `skills` mező a módválasztón szerkeszthető, a többi kulcs változatlanul megmarad', () => {
+    const onChange = vi.fn();
+    act(() => {
+      root.render(
+        <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={onChange} />,
+      );
+    });
+    expect(selectTrigger(container, 'Skillek használata').textContent).toBe('kiválasztott skillek');
+    chooseOption(container, 'Skillek használata', 'minden feltöltött skill');
+    expect(onChange).toHaveBeenLastCalledWith({ ...FULL_ENTRY, skills: 'all' });
+  });
+
+  it('a hiányzó `skills` kulcs "nincs beállítva", és a listás módra váltás üres listát ír a kulcsba', () => {
+    const onChange = vi.fn();
+    const withoutSkills = Object.fromEntries(Object.entries(FULL_ENTRY).filter(([key]) => key !== 'skills'));
+    act(() => {
+      root.render(
+        <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={withoutSkills} onChange={onChange} />,
+      );
+    });
+    expect(selectTrigger(container, 'Skillek használata').textContent).toBe('nincs beállítva');
+    chooseOption(container, 'Skillek használata', 'kiválasztott skillek');
+    expect(onChange).toHaveBeenLastCalledWith({ ...withoutSkills, skills: [] });
   });
 
   it('a három nem megerősített mező (M-90) értékkel is csak olvasható szöveg, vezérlő nélkül', () => {

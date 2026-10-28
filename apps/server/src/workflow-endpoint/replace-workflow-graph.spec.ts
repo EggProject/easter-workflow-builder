@@ -105,6 +105,51 @@ describe('createReplaceWorkflowGraphHandler', () => {
     expect(okOrThrow(database.workflows.readGraph(created.id)).nodes).toEqual([]);
   });
 
+  it('a lépés MCP hivatkozásának nem név alakú szerver oldali neve invalid_request, az érték nem kerül a hibába (SPEC-009 6.1, T-012-27)', async () => {
+    const database = openMemoryDatabase();
+    const created = okOrThrow(
+      database.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null }),
+    );
+    const config = {
+      type: 'agent_step',
+      promptTemplate: 'p',
+      providerId: null,
+      modelId: null,
+      effort: null,
+      thinking: null,
+      allowedTools: [],
+      disallowedTools: [],
+      permissionMode: null,
+      maxTurns: null,
+      maxBudgetUsd: null,
+      systemPrompt: null,
+      agents: {},
+      skills: null,
+      mcpServers: {},
+      mcpServerReferences: { github: { envBindings: { GITHUB_TOKEN: 'ghp-titok' }, authEnvName: null } },
+      cwd: null,
+      additionalDirectories: [],
+      sandbox: null,
+      sessionMode: 'isolated',
+      structuredOutput: null,
+      onUnhandledError: 'fail_run',
+    };
+
+    const result = await createReplaceWorkflowGraphHandler(database)({
+      parameters: { workflowId: created.id },
+      query: new URLSearchParams(),
+      body: {
+        nodes: [{ id: 'n1', type: 'agent_step', label: 'Lépés', positionX: 0, positionY: 0, config }],
+        edges: [],
+      },
+    });
+
+    expect(result.kind === 'error' && result.message).toBe(
+      'A kérés törzse érvénytelen, hibás mező(k): nodes.0.config.mcpServerReferences.github.envBindings.GITHUB_TOKEN (invalid_request).',
+    );
+    expect(okOrThrow(database.workflows.readGraph(created.id)).nodes).toEqual([]);
+  });
+
   it('nem létező node-ra mutató él idegenkulcs-sértést ad, ami conflict hibaosztályra képződik', async () => {
     const database = openMemoryDatabase();
     const created = okOrThrow(

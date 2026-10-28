@@ -7,8 +7,12 @@ import {
 import { Accordion, AccordionItem, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
 import { AgentsFieldEditor } from './AgentsFieldEditor.tsx';
+import { LEGACY_MCP_SERVERS_REASON } from './legacy-mcp-servers-reason.ts';
+import { McpServerReferencesField } from './McpServerReferencesField.tsx';
+import { ProviderSelect } from '../provider-select/ProviderSelect.tsx';
 import { ProviderOptionsContext } from './provider-options-context.ts';
 import { SandboxField } from './SandboxField.tsx';
+import { SkillsField } from './SkillsField.tsx';
 import { StructuredOutputField } from './StructuredOutputField.tsx';
 import { SystemPromptField } from './SystemPromptField.tsx';
 import { describeUnknownValue } from './describe-unknown-value.ts';
@@ -17,8 +21,6 @@ import { fromTextFieldValue, toTextFieldValue } from './nullable-text-field-valu
 import { fromStringListFieldValue, toStringListFieldValue } from './string-list-field-value.ts';
 import { useFieldError } from './use-field-error.ts';
 import './node-inspector.css';
-
-const SPEC_009_SCOPE_REASON = 'a SPEC-009 hatóköre (skill feltöltés / MCP konfiguráció), itt csak olvasható';
 
 export interface AgentStepConfigFieldsProperties {
   readonly config: AgentStepConfig;
@@ -43,9 +45,11 @@ export interface AgentStepConfigFieldsProperties {
 
 /**
  * Az `AgentStepConfig` teljes szerkesztő felülete: az `agent_step` node és a
- * `join` `ai_synthesis` módja egyaránt ezt használja. A `skills` és az
- * `mcpServers` mező olvasható, nem szerkeszthető - a panel ezt ki is mondja
- * (AC16). Az `agents` mező a `AgentsFieldEditor` saját, kulcsonkénti
+ * `join` `ai_synthesis` módja egyaránt ezt használja. A `skills` mező a
+ * `SkillsField` vezérlőjén szerkeszthető (SPEC-009 5.2, AC15); az MCP
+ * hivatkozás (`mcpServerReferences`) a `McpServerReferencesField` vezérlőjén
+ * (SPEC-009 6.2, AC16), a régi `mcpServers` mező olvasható, a régi alakot
+ * megnevező szöveggel (AC26). Az `agents` mező a `AgentsFieldEditor` saját, kulcsonkénti
  * szerkesztőjén megy.
  *
  * CSOPORTOSÍTÁS (SPEC-008 5.2, felhasználói kérés 2026-09-09). Ez az
@@ -66,8 +70,11 @@ export interface AgentStepConfigFieldsProperties {
  *   (sandbox, kimenet séma) különösen ritkán nyúlt.
  * - "Al-agentek (agents)" panel: saját, kulcsonkénti szerkesztő, ami
  *   nyitva sok helyet foglal, miközben a legtöbb lépésen üres.
- * - "Skillek és MCP szerverek (csak olvasható)" panel: itt semmit nem lehet
- *   szerkeszteni (SPEC-009 hatóköre), tehát a legkevésbé sem tartozik elöl.
+ * - "Skillek" panel: a módválasztó és a könyvtár skilljeinek jelölőnégyzetei,
+ *   alapesetben "nincs beállítva", tehát nem tartozik elöl.
+ * - "MCP szerverek" panel: a központi listából választott szerverek és a
+ *   hozzárendelés felülírása, alatta a régi `mcpServers` mező csak
+ *   olvashatóan; alapesetben üres, tehát nem tartozik elöl.
  */
 export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFieldsProperties>): ReactElement {
   const { config, onChange, inheritedProviderDescription, fieldPathPrefix } = properties;
@@ -109,7 +116,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
           setField('systemPrompt', nextValue);
         }}
       />
-      <SelectField
+      <ProviderSelect
         size="sm"
         label="Provider felülírás"
         error={providerIdError}
@@ -117,15 +124,14 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         // (SPEC-008 9. szekció 4. async pontja, user döntés 2026-10-21).
         loading={providerOptions.isLoading}
         loadingLabel="Betöltés…"
-        options={[
-          { value: '', label: 'nincs felülírás (öröklés)' },
-          ...providerOptions.providerIds.map((option) => ({ value: option, label: option })),
-        ]}
+        emptyOptionLabel="nincs felülírás (öröklés)"
+        providers={providerOptions.providerIds.map((option) => ({ id: option, displayName: option }))}
         value={config.providerId ?? ''}
+        testConnection={providerOptions.testConnection}
         onChange={(nextValue) => {
-          // A `SelectField` az opciólista értéktípusát adja vissza, tehát a
-          // `nextValue` itt `'' | ProviderId`. A "nincs felülírás" opció
-          // értéke az üres string; a `.find` ezt szűri ki, más ága nincs.
+          // A `ProviderSelect` az opciólista értékét adja vissza (sztring). A
+          // "nincs felülírás" opció értéke az üres string; a `.find` ezt
+          // szűri ki, más ága nincs.
           const matched = ProviderIdSchema.options.find((option) => option === nextValue);
           // eslint-disable-next-line unicorn/no-null -- a `providerId: ProviderId | null` `null` értéke jelenti a "nincs felülírás" állapotot.
           setField('providerId', matched ?? null);
@@ -277,17 +283,27 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
           />
         </AccordionItem>
 
-        <AccordionItem title="Skillek és MCP szerverek (csak olvasható)">
+        <AccordionItem title="Skillek">
+          <SkillsField
+            value={config.skills}
+            onChange={(nextValue) => {
+              setField('skills', nextValue);
+            }}
+          />
+        </AccordionItem>
+
+        <AccordionItem title="MCP szerverek">
+          <McpServerReferencesField
+            value={config.mcpServerReferences}
+            onChange={(nextValue) => {
+              setField('mcpServerReferences', nextValue);
+            }}
+          />
           <div className="node-inspector__group">
             <div className="field">
-              <span className="field__label">Skillek</span>
-              <p>{describeUnknownValue(config.skills)}</p>
-              <p className="node-inspector__reason">{SPEC_009_SCOPE_REASON}</p>
-            </div>
-            <div className="field">
-              <span className="field__label">MCP szerverek</span>
+              <span className="field__label">Régi mcpServers mező</span>
               <p>{describeUnknownValue(config.mcpServers)}</p>
-              <p className="node-inspector__reason">{SPEC_009_SCOPE_REASON}</p>
+              <p className="node-inspector__reason">{LEGACY_MCP_SERVERS_REASON}</p>
             </div>
           </div>
         </AccordionItem>

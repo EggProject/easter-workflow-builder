@@ -14,6 +14,7 @@ import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uu
 import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { runShutdownSequence } from './run-shutdown-sequence.ts';
+import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -304,11 +305,13 @@ describe('runShutdownSequence', () => {
     const database = openMemoryDatabase();
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, silentLogger()));
+    const engine = createEngine(
+      buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
+    );
     const { sink, lines } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,
@@ -329,11 +332,13 @@ describe('runShutdownSequence', () => {
     // A valódi összeállítás, eltérés nélkül: a `human_approval` lépés a
     // szállított Mustache renderelővel várakozó futást ad, amit a leállás
     // megszakíthat.
-    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, silentLogger()));
+    const engine = createEngine(
+      buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
+    );
     const { sink } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,
@@ -377,7 +382,7 @@ describe('runShutdownSequence', () => {
     // gazdagép env változói ne döntsenek). A sablon renderelő a szállított
     // Mustache port.
     const engine = createEngine({
-      ...buildEngineDependencies(database, streamRegistry, clock, silentLogger()),
+      ...buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
       agentQueryRunner: agent.runner,
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
       processEnvironment: { read: () => null, readAll: () => ({}) },
@@ -385,7 +390,7 @@ describe('runShutdownSequence', () => {
     const { sink } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,
@@ -447,7 +452,7 @@ describe('runShutdownSequence', () => {
     // Ugyanaz a két, tesztelhetőségi eltérés, mint az indító kérés
     // regressziós tesztjében.
     const engine = createEngine({
-      ...buildEngineDependencies(database, streamRegistry, clock, silentLogger()),
+      ...buildEngineDependencies(database, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
       agentQueryRunner: agent.runner,
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
       processEnvironment: { read: () => null, readAll: () => ({}) },
@@ -455,7 +460,7 @@ describe('runShutdownSequence', () => {
     const { sink } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,
@@ -544,11 +549,13 @@ describe('runShutdownSequence', () => {
     };
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    const engine = createEngine(buildEngineDependencies(racyDatabase, streamRegistry, clock, silentLogger()));
+    const engine = createEngine(
+      buildEngineDependencies(racyDatabase, streamRegistry, clock, silentLogger(), TEST_SKILL_LIBRARY.rootDirectory),
+    );
     const { sink, lines } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
-      handlers: buildRouteHandlers(racyDatabase, engine, streamRegistry),
+      handlers: buildRouteHandlers(racyDatabase, engine, streamRegistry, TEST_SKILL_LIBRARY),
       devOrigin: undefined,
       streamDependencies: { database: racyDatabase, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,

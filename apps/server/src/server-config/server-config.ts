@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { EnvironmentReader, Outcome } from '@easter-workflow-builder/core';
 import {
   ENV_LOG_DIRECTORY,
@@ -6,17 +7,23 @@ import {
   ENV_LOG_ROTATION_FREQUENCY,
   ENV_LOG_ROTATION_SIZE,
   ENV_SERVER_PORT,
+  ENV_SKILL_LIBRARY_DIRECTORY,
+  ENV_SKILL_MAX_ARCHIVE_BYTES,
+  ENV_SKILL_MAX_ENTRY_COUNT,
+  ENV_SKILL_MAX_UNPACKED_BYTES,
   ENV_STREAM_DEV_ORIGIN,
   ENV_STREAM_KEEP_ALIVE_INTERVAL_MS,
 } from './environment-variable-name.ts';
 import { DEFAULT_SERVER_CONFIG } from './default-server-config.ts';
+import { isValidSkillPluginName } from './is-valid-skill-plugin-name.ts';
 
 /**
  * A szerver induláskor beolvasott konfigurációja (SPEC-006 4.2 1. lépés,
  * 9.1 `server-config` téma). Minden mezőnek alapértéke van
  * (`DEFAULT_SERVER_CONFIG`, SPEC-012 4.2), kivéve a `devOrigin`-t (5.7,
- * opcionális: hiányában nincs CORS) és a `logLevel`-t (7.2, hiányában a pino
- * dokumentált `'info'` alapértéke érvényesül).
+ * opcionális: hiányában nincs CORS), a `logLevel`-t (7.2, hiányában a pino
+ * dokumentált `'info'` alapértéke érvényesül) és a `skillLibraryDirectory`-t
+ * (SPEC-009 5.1: kötelező, alapérték nélkül; hiányában a szerver nem indul).
  */
 export interface ServerConfig {
   readonly port: number;
@@ -27,10 +34,22 @@ export interface ServerConfig {
   readonly logRotationFrequency: number | string;
   readonly logRetainedFileCount: number;
   readonly streamKeepAliveIntervalMs: number;
+  readonly skillLibraryDirectory: string;
+  readonly skillMaxArchiveBytes: number;
+  readonly skillMaxUnpackedBytes: number;
+  readonly skillMaxEntryCount: number;
+}
+
+function missingVariableMessage(name: string): string {
+  return `A(z) "${name}" kötelező env változó hiányzik vagy üres (missing_env_variable).`;
 }
 
 function invalidVariableMessage(name: string): string {
   return `A(z) "${name}" env változó értéke érvénytelen (invalid_env_variable).`;
+}
+
+function invalidSkillPluginNameMessage(pluginName: string): string {
+  return `A(z) "${ENV_SKILL_LIBRARY_DIRECTORY}" env változó értéke érvénytelen: a könyvtár neve ("${pluginName}") a skill plugin neve, ami nem lehet üres, nem kezdődhet szóközzel, és nem tartalmazhat zárójelet, vesszőt vagy vezérlő karaktert (invalid_env_variable).`;
 }
 
 /**
@@ -104,6 +123,45 @@ export function readServerConfig(environment: EnvironmentReader): Outcome<Server
     return streamKeepAliveIntervalMs;
   }
 
+  const skillLibraryDirectory = readStringOrDefault(environment, ENV_SKILL_LIBRARY_DIRECTORY, '');
+  if (skillLibraryDirectory.length === 0) {
+    return { kind: 'error', message: missingVariableMessage(ENV_SKILL_LIBRARY_DIRECTORY) };
+  }
+  // A plugin neve az abszolút útvonal utolsó tagja (a relatív érték az induló könyvtárhoz képest
+  // oldódik fel, ugyanúgy, mint a `continueStartupWithDatabase`-ben), és a `query()` az érvénytelen
+  // alakra dob (M-136 5b), ezért a szerver ilyenkor el sem indul (SPEC-009 5.1).
+  const skillPluginName = path.basename(path.resolve(skillLibraryDirectory));
+  if (!isValidSkillPluginName(skillPluginName)) {
+    return { kind: 'error', message: invalidSkillPluginNameMessage(skillPluginName) };
+  }
+
+  const skillMaxArchiveBytes = readPositiveIntegerOrDefault(
+    environment,
+    ENV_SKILL_MAX_ARCHIVE_BYTES,
+    DEFAULT_SERVER_CONFIG.skillMaxArchiveBytes,
+  );
+  if (skillMaxArchiveBytes.kind === 'error') {
+    return skillMaxArchiveBytes;
+  }
+
+  const skillMaxUnpackedBytes = readPositiveIntegerOrDefault(
+    environment,
+    ENV_SKILL_MAX_UNPACKED_BYTES,
+    DEFAULT_SERVER_CONFIG.skillMaxUnpackedBytes,
+  );
+  if (skillMaxUnpackedBytes.kind === 'error') {
+    return skillMaxUnpackedBytes;
+  }
+
+  const skillMaxEntryCount = readPositiveIntegerOrDefault(
+    environment,
+    ENV_SKILL_MAX_ENTRY_COUNT,
+    DEFAULT_SERVER_CONFIG.skillMaxEntryCount,
+  );
+  if (skillMaxEntryCount.kind === 'error') {
+    return skillMaxEntryCount;
+  }
+
   const developmentOrigin = environment[ENV_STREAM_DEV_ORIGIN];
   const logLevel = environment[ENV_LOG_LEVEL];
 
@@ -116,6 +174,10 @@ export function readServerConfig(environment: EnvironmentReader): Outcome<Server
       logRotationFrequency: readRotationFrequency(environment, ENV_LOG_ROTATION_FREQUENCY),
       logRetainedFileCount: logRetainedFileCount.value,
       streamKeepAliveIntervalMs: streamKeepAliveIntervalMs.value,
+      skillLibraryDirectory,
+      skillMaxArchiveBytes: skillMaxArchiveBytes.value,
+      skillMaxUnpackedBytes: skillMaxUnpackedBytes.value,
+      skillMaxEntryCount: skillMaxEntryCount.value,
       ...(developmentOrigin !== undefined &&
         developmentOrigin.trim().length > 0 && { devOrigin: developmentOrigin.trim() }),
       ...(logLevel !== undefined && logLevel.trim().length > 0 && { logLevel: logLevel.trim() }),

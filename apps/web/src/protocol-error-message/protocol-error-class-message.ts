@@ -30,7 +30,7 @@ const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>
   insufficient_backoff_list:
     'Egy Hibakezelő csomópont várakozási listája rövidebb, mint amit a próbálkozások száma megkövetel.',
   missing_required_input: 'A futás egy kötelező bemeneti mezője hiányzik.',
-  no_default_provider: 'Nincs alapértelmezett provider beállítva.',
+  no_default_provider: 'Nincs alapértelmezett provider beállítva, válassz egyet a Beállítások képernyőn.',
   structured_output_strategy_unsupported:
     'Egy lépés strukturált kimenet stratégiáját a választott provider nem támogatja.',
   insufficient_max_turns: 'Egy lépés körszáma kevesebb, mint amennyit a strukturált kimenet stratégiája igényel.',
@@ -43,7 +43,26 @@ const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>
   provider_descriptor_sdk_mismatch: 'A provider leírója nem a telepített Agent SDK verzióhoz készült.',
   template_render_failed: 'A workflow egyik sablonja hibás, ezért a futás nem indítható.',
   expression_evaluation_failed: 'A workflow egyik kifejezése hibás, ezért a futás nem indítható.',
+  skill_not_found: 'Egy lépés olyan skillre hivatkozik, ami nincs a skill könyvtárban.',
+  mcp_server_not_found: 'Egy lépés olyan MCP szerverre hivatkozik, ami nincs a Beállítások MCP szerver listájában.',
+  missing_mcp_server_env: 'Egy lépés MCP szerveréhez rendelt szerver oldali env változó nincs beállítva.',
   already_decided: 'Ezt a jóváhagyást már eldöntötték.',
+  // SPEC-009 5.4 tábla: a skill feltöltés elutasítási okai (O-41, user döntés 2026-10-28).
+  skill_archive_unreadable: 'A feltöltött fájl nem érvényes ZIP csomag.',
+  skill_archive_entry_type_unsupported: 'A csomag nem támogatott bejegyzést tartalmaz, például szimbolikus linket.',
+  skill_archive_unsafe_path: 'A csomag egyik bejegyzésének útvonala tiltott.',
+  skill_archive_path_collision: 'A csomag két bejegyzésének útvonala azonos, vagy csak kis- és nagybetűben tér el.',
+  skill_archive_layout_invalid: 'A csomag gyökerében nincs SKILL.md, és nem pontosan egy mappát tartalmaz.',
+  skill_manifest_missing: 'Hiányzik a SKILL.md.',
+  skill_manifest_duplicate: 'A skill gyökerében több SKILL.md áll.',
+  skill_manifest_invalid: 'A SKILL.md fejléce hibás.',
+  skill_name_invalid: 'A megadott skill név nem felel meg a névszabálynak.',
+  skill_name_mismatch: 'A SKILL.md fejlécében álló név eltér a megadott névtől.',
+  skill_archive_too_large: 'A csomag túl nagy.',
+  skill_archive_too_many_entries: 'A csomag túl sok fájlt tartalmaz.',
+  skill_archive_entry_size_mismatch: 'A csomag egyik bejegyzése sérült.',
+  skill_archive_entry_encrypted: 'A csomag titkosított bejegyzést tartalmaz.',
+  skill_archive_compression_unsupported: 'A csomag nem támogatott tömörítést használ.',
 };
 
 export function protocolErrorClassMessage(errorClass: ProtocolErrorClass): string {

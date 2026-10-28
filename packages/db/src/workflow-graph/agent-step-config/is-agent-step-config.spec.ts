@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { AgentStepConfig } from './agent-step-config.ts';
 import { isAgentStepConfig } from './is-agent-step-config.ts';
 
+// A `JSON.parse` saját `__proto__` tulajdonságot hoz létre (egy objektum literál a prototípust állítaná).
+const OWN_PROTO_KEY_1: unknown = JSON.parse('{"__proto__":{"envBindings":{},"authEnvName":null}}');
+
 // Minden nullázható mező üres: ez fedi a guard `null` ágait.
 const minimalConfig: AgentStepConfig = {
   promptTemplate: '',
@@ -319,5 +322,40 @@ describe('isAgentStepConfig', () => {
       },
     };
     expect(isAgentStepConfig(value)).toBe(true);
+  });
+
+  /**
+   * A lépés új, elhagyható hivatkozás mezője (SPEC-009 6.2, O-42 (b);
+   * `docs/research/2026-10-26-spec-009-forrasok.md` 9.5 szekció 1. pont).
+   */
+  describe('mcpServerReferences (O-42)', () => {
+    const references = {
+      github_ceg: { envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_CEG' }, authEnvName: null },
+      remote: { envBindings: {}, authEnvName: 'REMOTE_AUTH_SAJAT' },
+    };
+
+    it('a mező nélküli régi config átmegy üres és nem üres régi mcpServers értékkel, mindhárom ágon', () => {
+      expect(isAgentStepConfig(minimalConfig)).toBe(true);
+      expect(Object.hasOwn(fullConfig, 'mcpServerReferences')).toBe(false);
+      expect(isAgentStepConfig(fullConfig)).toBe(true);
+    });
+
+    it('a hivatkozás mezővel átmegy, az üres rekorddal is', () => {
+      expect(isAgentStepConfig({ ...fullConfig, mcpServerReferences: references })).toBe(true);
+      expect(isAgentStepConfig({ ...minimalConfig, mcpServerReferences: {} })).toBe(true);
+    });
+
+    it.each([
+      ['nem rekord', []],
+      ['undefined értékű kulcs', undefined],
+      ['ismeretlen kulcsú bejegyzés', { s: { envBindings: {}, authEnvName: null, [UNKNOWN_KEY]: 1 } }],
+      ['hiányzó envBindings', { s: { authEnvName: null } }],
+      ['nem név értékű envBindings', { s: { envBindings: { GITHUB_TOKEN: 1 }, authEnvName: null } }],
+      ['nem név értékű authEnvName', { s: { envBindings: {}, authEnvName: 1 } }],
+      ['érték rekordot hordozó env mező', { s: { envBindings: {}, authEnvName: null, env: { A: 'titok' } } }],
+      ['saját __proto__ kulcs (T-012-27)', OWN_PROTO_KEY_1],
+    ])('elutasítja: %s', (_label, value) => {
+      expect(isAgentStepConfig({ ...fullConfig, mcpServerReferences: value })).toBe(false);
+    });
   });
 });

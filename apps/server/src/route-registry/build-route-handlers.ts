@@ -1,7 +1,6 @@
 import type { DatabaseContext } from '@easter-workflow-builder/db';
 import type { Engine } from '@easter-workflow-builder/engine';
-import type { RouteId } from '@easter-workflow-builder/protocol';
-import type { RouteHandler } from '../route-dispatch/route-handler.ts';
+import type { RouteHandlers } from '../route-dispatch/route-handlers.ts';
 import type { StreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { createReplaceStreamSubscriptionsHandler } from '../stream-registry/create-replace-stream-subscriptions-handler.ts';
 import { createListWorkflowsHandler } from '../workflow-endpoint/list-workflows.ts';
@@ -29,18 +28,33 @@ import { createUpdateSettingsHandler } from '../settings-endpoint/update-setting
 import { createListConcurrencyLimitsHandler } from '../settings-endpoint/list-concurrency-limits.ts';
 import { createSetConcurrencyLimitHandler } from '../settings-endpoint/set-concurrency-limit.ts';
 import { createClearConcurrencyLimitHandler } from '../settings-endpoint/clear-concurrency-limit.ts';
+import { createDeleteSkillHandler } from '../skill-endpoint/delete-skill.ts';
+import { createListSkillsHandler } from '../skill-endpoint/list-skills.ts';
+import type { SkillLibrary } from '../skill-endpoint/skill-library.ts';
+import { createSkillNameLock } from '../skill-endpoint/skill-name-lock.ts';
+import { createUploadSkillHandler } from '../skill-endpoint/upload-skill.ts';
+import { createDeleteMcpServerDefinitionHandler } from '../mcp-server-definition-endpoint/delete-mcp-server-definition.ts';
+import { createListMcpServerDefinitionsHandler } from '../mcp-server-definition-endpoint/list-mcp-server-definitions.ts';
+import { createSaveMcpServerDefinitionHandler } from '../mcp-server-definition-endpoint/save-mcp-server-definition.ts';
+import { createProcessEnvironmentReader } from '../engine-assembly/create-process-environment-reader.ts';
+import { createListServerEnvironmentNamesHandler } from '../server-environment-endpoint/list-server-environment-names.ts';
 
 /**
- * A `ROUTE_TABLE` mind a 26 azonosítójára kitöltött kezelő rekord
+ * A `ROUTE_TABLE` mind a 33 azonosítójára kitöltött kezelő rekord
  * (SPEC-006 `route-registry` téma, 12. elfogadási kritérium). A
- * `Record<RouteId, RouteHandler>` visszatérési típus miatt egy kimaradó
- * `RouteId` fordítási hibát ad, nem futásidejű "nincs kezelő" ágat.
+ * `RouteHandlers` visszatérési típus miatt egy kimaradó `RouteId` (vagy a
+ * nyers ZIP törzsű végpont nem bináris kezelője) fordítási hibát ad, nem
+ * futásidejű "nincs kezelő" ágat. A `skillLibrary` a skill könyvtár gyökere és
+ * a feltöltés korlátai (SPEC-009 5.1, 5.4 6. pont); a feltöltés és a törlés
+ * ugyanazon a név záron osztozik (PLAN-012 T-012-27).
  */
 export function buildRouteHandlers(
   database: DatabaseContext,
   engine: Engine,
   streamRegistry: StreamRegistry,
-): Readonly<Record<RouteId, RouteHandler>> {
+  skillLibrary: SkillLibrary,
+): RouteHandlers {
+  const skillNameLock = createSkillNameLock();
   return {
     // A. Workflow (8 végpont)
     listWorkflows: createListWorkflowsHandler(database),
@@ -79,5 +93,18 @@ export function buildRouteHandlers(
 
     // F. Stream vezérlés (1 végpont)
     replaceStreamSubscriptions: createReplaceStreamSubscriptionsHandler(database, streamRegistry),
+
+    // G. Skill könyvtár (3 végpont, SPEC-009 5.1)
+    listSkills: createListSkillsHandler(skillLibrary),
+    uploadSkill: createUploadSkillHandler(skillLibrary, skillNameLock),
+    deleteSkill: createDeleteSkillHandler(skillLibrary, skillNameLock),
+
+    // H. Központi MCP szerver lista (3 végpont, SPEC-009 6.2)
+    listMcpServerDefinitions: createListMcpServerDefinitionsHandler(database),
+    saveMcpServerDefinition: createSaveMcpServerDefinitionHandler(database),
+    deleteMcpServerDefinition: createDeleteMcpServerDefinitionHandler(database),
+
+    // I. Szerver környezet (1 végpont, SPEC-009 6.2, O-32): ugyanaz a port, amin a motor a neveket feloldja
+    listServerEnvironmentNames: createListServerEnvironmentNamesHandler(createProcessEnvironmentReader()),
   };
 }

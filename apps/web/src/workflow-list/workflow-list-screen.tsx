@@ -24,7 +24,7 @@ import { useRequestState } from '../request-state/use-request-state.ts';
 import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { CreateWorkflowModal } from './create-workflow-modal.tsx';
 import { DeleteWorkflowModal } from './delete-workflow-modal.tsx';
-import { RenameWorkflowModal } from './rename-workflow-modal.tsx';
+import { EditWorkflowModal } from './edit-workflow-modal.tsx';
 import './workflow-list-screen.css';
 
 /**
@@ -80,7 +80,7 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
 
   const workflowsRequest = useRequestState<readonly WorkflowSummary[]>();
   const [lastWorkflows, setLastWorkflows] = useState<readonly WorkflowSummary[] | undefined>(undefined);
-  const [workflowToRename, setWorkflowToRename] = useState<WorkflowSummary | undefined>(undefined);
+  const [workflowToEdit, setWorkflowToEdit] = useState<WorkflowSummary | undefined>(undefined);
   const [workflowToDelete, setWorkflowToDelete] = useState<WorkflowSummary | undefined>(undefined);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [startingRunWorkflowId, setStartingRunWorkflowId] = useState<string | undefined>(undefined);
@@ -104,7 +104,7 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
 
   useEffect(() => {
     // Csatoláskor fut, és minden szerver újraindulásra újra: a további
-    // hívásokat a felhasználói művelet (létrehozás, átnevezés, törlés,
+    // hívásokat a felhasználói művelet (létrehozás, szerkesztés, törlés,
     // indítás) váltja ki. A `serverRestartCount` szándékosan dependency,
     // holott a törzs nem olvassa (SPEC-007 9.2, 16. szekció 44.
     // kritérium); elágazás nélkül, hogy ne keletkezzen sosem futó ág.
@@ -174,10 +174,10 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
         >
           <MenuItem
             onSelect={() => {
-              setWorkflowToRename(row);
+              setWorkflowToEdit(row);
             }}
           >
-            Átnevezés
+            Szerkesztés
           </MenuItem>
           <MenuItem
             danger
@@ -238,12 +238,12 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
         apiOrigin={apiOrigin}
         fetchFunction={fetchFunction}
       />
-      <RenameWorkflowModal
-        workflow={workflowToRename}
+      <EditWorkflowModal
+        workflow={workflowToEdit}
         onClose={() => {
-          setWorkflowToRename(undefined);
+          setWorkflowToEdit(undefined);
         }}
-        onRenamed={() => {
+        onEdited={() => {
           void loadWorkflows();
         }}
         apiOrigin={apiOrigin}

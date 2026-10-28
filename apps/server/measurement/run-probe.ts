@@ -76,6 +76,7 @@ export async function runProbe(options: ProbeOptions): Promise<ProbeSummary> {
         EASTER_SERVER_PORT: String(port),
         EASTER_DB_FILE: path.join(workDirectory, 'proba.sqlite'),
         EASTER_LOG_DIRECTORY: path.join(workDirectory, 'logs', 'server'),
+        EASTER_SKILL_LIBRARY_DIRECTORY: path.join(workDirectory, 'skills'),
       },
       port,
       options.secretValues,
