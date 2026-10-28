@@ -214,6 +214,51 @@ for (const { errorClass, sentence } of LANGUAGE_FIELD_CASES) {
   });
 }
 
+// A skill és az MCP szerver hivatkozások ellenőrzését a motor a futás
+// indításakor végzi (SPEC-009 5.2, 6.3, 12. szekció AC14, AC17, O-43 (a)):
+// a törölt, de hivatkozott skill, a törölt, de hivatkozott MCP szerver és a
+// hozzárendelt, de a szerveren hiányzó env változó a futás indítását
+// elutasítja `unprocessable` kóddal, a felület saját mondatot mutat.
+const REFERENCE_CASES = [
+  {
+    errorClass: 'skill_not_found',
+    sentence: 'Egy lépés olyan skillre hivatkozik, ami nincs a skill könyvtárban.',
+  },
+  {
+    errorClass: 'mcp_server_not_found',
+    sentence: 'Egy lépés olyan MCP szerverre hivatkozik, ami nincs a Beállítások MCP szerver listájában.',
+  },
+  {
+    errorClass: 'missing_mcp_server_env',
+    sentence: 'Egy lépés MCP szerveréhez rendelt szerver oldali env változó nincs beállítva.',
+  },
+] as const satisfies readonly { readonly errorClass: ProtocolErrorBody['errorClass']; readonly sentence: string }[];
+
+for (const { errorClass, sentence } of REFERENCE_CASES) {
+  test(`a futás indításának ${errorClass} hibája a lábléc danger Alert blokkjában a saját mondatával áll`, async ({
+    page,
+  }) => {
+    await mockEditor(
+      page,
+      START_WITHOUT_FIELDS,
+      {
+        code: 'unprocessable',
+        message: internalMessage(errorClass),
+        errorClass,
+      } satisfies ProtocolErrorBody,
+      422,
+    );
+    await page.goto(EDITOR_URL);
+
+    await page.getByRole('button', { name: 'Futás indítása', exact: true }).click();
+
+    const alert = page.locator('.page-footer').getByRole('alert');
+    await expect(alert).toHaveText(sentence);
+    await expect(alert).toHaveClass(/\balert--danger\b/);
+    await expectNoInternalText(page, errorClass);
+  });
+}
+
 // A mentés `invalid_request` hibájának mezője nem nevezhető meg a felület
 // nyelvén (SPEC-007 8.4, O-10 lezárás): a szerver ugyanazzal a protokoll
 // sémával ellenőriz, amivel a kliens a küldés előtt, tehát a mezőút csak
