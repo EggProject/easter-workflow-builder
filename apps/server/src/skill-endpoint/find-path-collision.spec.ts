@@ -18,6 +18,11 @@ describe('findPathCollision', () => {
     expect(findPathCollision([file('Readme.md'), file('README.MD')])).toBe('README.MD');
   });
 
+  it('két csak Unicode normalizálásban eltérő útvonal ütközik, könyvtár szegmensben is (ZIP 2. találat)', () => {
+    expect(findPathCollision([file('caf\u{E9}.md'), file('cafe\u{301}.md')])).toBe('cafe\u{301}.md');
+    expect(findPathCollision([file('\u{C9}/a.md'), file('e\u{301}')])).toBe('\u{E9}');
+  });
+
   it('egy fájl és egy azonos nevű könyvtár bejegyzés ütközik', () => {
     expect(findPathCollision([file('x'), directory('X')])).toBe('X');
   });

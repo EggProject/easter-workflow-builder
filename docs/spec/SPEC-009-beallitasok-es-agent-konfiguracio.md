@@ -409,7 +409,12 @@ bejegyzést), megnevezett hibával, és semmi nem marad a skill könyvtárban.
    `versionMadeBy` mezőjének felső bájtja 3, APPNOTE 4.4.2) az `externalFileAttributes` felső 16 bitje a
    `st_mode`, ennek fájltípus mezője (`0o170000` maszk) könyvtár (`0o040000`) vagy szabályos fájl
    (`0o100000`) lehet; nem Unix gazdán, vagy üres típus mezőnél a `/` végű név a könyvtár (APPNOTE
-   4.4.17). Ha a Unix típus és a név ellentmond, a bejegyzés nem támogatott.
+   4.4.17). Ha a Unix típus és a név ellentmond, a bejegyzés nem támogatott. Az adatot hordozó könyvtár
+   bejegyzés (a `/` végű név, nem nulla deklarált kicsomagolt mérettel) szintén
+   `skill_archive_entry_type_unsupported`, mert a típusa ellentmondásos: könyvtárként a tartalma csendben
+   kimaradna (PLAN-012 T-012-27; a tábla a "deklarált és tényleges méret eltér" sort a `yauzl` méret
+   ellenőrzésének szánja, ami könyvtár bejegyzésre nem fut). A deflate tömörítésű üres könyvtár (nulla
+   kicsomagolt méret, néhány bájt tömörített adat) elfogadott.
 2. **Útvonal.** A bejegyzés neve nem lehet abszolút (`/` vagy meghajtó jel kezdet), nem tartalmazhat `..`
    szegmenst, visszaper (`\`) jelet és NUL bájtot. A kicsomagolás célja a feloldott abszolút útvonal
    alapján a cél könyvtáron belül marad (a fenti névszabály mellett ez a második védvonal). Ha
@@ -418,9 +423,11 @@ bejegyzést), megnevezett hibával, és semmi nem marad a skill könyvtárban.
    (`getFileNameLowLevel`, a `strictFileNames` megfelelőjével, tehát a visszaper nem cserélődik `/`-re),
    így a beépített ellenőrzés nem előzi meg a sajátot; az üres és a `.` szegmens is tiltott, mert
    ugyanarra a helyre több név mutatna, és a 3. pont ütközés ellenőrzése a kanonikus névre épül.
-3. **Ütközés.** Két azonos útvonalú bejegyzés, és két, csak kis-nagybetűben eltérő útvonalú bejegyzés
-   elutasítva (a kis-nagybetűt nem érzékeny fájlrendszeren, pl. macOS-en, az egyik felülírná a másikat;
-   a fejlesztői gép macOS, `.claude/CLAUDE.md` 12. szekció).
+3. **Ütközés.** Két azonos útvonalú bejegyzés, és két, csak kis-nagybetűben vagy csak Unicode
+   normalizálásban (NFC alak) eltérő útvonalú bejegyzés elutasítva (a kis-nagybetűt és a normalizálást
+   nem érzékeny fájlrendszeren, pl. macOS-en, az egyik felülírná a másikat; a fejlesztői gép macOS,
+   `.claude/CLAUDE.md` 12. szekció; az NFC kulcs PLAN-012 T-012-27). Ha a fájlrendszer ennél is többet von
+   össze, és az írás `EEXIST`, `ENOTDIR` vagy `EISDIR` hibát ad, az is `skill_archive_path_collision`.
 4. **`SKILL.md` és elrendezés** (O-35, lezárva). A skill gyökere vagy a zip gyökere (ott áll a
    `SKILL.md`), vagy, ha a zip gyökerében nincs `SKILL.md`, pontosan egy legfelső szintű mappa, és
    minden bejegyzés ebben a mappában áll; a mappa nevét a rendszer lecsípi, a skill neve a feltöltéskor
@@ -458,7 +465,18 @@ bejegyzést), megnevezett hibával, és semmi nem marad a skill könyvtárban.
    hogy a kliens a `422` választ kapja meg, ne egy félbeszakított kapcsolatot; a memória a korlátnál nem
    nő tovább (T-012-8).
 
-7. **Titkosított bejegyzés és nem támogatott tömörítési módszer** elutasítva.
+7. **Titkosított bejegyzés és nem támogatott tömörítési módszer** elutasítva. A titkosítási bit a központi
+   könyvtárban és a fájl bejegyzés helyi fejlécében is számít (a `yauzl` csak az elsőt nézi; a helyit a
+   kicsomagoló a `readLocalFileHeader` hívással olvassa, PLAN-012 T-012-27).
+   **A központi könyvtár teljessége.** A `yauzl` a záró rekord bejegyzésszámáig olvas; ha a beolvasott
+   rekordok összhossza eltér a záró rekord (ZIP64 esetén a ZIP64 záró rekord) deklarált központi könyvtár
+   méretétől, a bejegyzésszám alulhazudott, és a többi bejegyzés csendben kimaradna: `skill_archive_unreadable`
+   (PLAN-012 T-012-27).
+   **A fájlrendszer hibái.** A kiírás hibájából csak a csomag tartalmából fakadó a kliens hibája: a túl hosszú
+   név vagy túl mély útvonal (`ENAMETOOLONG`) addig `skill_archive_unreadable`, amíg az O-50 (14.9) el nem dől,
+   fájl és könyvtár bejegyzésre egyaránt; az ütközés kódjai a 3. pont szerint. A szerver oldali hiba
+   (`ENOSPC`, `EACCES`, `EIO` és minden más) nem kliens hiba: a szerver belső hiba útján `500 internal`,
+   a meglévő naplózással (PLAN-012 T-012-27).
 8. **Mód.** A zip Unix mód bitjei nem érvényesülnek: a fájlokat a szerver az alapértelmezett
    jogosultsággal hozza létre.
 9. **Atomi csere.** A kicsomagolás egy ideiglenes könyvtárba megy, az ellenőrzések után kerül a végleges
@@ -1112,7 +1130,7 @@ a user az ajánlott választ adta (2026-10-28)**; a döntések a 14.7 szekció O
 
 ### 14.9 A mérésből következő kérdések (nyitva, 2026-10-28)
 
-A sorok az M-136, az M-139 és az M-147 eredményéből jönnek (`docs/research/2026-10-28-spec-009-blokkolo-meresek.md` 4. és 5. szekció); mind a hat termékdöntés (az O-49 az átvezetés során, 2026-10-28-án került a listára), a user
+A sorok az M-136, az M-139 és az M-147 eredményéből jönnek (`docs/research/2026-10-28-spec-009-blokkolo-meresek.md` 4. és 5. szekció); mind termékdöntés (az O-49 az átvezetés során, az O-50 és az O-51 a T-012-27 adverzariális átvizsgálásból, 2026-10-28-án került a listára), a user
 válaszára vár.
 
 | #    | Kérdés                                                                                                                                                                                                                                                                                                                                                                                                        | Opciók (ajánlott elsőként)                                                                                                                                                                                                                                                                        | Mi a viselkedés addig                                                                                                                                                                                                                                                             | Mi zárná le                                                                                                                |
@@ -1123,6 +1141,8 @@ válaszára vár.
 | O-47 | Az al-agent skill láthatósága: a lépés `skills` listája (és a `[]`) az agent definíció al-agentjét nem szűkíti, az al-agent a lépés `plugins` útjának minden skilljét és a CLI beépítettjeit látja és hívhatja (M-147 A4, A5); és ha a lépés `skills` mezője `null`, de egy agent definíció skillre hivatkozik, a motor a `plugins` opciót kiadja, tehát a fő szál is látja a feltöltött skilleket (M-136 3a) | (a) elfogadjuk és a felület kimondja (a definíció `skills` mezője előtöltés, nem szűkítés); (b) a `null` lépésen ilyenkor a motor `skills: []` opciót ad (a fő szál a beépítetteket sem látja, az O-44 (a) iránya); (c) az agent definíció `skills` mezője csak nem `null` lépés mellett engedett | a motor a lépés szabályát alkalmazza (minősítés, `skill_not_found`), a `plugins` kimegy, ha a lépés vagy egy definíció hivatkozik skillre, és a lépés `skills` opciója `null` mellett nem megy ki; a (b) beköthetősége a `skillFields` `null` ága (`build-agent-step-options.ts`) | a user döntése                                                                                                             |
 | O-48 | Az agent definíció MCP felülírása hatástalan, ha a lépés ugyanazt a szerver nevet hivatkozza: az al-agent hívását a lépés konfigurációja szolgálja ki (M-147 B6)                                                                                                                                                                                                                                              | (a) a futás indítása megnevezett hibával utasítja el az ütköző felülírást (új hibaosztály, saját magyar mondattal); (b) elfogadjuk és a felület kimondja; (c) a motor az agent definíció szerverét más néven adja ki (az eszköz neve `mcp__<név>__` előtagja megváltozik)                         | a motor mindkét konfigurációt kiadja, a lépésé nyer (az SDK viselkedése); az (a) helye a `resolveOutgoingAgents`                                                                                                                                                                  | a user döntése                                                                                                             |
 | O-49 | A skill könyvtár útvonalának kötelezősége kontra a SPEC-012 4.2 szabálya: a SPEC-009 5.1 az `EASTER_SKILL_LIBRARY_DIRECTORY` változót kötelezőnek írja, alapérték nélkül (hiányában a szerver nem indul), a SPEC-012 4.2 szerint viszont minden konfigurációs értéknek alapértéke van a kódban, és a kivételt nem nevezi meg                                                                                  | (a) a változó kötelező marad, és a SPEC-012 4.2 kimondott kivételt kap; (b) a könyvtár útvonala forrásolt alapértéket kap (például a `.data/skills`, mint az adatbázis és a napló), és a változó opcionális                                                                                       | a SPEC-009 5.1 szerint kötelező: hiányában a szerver nem indul (`missing_env_variable`); a kód, a `.env.example` és az `apps/server` `server-config` téma ezt valósítja meg; a SPEC-012 4.2 szövege változatlan                                                                   | a user döntése; az (a) esetén a SPEC-012 4.2 kiegészítése, a (b) esetén a SPEC-009 5.1, az AC és a `server-config` átírása |
+| O-50 | A túl hosszú bejegyzés név vagy túl mély útvonal (a fájlrendszer `ENAMETOOLONG` hibája) hibaosztálya: ma a `skill_archive_unreadable` ("a fájl nem érvényes ZIP csomag"), ami a felhasználónak félrevezető, mert a csomag maga érvényes (PLAN-012 T-012-27, ZIP 3. találat)                                                                                                                                   | (a) `skill_archive_unsafe_path` (a bejegyzés útvonala nem megengedett); (b) új hibaosztály saját magyar mondattal (a `ProtocolErrorClass` szótár bővítése, az `error-class-drift-protection` szerint); (c) marad a `skill_archive_unreadable`                                                     | (c): fájl és könyvtár bejegyzésre egyaránt `skill_archive_unreadable` (422), nem kezeletlen kivétel; a beköthetőség helye a `classify-file-system-write-error.ts` `ENAMETOOLONG` sora                                                                                             | a user döntése; (b) esetén a 5.4 tábla, a szótár és a felület mondata                                                      |
+| O-51 | A frontmatter nem szöveg `name` mezője (például `name: 123` vagy `name: null`) ma `skill_name_mismatch`, mert az összehasonlítás a megadott névvel bukik; a mondat ("a `SKILL.md` neve eltér a megadott névtől") a hibás típust nem nevezi meg (PLAN-012 T-012-27, ZIP 11. találat)                                                                                                                           | (a) `skill_manifest_invalid` (a fejléc hibás); (b) marad a `skill_name_mismatch`                                                                                                                                                                                                                  | (b): a `read-skill-manifest.ts` a nem `undefined`, a megadottól eltérő értéket (a nem szöveget is) `skill_name_mismatch` hibával utasítja el                                                                                                                                      | a user döntése; (a) esetén a `readSkillManifest` `name` ága és a 5.4 5. pont                                               |
 
 ---
 

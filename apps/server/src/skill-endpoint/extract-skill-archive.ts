@@ -5,10 +5,13 @@ import { Transform, type TransformCallback } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fromBufferPromise, getFileNameLowLevel, type Entry, type ZipFile } from 'yauzl';
 import type { Outcome } from '@easter-workflow-builder/core';
+import { classifyFileSystemWriteError } from './classify-file-system-write-error.ts';
 import { classifyZipReadError } from './classify-zip-read-error.ts';
 import { findPathCollision } from './find-path-collision.ts';
+import { isFileSystemError } from './is-file-system-error.ts';
 import { isUnsafeEntryPath } from './is-unsafe-entry-path.ts';
 import type { PlannedZipEntry } from './planned-zip-entry.ts';
+import { readDeclaredCentralDirectorySize } from './read-declared-central-directory-size.ts';
 import { readSkillManifest, type SkillManifest } from './read-skill-manifest.ts';
 import { resolveSkillLayout } from './resolve-skill-layout.ts';
 import { resolveZipEntryKind } from './resolve-zip-entry-kind.ts';
@@ -17,6 +20,11 @@ import { skillUploadFailure } from './skill-upload-failure.ts';
 
 // APPNOTE 4.4.5: 0 tárolt, 8 deflate; a `yauzl` `canDecodeFileData()` is csak ezt a kettőt bontja ki.
 const SUPPORTED_COMPRESSION_METHODS: ReadonlySet<number> = new Set([0, 8]);
+// APPNOTE 4.4.4: az általános célú jelző 0. bitje a titkosítás.
+const ENCRYPTED_FLAG = 0x1;
+// APPNOTE 4.3.12: a központi könyvtár rekord rögzített része; utána a név, az extra mező és a megjegyzés.
+const CENTRAL_DIRECTORY_RECORD_FIXED_SIZE = 46;
+const WRITTEN: Outcome<undefined> = { kind: 'ok', value: undefined };
 
 interface ArchiveEntry extends PlannedZipEntry {
   readonly entry: Entry;
@@ -49,6 +57,14 @@ function planEntry(entry: Entry, entryPath: string, targetDirectory: string): Ou
       `A(z) "${entryPath}" bejegyzés se nem könyvtár, se nem szabályos fájl`,
     );
   }
+  // Adatot hordozó könyvtár bejegyzés: a tartalma a kicsomagoláskor csendben
+  // kimaradna (PLAN-012 T-012-27, ZIP 7. találat), tehát a típusa ellentmondásos.
+  if (kind === 'directory' && entry.uncompressedSize > 0) {
+    return skillUploadFailure(
+      'skill_archive_entry_type_unsupported',
+      `A(z) "${entryPath}" könyvtár bejegyzés adatot hordoz (${String(entry.uncompressedSize)} bájt)`,
+    );
+  }
   return { kind: 'ok', value: { entry, kind, path: entryPath.replace(/\/$/u, '') } };
 }
 
@@ -56,10 +72,19 @@ function planEntry(entry: Entry, entryPath: string, targetDirectory: string): Ou
  * Az első menet: a központi könyvtár minden bejegyzése, fájl írás nélkül. A
  * nevet a `decodeStrings: false` miatt itt dekódoljuk, a `strictFileNames`
  * megfelelőjével (a visszaper nem cserélődik `/`-re, tehát a saját
- * útvonal ellenőrzés elutasítja).
+ * útvonal ellenőrzés elutasítja). A beolvasott rekordok összhossza a záró
+ * rekord deklarált központi könyvtár méretével egyezik, különben a záró rekord
+ * bejegyzésszáma kevesebbet mond, mint amennyi bejegyzés áll a könyvtárban, és
+ * a többi csendben kimaradna (SPEC-009 5.4: "nem hagy ki csendben
+ * bejegyzést"; PLAN-012 T-012-27, ZIP 6. találat).
  */
-async function planEntries(zipFile: ZipFile, targetDirectory: string): Promise<Outcome<readonly ArchiveEntry[]>> {
+async function planEntries(
+  zipFile: ZipFile,
+  targetDirectory: string,
+  declaredCentralDirectorySize: number,
+): Promise<Outcome<readonly ArchiveEntry[]>> {
   const planned: ArchiveEntry[] = [];
+  let centralDirectoryBytes = 0;
   try {
     for await (const entry of zipFile.eachEntry()) {
       const entryPath = getFileNameLowLevel(entry.generalPurposeBitFlag, entry.fileNameRaw, entry.extraFields, true);
@@ -68,11 +93,49 @@ async function planEntries(zipFile: ZipFile, targetDirectory: string): Promise<O
         return outcome;
       }
       planned.push(outcome.value);
+      centralDirectoryBytes +=
+        CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.fileNameLength + entry.extraFieldLength + entry.fileCommentLength;
     }
   } catch (error) {
     return skillUploadFailure(classifyZipReadError(error), 'A csomag központi könyvtára nem olvasható');
   }
+  if (centralDirectoryBytes !== declaredCentralDirectorySize) {
+    return skillUploadFailure(
+      'skill_archive_unreadable',
+      `A záró rekord ${String(zipFile.entryCount)} bejegyzése ${String(centralDirectoryBytes)} bájt, a deklarált központi könyvtár ${String(declaredCentralDirectorySize)} bájt`,
+    );
+  }
   return { kind: 'ok', value: planned };
+}
+
+/**
+ * Egy bejegyzés kiírása. A fájl bejegyzés helyi fejlécének titkosítási bitje is
+ * számít (PLAN-012 T-012-27, ZIP 7. találat): a `yauzl` a központi könyvtár
+ * bitjét nézi, a helyi fejlécét nem, és egy csak ott titkosítottat jelző
+ * bejegyzés titkosított bájtjait nyers adatként bontaná ki. A helyi fejléc a
+ * kicsomagoláshoz amúgy is beolvasott 30 bájt plusz a név (`readLocalFileHeader`).
+ */
+async function writeEntry(
+  zipFile: ZipFile,
+  archiveEntry: ArchiveEntry,
+  destination: string,
+  countBytes: () => Transform,
+): Promise<Outcome<undefined>> {
+  if (archiveEntry.kind === 'directory') {
+    await mkdir(destination, { recursive: true });
+    return WRITTEN;
+  }
+  const localHeader = await zipFile.readLocalFileHeaderPromise(archiveEntry.entry);
+  if ((localHeader.generalPurposeBitFlag & ENCRYPTED_FLAG) !== 0) {
+    return skillUploadFailure(
+      'skill_archive_entry_encrypted',
+      `A(z) "${archiveEntry.path}" bejegyzés helyi fejléce titkosítottat jelez`,
+    );
+  }
+  await mkdir(path.dirname(destination), { recursive: true });
+  const source = await zipFile.openReadStreamPromise(archiveEntry.entry);
+  await pipeline(source, countBytes(), createWriteStream(destination, { flags: 'wx' }));
+  return WRITTEN;
 }
 
 /**
@@ -81,6 +144,12 @@ async function planEntries(zipFile: ZipFile, targetDirectory: string): Promise<O
  * nem a fejléc deklarált méretén (SPEC-009 5.4 6. pont, CERT IDS04-J), és a
  * korlát átlépésekor megszakít. A fájl a szerver alapértelmezett
  * jogosultságával jön létre, a zip Unix módja nem érvényesül (8. pont).
+ *
+ * A hiba besorolása (PLAN-012 T-012-27, ZIP 3. találat): a `yauzl` és a `zlib`
+ * hibája a csomag hibája (`classifyZipReadError`); a fájlrendszer hibájából
+ * csak az a kliens hibája, amit a csomag tartalma okoz
+ * (`classifyFileSystemWriteError`), minden más (`ENOSPC`, `EACCES`, `EIO`)
+ * továbbmegy, és a szerver belső hiba útján `500 internal` lesz, naplózva.
  */
 async function writeEntries(
   zipFile: ZipFile,
@@ -107,30 +176,35 @@ async function writeEntries(
     });
 
   for (const archiveEntry of entries) {
-    const relativePath = archiveEntry.path.slice(prefix.length);
-    const destination = path.join(targetDirectory, relativePath);
-    if (archiveEntry.kind === 'directory') {
-      await mkdir(destination, { recursive: true });
-      continue;
-    }
-    await mkdir(path.dirname(destination), { recursive: true });
+    const destination = path.join(targetDirectory, archiveEntry.path.slice(prefix.length));
     try {
-      const source = await zipFile.openReadStreamPromise(archiveEntry.entry);
-      await pipeline(source, countBytes(), createWriteStream(destination, { flags: 'wx' }));
+      const written = await writeEntry(zipFile, archiveEntry, destination, countBytes);
+      if (written.kind === 'error') {
+        return written;
+      }
     } catch (error) {
-      return unpacked.isLimitExceeded
-        ? skillUploadFailure(
-            'skill_archive_too_large',
-            `A kicsomagolt tartalom meghaladja a(z) ${String(maxUnpackedBytes)} bájtos korlátot`,
-          )
-        : skillUploadFailure(classifyZipReadError(error), `A(z) "${archiveEntry.path}" bejegyzés nem bontható ki`);
+      if (unpacked.isLimitExceeded) {
+        return skillUploadFailure(
+          'skill_archive_too_large',
+          `A kicsomagolt tartalom meghaladja a(z) ${String(maxUnpackedBytes)} bájtos korlátot`,
+        );
+      }
+      if (!isFileSystemError(error)) {
+        return skillUploadFailure(classifyZipReadError(error), `A(z) "${archiveEntry.path}" bejegyzés nem bontható ki`);
+      }
+      const errorClass = classifyFileSystemWriteError(error.code);
+      if (errorClass === undefined) {
+        throw error;
+      }
+      return skillUploadFailure(errorClass, `A(z) "${archiveEntry.path}" bejegyzés nem írható ki: ${error.code}`);
     }
   }
-  return { kind: 'ok', value: undefined };
+  return WRITTEN;
 }
 
 async function extractOpenedArchive(
   zipFile: ZipFile,
+  declaredCentralDirectorySize: number,
   targetDirectory: string,
   skillName: string,
   limits: SkillArchiveLimits,
@@ -142,7 +216,7 @@ async function extractOpenedArchive(
     );
   }
 
-  const planned = await planEntries(zipFile, targetDirectory);
+  const planned = await planEntries(zipFile, targetDirectory, declaredCentralDirectorySize);
   if (planned.kind === 'error') {
     return planned;
   }
@@ -188,7 +262,13 @@ export async function extractSkillArchive(
     return skillUploadFailure('skill_archive_unreadable', 'A törzs nem nyitható meg ZIP csomagként');
   }
   try {
-    return await extractOpenedArchive(zipFile, targetDirectory, skillName, limits);
+    return await extractOpenedArchive(
+      zipFile,
+      readDeclaredCentralDirectorySize(archive),
+      targetDirectory,
+      skillName,
+      limits,
+    );
   } finally {
     zipFile.close();
   }
