@@ -819,6 +819,10 @@ T-012-8-ban, mert az "olvashatatlan YAML" elutasításához YAML elemző kell; a
 - **Szerver végponttól végpontig** (a SPEC-010 12.3 mintája, rögzítő `query` porttal, valódi API
   nélkül): a lépés `Options` objektuma tartalmazza a feloldott `mcpServers`, a `plugins`, a
   `settingSources` és a `strictMcpConfig` mezőt, az env érték nem jelenik meg naplóban és eseményben.
+  Megvalósítva (T-012-13): `apps/server` `agent-options-end-to-end` téma; az env érték keresése a REST
+  válaszokra (a `run_event` sorok, a pillanatkép, a lépés futások, a központi lista, a skill lista és a
+  csak neveket adó végpont), a stream keretekre, a maszkolás nélküli szerver naplóra és az adatbázis fájl
+  nyers bájtjaira (WAL fájllal együtt) terjed ki.
 - **Sodródás védelem**: az új hibaosztályok az `error-class-drift-protection` témában (a tizenöt
   szerver oldali feltöltési osztály a típusszintű `Exclude` ágban, a három motor oldali osztály a
   részhalmaz szabály alatt); a lépés hivatkozás mezője a `node-config-drift-protection` témában, a
