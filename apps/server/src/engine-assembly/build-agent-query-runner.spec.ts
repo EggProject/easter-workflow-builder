@@ -54,6 +54,7 @@ describe('a motor thinking mezője az SDK ThinkingConfig alakja', () => {
       },
       environmentBlock: {},
       mcpServers: {},
+      agents: { definitions: {}, hasSkillReferences: false },
       sessionBinding: { mode: 'isolated' },
       skillLibrary: { rootDirectory: '/skillek', pluginName: 'skillek', skillNames: [] },
     });
@@ -103,6 +104,7 @@ describe('a motor skill mezői az SDK Options alakjai', () => {
       },
       environmentBlock: {},
       mcpServers: {},
+      agents: { definitions: {}, hasSkillReferences: false },
       sessionBinding: { mode: 'isolated' },
       skillLibrary: { rootDirectory: '/skillek', pluginName: 'skillek', skillNames: ['alfa'] },
     });
@@ -151,6 +153,7 @@ describe('a motor izolációs mezői az SDK Options alakjai', () => {
       },
       environmentBlock: {},
       mcpServers: {},
+      agents: { definitions: {}, hasSkillReferences: false },
       sessionBinding: { mode: 'isolated' },
       skillLibrary: { rootDirectory: '/skillek', pluginName: 'skillek', skillNames: [] },
     });

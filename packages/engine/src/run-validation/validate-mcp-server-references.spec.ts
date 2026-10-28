@@ -2,10 +2,14 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentStepConfig, McpServerDefinitionRecord } from '@easter-workflow-builder/db';
 import type { ProcessEnvironmentPort } from '../engine-port/process-environment-port.ts';
+import type { SkillLibrarySnapshot } from '../engine-port/skill-library-snapshot.ts';
 import type { ExecutableNodeConfig } from './executable-node-config.ts';
 import { validateMcpServerReferences } from './validate-mcp-server-references.ts';
 
-function agentStepConfig(mcpServerReferences: AgentStepConfig['mcpServerReferences']): AgentStepConfig {
+function agentStepConfig(
+  mcpServerReferences: AgentStepConfig['mcpServerReferences'],
+  agents: AgentStepConfig['agents'] = {},
+): AgentStepConfig {
   return {
     promptTemplate: 'prompt',
     providerId: null,
@@ -18,7 +22,7 @@ function agentStepConfig(mcpServerReferences: AgentStepConfig['mcpServerReferenc
     maxTurns: null,
     maxBudgetUsd: null,
     systemPrompt: null,
-    agents: {},
+    agents,
     skills: null,
     // A régi mező nem üres értéke a motor ellenőrzésében hatástalan (SPEC-009 6.2, research 9.5 5. pont).
     mcpServers: { regi: { type: 'stdio', command: 'regi-parancs', args: [], envNames: ['NINCS_BEALLITVA'] } },
@@ -32,6 +36,8 @@ function agentStepConfig(mcpServerReferences: AgentStepConfig['mcpServerReferenc
 }
 
 const NO_OVERRIDE = { envBindings: {}, authEnvName: null };
+
+const LIBRARY: SkillLibrarySnapshot = { rootDirectory: '/var/skillek', pluginName: 'skillek', skillNames: [] };
 
 const DOCS: McpServerDefinitionRecord = {
   name: 'docs',
@@ -52,7 +58,7 @@ describe('validateMcpServerReferences', () => {
       ['start', { type: 'start', inputFields: [], onUnhandledError: 'fail_run' }],
     ]);
 
-    expect(validateMcpServerReferences(configs, [], environmentOf({}))).toStrictEqual(OK);
+    expect(validateMcpServerReferences(configs, [], environmentOf({}), LIBRARY)).toStrictEqual(OK);
   });
 
   it('a feloldható hivatkozás zöld', () => {
@@ -60,7 +66,7 @@ describe('validateMcpServerReferences', () => {
       ['a1', { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig({ docs: NO_OVERRIDE }) }],
     ]);
 
-    expect(validateMcpServerReferences(configs, [DOCS], environmentOf({ DOCS_AUTH: 'x' }))).toStrictEqual(OK);
+    expect(validateMcpServerReferences(configs, [DOCS], environmentOf({ DOCS_AUTH: 'x' }), LIBRARY)).toStrictEqual(OK);
   });
 
   it('a join ai_synthesis lépés törölt definícióra mutató hivatkozására mcp_server_not_found hibát ad', () => {
@@ -76,7 +82,7 @@ describe('validateMcpServerReferences', () => {
       ],
     ]);
 
-    expect(validateMcpServerReferences(configs, [DOCS], environmentOf({}))).toStrictEqual({
+    expect(validateMcpServerReferences(configs, [DOCS], environmentOf({}), LIBRARY)).toStrictEqual({
       kind: 'error',
       message:
         'A(z) szintezis csomópont a(z) "torolt" MCP szerverre hivatkozik, ami nincs a központi MCP szerver listában (mcp_server_not_found).',
@@ -88,10 +94,70 @@ describe('validateMcpServerReferences', () => {
       ['a1', { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig({ docs: NO_OVERRIDE }) }],
     ]);
 
-    expect(validateMcpServerReferences(configs, [DOCS], environmentOf({}))).toStrictEqual({
+    expect(validateMcpServerReferences(configs, [DOCS], environmentOf({}), LIBRARY)).toStrictEqual({
       kind: 'error',
       message:
         'A(z) a1 csomópont "docs" MCP szerverének Authorization fejlécéhez rendelt "DOCS_AUTH" szerver oldali env változó nincs beállítva (missing_mcp_server_env).',
+    });
+  });
+
+  describe('az agent definíciók MCP hivatkozásai (SPEC-009 6.2, M-147)', () => {
+    it('a feloldható agent definíció hivatkozás zöld', () => {
+      const configs = new Map<string, ExecutableNodeConfig>([
+        [
+          'a1',
+          {
+            type: 'agent_step',
+            onUnhandledError: 'fail_run',
+            ...agentStepConfig(undefined, {
+              segito: { description: 'd', prompt: 'p', mcpServerReferences: { docs: NO_OVERRIDE } },
+            }),
+          },
+        ],
+      ]);
+
+      expect(validateMcpServerReferences(configs, [DOCS], environmentOf({ DOCS_AUTH: 'x' }), LIBRARY)).toStrictEqual(
+        OK,
+      );
+    });
+
+    it('a törölt definícióra mutató agent hivatkozás mcp_server_not_found, a csomópont és az agent nevével', () => {
+      const configs = new Map<string, ExecutableNodeConfig>([
+        [
+          'a1',
+          {
+            type: 'agent_step',
+            onUnhandledError: 'fail_run',
+            ...agentStepConfig(undefined, {
+              segito: { description: 'd', prompt: 'p', mcpServerReferences: { torolt: NO_OVERRIDE } },
+            }),
+          },
+        ],
+      ]);
+
+      expect(validateMcpServerReferences(configs, [DOCS], environmentOf({}), LIBRARY)).toStrictEqual({
+        kind: 'error',
+        message:
+          'A(z) a1 csomópont "segito" agent definíciója a(z) "torolt" MCP szerverre hivatkozik, ami nincs a központi MCP szerver listában (mcp_server_not_found).',
+      });
+    });
+
+    it('az érvénytelen alakú agent definíció malformed_node_config', () => {
+      const configs = new Map<string, ExecutableNodeConfig>([
+        [
+          'a1',
+          {
+            type: 'agent_step',
+            onUnhandledError: 'fail_run',
+            ...agentStepConfig(undefined, { segito: 'nem objektum' }),
+          },
+        ],
+      ]);
+
+      expect(validateMcpServerReferences(configs, [DOCS], environmentOf({}), LIBRARY)).toStrictEqual({
+        kind: 'error',
+        message: 'A(z) a1 csomópont "segito" agent definíciója érvénytelen alakú (malformed_node_config).',
+      });
     });
   });
 });

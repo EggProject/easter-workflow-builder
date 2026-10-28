@@ -318,7 +318,15 @@ const PROBE_NODES: readonly WorkflowNodeInput[] = [
       maxTurns: null,
       maxBudgetUsd: null,
       systemPrompt: null,
-      agents: {},
+      // Az agent definíció a lépés mezőivel azonos alakú skill és MCP hivatkozást hordoz (M-147).
+      agents: {
+        segito: {
+          description: 'Próba al-agent.',
+          prompt: 'Segíts.',
+          skills: ['alfa'],
+          mcpServerReferences: { 'web-api': { envBindings: {}, authEnvName: null } },
+        },
+      },
       skills: ['alfa'],
       mcpServers: {},
       mcpServerReferences: {
@@ -426,6 +434,18 @@ describe('végponttól végpontig próba: skill, MCP és izoláció a kimenő Op
         env: { FAJL_TOKEN: STDIO_SECRET },
       },
       'web-api': { type: 'http', url: 'http://127.0.0.1:1/mcp', headers: { Authorization: HTTP_OVERRIDE_SECRET } },
+    });
+    expect(options['agents']).toStrictEqual({
+      segito: {
+        description: 'Próba al-agent.',
+        prompt: 'Segíts.',
+        skills: [`${PLUGIN_NAME}:alfa`],
+        mcpServers: [
+          {
+            'web-api': { type: 'http', url: 'http://127.0.0.1:1/mcp', headers: { Authorization: HTTP_DEFAULT_SECRET } },
+          },
+        ],
+      },
     });
     expect(options['settingSources']).toStrictEqual([]);
     expect(options['strictMcpConfig']).toBe(true);

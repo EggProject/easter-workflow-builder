@@ -363,6 +363,21 @@ dolgozik; üres könyvtárnál az átemelt `empty` elem mutatja az üres állapo
 `skills` (SPEC-008 `:413-415`, 60. kritérium) ugyanígy szerkeszthetővé válik. A `null` jelentése: a
 lépés nem használ feltöltött skillt, a motor sem `plugins`, sem `skills` opciót nem ad (O-40, lezárva).
 
+**Az agent definíció `skills` mezője (M-147, `docs/research/2026-10-28-spec-009-blokkolo-meresek.md` 5.
+szekció; megvalósítva a motor `agent-definition` témájában).** A tárolt alak a lépés mezőjével azonos:
+`readonly string[] | 'all' | null` puszta nevekkel, a kulcs hiánya `null`. A motor ugyanazzal a
+szabállyal adja ki (`<plugin>:<név>`, az `'all'` a könyvtár neveinek explicit listája, a `null` és a
+hiányzó kulcs nem megy ki), mert az SDK az agent definíció `skills` listáját előtöltésként kezeli, és
+a puszta név egy azonos nevű beépített skillt tölt be (M-147 A8). A hiányzó nevet a futás indítása
+`skill_not_found` hibával utasítja el, a csomópont és az agent nevével, mert az SDK a nem létező és az
+érvénytelen alakú nevet ezen a listán csendben kihagyja (A6, A7). A plugin skill csak a lépés szintű
+`plugins` úton érhető el (A3), ezért a motor a `plugins` opciót akkor is kiadja, ha a lépés `skills`
+mezője `null`, de egy agent definíció nem `null` `skills` mezőt hordoz; a lépés `skills` opciója ilyenkor
+sem megy ki (O-40 (a) szövege szerint). Ennek következménye és az al-agent skill láthatósága (A4, A5: a
+lépés `skills` listája az al-agentet nem szűkíti) nyitott kérdés (O-47, 14.9). Érvénytelen alakú agent
+definíció (nem objektum, nem lista, `'all'` vagy `null` `skills`, hibás hivatkozás mező, nem lista régi
+`mcpServers`) a futás indításakor `malformed_node_config`.
+
 ### 5.3 A lista elemeinek alakja
 
 Az M-136 szerint (`docs/research/2026-10-28-spec-009-blokkolo-meresek.md` 2. szekció) a betöltés plugin úton (O-10) a skillt `<plugin>:<könyvtárnév>` néven
@@ -579,11 +594,21 @@ mezőn") felülírja, a user 2026-10-26-i szavai szerint.
 - A SPEC-011 O-8 ("A mező marad, a SPEC-009-ben lesz konfigurálva és bekötve") ezzel nem ütközik: a
   lépés MCP konfigurációja a SPEC-009-ben kap felületet és bekötést, a hivatkozás mezőn át; a régi
   mező marad.
-- **Az agent definíció** `mcpServers` bejegyzése az `agents` szűkítetlen rekordjában áll
-  (`Readonly<Record<string, unknown>>` a `db` és a `protocol` oldalán, `.claude/CLAUDE.md` 5.
-  szekció), tehát az O-42 a guardját és a sodródás védelmét nem érinti; a hivatkozás formáját a
-  felület mezőtáblája (T-012-23) és a motor leképezése (T-012-11) adja, az SDK név alakja szerint
-  (`AgentMcpServerSpec`, telepített `sdk.d.ts:59, 120`).
+- **Az agent definíció MCP hivatkozása (technikai döntés, M-147, 2026-10-28).** Az `agents` rekord
+  szűkítetlen (`Readonly<Record<string, unknown>>` a `db` és a `protocol` oldalán, `.claude/CLAUDE.md` 5. szekció), tehát az O-42 a guardját és a sodródás védelmét nem érinti. A definíció hivatkozás
+  mezője a lépésével **azonos nevű és alakú**: `mcpServerReferences?: Record<név, McpServerReference>`
+  (`{ envBindings, authEnvName }`, a hiány üres rekord), a `db` `isMcpServerReference` guardjával
+  olvasva. Indok: az AC16 az agent definíción is a hozzárendelés felülírását kéri mindhárom ágra, és a
+  mérés szerint az SDK `AgentMcpServerSpec` szöveg ága felülírást nem adhat, mert csak a lépés
+  szerverére mutat, amit az al-agent enélkül is örököl (M-147 B1, B4, B5), az objektum ága viszont az
+  al-agent saját, felülírt hozzárendelésű szerverét adja (B3). A motor (`resolveOutgoingAgents`) a
+  hivatkozásokat a lépés feloldásával (6.4, három szintű név feloldás) szerverenként egy
+  `{ <név>: <konfiguráció> }` elemre oldja fel az agent definíció kimenő `mcpServers` listájában; a
+  régi `mcpServers` lista elemei változatlanul elöl maradnak, a `mcpServerReferences` kulcs nem megy
+  ki. A hibák a lépésével azonosak (`mcp_server_not_found`, `missing_mcp_server_env`), az üzenet a
+  csomópontot és az agent nevét is megnevezi. **Kimondott korlát:** ha a lépés ugyanazt a szerver
+  nevet hivatkozza, a lépés konfigurációja szolgálja ki az al-agent hívását is, tehát a definíció
+  felülírása hatástalan (B6); nyitott kérdés (O-48, 14.9).
 - **Hivatkozott központi definíció törlése (O-43, user döntés 2026-10-28):** a törlés megengedett akkor
   is, ha egy lépés hivatkozik rá; a futás indítása az új `mcp_server_not_found` hibaosztállyal bukik,
   saját magyar mondattal, a skill törlés (O-13) mintájára (6.4).
@@ -678,11 +703,10 @@ változó nincs beállítva (missing_mcp_server_env)."; a kliens mondata (`proto
 motor validációs listájában `unprocessable` kódra képezi. Az üres érték (`NEV=`) a 6.4 szövege szerint
 nem hiányzó (csak a `null` az); ez eltér a provider kulcs szabályától (SPEC-013 4.3), és ha az üres
 érték hibát kellene adjon, az kimondott termékdöntés. A motor az SDK `mcpServerStatus()` metódusát nem
-hívja, tehát a válasza sehova nem íródik. Az agent definíció (`agents`) MCP hivatkozásának formája
-nem a motor leképezése: az `agents` rekordot a motor változatlanul adja át, és az SDK
-`AgentMcpServerSpec` szöveg ága a lépés `mcpServers` neveire hivatkozhat (telepített `sdk.d.ts`); hogy
-az SDK a szöveg ágat a lépés szervereire oldja-e fel, **nem ellenőrzött** (T-012-23 felülete előtt
-mérendő).
+hívja, tehát a válasza sehova nem íródik. Az agent definíció (`agents`) MCP hivatkozását a motor a
+lépés mezőjének alakján oldja fel (6.2, M-147): az SDK `AgentMcpServerSpec` szöveg ága a lépés
+`mcpServers` kulcsaira oldódik (M-147 B1), de az al-agent a lépés minden szerverét enélkül is örökli
+(B4, B5), ezért a motor az objektum ágat adja ki.
 
 ---
 
@@ -1067,14 +1091,16 @@ a user az ajánlott választ adta (2026-10-28)**; a döntések a 14.7 szekció O
 
 ### 14.9 A mérésből következő kérdések (nyitva, 2026-10-28)
 
-A sorok az M-136 és az M-139 eredményéből jönnek (`docs/research/2026-10-28-spec-009-blokkolo-meresek.md` 4. szekció); mindhárom termékdöntés, a user
+A sorok az M-136, az M-139 és az M-147 eredményéből jönnek (`docs/research/2026-10-28-spec-009-blokkolo-meresek.md` 4. és 5. szekció); mind az öt termékdöntés, a user
 válaszára vár.
 
-| #    | Kérdés                                                                                                                                                                                                                          | Opciók (ajánlott elsőként)                                                                                                                                                                                                                                                          | Mi a viselkedés addig                                                                                                                                                                                                                | Mi zárná le                                                    |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| O-44 | A `skills: null` ("nincs beállítva") lépésen a CLI beépített skilljei (például `simplify`, `claude-api`, `init`, `security-review`) a modell elé kerülnek és hívhatók (M-136 3b), a lista és a `'all'` mód (5.3) ezeket elrejti | (a) a `null` jelentése "skill nélkül": a motor `skills: []` opciót ad, `plugins` nélkül; (b) marad az O-40 (a): sem `plugins`, sem `skills`, a beépítettek elérhetők                                                                                                                | az O-40 (a) és az AC13 szerint (nincs `plugins`, nincs `skills`); a beköthetőség helye a motor `buildAgentStepOptions` `skillFields` segédjének `null` ága, ahol az (a) egyetlen visszaadott `{ skills: [] }` értékkel áll elő       | a user döntése; az AC13 átírása                                |
-| O-45 | A stdio MCP szerver folyamata a motor teljes kimenő környezetét örökli (M-139 3. pont): a provider kulcsát és a szerver környezetének minden változóját, a "három fiók" esetben a másik két fiók tokenjét is                    | (a) a szerver egy saját indító programon át indítja a stdio parancsot, ami a gyereknek csak a deklarált neveket, a `PATH` és a `HOME` változót adja (a d.ts-ben nincs opció az öröklés kikapcsolására); (b) kimondott kockázatként elfogadjuk, a felület és a dokumentáció kimondja | a 6.4 leképezés változatlan (T-012-11): a stdio gyerek az SDK alapviselkedésével a teljes kimenő környezetet kapja; az (a) beköthetősége a `resolveMcpServers` `stdio` ága, ami ma a `command` és az `args` mezőt változatlanul adja | a user döntése; (a) esetén a 6.3, 6.4 és a 9. szekció bővítése |
-| O-46 | Egy hivatkozott MCP szerver sikertelen kapcsolódásánál (`failed`) a futás nem bukik, az agent az eszközei nélkül fut (M-139 2. pont)                                                                                            | (a) a motor a kapcsolódás állapotát a `mcpServerStatus()` válaszából ellenőrzi, és `failed` állapotnál a lépés megnevezett hibával bukik (új hibaosztály, saját magyar mondattal); (b) marad: a lépés fut, az állapot csak az SDK `init` üzenetében látszik                         | a lépés fut, a sikertelen szerver eszközei hiányoznak; a motor a `mcpServerStatus()` metódust nem hívja (T-012-11), az (a) ennek a hívásnak a `runAgentStep` folyamába kötése                                                        | a user döntése                                                 |
+| #    | Kérdés                                                                                                                                                                                                                                                                                                                                                                                                        | Opciók (ajánlott elsőként)                                                                                                                                                                                                                                                                        | Mi a viselkedés addig                                                                                                                                                                                                                                                             | Mi zárná le                                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| O-44 | A `skills: null` ("nincs beállítva") lépésen a CLI beépített skilljei (például `simplify`, `claude-api`, `init`, `security-review`) a modell elé kerülnek és hívhatók (M-136 3b), a lista és a `'all'` mód (5.3) ezeket elrejti                                                                                                                                                                               | (a) a `null` jelentése "skill nélkül": a motor `skills: []` opciót ad, `plugins` nélkül; (b) marad az O-40 (a): sem `plugins`, sem `skills`, a beépítettek elérhetők                                                                                                                              | az O-40 (a) és az AC13 szerint (nincs `plugins`, nincs `skills`); a beköthetőség helye a motor `buildAgentStepOptions` `skillFields` segédjének `null` ága, ahol az (a) egyetlen visszaadott `{ skills: [] }` értékkel áll elő                                                    | a user döntése; az AC13 átírása                                |
+| O-45 | A stdio MCP szerver folyamata a motor teljes kimenő környezetét örökli (M-139 3. pont): a provider kulcsát és a szerver környezetének minden változóját, a "három fiók" esetben a másik két fiók tokenjét is                                                                                                                                                                                                  | (a) a szerver egy saját indító programon át indítja a stdio parancsot, ami a gyereknek csak a deklarált neveket, a `PATH` és a `HOME` változót adja (a d.ts-ben nincs opció az öröklés kikapcsolására); (b) kimondott kockázatként elfogadjuk, a felület és a dokumentáció kimondja               | a 6.4 leképezés változatlan (T-012-11): a stdio gyerek az SDK alapviselkedésével a teljes kimenő környezetet kapja; az (a) beköthetősége a `resolveMcpServers` `stdio` ága, ami ma a `command` és az `args` mezőt változatlanul adja                                              | a user döntése; (a) esetén a 6.3, 6.4 és a 9. szekció bővítése |
+| O-46 | Egy hivatkozott MCP szerver sikertelen kapcsolódásánál (`failed`) a futás nem bukik, az agent az eszközei nélkül fut (M-139 2. pont)                                                                                                                                                                                                                                                                          | (a) a motor a kapcsolódás állapotát a `mcpServerStatus()` válaszából ellenőrzi, és `failed` állapotnál a lépés megnevezett hibával bukik (új hibaosztály, saját magyar mondattal); (b) marad: a lépés fut, az állapot csak az SDK `init` üzenetében látszik                                       | a lépés fut, a sikertelen szerver eszközei hiányoznak; a motor a `mcpServerStatus()` metódust nem hívja (T-012-11), az (a) ennek a hívásnak a `runAgentStep` folyamába kötése                                                                                                     | a user döntése                                                 |
+| O-47 | Az al-agent skill láthatósága: a lépés `skills` listája (és a `[]`) az agent definíció al-agentjét nem szűkíti, az al-agent a lépés `plugins` útjának minden skilljét és a CLI beépítettjeit látja és hívhatja (M-147 A4, A5); és ha a lépés `skills` mezője `null`, de egy agent definíció skillre hivatkozik, a motor a `plugins` opciót kiadja, tehát a fő szál is látja a feltöltött skilleket (M-136 3a) | (a) elfogadjuk és a felület kimondja (a definíció `skills` mezője előtöltés, nem szűkítés); (b) a `null` lépésen ilyenkor a motor `skills: []` opciót ad (a fő szál a beépítetteket sem látja, az O-44 (a) iránya); (c) az agent definíció `skills` mezője csak nem `null` lépés mellett engedett | a motor a lépés szabályát alkalmazza (minősítés, `skill_not_found`), a `plugins` kimegy, ha a lépés vagy egy definíció hivatkozik skillre, és a lépés `skills` opciója `null` mellett nem megy ki; a (b) beköthetősége a `skillFields` `null` ága (`build-agent-step-options.ts`) | a user döntése                                                 |
+| O-48 | Az agent definíció MCP felülírása hatástalan, ha a lépés ugyanazt a szerver nevet hivatkozza: az al-agent hívását a lépés konfigurációja szolgálja ki (M-147 B6)                                                                                                                                                                                                                                              | (a) a futás indítása megnevezett hibával utasítja el az ütköző felülírást (új hibaosztály, saját magyar mondattal); (b) elfogadjuk és a felület kimondja; (c) a motor az agent definíció szerverét más néven adja ki (az eszköz neve `mcp__<név>__` előtagja megváltozik)                         | a motor mindkét konfigurációt kiadja, a lépésé nyer (az SDK viselkedése); az (a) helye a `resolveOutgoingAgents`                                                                                                                                                                  | a user döntése                                                 |
 
 ---
 

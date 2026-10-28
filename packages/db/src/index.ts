@@ -71,6 +71,9 @@ export type { AgentStepConfig } from './workflow-graph/agent-step-config/agent-s
 // A lépés hivatkozása a központi MCP definícióra (SPEC-009 6.2, O-42 (b)): az
 // `apps/server` `node-config-drift-protection` témája veti össze a `protocol` párjával.
 export type { McpServerReference } from './workflow-graph/agent-step-config/mcp-server-reference.ts';
+// A hivatkozás guardja: az `engine` az agent definíciók (`agents`, szűkítetlen rekord) azonos
+// nevű mezőjét ezzel olvassa (SPEC-009 6.2, M-147).
+export { isMcpServerReference } from './workflow-graph/agent-step-config/is-mcp-server-reference.ts';
 
 // graph-snapshot: a pillanatkép dokumentum alakja. A `readGraphSnapshot`-ot és
 // a lenyomat számítót szándékosan nem exportáljuk, csak a dokumentum típusait:

@@ -4,7 +4,7 @@ import type { AgentStepConfig } from '@easter-workflow-builder/db';
 import type { ExecutableNodeConfig } from './executable-node-config.ts';
 import { validateSkillReferences } from './validate-skill-references.ts';
 
-function agentStepConfig(skills: AgentStepConfig['skills']): AgentStepConfig {
+function agentStepConfig(skills: AgentStepConfig['skills'], agents: AgentStepConfig['agents'] = {}): AgentStepConfig {
   return {
     promptTemplate: 'prompt',
     providerId: null,
@@ -17,7 +17,7 @@ function agentStepConfig(skills: AgentStepConfig['skills']): AgentStepConfig {
     maxTurns: null,
     maxBudgetUsd: null,
     systemPrompt: null,
-    agents: {},
+    agents,
     skills,
     mcpServers: {},
     cwd: null,
@@ -40,6 +40,10 @@ function configsOf(
   entries: readonly (readonly [string, ExecutableNodeConfig])[],
 ): ReadonlyMap<string, ExecutableNodeConfig> {
   return new Map<string, ExecutableNodeConfig>(entries);
+}
+
+function withAgents(agents: AgentStepConfig['agents']): ExecutableNodeConfig {
+  return { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig(null, agents) };
 }
 
 const OK = { kind: 'ok', value: undefined };
@@ -86,6 +90,42 @@ describe('validateSkillReferences', () => {
       kind: 'error',
       message:
         'A(z) szintezis csomópont a(z) "torolt" skillre hivatkozik, ami nincs a skill könyvtárban (skill_not_found).',
+    });
+  });
+
+  describe('az agent definíciók skills listája (SPEC-009 5.2, M-147)', () => {
+    it('a könyvtárban álló, all és null állapotú definíciók zöldek', () => {
+      const configs = configsOf([
+        [
+          'agent',
+          withAgents({
+            lista: { description: 'd', prompt: 'p', skills: ['alfa'] },
+            minden: { description: 'd', prompt: 'p', skills: 'all' },
+            nincs: { description: 'd', prompt: 'p', skills: null },
+            hianyzo: { description: 'd', prompt: 'p' },
+          }),
+        ],
+      ]);
+
+      expect(validateSkillReferences(configs, ['alfa'])).toStrictEqual(OK);
+    });
+
+    it('a definíció hiányzó skilljére skill_not_found, a csomópont és az agent nevével', () => {
+      const configs = configsOf([
+        ['agent', withAgents({ segito: { description: 'd', prompt: 'p', skills: ['torolt'] } })],
+      ]);
+
+      expect(validateSkillReferences(configs, ['alfa'])).toStrictEqual({
+        kind: 'error',
+        message:
+          'A(z) agent csomópont "segito" agent definíciója a(z) "torolt" skillre hivatkozik, ami nincs a skill könyvtárban (skill_not_found).',
+      });
+    });
+
+    it('az érvénytelen alakú definíciót átugorja (azt a validateMcpServerReferences utasítja el)', () => {
+      const configs = configsOf([['agent', withAgents({ segito: { description: 'd', prompt: 'p', skills: 7 } })]]);
+
+      expect(validateSkillReferences(configs, [])).toStrictEqual(OK);
     });
   });
 });

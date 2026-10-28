@@ -1,11 +1,11 @@
 # PLAN-012 F0: a SPEC-009 blokkoló mérései (T-012-3 M-136, T-012-4 M-139)
 
-|               |                                                                                                                                                                                                                                                                   |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dátum         | 2026-10-28                                                                                                                                                                                                                                                        |
-| Terv          | [`../plan/PLAN-012-beallitasok-es-agent-konfiguracio.md`](../plan/PLAN-012-beallitasok-es-agent-konfiguracio.md) T-012-3, T-012-4                                                                                                                                 |
-| Spec          | [`../spec/SPEC-009-beallitasok-es-agent-konfiguracio.md`](../spec/SPEC-009-beallitasok-es-agent-konfiguracio.md) 4., 5.3, 6.4 szekció                                                                                                                             |
-| Mérő eszközök | [`2026-10-28-spec-009-blokkolo-meresek/`](2026-10-28-spec-009-blokkolo-meresek/): `m136.mjs`, `m139.mjs`, a közös `csonk-messages-api.mjs`, `sdk-betolto.mjs`, `mcp-jsonrpc.mjs`, `mcp-stdio-csonk.mjs`; nyers kimenet `m136-kimenet.jsonl`, `m139-kimenet.jsonl` |
+|               |                                                                                                                                                                                                                                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dátum         | 2026-10-28                                                                                                                                                                                                                                                                                          |
+| Terv          | [`../plan/PLAN-012-beallitasok-es-agent-konfiguracio.md`](../plan/PLAN-012-beallitasok-es-agent-konfiguracio.md) T-012-3, T-012-4                                                                                                                                                                   |
+| Spec          | [`../spec/SPEC-009-beallitasok-es-agent-konfiguracio.md`](../spec/SPEC-009-beallitasok-es-agent-konfiguracio.md) 4., 5.3, 6.4 szekció                                                                                                                                                               |
+| Mérő eszközök | [`2026-10-28-spec-009-blokkolo-meresek/`](2026-10-28-spec-009-blokkolo-meresek/): `m136.mjs`, `m139.mjs`, `m147.mjs`, a közös `csonk-messages-api.mjs`, `sdk-betolto.mjs`, `mcp-jsonrpc.mjs`, `mcp-stdio-csonk.mjs`; nyers kimenet `m136-kimenet.jsonl`, `m139-kimenet.jsonl`, `m147-kimenet.jsonl` |
 
 ## 1. Felállás
 
@@ -186,3 +186,77 @@ A CLI saját, a gyereknek továbbadott változói (a megadott `Options.env` neve
   környezetében van; kérdés a usernek (jelentés).
 - **A naplózás:** a `mcpServerStatus()` `config` mezője a http `Authorization` értékét hordozza, ezért
   a motor ezt a választ nem naplózhatja és nem írhatja `run_event` sorba (SPEC-009 AC19).
+
+## 5. M-147: az agent definíció `skills` és `mcpServers` mezője (PLAN-012 T-012-22, T-012-23 előtt)
+
+**Kérdés.** (a) Milyen név alakot fogad az `Options.agents` egy definíciójának `skills` listája, és
+kell-e hozzá a lépés szintű `plugins`; (b) az `AgentMcpServerSpec` (telepített `sdk.d.ts`:
+`string | Record<string, McpServerConfigForProcessTransport>`) szöveg ága a lépés `mcpServers`
+kulcsaira oldódik-e, és mit lát az al-agent a szülő szervereiből.
+
+**Felállás.** Az 1. szekció felállása (pinelt SDK `0.3.245`, beágyazott CLI `2.1.245`, helyi csonk,
+hamis kulcs, `settingSources: []`, `strictMcpConfig: true`, valódi API hívás nincs), egy `segito`
+nevű agent definícióval (`description`, `prompt` és az eset mezői). A csonk az al-agent kéréseit a
+rendszer promptjába tett jelölőről ismeri fel. A fő szál első válasza `Agent` eszköz hívás
+(`subagent_type: 'segito'`, `run_in_background: false`, mert az eszköz alapból háttérben futtat, és
+akkor a fő szál a lezárt folyam miatt az al-agent eszköz engedélyét már nem tudja megadni); az
+al-agent első válasza az eset `subHivas` eszköze, utána szöveg. A skill gyökér a szerver mintájára
+manifeszt nélküli, a plugin neve a gyökér könyvtárneve (`easter-skills`, M-136 4a). Az előfeltöltés
+bizonyítéka a `SKILL.md` törzsének jelölője (`TORZS-JELOLO-<név>`) az al-agent **első** kérésében, a
+`Skill` hívás előtt. A stdio csonk (`mcp-stdio-csonk.mjs`, harmadik argumentuma a válaszban
+visszaadott név) indításkor jelentés fájlt ír, ebből látszik, melyik konfiguráció indult el.
+Futtatás: `node m147.mjs > m147-kimenet.jsonl`, egy futás kevesebb mint egy perc.
+
+| Eset | Lépés `plugins`, `skills`, `mcpServers`          | Agent definíció                                | Az al-agent első kérése                                                                     | Az al-agent hívása és eredménye                                 |
+| ---- | ------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| A1   | gyökér, elhagyva, nincs                          | `skills: ['easter-skills:alfa']`               | az `alfa` törzse előtöltve; a listázásban mindkét plugin skill és a beépítettek             | `Skill easter-skills:alfa`: betöltve                            |
+| A2   | gyökér, elhagyva, nincs                          | `skills: ['alfa']`                             | az `alfa` törzse előtöltve                                                                  | `Skill easter-skills:alfa`: betöltve                            |
+| A3   | nincs, elhagyva, nincs                           | `skills: ['easter-skills:alfa']`               | nincs előtöltés; a listázásban csak a beépítettek                                           | `Skill easter-skills:alfa`: "Unknown skill"                     |
+| A4   | gyökér, `[]`, nincs                              | `skills: ['easter-skills:alfa']`               | az `alfa` törzse előtöltve; a listázásban mindkét plugin skill és a beépítettek             | `Skill easter-skills:alfa`: betöltve                            |
+| A5   | gyökér, `['easter-skills:beta']`, nincs          | `skills: ['easter-skills:alfa']`               | az `alfa` törzse előtöltve; a listázásban mindkét plugin skill és a beépítettek             | `Skill easter-skills:alfa`: betöltve                            |
+| A6   | gyökér, elhagyva, nincs                          | `skills: ['easter-skills:nincs-ilyen']`        | nincs előtöltés, hiba nélkül; a `query()` nem dob                                           | (nincs hívás); a futás `success`                                |
+| A7   | gyökér, elhagyva, nincs                          | `skills: ['rossz,nev']`                        | nincs előtöltés; a `query()` **nem** dob (a lépés listáján dob, M-136 5b)                   | (nincs hívás); a futás `success`                                |
+| A8   | `utkozo` gyökér, elhagyva, nincs                 | `skills: ['simplify']`                         | a plugin `simplify` törzse **nincs** előtöltve (a puszta név a beépítettre oldódik)         | (nincs hívás)                                                   |
+| B1   | nincs, nincs, `lepes-csonk`                      | `mcpServers: ['lepes-csonk']`                  | `mcp__lepes-csonk__ping` az eszközök között                                                 | `pong lepes-csonk`                                              |
+| B2   | nincs, nincs, nincs                              | `mcpServers: ['lepes-csonk']`                  | nincs MCP eszköz, hiba nélkül; az `init` `mcp_servers` üres                                 | "No such tool available"                                        |
+| B3   | nincs, nincs, nincs                              | `mcpServers: [{ 'agent-csonk': <stdio> }]`     | `mcp__agent-csonk__ping`; a **fő szál** eszközei között nincs, az `init` `mcp_servers` üres | `pong agent-csonk`                                              |
+| B4   | nincs, nincs, `lepes-csonk`                      | `mcpServers` nélkül                            | `mcp__lepes-csonk__ping` (öröklés)                                                          | `pong lepes-csonk`                                              |
+| B5   | nincs, nincs, `lepes-csonk`, `masik-csonk`       | `mcpServers: ['masik-csonk']`                  | **mindkét** szerver eszköze                                                                 | `mcp__lepes-csonk__ping`: `pong lepes-csonk`                    |
+| B6   | nincs, nincs, `lepes-csonk` (lépés konfiguráció) | `mcpServers: [{ 'lepes-csonk': <más stdio> }]` | egyetlen `mcp__lepes-csonk__ping`; mindkét konfiguráció elindult                            | `pong lepes-konfiguracio`: a **lépés** konfigurációja válaszolt |
+
+**Megállapítások:**
+
+1. **Az agent definíció `skills` listája előtöltés** (a d.ts szerint "skill names to preload into the
+   agent context"): a megnevezett skill törzse az al-agent első kérésében áll (A1, A2, A4, A5). A
+   `<plugin>:<könyvtárnév>` alak működik (A1); a puszta könyvtárnév ütközés nélkül működik (A2), de egy
+   azonos nevű beépített skill mellett nem a plugin skillt tölti be (A8). A lépés `skills` mezőjének
+   szabálya (minősített alak) tehát itt is a helyes.
+2. **A lépés szintű `plugins` kell**: nélküle a plugin skill nem töltődik be és nem hívható (A3). Az
+   agent definíciónak nincs saját `plugins` mezője (d.ts `AgentDefinition`).
+3. **A lépés `skills` mezője az al-agentet nem szűkíti**: `[]` (A4) és egy másik skillre szűkített
+   lista (A5) mellett is az al-agent listázása a `plugins` minden skillje plusz a beépítettek, és a
+   definíció skillje betöltődik és hívható. Az al-agent skill láthatóságát tehát semmi nem szűkíti a
+   definíció előtöltésén túl; ez a mérés a lépés `skills` lista (5.2, O-40) hatókörét az al-agentekre
+   nem igazolja (kérdés a jelentésben).
+4. **Nem létező és érvénytelen alakú név a definíció listáján csendben kimarad** (A6, A7): a `query()`
+   egyikre sem dob, a lépés listájától eltérően (M-136 5b). A motor `skill_not_found` ellenőrzése a
+   definíciókra is kell.
+5. **Az `AgentMcpServerSpec` szöveg ága a lépés `mcpServers` kulcsaira oldódik** (B1), nem létező
+   névre csendben semmit nem ad (B2). Az al-agent viszont a definíció `mcpServers` mezőjétől
+   függetlenül örökli a lépés **minden** szerverét (B4, B5: a szöveg ág a többit nem szűkíti), tehát a
+   szöveg ág önmagában hatástalan.
+6. **Az objektum ág az al-agent saját szerverét adja**: a szerver elindul, az eszköze csak az
+   al-agentnél látszik, a fő szálnál és az `init` `mcp_servers` listájában nem (B3). Ez az egyetlen út,
+   amin egy agent definíció a lépéstől eltérő hozzárendelésű (felülírt env vagy `Authorization`)
+   szervert kaphat.
+7. **Azonos nevű objektum ág és lépés szerver mellett a lépés konfigurációja nyer** (B6): mindkét
+   folyamat elindul, de az eszköz hívását a lépés konfigurációja szolgálja ki. Egy agent definíció
+   felülírása tehát hatástalan, ha a lépés ugyanazt a szerver nevet hivatkozza.
+
+**Hatás.** A motor az agent definíció `skills` mezőjét a lépés szabályával kezeli (minősítés,
+`'all'` a könyvtár neveire, `skill_not_found` indítási ellenőrzés), és a `plugins` opciót akkor is
+kiadja, ha csak agent definíció hivatkozik skillre (2. pont). Az agent definíció MCP hivatkozása a
+lépés `mcpServerReferences` mezőjének alakját kapja, és a motor szerverenként egy objektum ágú
+`mcpServers` elemre oldja fel (6. pont; a szöveg ág az 5. pont szerint nem adhat felülírást, a SPEC-009
+AC16 viszont az agent definíción is felülírást kér). A 3. és a 7. pont kérdés a usernek (SPEC-009
+14.9).

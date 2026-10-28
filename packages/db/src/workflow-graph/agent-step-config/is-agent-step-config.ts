@@ -11,10 +11,9 @@ import {
   isRecordWithKnownKeys,
   isString,
   isStringArray,
-  isStringRecord,
 } from '@easter-workflow-builder/typeguards';
 import type { AgentStepConfig, PresetSystemPrompt, StructuredOutputConfig } from './agent-step-config.ts';
-import type { McpServerReference } from './mcp-server-reference.ts';
+import { isMcpServerReference } from './is-mcp-server-reference.ts';
 import type { SandboxConfig } from './sandbox-config.ts';
 import type { SessionMode } from './session-mode.ts';
 import type {
@@ -68,11 +67,6 @@ const AGENT_STEP_CONFIG_KEYS: Readonly<Record<keyof AgentStepConfig, true>> = {
   sandbox: true,
   sessionMode: true,
   structuredOutput: true,
-};
-
-const MCP_SERVER_REFERENCE_KEYS: Readonly<Record<keyof McpServerReference, true>> = {
-  envBindings: true,
-  authEnvName: true,
 };
 
 const PRESET_SYSTEM_PROMPT_KEYS: Readonly<Record<keyof PresetSystemPrompt, true>> = {
@@ -203,14 +197,6 @@ function isStorableMcpServer(value: unknown): value is StorableMcpServer {
 
 function isMcpServerRecord(value: unknown): value is Readonly<Record<string, StorableMcpServer>> {
   return isRecord(value) && Object.values(value).every((server: unknown) => isStorableMcpServer(server));
-}
-
-function isMcpServerReference(value: unknown): value is McpServerReference {
-  return (
-    isRecordWithKnownKeys(value, MCP_SERVER_REFERENCE_KEYS) &&
-    isStringRecord(value.envBindings) &&
-    isNullableString(value.authEnvName)
-  );
 }
 
 /**

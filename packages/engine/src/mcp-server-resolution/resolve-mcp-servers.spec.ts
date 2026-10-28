@@ -9,6 +9,9 @@ function environmentOf(values: Readonly<Record<string, string>>): ProcessEnviron
   return { read: (name) => entries.get(name) ?? null, readAll: () => values };
 }
 
+// Az üzenet alanya a lépésnél (a `resolveOutgoingAgents` az agent definíció alanyát adja).
+const STEP = 'A(z) a1 csomópont';
+
 const NO_OVERRIDE: McpServerReference = { envBindings: {}, authEnvName: null };
 
 const GITHUB: McpServerDefinitionRecord = {
@@ -36,8 +39,8 @@ describe('resolveMcpServers', () => {
   it('a hiányzó és az üres hivatkozás mező ugyanazt az üres eredményt adja', () => {
     const environment = environmentOf({});
 
-    expect(resolveMcpServers('a1', undefined, [GITHUB], environment)).toStrictEqual({ kind: 'ok', value: {} });
-    expect(resolveMcpServers('a1', {}, [GITHUB], environment)).toStrictEqual({ kind: 'ok', value: {} });
+    expect(resolveMcpServers(STEP, undefined, [GITHUB], environment)).toStrictEqual({ kind: 'ok', value: {} });
+    expect(resolveMcpServers(STEP, {}, [GITHUB], environment)).toStrictEqual({ kind: 'ok', value: {} });
   });
 
   it('a stdio ág szerver oldali neve a három szint sorrendjében oldódik fel: lépés felülírás, központi alapértelmezés, deklarált név', () => {
@@ -49,7 +52,7 @@ describe('resolveMcpServers', () => {
     });
     const reference: McpServerReference = { envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_SAJAT' }, authEnvName: null };
 
-    expect(resolveMcpServers('a1', { github: reference }, [GITHUB], environment)).toStrictEqual({
+    expect(resolveMcpServers(STEP, { github: reference }, [GITHUB], environment)).toStrictEqual({
       kind: 'ok',
       value: {
         github: {
@@ -70,7 +73,7 @@ describe('resolveMcpServers', () => {
       GITHUB_ORG: 'org',
     });
 
-    const resolved = resolveMcpServers('a1', { github: NO_OVERRIDE }, [GITHUB], environment);
+    const resolved = resolveMcpServers(STEP, { github: NO_OVERRIDE }, [GITHUB], environment);
 
     expect(resolved).toMatchObject({ kind: 'ok', value: { github: { env: { GITHUB_TOKEN: 'token-ceg' } } } });
   });
@@ -82,7 +85,7 @@ describe('resolveMcpServers', () => {
     };
     const reference: McpServerReference = { envBindings: { NEM_DEKLARALT: 'MASIK' }, authEnvName: 'MASIK' };
 
-    expect(resolveMcpServers('a1', { egyszeru: reference }, [definition], environmentOf({ MASIK: 'x' }))).toStrictEqual(
+    expect(resolveMcpServers(STEP, { egyszeru: reference }, [definition], environmentOf({ MASIK: 'x' }))).toStrictEqual(
       {
         kind: 'ok',
         value: { egyszeru: { type: 'stdio', command: 'cmd', args: [], env: {} } },
@@ -97,7 +100,7 @@ describe('resolveMcpServers', () => {
     };
 
     expect(
-      resolveMcpServers('a1', { proto: NO_OVERRIDE }, [definition], environmentOf({ constructor: 'ertek' })),
+      resolveMcpServers(STEP, { proto: NO_OVERRIDE }, [definition], environmentOf({ constructor: 'ertek' })),
     ).toStrictEqual({
       kind: 'ok',
       value: { proto: { type: 'stdio', command: 'cmd', args: [], env: { constructor: 'ertek' } } },
@@ -112,7 +115,7 @@ describe('resolveMcpServers', () => {
     // A számított kulcs saját tulajdonságot hoz létre, a `__proto__: ...` alak a prototípust állítaná.
     const references: Readonly<Record<string, McpServerReference>> = { ['__proto__']: NO_OVERRIDE };
 
-    const resolved = resolveMcpServers('a1', references, [definition], environmentOf({}));
+    const resolved = resolveMcpServers(STEP, references, [definition], environmentOf({}));
     if (resolved.kind !== 'ok') {
       throw new Error(resolved.message);
     }
@@ -124,7 +127,7 @@ describe('resolveMcpServers', () => {
   it('a hiányzó stdio változóra missing_mcp_server_env hibát ad a deklarált és a szerver oldali névvel, érték nélkül', () => {
     const environment = environmentOf({ GITHUB_TOKEN_CEG: 'titkos-ertek' });
 
-    expect(resolveMcpServers('a1', { github: NO_OVERRIDE }, [GITHUB], environment)).toStrictEqual({
+    expect(resolveMcpServers(STEP, { github: NO_OVERRIDE }, [GITHUB], environment)).toStrictEqual({
       kind: 'error',
       errorKind: 'missing_mcp_server_env',
       message:
@@ -135,14 +138,14 @@ describe('resolveMcpServers', () => {
   it('a http ág Authorization fejléce a feloldott változó teljes értéke, a lépés felülírása elsőbbséget kap', () => {
     const environment = environmentOf({ DOCS_AUTH: 'Bearer kozponti', DOCS_AUTH_SAJAT: 'Bearer sajat' });
 
-    expect(resolveMcpServers('a1', { docs: NO_OVERRIDE }, [DOCS], environment)).toStrictEqual({
+    expect(resolveMcpServers(STEP, { docs: NO_OVERRIDE }, [DOCS], environment)).toStrictEqual({
       kind: 'ok',
       value: {
         docs: { type: 'http', url: 'http://127.0.0.1:4100/mcp', headers: { Authorization: 'Bearer kozponti' } },
       },
     });
     expect(
-      resolveMcpServers('a1', { docs: { envBindings: {}, authEnvName: 'DOCS_AUTH_SAJAT' } }, [DOCS], environment),
+      resolveMcpServers(STEP, { docs: { envBindings: {}, authEnvName: 'DOCS_AUTH_SAJAT' } }, [DOCS], environment),
     ).toStrictEqual({
       kind: 'ok',
       value: { docs: { type: 'http', url: 'http://127.0.0.1:4100/mcp', headers: { Authorization: 'Bearer sajat' } } },
@@ -152,12 +155,12 @@ describe('resolveMcpServers', () => {
   it('a null authEnvName mellett a sse ág fejléc nélkül megy ki, a lépés felülírása viszont fejlécet ad', () => {
     const environment = environmentOf({ EVENTS_AUTH: 'Token esemeny' });
 
-    expect(resolveMcpServers('a1', { events: NO_OVERRIDE }, [EVENTS], environment)).toStrictEqual({
+    expect(resolveMcpServers(STEP, { events: NO_OVERRIDE }, [EVENTS], environment)).toStrictEqual({
       kind: 'ok',
       value: { events: { type: 'sse', url: 'http://127.0.0.1:4200/sse' } },
     });
     expect(
-      resolveMcpServers('a1', { events: { envBindings: {}, authEnvName: 'EVENTS_AUTH' } }, [EVENTS], environment),
+      resolveMcpServers(STEP, { events: { envBindings: {}, authEnvName: 'EVENTS_AUTH' } }, [EVENTS], environment),
     ).toStrictEqual({
       kind: 'ok',
       value: { events: { type: 'sse', url: 'http://127.0.0.1:4200/sse', headers: { Authorization: 'Token esemeny' } } },
@@ -165,7 +168,7 @@ describe('resolveMcpServers', () => {
   });
 
   it('a hiányzó Authorization változóra missing_mcp_server_env hibát ad', () => {
-    expect(resolveMcpServers('a1', { docs: NO_OVERRIDE }, [DOCS], environmentOf({}))).toStrictEqual({
+    expect(resolveMcpServers(STEP, { docs: NO_OVERRIDE }, [DOCS], environmentOf({}))).toStrictEqual({
       kind: 'error',
       errorKind: 'missing_mcp_server_env',
       message:
@@ -174,7 +177,7 @@ describe('resolveMcpServers', () => {
   });
 
   it('a központi listában nem álló névre mcp_server_not_found hibát ad, a csomópont és a szerver nevével', () => {
-    expect(resolveMcpServers('a1', { torolt: NO_OVERRIDE }, [DOCS], environmentOf({ DOCS_AUTH: 'x' }))).toStrictEqual({
+    expect(resolveMcpServers(STEP, { torolt: NO_OVERRIDE }, [DOCS], environmentOf({ DOCS_AUTH: 'x' }))).toStrictEqual({
       kind: 'error',
       errorKind: 'mcp_server_not_found',
       message:
@@ -184,7 +187,7 @@ describe('resolveMcpServers', () => {
 
   it('több hivatkozott szervert egyszerre old fel', () => {
     const resolved = resolveMcpServers(
-      'a1',
+      STEP,
       { docs: NO_OVERRIDE, events: NO_OVERRIDE },
       [EVENTS, DOCS],
       environmentOf({ DOCS_AUTH: 'x' }),

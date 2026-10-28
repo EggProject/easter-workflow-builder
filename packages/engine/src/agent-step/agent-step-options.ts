@@ -16,8 +16,11 @@ import type { OutgoingMcpServer } from '../mcp-server-resolution/outgoing-mcp-se
  * **Minden mező forrása az F-2 tény**, tehát a research 1. szekciójában
  * névvel felsorolt `Options` mező; kitalált mező nincs. A típusok több
  * helyen indexelt hozzáféréssel jönnek a tárolt `AgentStepConfig` alakból
- * (`systemPrompt`, `sandbox`, `agents`), mert a motor ezeket
- * változatlanul adja tovább, tehát a két alaknak együtt kell mozognia. A
+ * (`systemPrompt`, `sandbox`, `agents`), mert a motor az első kettőt
+ * változatlanul adja tovább, tehát a két alaknak együtt kell mozognia; az
+ * `agents` rekord a `resolveOutgoingAgents` kimenete (minősített `skills`,
+ * feloldott MCP hivatkozások, SPEC-009 5.2, 6.2), a szűkítetlen tárolt
+ * rekordtípussal. A
  * `skills` kimenő alakja a tárolttól eltér (`<plugin>:<név>` lista, SPEC-009
  * 5.3), a `plugins` az SDK `SdkPluginConfig` `local` ága (SPEC-009 5.1), az
  * `mcpServers` a lépés hivatkozás mezőjéből feloldott alak (SPEC-009 6.4).

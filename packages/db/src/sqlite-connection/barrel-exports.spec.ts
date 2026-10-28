@@ -60,7 +60,7 @@ function readExportStatements(): { names: readonly string[]; moduleSpecifiers: r
 }
 
 describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritérium)', () => {
-  it('futásidőben pontosan a tizenegy nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
+  it('futásidőben pontosan a tizenkét nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
     expect(new Set(Object.keys(barrel))).toStrictEqual(
       new Set([
         'ENV_EASTER_DB_FILE',
@@ -87,6 +87,10 @@ describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritér
         // `mcp-server-definition-drift-protection` témája a központi MCP
         // definíció guardját veti össze a `protocol` sémájával (SPEC-009 6.1).
         'isMcpServerDefinition',
+        // A tizenkettedik a PLAN-012 M-147 óta: az `engine` csomag
+        // `agent-definition` témája az agent definíciók `mcpServerReferences`
+        // mezőjét ezzel olvassa (SPEC-009 6.2).
+        'isMcpServerReference',
       ]),
     );
   });

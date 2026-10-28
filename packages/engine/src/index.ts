@@ -218,6 +218,7 @@ export type {
 } from './agent-step/validate-agent-step-capabilities.ts';
 export { validateAgentStepCapabilities } from './agent-step/validate-agent-step-capabilities.ts';
 export type { BuildAgentStepOptionsInput } from './agent-step/build-agent-step-options.ts';
+export type { OutgoingAgents } from './agent-definition/outgoing-agents.ts';
 export { buildAgentStepOptions } from './agent-step/build-agent-step-options.ts';
 export { readResultTelemetry } from './agent-step/read-result-telemetry.ts';
 export { runAgentStep } from './agent-step/run-agent-step.ts';

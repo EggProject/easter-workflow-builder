@@ -5,14 +5,17 @@ import type { AgentStepOptions } from './agent-step-options.ts';
 import type { SessionBinding } from './session-binding.ts';
 import type { SkillLibrarySnapshot } from '../engine-port/skill-library-snapshot.ts';
 import type { OutgoingMcpServer } from '../mcp-server-resolution/outgoing-mcp-server.ts';
+import type { OutgoingAgents } from '../agent-definition/outgoing-agents.ts';
+import { qualifySkillNames } from '../agent-definition/qualify-skill-names.ts';
 
 /**
- * A `buildAgentStepOptions` bemenete. A hat mező hat, egymástól független
- * forrásból jön, és mind a hat **készen** érkezik: a lépés tárolt configja,
+ * A `buildAgentStepOptions` bemenete. A hét mező egymástól független
+ * forrásból jön, és mind **készen** érkezik: a lépés tárolt configja,
  * a leírótól függő döntések (`validateAgentStepCapabilities`), a kimenő env
  * blokk (`buildOutgoingEnvironment`, a `processEnvironment` porton át), a
  * feloldott MCP szerverek (`resolveMcpServers`, a `database` és a
- * `processEnvironment` porton át), a session kötés (`resolveSessionBinding`)
+ * `processEnvironment` porton át), az agent definíciók kimenő alakja
+ * (`resolveOutgoingAgents`), a session kötés (`resolveSessionBinding`)
  * és a skill könyvtár állapota (a `skillLibrary` porton át). Így az
  * összeállítás maga tiszta függvény marad: sem portot, sem adatbázist nem
  * érint.
@@ -22,6 +25,7 @@ export interface BuildAgentStepOptionsInput {
   readonly decisions: AgentStepCapabilityDecisions;
   readonly environmentBlock: Readonly<Record<string, string>>;
   readonly mcpServers: Readonly<Record<string, OutgoingMcpServer>>;
+  readonly agents: OutgoingAgents;
   readonly sessionBinding: SessionBinding;
   readonly skillLibrary: SkillLibrarySnapshot;
 }
@@ -38,32 +42,30 @@ function sessionFields(
 }
 
 /**
- * A skill mezők (SPEC-009 5.1, 5.3): a `skills: null` lépésen sem `plugins`,
- * sem `skills` nem megy ki (O-40 (a)). Különben a `plugins` a skill könyvtár
- * gyökerére mutat, a `skills` pedig `<plugin>:<név>` alakú lista: a tárolt
- * puszta név a plugin névvel minősítve, mert a puszta név egy azonos nevű CLI
- * beépített skillt is engedélyezne (M-136 6a), a tárolt `'all'` pedig a
- * könyvtár aktuális neveinek explicit listája, mert az SDK `'all'` értéke a
- * beépítetteket is engedélyezné (M-136 2c, 4a; research
- * `2026-10-28-spec-009-blokkolo-meresek.md` 2. szekció).
+ * A skill mezők (SPEC-009 5.1, 5.3): a `skills: null` lépésen a `skills`
+ * opció nem megy ki (O-40 (a)), és a `plugins` is csak akkor, ha egy agent
+ * definíció hivatkozik skillre, mert az al-agent a skillt csak a lépés szintű
+ * `plugins` úton éri el (M-147 A3). Nem `null` lépésen a `plugins` a skill
+ * könyvtár gyökerére mutat, a `skills` pedig `<plugin>:<név>` alakú lista
+ * (`qualifySkillNames`; research `2026-10-28-spec-009-blokkolo-meresek.md` 2.
+ * és 5. szekció).
  */
 function skillFields(
   skills: AgentStepConfig['skills'],
   library: SkillLibrarySnapshot,
+  hasAgentSkillReferences: boolean,
 ):
   | Record<string, never>
+  | { readonly plugins: NonNullable<AgentStepOptions['plugins']> }
   | {
       readonly plugins: NonNullable<AgentStepOptions['plugins']>;
       readonly skills: NonNullable<AgentStepOptions['skills']>;
     } {
+  const plugins = [{ type: 'local', path: library.rootDirectory }] as const;
   if (skills === null) {
-    return {};
+    return hasAgentSkillReferences ? { plugins } : {};
   }
-  const names = skills === 'all' ? library.skillNames : skills;
-  return {
-    plugins: [{ type: 'local', path: library.rootDirectory }],
-    skills: names.map((name) => `${library.pluginName}:${name}`),
-  };
+  return { plugins, skills: qualifySkillNames(skills, library) };
 }
 
 /**
@@ -138,6 +140,9 @@ function thinkingFields(
  *    (`StorableMcpServer`) a motor nem képezi le (SPEC-009 6.2, O-42 (b)). A
  *    mező az env és fejléc **értékeket** hordozza, ezért az `Options`
  *    objektumot a motor nem naplózza és nem írja eseménybe (AC19).
+ * 5. **Az `agents` mező** (SPEC-009 5.2, 6.2): a `resolveOutgoingAgents`
+ *    kimenete, a definíciók minősített `skills` listájával és feloldott MCP
+ *    hivatkozásaival; ugyanúgy értéket hordoz, mint az `mcpServers`.
  */
 export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentStepOptions {
   const config = input.config;
@@ -148,7 +153,7 @@ export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentS
     allowedTools: config.allowedTools,
     disallowedTools: [...config.disallowedTools, ...decisions.disallowedServerTools.disallowedTools],
     additionalDirectories: config.additionalDirectories,
-    agents: config.agents,
+    agents: input.agents.definitions,
     env: input.environmentBlock,
     includePartialMessages: decisions.includePartialMessages,
     persistSession: true,
@@ -160,7 +165,7 @@ export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentS
     ...(config.maxTurns !== null && { maxTurns: config.maxTurns }),
     ...(config.maxBudgetUsd !== null && { maxBudgetUsd: config.maxBudgetUsd }),
     ...(config.systemPrompt !== null && { systemPrompt: config.systemPrompt }),
-    ...skillFields(config.skills, input.skillLibrary),
+    ...skillFields(config.skills, input.skillLibrary, input.agents.hasSkillReferences),
     ...(Object.keys(input.mcpServers).length > 0 && { mcpServers: input.mcpServers }),
     ...(config.cwd !== null && { cwd: config.cwd }),
     ...(config.sandbox !== null && { sandbox: config.sandbox }),

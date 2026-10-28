@@ -33,7 +33,7 @@ function ownEntry(record: Readonly<Record<string, string>>, key: string): string
 }
 
 function missingEnvironment(
-  nodeId: string,
+  subject: string,
   serverName: string,
   target: string,
   environmentName: string,
@@ -43,7 +43,7 @@ function missingEnvironment(
     errorKind: 'missing_mcp_server_env',
     message: formatEngineErrorMessage(
       'missing_mcp_server_env',
-      `A(z) ${nodeId} csomópont "${serverName}" MCP szerverének ${target} rendelt "${environmentName}" szerver oldali env változó nincs beállítva`,
+      `${subject} "${serverName}" MCP szerverének ${target} rendelt "${environmentName}" szerver oldali env változó nincs beállítva`,
     ),
   };
 }
@@ -57,7 +57,7 @@ function missingEnvironment(
  * előtag nélkül (6.4), `null` név mellett fejléc nélkül.
  */
 function resolveServer(
-  nodeId: string,
+  subject: string,
   serverName: string,
   definition: McpServerDefinition,
   reference: McpServerReference,
@@ -70,7 +70,7 @@ function resolveServer(
         ownEntry(reference.envBindings, declaredName) ?? ownEntry(definition.envBindings, declaredName) ?? declaredName;
       const value = processEnvironment.read(environmentName);
       if (value === null) {
-        return missingEnvironment(nodeId, serverName, `"${declaredName}" változójához`, environmentName);
+        return missingEnvironment(subject, serverName, `"${declaredName}" változójához`, environmentName);
       }
       environmentEntries.push([declaredName, value]);
     }
@@ -91,7 +91,7 @@ function resolveServer(
   }
   const value = processEnvironment.read(environmentName);
   if (value === null) {
-    return missingEnvironment(nodeId, serverName, 'Authorization fejlécéhez', environmentName);
+    return missingEnvironment(subject, serverName, 'Authorization fejlécéhez', environmentName);
   }
   return { kind: 'ok', value: { type: definition.type, url: definition.url, headers: { Authorization: value } } };
 }
@@ -108,13 +108,18 @@ function resolveServer(
  *   `missing_mcp_server_env` (O-18), a szerver, a deklarált hely és a
  *   szerver oldali név megnevezésével; az érték sosem kerül az üzenetbe.
  *
+ * A `subject` az üzenet alanya: a lépésnél `A(z) <csomópont> csomópont`, az
+ * agent definíciónál a csomópont és az agent neve (`resolveOutgoingAgents`).
+ * Az agent definíció ugyanezt az alakú hivatkozás mezőt hordozza (SPEC-009
+ * 6.2, M-147).
+ *
  * A régi `mcpServers` mező nem bemenet: a motor nem képezi le (6.2). Az
  * eredmény objektum `Object.fromEntries` hívással épül, mert a név szabály a
  * `__proto__` nevet is engedi, egy értékadás pedig azt prototípusként
  * állítaná be, nem kulcsként.
  */
 export function resolveMcpServers(
-  nodeId: string,
+  subject: string,
   references: AgentStepConfig['mcpServerReferences'],
   definitions: readonly McpServerDefinitionRecord[],
   processEnvironment: ProcessEnvironmentPort,
@@ -130,11 +135,11 @@ export function resolveMcpServers(
         errorKind: 'mcp_server_not_found',
         message: formatEngineErrorMessage(
           'mcp_server_not_found',
-          `A(z) ${nodeId} csomópont a(z) "${serverName}" MCP szerverre hivatkozik, ami nincs a központi MCP szerver listában`,
+          `${subject} a(z) "${serverName}" MCP szerverre hivatkozik, ami nincs a központi MCP szerver listában`,
         ),
       };
     }
-    const server = resolveServer(nodeId, serverName, definition, reference, processEnvironment);
+    const server = resolveServer(subject, serverName, definition, reference, processEnvironment);
     if (server.kind === 'error') {
       return server;
     }

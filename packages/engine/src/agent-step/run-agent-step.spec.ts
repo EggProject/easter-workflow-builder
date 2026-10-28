@@ -610,6 +610,91 @@ describe('runAgentStep', () => {
     database.close();
   });
 
+  it('az agent definíciók skill és MCP hivatkozásai a kimenő agents mezőben oldódnak fel, a plugins a lépés null skills mezője mellett is kimegy (M-147)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'docs',
+        definition: { type: 'http', url: 'http://127.0.0.1:4100/mcp', authEnvName: 'DOCS_AUTH' },
+      }),
+    );
+    const environment = new Map([['DOCS_AUTH_SEGITO', 'Bearer agent-titok-docs']]);
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+      processEnvironment: { read: (name) => environment.get(name) ?? null, readAll: () => ({}) },
+      skillLibrary: {
+        readSkillLibrary: () => ({
+          rootDirectory: '/skill-konyvtar',
+          pluginName: 'skill-konyvtar',
+          skillNames: ['alfa'],
+        }),
+      },
+    });
+    const config = agentStepConfig({
+      agents: {
+        segito: {
+          description: 'Segítő',
+          prompt: 'Segíts.',
+          skills: ['alfa'],
+          mcpServerReferences: { docs: { envBindings: {}, authEnvName: 'DOCS_AUTH_SEGITO' } },
+        },
+      },
+    });
+
+    const execution = okOrThrow(
+      await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry),
+    );
+
+    expect(execution.outcome.status).toBe('succeeded');
+    expect(captured.request?.options['agents']).toStrictEqual({
+      segito: {
+        description: 'Segítő',
+        prompt: 'Segíts.',
+        skills: ['skill-konyvtar:alfa'],
+        mcpServers: [
+          {
+            docs: {
+              type: 'http',
+              url: 'http://127.0.0.1:4100/mcp',
+              headers: { Authorization: 'Bearer agent-titok-docs' },
+            },
+          },
+        ],
+      },
+    });
+    expect(captured.request?.options['plugins']).toStrictEqual([{ type: 'local', path: '/skill-konyvtar' }]);
+    expect(Object.hasOwn(captured.request?.options ?? {}, 'skills')).toBe(false);
+    const events = okOrThrow(database.events.readEventsForStep(stepRunId, 100));
+    expect(JSON.stringify(events)).not.toContain('agent-titok');
+
+    database.close();
+  });
+
+  it('az érvénytelen alakú agent definíció malformed_node_config, futtatás nélkül', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+    });
+    const config = agentStepConfig({ agents: { segito: { description: 'd', prompt: 'p', skills: 7 } } });
+
+    const request = requestOf({ runId, stepRunId, config });
+    const failure = failedOutcomeOf(okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry)));
+
+    expect(failure).toStrictEqual({
+      kind: 'malformed_node_config',
+      message: 'A(z) a csomópont "segito" agent definíciója érvénytelen alakú (malformed_node_config).',
+    });
+    expect(captured.request).toBeUndefined();
+
+    database.close();
+  });
+
   it('a futás indítása után törölt központi definícióra mcp_server_not_found, futtatás nélkül (O-43)', async () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRun(database);

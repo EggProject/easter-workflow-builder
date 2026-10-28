@@ -171,15 +171,13 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
 
     // 3. (a lépések skill hivatkozásai, SPEC-009 5.1, O-13): a skill könyvtár
     //    a `skillLibrary` porton át, az indítás pillanatának állapotában.
-    const skillReferences = validateSkillReferences(
-      validated.value.nodeConfigsById,
-      ports.skillLibrary.readSkillLibrary().skillNames,
-    );
+    const skillLibrary = ports.skillLibrary.readSkillLibrary();
+    const skillReferences = validateSkillReferences(validated.value.nodeConfigsById, skillLibrary.skillNames);
     if (skillReferences.kind === 'error') {
       return skillReferences;
     }
 
-    // 3. (a lépések MCP szerver hivatkozásai, SPEC-009 6.4, O-43, O-18): a
+    // 3. (a lépések és az agent definíciók MCP szerver hivatkozásai, SPEC-009 6.4, O-43, O-18): a
     //    központi definíciók a `database` porton, a szerver oldali változók a
     //    `processEnvironment` porton át, az indítás pillanatának állapotában.
     const mcpServerDefinitions = ports.database.mcpServerDefinitions.listDefinitions();
@@ -190,6 +188,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
       validated.value.nodeConfigsById,
       mcpServerDefinitions.value,
       ports.processEnvironment,
+      skillLibrary,
     );
     if (mcpServerReferences.kind === 'error') {
       return mcpServerReferences;

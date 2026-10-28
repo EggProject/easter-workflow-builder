@@ -5,6 +5,7 @@ import type { AgentStepCapabilityDecisions } from './agent-step-capability-decis
 import { buildAgentStepOptions } from './build-agent-step-options.ts';
 import type { SessionBinding } from './session-binding.ts';
 import type { SkillLibrarySnapshot } from '../engine-port/skill-library-snapshot.ts';
+import type { OutgoingAgents } from '../agent-definition/outgoing-agents.ts';
 
 function agentStepConfig(overrides: Partial<AgentStepConfig> = {}): AgentStepConfig {
   return {
@@ -45,6 +46,8 @@ function decisions(overrides: Partial<AgentStepCapabilityDecisions> = {}): Agent
 
 const isolated: SessionBinding = { mode: 'isolated' };
 
+const NO_AGENTS: OutgoingAgents = { definitions: {}, hasSkillReferences: false };
+
 const LIBRARY: SkillLibrarySnapshot = {
   rootDirectory: '/var/skillek',
   pluginName: 'skillek',
@@ -57,6 +60,7 @@ function optionsFor(skills: AgentStepConfig['skills']): ReturnType<typeof buildA
     decisions: decisions(),
     environmentBlock: {},
     mcpServers: {},
+    agents: NO_AGENTS,
     sessionBinding: isolated,
     skillLibrary: LIBRARY,
   });
@@ -69,6 +73,7 @@ describe('buildAgentStepOptions', () => {
       decisions: decisions(),
       environmentBlock: { PROVIDER_BASE_URL: 'https://pelda' },
       mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -93,6 +98,7 @@ describe('buildAgentStepOptions', () => {
       decisions: decisions(),
       environmentBlock: {},
       mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -107,6 +113,7 @@ describe('buildAgentStepOptions', () => {
       decisions: decisions(),
       environmentBlock: {},
       mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: { mode: 'continued', resume: 'session-1', forkSession: true },
       skillLibrary: LIBRARY,
     });
@@ -125,7 +132,6 @@ describe('buildAgentStepOptions', () => {
         skills: 'all',
         cwd: '/munka',
         additionalDirectories: ['/adat'],
-        agents: { elemzo: {} },
         sandbox: {
           enabled: true,
           failIfUnavailable: false,
@@ -137,6 +143,8 @@ describe('buildAgentStepOptions', () => {
       decisions: decisions({ thinking: 'adaptive', effort: 'high' }),
       environmentBlock: {},
       mcpServers: {},
+      // Az `agents` a `resolveOutgoingAgents` kész kimenete, a config rekordja nem bemenet.
+      agents: { definitions: { elemzo: {} }, hasSkillReferences: false },
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -163,6 +171,7 @@ describe('buildAgentStepOptions', () => {
       decisions: decisions({ thinking: 'disabled' }),
       environmentBlock: {},
       mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -176,6 +185,7 @@ describe('buildAgentStepOptions', () => {
       decisions: decisions({ thinking: 'always_on' }),
       environmentBlock: {},
       mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -191,6 +201,7 @@ describe('buildAgentStepOptions', () => {
       }),
       environmentBlock: {},
       mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -206,6 +217,7 @@ describe('buildAgentStepOptions', () => {
       decisions: decisions(),
       environmentBlock: {},
       mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -221,6 +233,7 @@ describe('buildAgentStepOptions', () => {
       decisions: decisions(),
       environmentBlock: { KULCS_NEVE: 'ertek-1' },
       mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -233,6 +246,7 @@ describe('buildAgentStepOptions', () => {
       }),
       environmentBlock: { MASIK_KULCS: 'ertek-2' },
       mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -269,6 +283,23 @@ describe('buildAgentStepOptions', () => {
       expect(options.plugins).toStrictEqual([{ type: 'local', path: '/var/skillek' }]);
       expect(options.skills).toStrictEqual([]);
     });
+
+    it('null skills mellett a plugins kimegy, ha egy agent definíció skillre hivatkozik, a skills mező nem (M-147 A3)', () => {
+      const definitions = { segito: { description: 'd', prompt: 'p', skills: ['skillek:alfa'] } };
+      const options = buildAgentStepOptions({
+        config: agentStepConfig({ skills: null }),
+        decisions: decisions(),
+        environmentBlock: {},
+        mcpServers: {},
+        agents: { definitions, hasSkillReferences: true },
+        sessionBinding: isolated,
+        skillLibrary: LIBRARY,
+      });
+
+      expect(options.plugins).toStrictEqual([{ type: 'local', path: '/var/skillek' }]);
+      expect(Object.hasOwn(options, 'skills')).toBe(false);
+      expect(options.agents).toBe(definitions);
+    });
   });
   it('a feloldott MCP szervereket változatlanul átadja, a régi mcpServers mezőt nem (SPEC-009 6.4, research 9.5 5. pont)', () => {
     const mcpServers = {
@@ -284,6 +315,7 @@ describe('buildAgentStepOptions', () => {
       decisions: decisions(),
       environmentBlock: {},
       mcpServers,
+      agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -299,6 +331,7 @@ describe('buildAgentStepOptions', () => {
       decisions: decisions(),
       environmentBlock: {},
       mcpServers: {},
+      agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
