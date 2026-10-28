@@ -437,6 +437,31 @@ test('az sse szerver és a hozzárendelés nélküli deklarált változó alapé
   );
 });
 
+test('az sse szerver Authorization felülírása a szerver oldali nevek listájából választható, és a PUT törzsben authEnvName névként áll (AC16, sse ág)', async ({
+  page,
+}) => {
+  const putBodies: unknown[] = [];
+  await openEditor(page, graphWith(agentStepConfig(undefined, {})), putBodies, {
+    listServers: async (route) => route.fulfill(jsonBody(SZELEVENY_SERVERS)),
+  });
+  const region = await openStepMcp(page);
+
+  await toggle(region, 'esemeny');
+  const sseAuthorization = region.getByRole('combobox', {
+    name: 'esemeny: Authorization fejléc szerver oldali változója',
+  });
+  await chooseSelectOption(page, sseAuthorization, 'TAVOLI_AUTH');
+  await expect(sseAuthorization).toHaveText('TAVOLI_AUTH');
+
+  await saveButton(page).click();
+  await expect(page.getByText('Gráf mentve')).toBeVisible();
+  expect(putBodies).toHaveLength(1);
+  expect(savedStepConfig(putBodies, 0).mcpServers).toEqual(LEGACY_MCP_SERVERS);
+  expect(savedStepConfig(putBodies, 0).mcpServerReferences).toEqual({
+    esemeny: { envBindings: {}, authEnvName: 'TAVOLI_AUTH' },
+  });
+});
+
 test('a felülírásban tárolt, de a szerver környezetéből eltávolított név megmarad opcióként, jelzéssel', async ({
   page,
 }) => {

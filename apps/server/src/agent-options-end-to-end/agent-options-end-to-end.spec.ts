@@ -14,6 +14,7 @@ import type { AgentQueryRequest, AgentQueryRunner } from '@easter-workflow-build
 import {
   buildStreamUrl,
   decodeStreamFrame,
+  ProtocolErrorBodySchema,
   RunDetailSchema,
   StartedRunResponseSchema,
   WorkflowDetailSchema,
@@ -346,6 +347,56 @@ const PROBE_EDGES = [
 ];
 /* eslint-enable unicorn/no-null */
 
+// Ideiglenes könyvtár, a próba env értékei és a szerver indítása. A plugin neve a skill
+// könyvtár gyökerének neve (M-136 4a), ezért a gyökér egy almappa.
+async function startStubbedProbe(): Promise<Probe> {
+  const directory = await mkdtemp(path.join(tmpdir(), 'agent-options-vegpont-'));
+  const skillRoot = path.join(directory, PLUGIN_NAME);
+  const environment = { ...PROBE_ENVIRONMENT, EASTER_SKILL_LIBRARY_DIRECTORY: skillRoot };
+  for (const [name, value] of Object.entries(environment)) {
+    vi.stubEnv(name, value);
+  }
+  return startProbe(directory, skillRoot);
+}
+
+// A skill és a két MCP definíció a REST úton, a lépést hordozó gráf és az alapértelmezett
+// provider; a workflow azonosítóját adja.
+async function prepareProbeWorkflow(current: Probe): Promise<string> {
+  const uploaded = await request(current, 'PUT', '/api/skills/alfa', undefined, skillArchive('alfa'));
+  expect(uploaded.status).toBe(200);
+  const stdioSaved = await request(current, 'PUT', '/api/mcp-servers/fajl-eszkozok', {
+    type: 'stdio',
+    command: 'node',
+    args: ['fajl-szerver.mjs', '--csak-olvas'],
+    envNames: ['FAJL_TOKEN'],
+    envBindings: { FAJL_TOKEN: 'EASTER_VEGPONT_STDIO_TOKEN' },
+  });
+  expect(stdioSaved.status).toBe(200);
+  const httpSaved = await request(current, 'PUT', '/api/mcp-servers/web-api', {
+    type: 'http',
+    url: 'http://127.0.0.1:1/mcp',
+    authEnvName: 'EASTER_VEGPONT_HTTP_ALAP',
+  });
+  expect(httpSaved.status).toBe(200);
+
+  const created = await request(current, 'POST', '/api/workflows', {
+    name: 'opciok',
+    // eslint-disable-next-line unicorn/no-null -- a leírás valódi NULL érték (SPEC-005 4.2 A)
+    description: null,
+    // eslint-disable-next-line unicorn/no-null -- a workflow providerId mező valódi NULL érték (SPEC-005 4.2 A)
+    providerId: null,
+  });
+  const workflowId = parsedOrThrow(WorkflowDetailSchema.safeParse(created.body)).id;
+  const saved = await request(current, 'PUT', `/api/workflows/${workflowId}/graph`, {
+    nodes: PROBE_NODES,
+    edges: PROBE_EDGES,
+  });
+  expect(saved.status).toBe(200);
+  const settings = await request(current, 'PUT', '/api/settings', { defaultProviderId: 'claude-subscription' });
+  expect(settings.status).toBe(200);
+  return workflowId;
+}
+
 describe('végponttól végpontig próba: skill, MCP és izoláció a kimenő Options-ban (SPEC-009 19., 22. kritérium)', () => {
   let probe: Probe | undefined;
 
@@ -371,48 +422,9 @@ describe('végponttól végpontig próba: skill, MCP és izoláció a kimenő Op
   });
 
   it('a REST úton feltöltött skill és mentett MCP definíció a rögzített Options-ban jelenik meg, és a próba env értékek sehol nincsenek a kimenetben', async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), 'agent-options-vegpont-'));
-    // A plugin neve a skill könyvtár gyökerének neve (M-136 4a), ezért a gyökér egy almappa.
-    const skillRoot = path.join(directory, PLUGIN_NAME);
-    const environment = { ...PROBE_ENVIRONMENT, EASTER_SKILL_LIBRARY_DIRECTORY: skillRoot };
-    for (const [name, value] of Object.entries(environment)) {
-      vi.stubEnv(name, value);
-    }
-    probe = await startProbe(directory, skillRoot);
+    probe = await startStubbedProbe();
     const current = probe;
-
-    const uploaded = await request(current, 'PUT', '/api/skills/alfa', undefined, skillArchive('alfa'));
-    expect(uploaded.status).toBe(200);
-    const stdioSaved = await request(current, 'PUT', '/api/mcp-servers/fajl-eszkozok', {
-      type: 'stdio',
-      command: 'node',
-      args: ['fajl-szerver.mjs', '--csak-olvas'],
-      envNames: ['FAJL_TOKEN'],
-      envBindings: { FAJL_TOKEN: 'EASTER_VEGPONT_STDIO_TOKEN' },
-    });
-    expect(stdioSaved.status).toBe(200);
-    const httpSaved = await request(current, 'PUT', '/api/mcp-servers/web-api', {
-      type: 'http',
-      url: 'http://127.0.0.1:1/mcp',
-      authEnvName: 'EASTER_VEGPONT_HTTP_ALAP',
-    });
-    expect(httpSaved.status).toBe(200);
-
-    const created = await request(current, 'POST', '/api/workflows', {
-      name: 'opciok',
-      // eslint-disable-next-line unicorn/no-null -- a leírás valódi NULL érték (SPEC-005 4.2 A)
-      description: null,
-      // eslint-disable-next-line unicorn/no-null -- a workflow providerId mező valódi NULL érték (SPEC-005 4.2 A)
-      providerId: null,
-    });
-    const workflowId = parsedOrThrow(WorkflowDetailSchema.safeParse(created.body)).id;
-    const saved = await request(current, 'PUT', `/api/workflows/${workflowId}/graph`, {
-      nodes: PROBE_NODES,
-      edges: PROBE_EDGES,
-    });
-    expect(saved.status).toBe(200);
-    const settings = await request(current, 'PUT', '/api/settings', { defaultProviderId: 'claude-subscription' });
-    expect(settings.status).toBe(200);
+    const workflowId = await prepareProbeWorkflow(current);
 
     const started = await request(current, 'POST', `/api/workflows/${workflowId}/runs`, { input: {} });
     expect(started.status).toBe(200);
@@ -487,5 +499,36 @@ describe('végponttól végpontig próba: skill, MCP és izoláció a kimenő Op
     }
     // A nevek viszont ott vannak, ahol a spec szerint állniuk kell (a keresés tehát nem vak).
     expect(surfaces.some((surface) => surface.includes('EASTER_VEGPONT_STDIO_TOKEN'))).toBe(true);
+  });
+
+  it('a REST úton törölt, de hivatkozott skillre és MCP definícióra a futás indítása 422 a saját hibaosztállyal, futás és SDK hívás nélkül (AC14, AC17)', async () => {
+    probe = await startStubbedProbe();
+    const current = probe;
+    const workflowId = await prepareProbeWorkflow(current);
+
+    const skillDeleted = await request(current, 'DELETE', '/api/skills/alfa');
+    expect(skillDeleted.status).toBe(204);
+    const withoutSkill = await request(current, 'POST', `/api/workflows/${workflowId}/runs`, { input: {} });
+    expect(withoutSkill.status).toBe(422);
+    expect(parsedOrThrow(ProtocolErrorBodySchema.safeParse(withoutSkill.body))).toMatchObject({
+      code: 'unprocessable',
+      errorClass: 'skill_not_found',
+    });
+
+    const reuploaded = await request(current, 'PUT', '/api/skills/alfa', undefined, skillArchive('alfa'));
+    expect(reuploaded.status).toBe(200);
+    const serverDeleted = await request(current, 'DELETE', '/api/mcp-servers/fajl-eszkozok');
+    expect(serverDeleted.status).toBe(204);
+    const withoutServer = await request(current, 'POST', `/api/workflows/${workflowId}/runs`, { input: {} });
+    expect(withoutServer.status).toBe(422);
+    expect(parsedOrThrow(ProtocolErrorBodySchema.safeParse(withoutServer.body))).toMatchObject({
+      code: 'unprocessable',
+      errorClass: 'mcp_server_not_found',
+    });
+
+    const runs = await request(current, 'GET', `/api/runs?limit=10&workflowId=${workflowId}`);
+    expect(runs.status).toBe(200);
+    expect(runs.body).toStrictEqual([]);
+    expect(current.requests).toStrictEqual([]);
   });
 });
