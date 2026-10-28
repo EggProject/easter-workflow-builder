@@ -32,7 +32,9 @@ const CONFLICT_ERROR_CLASSES: ReadonlySet<string> = new Set([
  * feloldás és a 11.3 leíró alapú ellenőrzések, plusz a SPEC-010 9.2 sablon és
  * kifejezés fordítási ellenőrzése (`template_render_failed`,
  * `expression_evaluation_failed`, SPEC-010 9.3), plusz a SPEC-009 5.1 skill
- * hivatkozás ellenőrzése (`skill_not_found`, O-13). A sablon és a kifejezés
+ * hivatkozás ellenőrzése (`skill_not_found`, O-13), plusz a SPEC-009 6.4 MCP
+ * hivatkozás ellenőrzése (`mcp_server_not_found`, O-43; `missing_mcp_server_env`,
+ * O-18). A sablon és a kifejezés
  * osztálya a REST
  * válaszban csak a futás indításából érkezhet, mert a lépés futásának hibája
  * a futás eseményein megy ki. A kiértékelő hiányát jelző korábbi hibaosztály a
@@ -72,6 +74,8 @@ const ENGINE_VALIDATION_ERROR_CLASSES = [
   'template_render_failed',
   'expression_evaluation_failed',
   'skill_not_found',
+  'mcp_server_not_found',
+  'missing_mcp_server_env',
 ] satisfies readonly EngineErrorKind[];
 
 /**

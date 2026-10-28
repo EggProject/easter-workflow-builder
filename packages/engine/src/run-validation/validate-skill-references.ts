@@ -1,20 +1,7 @@
-import type { AgentStepConfig } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
+import { agentStepConfigOf } from './agent-step-config-of.ts';
 import type { ExecutableNodeConfig } from './executable-node-config.ts';
-
-// A node agent lépés alobjektuma, vagy `undefined`, ha a node nem futtat agent
-// lépést: az `agent_step` maga, a `join` `ai_synthesis` módja a `settings`
-// mezőjében (SPEC-004 5. szekció táblázatának 2. és 5. sora).
-function agentStepConfigOf(config: ExecutableNodeConfig): AgentStepConfig | undefined {
-  if (config.type === 'agent_step') {
-    return config;
-  }
-  if (config.type === 'join' && config.mode === 'ai_synthesis') {
-    return config.settings;
-  }
-  return undefined;
-}
 
 /**
  * A futás indítási ellenőrzése a lépések `skills` listájára (SPEC-009 5.1,

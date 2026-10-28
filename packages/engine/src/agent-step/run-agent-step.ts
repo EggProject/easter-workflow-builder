@@ -7,6 +7,7 @@ import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import { buildOutgoingEnvironment } from '../provider-environment/build-outgoing-environment.ts';
+import { resolveMcpServers } from '../mcp-server-resolution/resolve-mcp-servers.ts';
 import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { AgentStepExecution } from './agent-step-execution.ts';
 import type { AgentStepOutcome } from './agent-step-outcome.ts';
@@ -256,6 +257,23 @@ export async function runAgentStep(
     return preStreamFailure('missing_provider_env', environmentBlock.message);
   }
 
+  // A futás indítási ellenőrzése (`validateMcpServerReferences`) ugyanezt
+  // futtatta, de a definíció és a szerver környezete azóta változhatott
+  // (törlés, O-43), ezért a lépés a saját pillanatának állapotát oldja fel.
+  const mcpServerDefinitions = dependencies.database.mcpServerDefinitions.listDefinitions();
+  if (mcpServerDefinitions.kind === 'error') {
+    return mcpServerDefinitions;
+  }
+  const mcpServers = resolveMcpServers(
+    request.instance.nodeId,
+    request.config.mcpServerReferences,
+    mcpServerDefinitions.value,
+    dependencies.processEnvironment,
+  );
+  if (mcpServers.kind === 'error') {
+    return preStreamFailure(mcpServers.errorKind, mcpServers.message);
+  }
+
   const sessionBinding = resolveSessionBinding({
     graph: request.graph,
     sessionSourceNodes: request.sessionSourceNodes,
@@ -273,6 +291,7 @@ export async function runAgentStep(
       config: request.config,
       decisions: request.decisions,
       environmentBlock: environmentBlock.value,
+      mcpServers: mcpServers.value,
       sessionBinding: sessionBinding.value,
       skillLibrary: dependencies.skillLibrary.readSkillLibrary(),
     }),

@@ -56,6 +56,7 @@ function optionsFor(skills: AgentStepConfig['skills']): ReturnType<typeof buildA
     config: agentStepConfig({ skills }),
     decisions: decisions(),
     environmentBlock: {},
+    mcpServers: {},
     sessionBinding: isolated,
     skillLibrary: LIBRARY,
   });
@@ -67,6 +68,7 @@ describe('buildAgentStepOptions', () => {
       config: agentStepConfig(),
       decisions: decisions(),
       environmentBlock: { PROVIDER_BASE_URL: 'https://pelda' },
+      mcpServers: {},
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -90,6 +92,7 @@ describe('buildAgentStepOptions', () => {
       config: agentStepConfig(),
       decisions: decisions(),
       environmentBlock: {},
+      mcpServers: {},
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -103,6 +106,7 @@ describe('buildAgentStepOptions', () => {
       config: agentStepConfig({ sessionMode: 'continued' }),
       decisions: decisions(),
       environmentBlock: {},
+      mcpServers: {},
       sessionBinding: { mode: 'continued', resume: 'session-1', forkSession: true },
       skillLibrary: LIBRARY,
     });
@@ -132,6 +136,7 @@ describe('buildAgentStepOptions', () => {
       }),
       decisions: decisions({ thinking: 'adaptive', effort: 'high' }),
       environmentBlock: {},
+      mcpServers: {},
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -157,6 +162,7 @@ describe('buildAgentStepOptions', () => {
       config: agentStepConfig(),
       decisions: decisions({ thinking: 'disabled' }),
       environmentBlock: {},
+      mcpServers: {},
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -169,6 +175,7 @@ describe('buildAgentStepOptions', () => {
       config: agentStepConfig(),
       decisions: decisions({ thinking: 'always_on' }),
       environmentBlock: {},
+      mcpServers: {},
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -183,6 +190,7 @@ describe('buildAgentStepOptions', () => {
         disallowedServerTools: { disallowedTools: ['KliensKereses'], serverToolAvailabilityUnproven: false },
       }),
       environmentBlock: {},
+      mcpServers: {},
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -197,6 +205,7 @@ describe('buildAgentStepOptions', () => {
       }),
       decisions: decisions(),
       environmentBlock: {},
+      mcpServers: {},
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -211,6 +220,7 @@ describe('buildAgentStepOptions', () => {
       config,
       decisions: decisions(),
       environmentBlock: { KULCS_NEVE: 'ertek-1' },
+      mcpServers: {},
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -222,6 +232,7 @@ describe('buildAgentStepOptions', () => {
         disallowedServerTools: { disallowedTools: ['KliensKereses'], serverToolAvailabilityUnproven: false },
       }),
       environmentBlock: { MASIK_KULCS: 'ertek-2' },
+      mcpServers: {},
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
     });
@@ -258,5 +269,40 @@ describe('buildAgentStepOptions', () => {
       expect(options.plugins).toStrictEqual([{ type: 'local', path: '/var/skillek' }]);
       expect(options.skills).toStrictEqual([]);
     });
+  });
+  it('a feloldott MCP szervereket változatlanul átadja, a régi mcpServers mezőt nem (SPEC-009 6.4, research 9.5 5. pont)', () => {
+    const mcpServers = {
+      github: { type: 'stdio', command: 'github-mcp', args: [], env: { GITHUB_TOKEN: 'ertek' } },
+      docs: { type: 'http', url: 'https://127.0.0.1:4100/mcp', headers: { Authorization: 'Bearer x' } },
+    } as const;
+    const config = agentStepConfig({
+      mcpServers: { regi: { type: 'stdio', command: 'regi', args: [], envNames: [] } },
+    });
+
+    const options = buildAgentStepOptions({
+      config,
+      decisions: decisions(),
+      environmentBlock: {},
+      mcpServers,
+      sessionBinding: isolated,
+      skillLibrary: LIBRARY,
+    });
+
+    expect(options.mcpServers).toBe(mcpServers);
+  });
+
+  it('üres feloldásnál nincs mcpServers mező, akkor sem, ha a régi mező nem üres', () => {
+    const options = buildAgentStepOptions({
+      config: agentStepConfig({
+        mcpServers: { regi: { type: 'http', url: 'https://regi.example', authEnvName: null } },
+      }),
+      decisions: decisions(),
+      environmentBlock: {},
+      mcpServers: {},
+      sessionBinding: isolated,
+      skillLibrary: LIBRARY,
+    });
+
+    expect(Object.hasOwn(options, 'mcpServers')).toBe(false);
   });
 });

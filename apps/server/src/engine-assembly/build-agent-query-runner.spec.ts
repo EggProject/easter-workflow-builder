@@ -53,6 +53,7 @@ describe('a motor thinking mezője az SDK ThinkingConfig alakja', () => {
         includePartialMessages: false,
       },
       environmentBlock: {},
+      mcpServers: {},
       sessionBinding: { mode: 'isolated' },
       skillLibrary: { rootDirectory: '/skillek', pluginName: 'skillek', skillNames: [] },
     });
@@ -101,6 +102,7 @@ describe('a motor skill mezői az SDK Options alakjai', () => {
         includePartialMessages: false,
       },
       environmentBlock: {},
+      mcpServers: {},
       sessionBinding: { mode: 'isolated' },
       skillLibrary: { rootDirectory: '/skillek', pluginName: 'skillek', skillNames: ['alfa'] },
     });
@@ -148,6 +150,7 @@ describe('a motor izolációs mezői az SDK Options alakjai', () => {
         includePartialMessages: false,
       },
       environmentBlock: {},
+      mcpServers: {},
       sessionBinding: { mode: 'isolated' },
       skillLibrary: { rootDirectory: '/skillek', pluginName: 'skillek', skillNames: [] },
     });

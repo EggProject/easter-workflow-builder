@@ -47,6 +47,11 @@ describe('protocolErrorClassMessage', () => {
     ['template_render_failed', 'A workflow egyik sablonja hibás, ezért a futás nem indítható.'],
     ['expression_evaluation_failed', 'A workflow egyik kifejezése hibás, ezért a futás nem indítható.'],
     ['skill_not_found', 'Egy lépés olyan skillre hivatkozik, ami nincs a skill könyvtárban.'],
+    [
+      'mcp_server_not_found',
+      'Egy lépés olyan MCP szerverre hivatkozik, ami nincs a Beállítások MCP szerver listájában.',
+    ],
+    ['missing_mcp_server_env', 'Egy lépés MCP szerveréhez rendelt szerver oldali env változó nincs beállítva.'],
     ['already_decided', 'Ezt a jóváhagyást már eldöntötték.'],
     ['skill_archive_unreadable', 'A feltöltött fájl nem érvényes ZIP csomag.'],
     [

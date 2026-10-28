@@ -4,20 +4,24 @@ import type { ThinkingMode } from '@easter-workflow-builder/provider-capability'
 import type { AgentStepOptions } from './agent-step-options.ts';
 import type { SessionBinding } from './session-binding.ts';
 import type { SkillLibrarySnapshot } from '../engine-port/skill-library-snapshot.ts';
+import type { OutgoingMcpServer } from '../mcp-server-resolution/outgoing-mcp-server.ts';
 
 /**
- * A `buildAgentStepOptions` bemenete. Az öt mező öt, egymástól független
- * forrásból jön, és mind az öt **készen** érkezik: a lépés tárolt configja,
+ * A `buildAgentStepOptions` bemenete. A hat mező hat, egymástól független
+ * forrásból jön, és mind a hat **készen** érkezik: a lépés tárolt configja,
  * a leírótól függő döntések (`validateAgentStepCapabilities`), a kimenő env
- * blokk (`buildOutgoingEnvironment`, a `processEnvironment` porton át),
- * a session kötés (`resolveSessionBinding`) és a skill könyvtár állapota (a
- * `skillLibrary` porton át). Így az összeállítás maga tiszta függvény marad:
- * sem portot, sem adatbázist nem érint.
+ * blokk (`buildOutgoingEnvironment`, a `processEnvironment` porton át), a
+ * feloldott MCP szerverek (`resolveMcpServers`, a `database` és a
+ * `processEnvironment` porton át), a session kötés (`resolveSessionBinding`)
+ * és a skill könyvtár állapota (a `skillLibrary` porton át). Így az
+ * összeállítás maga tiszta függvény marad: sem portot, sem adatbázist nem
+ * érint.
  */
 export interface BuildAgentStepOptionsInput {
   readonly config: AgentStepConfig;
   readonly decisions: AgentStepCapabilityDecisions;
   readonly environmentBlock: Readonly<Record<string, string>>;
+  readonly mcpServers: Readonly<Record<string, OutgoingMcpServer>>;
   readonly sessionBinding: SessionBinding;
   readonly skillLibrary: SkillLibrarySnapshot;
 }
@@ -126,11 +130,14 @@ function thinkingFields(
  *    kiküldött `null`-t, hanem **hiányzó mezőt** jelent.
  * 3. **A session, a skill és a strukturált kimenet mezői**, a segédfüggvények
  *    szerint.
- *
- * **Ami szándékosan kimarad: az `mcpServers`.** A tárolt `StorableMcpServer`
- * alak titok helyett env változó **nevet** hordoz; a mező bekötése a SPEC-009
- * hatóköre (SPEC-011 3.2), a motorban kitalált alakot nem építünk
- * (`.claude/CLAUDE.md` 4.).
+ * 4. **Az `mcpServers` mező** (SPEC-009 6.3, 6.4): a lépés
+ *    `mcpServerReferences` hivatkozásaiból a motor `mcp-server-resolution`
+ *    témája oldja fel, a központi definíciókból és a `processEnvironment`
+ *    portból; üres eredménynél a mező nem megy ki, tehát a hivatkozás nélküli
+ *    lépés `Options` objektuma változatlan. A lépés régi `mcpServers` mezőjét
+ *    (`StorableMcpServer`) a motor nem képezi le (SPEC-009 6.2, O-42 (b)). A
+ *    mező az env és fejléc **értékeket** hordozza, ezért az `Options`
+ *    objektumot a motor nem naplózza és nem írja eseménybe (AC19).
  */
 export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentStepOptions {
   const config = input.config;
@@ -154,6 +161,7 @@ export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentS
     ...(config.maxBudgetUsd !== null && { maxBudgetUsd: config.maxBudgetUsd }),
     ...(config.systemPrompt !== null && { systemPrompt: config.systemPrompt }),
     ...skillFields(config.skills, input.skillLibrary),
+    ...(Object.keys(input.mcpServers).length > 0 && { mcpServers: input.mcpServers }),
     ...(config.cwd !== null && { cwd: config.cwd }),
     ...(config.sandbox !== null && { sandbox: config.sandbox }),
     ...sessionFields(input.sessionBinding),

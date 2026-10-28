@@ -54,6 +54,10 @@ export const ProtocolErrorClassSchema = z.enum([
   'provider_descriptor_sdk_mismatch',
   // SPEC-009 5.1 (O-13): a lépés skill hivatkozása nincs a skill könyvtárban
   'skill_not_found',
+  // SPEC-009 6.4 (O-43, O-18): a lépés MCP hivatkozása nincs a központi
+  // listában, illetve a hozzárendelt szerver oldali env változó nincs beállítva
+  'mcp_server_not_found',
+  'missing_mcp_server_env',
   // SPEC-005 4.2 18. végpont: a jóváhagyás már el van döntve
   'already_decided',
   // SPEC-009 5.4: a skill feltöltés elutasítási okai (O-41)

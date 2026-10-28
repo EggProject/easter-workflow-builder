@@ -487,6 +487,30 @@ function agentNode(
 function skillAgentNode(id: string, skills: AgentStepConfig['skills']): WorkflowNodeInput {
   return nodeOf(id, { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig('sikeres'), skills });
 }
+const MCP_NO_OVERRIDE = { envBindings: {}, authEnvName: null };
+
+function mcpAgentNode(id: string, references: AgentStepConfig['mcpServerReferences']): WorkflowNodeInput {
+  return nodeOf(id, {
+    type: 'agent_step',
+    onUnhandledError: 'fail_run',
+    ...agentStepConfig('sikeres'),
+    ...(references !== undefined && { mcpServerReferences: references }),
+    // A régi mező nem üres értéke: a motor nem képezi le (SPEC-009 6.2, research 9.5 5. pont).
+    mcpServers: { regi: { type: 'stdio', command: 'regi-parancs', args: [], envNames: ['REGI_NEV'] } },
+  });
+}
+
+function capturingRunner(captured: Readonly<Record<string, unknown>>[]): AgentQueryRunner {
+  return {
+    run: (request) => {
+      captured.push(request.options);
+      return {
+        kind: 'ok',
+        value: { messages: messageIterable(successMessages(1)), interrupt: () => Promise.resolve() },
+      };
+    },
+  };
+}
 function approvalNode(id: string, timeoutMs: number | null): WorkflowNodeInput {
   return nodeOf(id, {
     type: 'human_approval',
@@ -1112,6 +1136,169 @@ describe('createEngine', () => {
       expect(captured.map((options) => [options['plugins'], options['skills']])).toStrictEqual([
         [[{ type: 'local', path: '/var/skillek' }], ['skillek:beta']],
       ]);
+    });
+  });
+
+  describe('MCP szerver hivatkozások (SPEC-009 6.4)', () => {
+    it('a törölt, de hivatkozott definícióra a futás indítása mcp_server_not_found hibát ad, és nem hoz létre futást (O-43, AC17)', async () => {
+      const captured: Readonly<Record<string, unknown>>[] = [];
+      const harness = openHarness({ agentQueryRunner: capturingRunner(captured) });
+      okOrThrow(
+        harness.database.mcpServerDefinitions.saveDefinition({
+          name: 'docs',
+          definition: { type: 'http', url: 'http://127.0.0.1:4100/mcp', authEnvName: null },
+        }),
+      );
+      okOrThrow(harness.database.mcpServerDefinitions.deleteDefinition('docs'));
+      const workflowId = createWorkflow(
+        harness.database,
+        'mcp-torolt',
+        [startNode('start'), mcpAgentNode('a1', { docs: MCP_NO_OVERRIDE })],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      const started = await harness.engine.startRun({ workflowId, input: {} });
+
+      expect(started).toStrictEqual({
+        kind: 'error',
+        message:
+          'A(z) a1 csomópont a(z) "docs" MCP szerverre hivatkozik, ami nincs a központi MCP szerver listában (mcp_server_not_found).',
+      });
+      expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+      expect(captured).toStrictEqual([]);
+    });
+
+    it('a hiányzó szerver oldali változóra a futás indítása missing_mcp_server_env hibát ad, futás nélkül (O-18, AC18)', async () => {
+      const harness = openHarness();
+      okOrThrow(
+        harness.database.mcpServerDefinitions.saveDefinition({
+          name: 'github',
+          definition: { type: 'stdio', command: 'gh', args: [], envNames: ['GITHUB_TOKEN'], envBindings: {} },
+        }),
+      );
+      const workflowId = createWorkflow(
+        harness.database,
+        'mcp-env-hianyzik',
+        [
+          startNode('start'),
+          mcpAgentNode('a1', {
+            github: { envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_CEG' }, authEnvName: MCP_NO_OVERRIDE.authEnvName },
+          }),
+        ],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      const started = await harness.engine.startRun({ workflowId, input: {} });
+
+      expect(started).toStrictEqual({
+        kind: 'error',
+        message:
+          'A(z) a1 csomópont "github" MCP szerverének "GITHUB_TOKEN" változójához rendelt "GITHUB_TOKEN_CEG" szerver oldali env változó nincs beállítva (missing_mcp_server_env).',
+      });
+      expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+    });
+
+    it('a központi lista olvasásának adatbázis hibája a futás indításának hibaága', async () => {
+      const database = okOrThrow(openDatabase(':memory:'));
+      const harness = openHarness({
+        database: {
+          ...database,
+          mcpServerDefinitions: {
+            ...database.mcpServerDefinitions,
+            listDefinitions: () => ({ kind: 'error', message: 'olvasási hiba (corrupt_mcp_server_definition).' }),
+          },
+        },
+      });
+      const workflowId = createWorkflow(
+        harness.database,
+        'mcp-db-hiba',
+        [startNode('start'), agentNode('a1', 'sikeres')],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      expect(await harness.engine.startRun({ workflowId, input: {} })).toStrictEqual({
+        kind: 'error',
+        message: 'olvasási hiba (corrupt_mcp_server_definition).',
+      });
+    });
+
+    it('a régi mcpServers mezős, hivatkozás nélküli lépés fut, és a kimenő Options-ban nincs mcpServers (research 9.5 5. pont, AC20)', async () => {
+      const captured: Readonly<Record<string, unknown>>[] = [];
+      const harness = openHarness({ agentQueryRunner: capturingRunner(captured) });
+      for (const [suffix, references] of [
+        ['hianyzo', undefined],
+        ['ures', {}],
+      ] as const) {
+        const workflowId = createWorkflow(
+          harness.database,
+          `mcp-regi-${suffix}`,
+          [startNode(`start-${suffix}`), mcpAgentNode(`a-${suffix}`, references)],
+          [edgeOf(`e-${suffix}`, `start-${suffix}`, `a-${suffix}`)],
+        );
+        const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+        expect(await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES)).toBe('succeeded');
+      }
+
+      expect(captured.map((options) => Object.hasOwn(options, 'mcpServers'))).toStrictEqual([false, false]);
+    });
+
+    it('a feloldott szerverek a kimenő Options-ba kerülnek, az érték sem eseménybe, sem a kiadott keretekbe nem (AC17, AC18, AC19)', async () => {
+      const captured: Readonly<Record<string, unknown>>[] = [];
+      const environment = new Map([
+        ['GITHUB_TOKEN_SAJAT', 'mcp-titok-github'],
+        ['DOCS_AUTH', 'Bearer mcp-titok-docs'],
+      ]);
+      const harness = openHarness({
+        agentQueryRunner: capturingRunner(captured),
+        processEnvironment: { read: (name) => environment.get(name) ?? null, readAll: () => ({}) },
+      });
+      okOrThrow(
+        harness.database.mcpServerDefinitions.saveDefinition({
+          name: 'github',
+          definition: {
+            type: 'stdio',
+            command: 'gh',
+            args: ['mcp'],
+            envNames: ['GITHUB_TOKEN'],
+            envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_CEG' },
+          },
+        }),
+      );
+      okOrThrow(
+        harness.database.mcpServerDefinitions.saveDefinition({
+          name: 'docs',
+          definition: { type: 'sse', url: 'http://127.0.0.1:4200/sse', authEnvName: 'DOCS_AUTH' },
+        }),
+      );
+      const workflowId = createWorkflow(
+        harness.database,
+        'mcp-felold',
+        [
+          startNode('start'),
+          mcpAgentNode('a1', {
+            github: { envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_SAJAT' }, authEnvName: MCP_NO_OVERRIDE.authEnvName },
+            docs: MCP_NO_OVERRIDE,
+          }),
+        ],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(status).toBe('succeeded');
+      expect(captured.map((options) => options['mcpServers'])).toStrictEqual([
+        {
+          github: { type: 'stdio', command: 'gh', args: ['mcp'], env: { GITHUB_TOKEN: 'mcp-titok-github' } },
+          docs: { type: 'sse', url: 'http://127.0.0.1:4200/sse', headers: { Authorization: 'Bearer mcp-titok-docs' } },
+        },
+      ]);
+      const publishedText = JSON.stringify(harness.published);
+      const storedText = JSON.stringify(okOrThrow(harness.database.events.readEventsSince(started.run.id, 0, 1000)));
+      const snapshotText = JSON.stringify(okOrThrow(harness.database.runs.readSnapshot(started.run.id)));
+      for (const text of [publishedText, storedText, snapshotText]) {
+        expect(text).not.toContain('mcp-titok');
+      }
     });
   });
 

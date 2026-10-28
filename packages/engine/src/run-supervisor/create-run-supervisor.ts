@@ -10,6 +10,7 @@ import { cancelActiveRunTree } from '../run-interrupt/cancel-active-run-tree.ts'
 import { validateLanguageFields } from '../run-validation/validate-language-fields.ts';
 import { validateRun } from '../run-validation/validate-run.ts';
 import { validateSkillReferences } from '../run-validation/validate-skill-references.ts';
+import { validateMcpServerReferences } from '../run-validation/validate-mcp-server-references.ts';
 import { createSchedulerState } from '../scheduling/create-scheduler-state.ts';
 import { enqueueStartInstance } from '../scheduling/enqueue-start-instance.ts';
 import type { ActiveRunHandle } from './active-run-registry.ts';
@@ -176,6 +177,22 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
     );
     if (skillReferences.kind === 'error') {
       return skillReferences;
+    }
+
+    // 3. (a lépések MCP szerver hivatkozásai, SPEC-009 6.4, O-43, O-18): a
+    //    központi definíciók a `database` porton, a szerver oldali változók a
+    //    `processEnvironment` porton át, az indítás pillanatának állapotában.
+    const mcpServerDefinitions = ports.database.mcpServerDefinitions.listDefinitions();
+    if (mcpServerDefinitions.kind === 'error') {
+      return mcpServerDefinitions;
+    }
+    const mcpServerReferences = validateMcpServerReferences(
+      validated.value.nodeConfigsById,
+      mcpServerDefinitions.value,
+      ports.processEnvironment,
+    );
+    if (mcpServerReferences.kind === 'error') {
+      return mcpServerReferences;
     }
 
     // 3. (provider validáció, 11.2) és 4. (a bemenet ellenőrzése).

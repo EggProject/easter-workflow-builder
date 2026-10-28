@@ -68,6 +68,8 @@ describe('mapOutcomeMessageToErrorCode', () => {
     'template_render_failed',
     'expression_evaluation_failed',
     'skill_not_found',
+    'mcp_server_not_found',
+    'missing_mcp_server_env',
   ] as const)('a motor %s validációs hibaosztályát unprocessable kódra képezi', (kind) => {
     expect(mapOutcomeMessageToErrorCode(formatEngineErrorMessage(kind, 'A futás nem indítható'))).toBe('unprocessable');
   });
