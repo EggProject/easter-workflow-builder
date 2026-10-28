@@ -504,6 +504,8 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       [path.join('node-inspector', 'ScriptNodeFields.tsx')]: 1,
       // a skill feltöltés hiányzó ZIP csomagjának mező alatti hibája (helyi ellenőrzés, a `TextField` hibájával azonos alak)
       [path.join('skill-upload', 'SkillUploadForm.tsx')]: 1,
+      // az MCP szerver deklarált változó neveinek mező alatti hibája (helyi ellenőrzés, a `TagInput`-nak nincs saját hibaága)
+      [path.join('mcp-server-config', 'McpServerEditModal.tsx')]: 1,
     };
     const alertCounts = Object.fromEntries(
       PRODUCT_FILES.map(

@@ -54,6 +54,12 @@ function createFetchFunction(initial: SettingsRecord): { readonly fetchFunction:
     if (input.endsWith('/api/skills')) {
       return Promise.resolve(Response.json([]));
     }
+    if (input.endsWith('/api/mcp-servers')) {
+      return Promise.resolve(Response.json([]));
+    }
+    if (input.endsWith('/api/server-environment-names')) {
+      return Promise.resolve(Response.json([]));
+    }
     if (method === 'PUT' && typeof init.body === 'string') {
       const body: unknown = JSON.parse(init.body);
       const parsed = UpdateSettingsRequestSchema.safeParse(body);
@@ -101,7 +107,7 @@ describe('SettingsScreen', () => {
     );
   }
 
-  it('a kártyákat egymás alatt, a SPEC-009 3.1 sorrendjében rajzolja (Provider, Párhuzamossági korlát, Futás napló, Skill könyvtár, majd a gráf szerkesztő)', async () => {
+  it('a kártyákat egymás alatt, a SPEC-009 3.1 sorrendjében rajzolja (Provider, Párhuzamossági korlát, Futás napló, Skill könyvtár, MCP szerverek, majd a gráf szerkesztő)', async () => {
     await render(createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false }).fetchFunction);
 
     expect(headings()).toEqual([
@@ -109,17 +115,20 @@ describe('SettingsScreen', () => {
       'Párhuzamossági korlát',
       'Futás napló',
       'Skill könyvtár',
+      'MCP szerverek',
       'Gráf szerkesztő',
     ]);
-    expect(container.querySelector('.settings-screen')?.children).toHaveLength(5);
+    expect(container.querySelector('.settings-screen')?.children).toHaveLength(6);
   });
 
-  it('a provider listát, a beállítást, a korlátokat és a skill listát egyszer tölti be, kártyánként ismételt kérés nélkül', async () => {
+  it('a provider listát, a beállítást, a korlátokat, a skill listát, az MCP szerver listát és a szerver környezet neveit egyszer tölti be, kártyánként ismételt kérés nélkül', async () => {
     const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
     await render(fetchFunction);
 
     expect(requests.toSorted((left, right) => left.localeCompare(right))).toEqual([
+      'GET /api/mcp-servers',
       'GET /api/providers',
+      'GET /api/server-environment-names',
       'GET /api/settings',
       'GET /api/settings/concurrency-limits',
       'GET /api/skills',

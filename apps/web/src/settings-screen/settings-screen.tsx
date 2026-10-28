@@ -1,5 +1,8 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import { useMemo, type ReactElement } from 'react';
+import { McpServerSettingsCard } from '../mcp-server-config/McpServerSettingsCard.tsx';
+import { useMcpServerLibrary } from '../mcp-server-config/use-mcp-server-library.ts';
+import { useServerEnvironmentNames } from '../mcp-server-config/use-server-environment-names.ts';
 import { createProviderConnectionTester } from '../provider-select/create-provider-connection-tester.ts';
 import { SkillLibrarySettingsCard } from '../skill-upload/SkillLibrarySettingsCard.tsx';
 import { useSkillLibrary } from '../skill-upload/use-skill-library.ts';
@@ -22,15 +25,17 @@ export interface SettingsScreenProperties {
  * egymás alatt egy oldalon, oldalsó navigáció nélkül, a teljes szélességen.
  * Kártya a kártyában nincs (`.claude/CLAUDE.md` 11. szekció). A SPEC-009 3.1
  * sorrendje: Provider, Párhuzamossági korlát, Futás napló, Skill könyvtár, MCP
- * szerverek, gráf szerkesztő; az MCP szerverek kártya (még nem megvalósult) a
- * saját lépésében kerül a sorba, a helyén.
+ * szerverek, gráf szerkesztő.
  *
  * A képernyő tölti a kártyák adatát, hogy a kérések ne a megjelenítésben
  * éljenek: a provider listát (`GET /api/providers`, a Provider és a
  * Párhuzamossági korlát kártya közös), a beállítás rekordot (`GET`/`PUT
  * /api/settings`) és a providerenkénti korlátokat (`GET
  * /api/settings/concurrency-limits`, soronként `PUT`/`DELETE`) és a skill
- * könyvtárat (`GET /api/skills`, `PUT`/`DELETE /api/skills/:name`). A
+ * könyvtárat (`GET /api/skills`, `PUT`/`DELETE /api/skills/:name`), a központi
+ * MCP szerver listát (`GET /api/mcp-servers`, `PUT`/`DELETE
+ * /api/mcp-servers/:name`) és a szerver környezeti változóinak neveit (`GET
+ * /api/server-environment-names`). A
  * "Kapcsolat teszt" hívása a provider választóé (SPEC-009 3.2).
  */
 export function SettingsScreen(properties: Readonly<SettingsScreenProperties>): ReactElement {
@@ -39,6 +44,8 @@ export function SettingsScreen(properties: Readonly<SettingsScreenProperties>): 
   const { state: settingsState, save: saveSettings } = useSettingsRecord(apiOrigin, fetchFunction);
   const concurrencyLimits = useConcurrencyLimits(apiOrigin, fetchFunction);
   const skillLibrary = useSkillLibrary(apiOrigin, fetchFunction);
+  const mcpServerLibrary = useMcpServerLibrary(apiOrigin, fetchFunction);
+  const environmentNames = useServerEnvironmentNames(apiOrigin, fetchFunction);
   const testConnection = useMemo(
     () => createProviderConnectionTester(apiOrigin, fetchFunction),
     [apiOrigin, fetchFunction],
@@ -63,6 +70,12 @@ export function SettingsScreen(properties: Readonly<SettingsScreenProperties>): 
         skillsState={skillLibrary.state}
         uploadSkill={skillLibrary.uploadSkill}
         deleteSkill={skillLibrary.deleteSkill}
+      />
+      <McpServerSettingsCard
+        serversState={mcpServerLibrary.state}
+        environmentNamesState={environmentNames}
+        saveServer={mcpServerLibrary.saveServer}
+        deleteServer={mcpServerLibrary.deleteServer}
       />
       <EditorSettingsCard />
     </div>
