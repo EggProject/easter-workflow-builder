@@ -293,6 +293,16 @@ function failedOutcomeOf(execution: AgentStepExecution): { readonly kind: string
     : { kind: 'succeeded', message: '' };
 }
 
+function failingListDatabase(database: DatabaseContext): DatabaseContext {
+  return {
+    ...database,
+    mcpServerDefinitions: {
+      ...database.mcpServerDefinitions,
+      listDefinitions: () => ({ kind: 'error', message: 'olvasási hiba (corrupt_mcp_server_definition).' }),
+    },
+  };
+}
+
 describe('runAgentStep', () => {
   it('sikeres futtatás: a lépés succeeded, a számadatok és a session a helyükre kerülnek', async () => {
     const database = openMemoryDatabase();
@@ -744,25 +754,49 @@ describe('runAgentStep', () => {
     database.close();
   });
 
-  it('a központi MCP lista olvasásának adatbázis hibája az Outcome hibaágán jelenik meg', async () => {
+  it('a központi MCP lista olvasásának adatbázis hibája a hivatkozó lépés Outcome hibaágán jelenik meg', async () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRun(database);
-    const failingDatabase: DatabaseContext = {
-      ...database,
-      mcpServerDefinitions: {
-        ...database.mcpServerDefinitions,
-        listDefinitions: () => ({ kind: 'error', message: 'olvasási hiba (corrupt_mcp_server_definition).' }),
-      },
-    };
     const dependencies = dependenciesOf({
-      database: failingDatabase,
+      database: failingListDatabase(database),
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), newCapture()),
     });
-
-    expect(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry)).toStrictEqual({
-      kind: 'error',
-      message: 'olvasási hiba (corrupt_mcp_server_definition).',
+    const stepReference = agentStepConfig({ mcpServerReferences: { docs: { envBindings: {}, authEnvName: null } } });
+    const agentReference = agentStepConfig({
+      agents: {
+        kutato: {
+          description: 'd',
+          prompt: 'p',
+          mcpServerReferences: { docs: { envBindings: {}, authEnvName: null } },
+        },
+      },
     });
+
+    for (const config of [stepReference, agentReference]) {
+      expect(
+        await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry),
+      ).toStrictEqual({
+        kind: 'error',
+        message: 'olvasási hiba (corrupt_mcp_server_definition).',
+      });
+    }
+
+    database.close();
+  });
+
+  it('MCP hivatkozás nélkül a központi lista hibája nem állítja meg a lépést (T-012-27)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database: failingListDatabase(database),
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+    });
+
+    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry));
+
+    expect(execution.outcome.status).toBe('succeeded');
+    expect(captured.request).toBeDefined();
 
     database.close();
   });

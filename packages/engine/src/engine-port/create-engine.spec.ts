@@ -995,6 +995,19 @@ async function startWaitingErrorHandler(): Promise<{
   return { harness, runId: started.run.id, sleepMs: waiting.sleepMs };
 }
 
+function failingListHarness(): ReturnType<typeof openHarness> {
+  const database = okOrThrow(openDatabase(':memory:'));
+  return openHarness({
+    database: {
+      ...database,
+      mcpServerDefinitions: {
+        ...database.mcpServerDefinitions,
+        listDefinitions: () => ({ kind: 'error', message: 'olvasási hiba (corrupt_mcp_server_definition).' }),
+      },
+    },
+  });
+}
+
 describe('createEngine', () => {
   it('VÉGPONTTÓL VÉGPONTIG: startRun egy egyszerű start -> agent_step gráfon succeeded futást ad', async () => {
     const harness = openHarness();
@@ -1198,21 +1211,12 @@ describe('createEngine', () => {
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
     });
 
-    it('a központi lista olvasásának adatbázis hibája a futás indításának hibaága', async () => {
-      const database = okOrThrow(openDatabase(':memory:'));
-      const harness = openHarness({
-        database: {
-          ...database,
-          mcpServerDefinitions: {
-            ...database.mcpServerDefinitions,
-            listDefinitions: () => ({ kind: 'error', message: 'olvasási hiba (corrupt_mcp_server_definition).' }),
-          },
-        },
-      });
+    it('a központi lista olvasásának adatbázis hibája a hivatkozó futás indításának hibaága', async () => {
+      const harness = failingListHarness();
       const workflowId = createWorkflow(
         harness.database,
         'mcp-db-hiba',
-        [startNode('start'), agentNode('a1', 'sikeres')],
+        [startNode('start'), mcpAgentNode('a1', { docs: MCP_NO_OVERRIDE })],
         [edgeOf('e1', 'start', 'a1')],
       );
 
@@ -1220,6 +1224,20 @@ describe('createEngine', () => {
         kind: 'error',
         message: 'olvasási hiba (corrupt_mcp_server_definition).',
       });
+    });
+
+    it('MCP hivatkozás nélkül a központi lista hibája nem állítja meg a futást (T-012-27)', async () => {
+      const harness = failingListHarness();
+      const workflowId = createWorkflow(
+        harness.database,
+        'mcp-db-hiba-hivatkozas-nelkul',
+        [startNode('start'), agentNode('a1', 'sikeres')],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+
+      expect(await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES)).toBe('succeeded');
     });
 
     it('a régi mcpServers mezős, hivatkozás nélküli lépés fut, és a kimenő Options-ban nincs mcpServers (research 9.5 5. pont, AC20)', async () => {

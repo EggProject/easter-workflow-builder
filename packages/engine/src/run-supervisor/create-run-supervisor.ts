@@ -1,5 +1,10 @@
 import type { Outcome } from '@easter-workflow-builder/core';
-import type { CancelRunTreeResult, StartRunInput, WorkflowRunRecord } from '@easter-workflow-builder/db';
+import type {
+  CancelRunTreeResult,
+  McpServerDefinitionRecord,
+  StartRunInput,
+  WorkflowRunRecord,
+} from '@easter-workflow-builder/db';
 import { collectSessionSourceNodes } from '../agent-step/collect-session-source-nodes.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { ChildWorkflowRunRequest, ChildWorkflowRunResult } from '../node-executor/child-workflow-runner.ts';
@@ -11,6 +16,8 @@ import { validateLanguageFields } from '../run-validation/validate-language-fiel
 import { validateRun } from '../run-validation/validate-run.ts';
 import { validateSkillReferences } from '../run-validation/validate-skill-references.ts';
 import { validateMcpServerReferences } from '../run-validation/validate-mcp-server-references.ts';
+import { agentStepConfigOf } from '../run-validation/agent-step-config-of.ts';
+import { hasMcpServerReferences } from '../mcp-server-resolution/has-mcp-server-references.ts';
 import { createSchedulerState } from '../scheduling/create-scheduler-state.ts';
 import { enqueueStartInstance } from '../scheduling/enqueue-start-instance.ts';
 import type { ActiveRunHandle } from './active-run-registry.ts';
@@ -179,8 +186,17 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
 
     // 3. (a lépések és az agent definíciók MCP szerver hivatkozásai, SPEC-009 6.4, O-43, O-18): a
     //    központi definíciók a `database` porton, a szerver oldali változók a
-    //    `processEnvironment` porton át, az indítás pillanatának állapotában.
-    const mcpServerDefinitions = ports.database.mcpServerDefinitions.listDefinitions();
+    //    `processEnvironment` porton át, az indítás pillanatának állapotában. A központi
+    //    listát csak akkor olvassa, ha valamelyik lépés hivatkozik MCP szerverre: egy hibás
+    //    definíció sor így nem állítja meg az MCP szervert nem használó futást (T-012-27).
+    const mcpServerDefinitions: Outcome<readonly McpServerDefinitionRecord[]> = validated.value.nodeConfigsById
+      .values()
+      .some((config) => {
+        const agentStep = agentStepConfigOf(config);
+        return agentStep !== undefined && hasMcpServerReferences(agentStep);
+      })
+      ? ports.database.mcpServerDefinitions.listDefinitions()
+      : { kind: 'ok', value: [] };
     if (mcpServerDefinitions.kind === 'error') {
       return mcpServerDefinitions;
     }

@@ -739,7 +739,9 @@ olvassa; a skill könyvtár azért kapott saját portot, mert az a fájlrendszer
 (`validateMcpServerReferences`, a `run-validation` témában, a `validateSkillReferences` után, adatbázis
 írás nélkül) és a lépés (`runAgentStep`, mert a definíció a futás közben törölhető, O-43) ugyanazt a
 feloldást futtatja; a lépés szintű hiba a lépést a hibaosztállyal zárja, futtatás nélkül. A hiányzó
-hivatkozás mező és az üres rekord esetén az `mcpServers` mező nem megy ki, tehát a régi gráf
+hivatkozás mező és az üres rekord esetén az `mcpServers` mező nem megy ki, és a motor a központi
+listát sem olvassa (ha egyetlen lépés és agent definíció sem hivatkozik MCP szerverre, egy hibás
+definíció sor, `corrupt_mcp_server_definition`, a futást és a lépést nem állítja meg, T-012-27), tehát a régi gráf
 `Options` objektuma bájtra változatlan (research `2026-10-26-spec-009-forrasok.md` 9.5 5. pont). A
 `sse` és a `http` ágon `null` feloldott név mellett a `headers` mező is elmarad. A nevek kulcsként
 `Object.hasOwn` szerint olvasódnak, és az eredmény `Object.fromEntries` hívással épül, mert a POSIX

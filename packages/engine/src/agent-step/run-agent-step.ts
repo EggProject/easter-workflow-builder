@@ -1,12 +1,13 @@
 import type { AgentQuery, SdkResultMessage } from '@easter-workflow-builder/agent';
 import { hasStructuredOutput, isSdkResultMessage, isSdkSystemInitMessage } from '@easter-workflow-builder/agent';
-import type { AgentStepConfig } from '@easter-workflow-builder/db';
+import type { AgentStepConfig, McpServerDefinitionRecord } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { describeError } from '@easter-workflow-builder/core';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import { buildOutgoingEnvironment } from '../provider-environment/build-outgoing-environment.ts';
+import { hasMcpServerReferences } from '../mcp-server-resolution/has-mcp-server-references.ts';
 import { resolveMcpServers } from '../mcp-server-resolution/resolve-mcp-servers.ts';
 import { resolveOutgoingAgents } from '../agent-definition/resolve-outgoing-agents.ts';
 import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
@@ -262,7 +263,11 @@ export async function runAgentStep(
   // futtatta, de a definíció és a szerver környezete azóta változhatott
   // (törlés, O-43), ezért a lépés a saját pillanatának állapotát oldja fel, a
   // lépés és az agent definíciói hivatkozásait egyaránt (SPEC-009 6.2, M-147).
-  const mcpServerDefinitions = dependencies.database.mcpServerDefinitions.listDefinitions();
+  // A központi listát csak hivatkozás mellett olvassa: egy hibás definíció sor
+  // így nem állítja meg az MCP szervert nem használó lépést (T-012-27).
+  const mcpServerDefinitions: Outcome<readonly McpServerDefinitionRecord[]> = hasMcpServerReferences(request.config)
+    ? dependencies.database.mcpServerDefinitions.listDefinitions()
+    : { kind: 'ok', value: [] };
   if (mcpServerDefinitions.kind === 'error') {
     return mcpServerDefinitions;
   }
