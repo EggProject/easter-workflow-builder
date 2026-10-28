@@ -232,6 +232,10 @@ test('üres űrlapon a Feltöltés a név és a fájl hibáját a mező alatt je
     'Válassz ki egy ZIP csomagot.',
   ]);
   await expect(card(page).getByRole('textbox', { name: /^Skill neve/u })).toHaveAttribute('aria-invalid', 'true');
+  // A hiányzó fájl hibája a natív fájl választóhoz van kötve, a képernyőolvasó a mezővel együtt olvassa.
+  const fileInput = card(page).getByLabel(/tallózz/u);
+  await expect(fileInput).toHaveAttribute('aria-invalid', 'true');
+  await expect(fileInput).toHaveAccessibleDescription('Válassz ki egy ZIP csomagot.');
 
   await fillName(page, 'Rossz Név');
   await expect(card(page).getByRole('alert')).toHaveText([
@@ -243,6 +247,7 @@ test('üres űrlapon a Feltöltés a név és a fájl hibáját a mező alatt je
   await expect(card(page).getByRole('alert')).toHaveText('Válassz ki egy ZIP csomagot.');
   await chooseArchive(page);
   await expect(card(page).getByRole('alert')).toHaveCount(0);
+  await expect(card(page).getByLabel(/tallózz/u)).not.toHaveAttribute('aria-invalid');
   expect(mockState.uploads).toHaveLength(0);
 });
 

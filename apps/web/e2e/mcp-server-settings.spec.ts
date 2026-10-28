@@ -279,6 +279,9 @@ test('érvénytelen értékre a hiba a mező alatt jelenik meg, és a PUT nem me
   await declared.fill('1ROSSZ');
   await declared.press('Enter');
   await expect(modal.getByRole('alert').filter({ hasText: 'betűvel vagy aláhúzással kezdődik' })).toBeVisible();
+  // A hiba a címkéző mező beviteli elemére van kötve, a képernyőolvasó a mezővel együtt olvassa.
+  await expect(declared).toHaveAttribute('aria-invalid', 'true');
+  await expect(declared).toHaveAccessibleDescription(/betűvel vagy aláhúzással kezdődik/u);
 
   expect(mockState.puts).toHaveLength(0);
 });

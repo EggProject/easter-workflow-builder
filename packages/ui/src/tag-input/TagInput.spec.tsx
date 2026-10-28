@@ -276,6 +276,20 @@ describe('TagInput', () => {
     });
   });
 
+  it('az aria-describedby és az aria-invalid a beágyazott mezőre kerül, megadás nélkül egyik sincs', () => {
+    act(() => {
+      root.render(<TagInput />);
+    });
+    expect(renderedInput().hasAttribute('aria-describedby')).toBe(false);
+    expect(renderedInput().hasAttribute('aria-invalid')).toBe(false);
+
+    act(() => {
+      root.render(<TagInput aria-describedby="cimke-hiba" aria-invalid />);
+    });
+    expect(renderedInput().getAttribute('aria-describedby')).toBe('cimke-hiba');
+    expect(renderedInput().getAttribute('aria-invalid')).toBe('true');
+  });
+
   it('a labels a saját mondatokat adja', () => {
     const labels: TagInputLabels = {
       added: (tag) => `Hozzáadva: ${tag}`,

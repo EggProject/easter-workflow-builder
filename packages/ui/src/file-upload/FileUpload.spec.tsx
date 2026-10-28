@@ -70,6 +70,20 @@ describe('FileUpload', () => {
       expect(container.firstElementChild?.className).toBe('extra');
     });
 
+    it('az aria-describedby és az aria-invalid a natív választóra kerül, megadás nélkül egyik sincs', () => {
+      act(() => {
+        root.render(<FileUpload />);
+      });
+      expect(renderedInput().hasAttribute('aria-describedby')).toBe(false);
+      expect(renderedInput().hasAttribute('aria-invalid')).toBe(false);
+
+      act(() => {
+        root.render(<FileUpload aria-describedby="fajl-hiba" aria-invalid />);
+      });
+      expect(renderedInput().getAttribute('aria-describedby')).toBe('fajl-hiba');
+      expect(renderedInput().getAttribute('aria-invalid')).toBe('true');
+    });
+
     it('az accept a tippben pontok nélkül, nagybetűvel áll', () => {
       act(() => {
         root.render(<FileUpload accept=".zip,.tar" />);

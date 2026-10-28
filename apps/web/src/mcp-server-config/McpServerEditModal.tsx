@@ -63,6 +63,7 @@ const TYPE_OPTIONS: readonly SelectFieldOption<McpServerType>[] = [
 export function McpServerEditModal(properties: Readonly<McpServerEditModalProperties>): ReactElement {
   const { record, existingNames, environmentNames, saveServer, onClose } = properties;
   const formId = useId();
+  const environmentNamesErrorId = useId();
   const [draft, setDraft] = useState<McpServerDraft>(() => createMcpServerDraft(record));
   const [isSubmitAttempted, setIsSubmitAttempted] = useState(false);
   const [isEnvironmentNamesTouched, setIsEnvironmentNamesTouched] = useState(false);
@@ -73,6 +74,8 @@ export function McpServerEditModal(properties: Readonly<McpServerEditModalProper
   const hasErrors = Object.values(errors).some((error) => error !== undefined);
   const isOverwrite = !isEdit && existingNames.includes(draft.name);
   const isSaving = request.state.status === 'pending';
+  const isEnvironmentNamesErrorVisible =
+    (isEnvironmentNamesTouched || isSubmitAttempted) && errors.envNames !== undefined;
   const hasEnvironmentSelects = draft.type === 'stdio' ? draft.envNames.length > 0 : true;
 
   function update(change: Partial<McpServerDraft>): void {
@@ -168,14 +171,16 @@ export function McpServerEditModal(properties: Readonly<McpServerEditModalProper
                   ariaLabel="Deklarált környezeti változók"
                   placeholder="Változó neve, majd Enter"
                   labels={MCP_TAG_INPUT_LABELS}
+                  aria-invalid={isEnvironmentNamesErrorVisible ? true : undefined}
+                  aria-describedby={isEnvironmentNamesErrorVisible ? environmentNamesErrorId : undefined}
                   value={draft.envNames}
                   onChange={(nextEnvironmentNames) => {
                     setIsEnvironmentNamesTouched(true);
                     update({ envNames: nextEnvironmentNames });
                   }}
                 />
-                {(isEnvironmentNamesTouched || isSubmitAttempted) && errors.envNames !== undefined && (
-                  <span className="field__error" role="alert">
+                {isEnvironmentNamesErrorVisible && (
+                  <span className="field__error" id={environmentNamesErrorId} role="alert">
                     {errors.envNames}
                   </span>
                 )}

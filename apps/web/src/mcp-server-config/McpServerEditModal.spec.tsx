@@ -183,6 +183,22 @@ describe('McpServerEditModal', () => {
     expect(inputByLabel('Név').getAttribute('aria-invalid')).toBe('true');
   });
 
+  it('a deklarált változó nevek hibája a címkéző mezőhöz van kötve (aria-describedby, aria-invalid), de csak a megjelenésével együtt', () => {
+    render();
+    expect(tagInput('Deklarált környezeti változók').hasAttribute('aria-invalid')).toBe(false);
+    expect(tagInput('Deklarált környezeti változók').hasAttribute('aria-describedby')).toBe(false);
+
+    typeInto(tagInput('Deklarált környezeti változók'), '1ROSSZ');
+    pressEnter(tagInput('Deklarált környezeti változók'));
+
+    const error = [...container.querySelectorAll('.field__error')].find((candidate) =>
+      candidate.textContent.includes('betűvel vagy aláhúzással kezdődik'),
+    );
+    expect(error?.id).not.toBe('');
+    expect(tagInput('Deklarált környezeti változók').getAttribute('aria-invalid')).toBe('true');
+    expect(tagInput('Deklarált környezeti változók').getAttribute('aria-describedby')).toBe(error?.id);
+  });
+
   it('stdio kitöltés után a mentés a nevet és a definíciót adja, siker után bezár', async () => {
     const saveServer = vi.fn(() => Promise.resolve(saved(STDIO_RECORD)));
     const onClose = vi.fn();

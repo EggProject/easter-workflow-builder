@@ -107,6 +107,25 @@ describe('SkillUploadForm', () => {
     expect(nameField().getAttribute('aria-invalid')).toBe('true');
   });
 
+  it('a hiányzó fájl hibája a fájl választóhoz van kötve (aria-describedby, aria-invalid), de csak a megjelenésével együtt', async () => {
+    render();
+    typeInto(nameField(), 'uj-skill');
+    expect(fileInput().hasAttribute('aria-invalid')).toBe(false);
+    expect(fileInput().hasAttribute('aria-describedby')).toBe(false);
+
+    await submit();
+
+    const error = container.querySelector('.field__error');
+    expect(error?.id).not.toBe('');
+    expect(fileInput().getAttribute('aria-invalid')).toBe('true');
+    expect(fileInput().getAttribute('aria-describedby')).toBe(error?.id);
+
+    chooseFile(fileInput(), [ARCHIVE]);
+
+    expect(fileInput().hasAttribute('aria-invalid')).toBe(false);
+    expect(fileInput().hasAttribute('aria-describedby')).toBe(false);
+  });
+
   it('érvénytelen névvel és kiválasztott fájllal csak a név hibát mutatja, hívás nélkül', async () => {
     const uploadSkill = vi.fn();
     render({ uploadSkill });

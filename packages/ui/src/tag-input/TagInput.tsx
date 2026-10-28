@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactElement } from 'react';
+import { useRef, useState, type AriaAttributes, type ChangeEvent, type KeyboardEvent, type ReactElement } from 'react';
 import './tag-input.css';
 
 export type TagInputTone = 'blue' | 'ink' | 'yolk' | 'paper';
@@ -36,7 +36,10 @@ export const TAG_INPUT_SOURCE_LABELS: TagInputLabels = {
 /**
  * A forrás `TagInput` propjai, egy az egyben: `value`, `onChange`,
  * `placeholder`, `tone`, `separators`, `className` és `ariaLabel`, plusz a
- * `labels` kiegészítés.
+ * `labels` kiegészítés és a mező hibájának kötése (`aria-describedby`,
+ * `aria-invalid`): a forrásban nincs ilyen prop, a beágyazott beviteli mezőre
+ * kerülnek, hogy a mező alatti hibaüzenet a képernyőolvasónak is a mezőhöz
+ * tartozzon (`.claude/CLAUDE.md` 11. szekció).
  */
 export interface TagInputProperties {
   /**
@@ -61,6 +64,15 @@ export interface TagInputProperties {
    */
   readonly ariaLabel?: string;
   readonly labels?: TagInputLabels;
+  /**
+   * A mező alatti hibaüzenet azonosítója, a beágyazott beviteli mezőn.
+   */
+  readonly 'aria-describedby'?: string | undefined;
+  /**
+   * A hibás állapot jelzése a beágyazott beviteli mezőn; csak a hibaüzenet
+   * megjelenésével együtt szabad igazra állítani.
+   */
+  readonly 'aria-invalid'?: AriaAttributes['aria-invalid'] | undefined;
 }
 
 const NO_TAGS: readonly string[] = [];
@@ -87,6 +99,8 @@ export function TagInput(properties: Readonly<TagInputProperties>): ReactElement
     className,
     ariaLabel = 'Tags',
     labels = TAG_INPUT_SOURCE_LABELS,
+    'aria-describedby': ariaDescribedBy,
+    'aria-invalid': ariaInvalid,
   } = properties;
 
   const [draft, setDraft] = useState('');
@@ -161,6 +175,8 @@ export function TagInput(properties: Readonly<TagInputProperties>): ReactElement
         }}
         placeholder={value.length > 0 ? '' : placeholder}
         aria-label={ariaLabel === '' ? 'Tags' : ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
       />
       <span className="tagi__status" role="status" aria-live="polite">
         {announcement}

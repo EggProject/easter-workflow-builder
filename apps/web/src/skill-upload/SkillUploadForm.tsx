@@ -7,7 +7,7 @@ import {
   FileUpload,
   TextField,
 } from '@easter-workflow-builder/ui';
-import { useState, type ChangeEvent, type ReactElement, type SubmitEvent } from 'react';
+import { useId, useState, type ChangeEvent, type ReactElement, type SubmitEvent } from 'react';
 import { useRequestState } from '../request-state/use-request-state.ts';
 import type { RouteOutcome } from '../rest-client/route-outcome.ts';
 import { OverwriteSkillModal } from './OverwriteSkillModal.tsx';
@@ -56,9 +56,11 @@ export function SkillUploadForm(properties: Readonly<SkillUploadFormProperties>)
   const [nameGeneration, setNameGeneration] = useState(0);
   const [pendingOverwrite, setPendingOverwrite] = useState<PendingOverwrite | undefined>(undefined);
   const request = useRequestState<SkillSummary>();
+  const missingFileErrorId = useId();
 
   const parsedName = parseSkillNameDraft(nameDraft);
   const isUploading = request.state.status === 'pending';
+  const isMissingFileErrorVisible = isSubmitAttempted && file === undefined;
 
   function startUpload(name: string, archive: File): void {
     void request.run(async () => {
@@ -132,6 +134,8 @@ export function SkillUploadForm(properties: Readonly<SkillUploadFormProperties>)
                 remove: (fileName) => `Eltávolítás: ${fileName}`,
               }}
               hint="ZIP csomag, a gyökerében SKILL.md fájllal"
+              aria-invalid={isMissingFileErrorVisible ? true : undefined}
+              aria-describedby={isMissingFileErrorVisible ? missingFileErrorId : undefined}
               files={file === undefined ? [] : [{ name: file.name, size: file.size }]}
               onFiles={(selectedFiles) => {
                 setFile(selectedFiles[0]);
@@ -141,8 +145,8 @@ export function SkillUploadForm(properties: Readonly<SkillUploadFormProperties>)
                 setFieldGeneration((generation) => generation + 1);
               }}
             />
-            {isSubmitAttempted && file === undefined && (
-              <span className="field__error" role="alert">
+            {isMissingFileErrorVisible && (
+              <span className="field__error" id={missingFileErrorId} role="alert">
                 {MISSING_FILE_MESSAGE}
               </span>
             )}

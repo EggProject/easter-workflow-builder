@@ -1,4 +1,11 @@
-import { useState, type ChangeEvent, type DragEvent, type ReactElement, type ReactNode } from 'react';
+import {
+  useState,
+  type AriaAttributes,
+  type ChangeEvent,
+  type DragEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { joinClassNames } from '../class-name-list/join-class-names.ts';
 import { formatBytes } from './format-bytes.ts';
 import './file-upload.css';
@@ -70,7 +77,10 @@ export const FILE_UPLOAD_SOURCE_LABELS: FileUploadLabels = {
 /**
  * A forrás `FileUpload` propjai, egy az egyben: `onFiles`, `accept`,
  * `multiple`, `size`, `title`, `hint`, `files`, `onRemove` és `className`,
- * plusz a `labels` kiegészítés.
+ * plusz a `labels` kiegészítés és a mező hibájának kötése (`aria-describedby`,
+ * `aria-invalid`): a forrásban nincs ilyen prop, a natív fájl választóra
+ * kerülnek, hogy a mező alatti hibaüzenet a képernyőolvasónak is a mezőhöz
+ * tartozzon (`.claude/CLAUDE.md` 11. szekció).
  */
 export interface FileUploadProperties {
   /**
@@ -102,6 +112,15 @@ export interface FileUploadProperties {
   readonly onRemove?: (file: FileUploadFile) => void;
   readonly className?: string;
   readonly labels?: FileUploadLabels;
+  /**
+   * A mező alatti hibaüzenet azonosítója, a natív fájl választón.
+   */
+  readonly 'aria-describedby'?: string | undefined;
+  /**
+   * A hibás állapot jelzése a natív fájl választón; csak a hibaüzenet
+   * megjelenésével együtt szabad igazra állítani.
+   */
+  readonly 'aria-invalid'?: AriaAttributes['aria-invalid'] | undefined;
 }
 
 function clampPercent(progress: number): number {
@@ -128,6 +147,8 @@ export function FileUpload(properties: Readonly<FileUploadProperties>): ReactEle
     onRemove,
     className,
     labels = FILE_UPLOAD_SOURCE_LABELS,
+    'aria-describedby': ariaDescribedBy,
+    'aria-invalid': ariaInvalid,
   } = properties;
 
   const [dragging, setDragging] = useState(false);
@@ -157,7 +178,15 @@ export function FileUpload(properties: Readonly<FileUploadProperties>): ReactEle
         }}
         onDrop={handleDrop}
       >
-        <input type="file" className="dropzone__input" accept={accept} multiple={multiple} onChange={handleChange} />
+        <input
+          type="file"
+          className="dropzone__input"
+          accept={accept}
+          multiple={multiple}
+          onChange={handleChange}
+          aria-describedby={ariaDescribedBy}
+          aria-invalid={ariaInvalid}
+        />
         <span className="dropzone__icon">
           <svg
             viewBox="0 0 20 20"
