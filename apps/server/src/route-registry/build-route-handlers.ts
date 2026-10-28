@@ -35,9 +35,11 @@ import { createUploadSkillHandler } from '../skill-endpoint/upload-skill.ts';
 import { createDeleteMcpServerDefinitionHandler } from '../mcp-server-definition-endpoint/delete-mcp-server-definition.ts';
 import { createListMcpServerDefinitionsHandler } from '../mcp-server-definition-endpoint/list-mcp-server-definitions.ts';
 import { createSaveMcpServerDefinitionHandler } from '../mcp-server-definition-endpoint/save-mcp-server-definition.ts';
+import { createProcessEnvironmentReader } from '../engine-assembly/create-process-environment-reader.ts';
+import { createListServerEnvironmentNamesHandler } from '../server-environment-endpoint/list-server-environment-names.ts';
 
 /**
- * A `ROUTE_TABLE` mind a 32 azonosítójára kitöltött kezelő rekord
+ * A `ROUTE_TABLE` mind a 33 azonosítójára kitöltött kezelő rekord
  * (SPEC-006 `route-registry` téma, 12. elfogadási kritérium). A
  * `RouteHandlers` visszatérési típus miatt egy kimaradó `RouteId` (vagy a
  * nyers ZIP törzsű végpont nem bináris kezelője) fordítási hibát ad, nem
@@ -98,5 +100,8 @@ export function buildRouteHandlers(
     listMcpServerDefinitions: createListMcpServerDefinitionsHandler(database),
     saveMcpServerDefinition: createSaveMcpServerDefinitionHandler(database),
     deleteMcpServerDefinition: createDeleteMcpServerDefinitionHandler(database),
+
+    // I. Szerver környezet (1 végpont, SPEC-009 6.2, O-32): ugyanaz a port, amin a motor a neveket feloldja
+    listServerEnvironmentNames: createListServerEnvironmentNamesHandler(createProcessEnvironmentReader()),
   };
 }

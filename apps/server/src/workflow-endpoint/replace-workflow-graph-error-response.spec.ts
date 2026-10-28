@@ -103,6 +103,7 @@ function buildHandlers(database: DatabaseContext): RouteHandlers {
     listMcpServerDefinitions: DEFAULT_HANDLER,
     saveMcpServerDefinition: DEFAULT_HANDLER,
     deleteMcpServerDefinition: DEFAULT_HANDLER,
+    listServerEnvironmentNames: DEFAULT_HANDLER,
   };
   return {
     ...base,

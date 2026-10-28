@@ -1,7 +1,7 @@
 // Barrel: csak nevesített újraexport (SPEC-002 6.6 6. szabálya). A csomag téma mappánként
 // bővül, ahogy a SPEC-005 végrehajtási lépései elkészülnek.
 
-// http-route: az API_BASE_PATH és a STREAM_PATH konstans, a 32 végpont útvonal sablonja,
+// http-route: az API_BASE_PATH és a STREAM_PATH konstans, a 33 végpont útvonal sablonja,
 // a paraméter behelyettesítő tiszta függvény, és a nyers ZIP törzsű végpontok guardja.
 export { API_BASE_PATH } from './http-route/api-base-path.ts';
 export { STREAM_PATH } from './http-route/stream-path.ts';
@@ -250,3 +250,8 @@ export {
 } from './mcp-server-definition/mcp-server-definition.ts';
 export type { McpServerDefinitionRecord } from './mcp-server-definition/mcp-server-definition-record.ts';
 export { McpServerDefinitionRecordSchema } from './mcp-server-definition/mcp-server-definition-record.ts';
+
+// server-environment: a szerver környezet változó NEVEINEK listája (SPEC-009 6.2, O-32 (a), PLAN-012
+// T-012-11), értéket soha nem hordoz.
+export type { ServerEnvironmentNameList } from './server-environment/server-environment-name-list.ts';
+export { ServerEnvironmentNameListSchema } from './server-environment/server-environment-name-list.ts';

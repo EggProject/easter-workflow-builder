@@ -26,7 +26,8 @@ export interface RouteDefinition {
 /**
  * A SPEC-005 4.2 táblázatának mind a 26 REST végpontja (11. kritérium), plusz a
  * SPEC-009 5.1 három skill könyvtár végpontja (G. csoport) és a SPEC-009 6.2
- * három központi MCP szerver végpontja (H. csoport), összesen 32 végpont. A
+ * három központi MCP szerver végpontja (H. csoport), valamint a szerver
+ * környezet változó neveit adó végpont (I. csoport, O-32), összesen 33 végpont. A
  * kulcsnév a végpont felelősségét nevezi meg, nem a HTTP metódust vagy az
  * útvonalat, hogy a hívó (`apps/server`) olvasható azonosítóval hivatkozhasson
  * rá. A `GET /events` stream végpont szándékosan NEM tagja ennek a
@@ -96,6 +97,9 @@ export const ROUTE_TABLE = {
   listMcpServerDefinitions: { method: 'GET', template: `${API_BASE_PATH}/mcp-servers` },
   saveMcpServerDefinition: { method: 'PUT', template: `${API_BASE_PATH}/mcp-servers/:name` },
   deleteMcpServerDefinition: { method: 'DELETE', template: `${API_BASE_PATH}/mcp-servers/:name` },
+
+  // I. Szerver környezet (1 végpont, SPEC-009 6.2, O-32 (a)): csak a változók NEVEI, értéket soha
+  listServerEnvironmentNames: { method: 'GET', template: `${API_BASE_PATH}/server-environment-names` },
 } as const satisfies Readonly<Record<string, RouteDefinition>>;
 
 // A `ROUTE_TABLE` kulcsainak uniója: minden REST végpont azonosítója.

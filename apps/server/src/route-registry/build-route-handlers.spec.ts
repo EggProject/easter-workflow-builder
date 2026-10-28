@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
 import { isRouteId, isZipBodyRouteId, ROUTE_TABLE } from '@easter-workflow-builder/protocol';
@@ -45,7 +45,11 @@ function buildHandlers(database: DatabaseContext) {
 }
 
 describe('buildRouteHandlers', () => {
-  it('a ROUTE_TABLE mind a 32 azonosítójára kitölt egy kezelőt, a nyers ZIP törzsű végpontra bináris kezelőt', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('a ROUTE_TABLE mind a 33 azonosítójára kitölt egy kezelőt, a nyers ZIP törzsű végpontra bináris kezelőt', () => {
     const handlers = buildHandlers(openMemoryDatabase());
     for (const routeId of Object.keys(ROUTE_TABLE)) {
       expect(isRouteId(routeId)).toBe(true);
@@ -71,5 +75,18 @@ describe('buildRouteHandlers', () => {
     const handlers = buildHandlers(openMemoryDatabase());
     const result = await handlers.readSettings({ parameters: {}, query: new URLSearchParams(), body: undefined });
     expect(result.kind).toBe('ok');
+  });
+  it('a listServerEnvironmentNames a folyamat valódi környezetének neveit adja, értéket nem (SPEC-009 6.2, O-32)', async () => {
+    vi.stubEnv('EASTER_T01211_PROBA_NEV', 'proba-titok-ertek');
+    const handlers = buildHandlers(openMemoryDatabase());
+
+    const result = await handlers.listServerEnvironmentNames({
+      parameters: {},
+      query: new URLSearchParams(),
+      body: undefined,
+    });
+
+    expect(result.kind === 'ok' && result.value.body).toContain('EASTER_T01211_PROBA_NEV');
+    expect(JSON.stringify(result)).not.toContain('proba-titok-ertek');
   });
 });

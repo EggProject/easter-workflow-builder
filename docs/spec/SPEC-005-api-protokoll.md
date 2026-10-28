@@ -130,7 +130,7 @@ A `protocol` `dependencies` mezője a jelen spec után: `@easter-workflow-builde
 - **Minden azonosító szöveg**, kivéve a `run_event.id` értékét, ami egész (F-18).
 - **Hibánál a válasz törzse egyetlen alak**, a 8. szekció `ProtocolErrorBody` sémája, a státusz kód pedig a 8.2 táblázat szerinti.
 
-### 4.2 A 32 REST végpont
+### 4.2 A 33 REST végpont
 
 A "Motor vagy repository" oszlop mondja meg, mire képződik le a végpont. Ahol a cél a motor, ott a hívás **nem** kerülheti meg a motort, mert a validáció, a provider feloldás és a pillanatkép a motor felelőssége (SPEC-004 4.8).
 
@@ -238,6 +238,18 @@ A 28. végpont az egyetlen, amelynek törzse nem JSON: a `ROUTE_TABLE` sora `req
 A 31. végpont létrehoz vagy teljesen lecserél név szerint (a skill feltöltés `PUT` mintája); a
 definíció csak env változó NEVEKET hordoz, értéket soha. A 32. végpont hivatkozó lépés mellett is töröl
 (SPEC-009 O-43 (a)); a hiányzó definícióra a futás indítása ad megnevezett hibát (SPEC-009 6.4).
+
+**I. Szerver környezet (1 végpont, SPEC-009 6.2, O-32 (a), PLAN-012 T-012-11)**
+
+| #   | Metódus és útvonal                  | Kérés | Válasz                                                   | Saját hibaágai |
+| --- | ----------------------------------- | ----- | -------------------------------------------------------- | -------------- |
+| 33  | `GET /api/server-environment-names` | nincs | `ServerEnvironmentNameList`: név tömb, UTF-16 sorrendben | nincs          |
+
+A válasz a szerver folyamat környezetének változó NEVEIT adja, értéket soha: ugyanazt a
+`processEnvironment` portot olvassa, amin a motor a futáskor feloldja őket, és csak a név alakú
+(`EnvironmentVariableNameSchema`, SPEC-009 6.1) neveket tartja meg, mert a hozzárendelés szerver oldali
+neve csak ilyen lehet. A felület ebből választ (SPEC-009 6.2); a kimondott kockázat a SPEC-009 11.
+szekcióban áll.
 
 ## 5. Az SSE protokoll
 

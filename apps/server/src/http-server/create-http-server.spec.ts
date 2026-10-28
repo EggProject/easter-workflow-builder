@@ -115,6 +115,7 @@ function buildHandlers(overrides: Partial<RouteHandlers>): RouteHandlers {
     listMcpServerDefinitions: DEFAULT_HANDLER,
     saveMcpServerDefinition: DEFAULT_HANDLER,
     deleteMcpServerDefinition: DEFAULT_HANDLER,
+    listServerEnvironmentNames: DEFAULT_HANDLER,
   };
   return { ...base, ...overrides };
 }
