@@ -36,7 +36,8 @@ huszonegyedik), `run-graph` (T-009-20, huszonkettedik), `run-view` (T-009-20, hu
 SPEC-008 11.2 szekciója tíz témát ír elő, ezzel mind a tíz elkészült; a "huszonnégy téma"
 végösszeg (SPEC-008 DoD 2.) és a tényleges darabszám (tizenkettő SPEC-007 UI + nyolc invariáns +
 tizenkét SPEC-008 + a saját kiegészítés `themed-skeleton` és `branch-iteration-list` (T-009-61) =
-harmincnégy `src/` téma mappa) közötti eltérést a spec szándékosan nem számolja (SPEC-008
+harmincnégy `src/` téma mappa a SPEC-008 zárásakor; a SPEC-009 a `provider-select`, `skill-upload` és
+`mcp-server-config` témával bővítette, azóta harminchét) közötti eltérést a spec szándékosan nem számolja (SPEC-008
 11.1 szekció vége: kitalált szám ide nem kerül). A
 `run-control` téma a SPEC-008 11.2 táblázatán FELÜLI, tizenegyedik SPEC-008 téma: a spec a futás
 vezérlését a `run-view` témába sorolta, de az indítás modálisa a SZERKESZTŐBŐL nyílik (SPEC-008
