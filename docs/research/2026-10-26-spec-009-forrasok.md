@@ -247,7 +247,7 @@ ez a mai viselkedés megtartása, nem új döntés.
    `protocol` oldalon ugyanaz a típus, a `node-config-drift-protection` kétirányú egyenlőségével; a
    9.1.13 kapcsoló mellett az elhagyható mező pontos deklarációját (a `db` oldali `?:` és a zod
    `.optional()` egyezését) a `typecheck` kapu dönti el, nem ez a jegyzet.
-3. A régi `mcpServers` mező: a felület csak olvashatóan mutatja (a `SPEC_009_SCOPE_REASON` szöveg
+3. A régi `mcpServers` mező: a felület csak olvashatóan mutatja (a korábbi hatókör indoklás szöveg
    helyett a régi, a futás által nem használt alakot megnevező szöveggel), a motor nem képezi le, a
    mentési séma változatlanul elfogadja.
 4. Az agent definíció `mcpServers` bejegyzése az `agents` szűkítetlen rekordjában marad (9.1.11), tehát

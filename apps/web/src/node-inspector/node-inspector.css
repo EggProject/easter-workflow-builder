@@ -147,7 +147,7 @@
   grid-template-rows: auto auto minmax(var(--ep-space-5), auto);
 }
 
-/* Az örökölt provider megnevezése és a "SPEC-009 hatóköre" indoklások. */
+/* Az örökölt provider megnevezése és az olvasható mezők indoklásai (régi mcpServers alak, nem megerősített mezők). */
 .node-inspector__reason {
   margin: 0;
   font: var(--ep-text-meta);
