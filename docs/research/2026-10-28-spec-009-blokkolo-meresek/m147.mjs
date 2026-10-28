@@ -189,7 +189,7 @@ function skillListazas(body) {
   return JSON.stringify({ system: body.system, messages: body.messages })
     .split(/\\n/)
     .filter((s) => /^- [\w:.-]+: /.test(s))
-    .map((s) => s.slice(0, 100).replaceAll('—', '-'));
+    .map((s) => s.slice(0, 100).replaceAll('\u2014', '-'));
 }
 
 const torzsJelolok = (body) =>
@@ -263,7 +263,7 @@ for (const eset of ESETEK(ujMunkakonyvtar('m147-home-sablon'))) {
   } catch (hiba) {
     sor.dobott = String(hiba instanceof Error ? hiba.message : hiba)
       .slice(0, 400)
-      .replaceAll('—', '-');
+      .replaceAll('\u2014', '-');
   }
   sor.kerdesek = kerdesek
     .filter((k) => k.metodus === 'POST')
