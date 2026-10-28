@@ -21,8 +21,8 @@ import type { DatabaseContext } from '../engine-port/database-port.ts';
  * `DatabaseContext`-et KAPJA paraméterként, nem maga nyitja (a kapcsolat-nyitó
  * függvény nem szerepel a motor kilenc portja között, SPEC-004 3.2). A
  * ténylegesen betartatott, `apps/server` oldali sorrend ezen a specen KÍVÜL
- * esik (AC-53 "a `apps/server` erre épülő sorrendjét regressziós teszt őrzi"
- * fordulata egy KÉSŐBBI specifikációra mutat); ez a téma azt a garanciát
+ * esik: ma az `apps/server` `startup-sequence/continue-startup-with-database.ts`
+ * fájlja tartja be (SPEC-006 4.1); ez a téma azt a garanciát
  * adja, hogy a motor MAGA soha nem nyitja meg az adatbázis kapcsolatot (lásd
  * `engine-never-opens-database.spec.ts`), tehát a sorrend megfordítására
  * nincs mód a motor kódjából.

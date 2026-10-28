@@ -53,7 +53,7 @@ projekt konvenciója szerint (például `is-non-empty-string.ts`, nem `string-gu
 guarddal egy fájlban).
 
 **Minden guardhoz kötelező unit teszt.** Mindkét ágra (amikor igazat ad, amikor hamisat ad)
-és a típusszűkítésre is - a `packages/providers/src/evidence/is-known-fact.spec.ts` és
+és a típusszűkítésre is - a `packages/provider-capability/src/evidence/fact/is-known-fact.spec.ts` és
 `is-unknown-fact.spec.ts` a követendő minta.
 
 **Domain-specifikus guard NEM ide tartozik.** Ha egy guard egy konkrét, egy csomaghoz kötött
