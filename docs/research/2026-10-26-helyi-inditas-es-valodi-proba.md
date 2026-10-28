@@ -1,0 +1,705 @@
+# Helyi indítás és a kimenő SDK környezet: mérések és források
+
+Dátum: 2026-10-26. Fej: `origin/main` `ba6d424`. Node `v26.7.0` (`node --version`), Bun `1.4.0`
+(`bun --version`), `@anthropic-ai/claude-agent-sdk` `0.3.245` (pinelve, `apps/server/package.json`).
+A SPEC-012 és a PLAN-013 bemenete. **Valódi provider hívás (MiniMax, Anthropic) egyik mérésben
+sem történt**: a mérések helyi folyamatok és egy hamis CLI végrehajtható ellen futottak.
+
+A mérési azonosítók a `main` (`M-135`) és a `feat/spec-009-beallitasok` branch (`M-140`) legnagyobb
+azonosítója után folytatódnak, hogy ne ütközzenek.
+
+## 1. M-141: a szerver build nélkül elindul a pinelt Node alatt
+
+**Módszer.** A worktree gyökeréből, üres környezettel (`env -i PATH=... HOME=...`):
+`node apps/server/src/main.ts`, majd a hat kötelező szerver env változóval
+(`EASTER_SERVER_PORT=3001`, `EASTER_LOG_DIRECTORY`, `EASTER_LOG_ROTATION_SIZE`,
+`EASTER_LOG_ROTATION_FREQUENCY`, `EASTER_LOG_RETAINED_FILE_COUNT`,
+`EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS`) és egy ideiglenes `EASTER_DB_FILE` értékkel háttérben,
+utána `curl`, végül `SIGINT`. A számértékek a mérés kedvéért beírt értékek, nem javaslatok.
+
+**Eredmény.**
+
+- Env nélkül: `fatal: A(z) "EASTER_SERVER_PORT" kötelező env változó hiányzik vagy üres
+(missing_env_variable).`, kilépési kód `1`.
+- A hat változóval: `GET /api/providers` HTTP `200`, a két provider listája; `GET /api/settings`
+  törzse `{"defaultProviderId":null,"persistStreamDeltas":false}`.
+- `node -e "console.log(process.features.typescript)"` kimenete `strip`.
+
+**Forrás a viselkedéshez.** A Node TypeScript dokumentációja szerint a típustörlés a `v25.2.0` óta
+stabil, és alapból be van kapcsolva (`--no-strip-types` kapcsolja ki); a `node_modules` alatti
+TypeScript fájlt a Node elutasítja
+(<https://nodejs.org/docs/latest-v26.x/api/typescript.html>). A workspace csomagok a
+`node_modules`-ban szimbolikus linkek, a mérés szerint a feloldás ennek ellenére működik (a valódi
+útvonal a `packages/` alatt van). Ez utóbbi magyarázat **nem ellenőrzött** forrásból, csak a mért
+eredmény áll.
+
+## 2. M-142: az `EASTER_LOG_DIRECTORY` értéke fájl útvonal, nem könyvtár
+
+**Módszer.** Az M-141 futás `EASTER_LOG_DIRECTORY=<tmp>/logs` értékkel, utána `ls <tmp>`.
+
+**Eredmény.** A napló a `<tmp>/logs.1.log` fájlba került; `<tmp>/logs` könyvtár nem jött létre.
+
+**Forrás.** A `buildLogRotationOptions` a változó értékét a `pino-roll` `file` mezőjébe teszi
+(`packages/logger/src/log-rotation/build-log-rotation-options.ts:34`). A `pino-roll` README-je a
+`file` mezőt a napló fájl útvonalaként írja le ("Absolute or relative path to the log file"; a
+telepített `pino-roll@4.0.0` README 41. sora, és
+<https://github.com/mcollina/pino-roll/blob/main/README.md>). A változó neve tehát félrevezető; a
+`.env.example` és a `README.md` ezt ki kell mondja (SPEC-012 O-19).
+
+## 3. M-143: a megadott `Options.env` az alfolyamat teljes környezete
+
+**Módszer.** Repón kívüli, eldobható próba (a szöveg alább, hogy újra előállítható legyen): a
+telepített SDK `query()` függvénye egy hamis CLI végrehajtható ellen
+(`pathToClaudeCodeExecutable`, sdk.d.ts:1777), ami a kapott környezet változóneveit fájlba írja és
+azonnal kilép. Két változat: `env: { PROBE_OUT: ... }` (a mai `claude-subscription` blokk
+alakja, egy jelölő változóval) és `env: { ...process.env, PROBE_OUT: ... }`.
+
+```js
+// fake-cli.mjs (futtatható): a kapott env neveit írja ki, értéket nem
+import { writeFileSync } from 'node:fs';
+writeFileSync(process.env.PROBE_OUT, JSON.stringify(Object.keys(process.env).sort()));
+process.exit(0);
+// probe.mjs: query({ prompt: 'x', options: { env, pathToClaudeCodeExecutable: '<fake-cli.mjs>' } })
+```
+
+**Eredmény.**
+
+| Változat                     | Nevek száma | `PATH` | `HOME` | `CLAUDE*` nevek                                                                                                       |
+| ---------------------------- | ----------- | ------ | ------ | --------------------------------------------------------------------------------------------------------------------- |
+| csak a blokk                 | 3           | nincs  | nincs  | `CLAUDE_AGENT_SDK_VERSION`, `CLAUDE_CODE_ENTRYPOINT`                                                                  |
+| `process.env` plusz a jelölő | 35          | van    | van    | `CLAUDE_AGENT_SDK_VERSION`, `CLAUDE_CODE_CERT_STORE`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_TMPDIR`, `CLAUDE_TMPDIR` |
+
+A blokk változatban az alfolyamat a jelölőn kívül csak a két, az SDK által pótolt változót kapta.
+
+**Források.**
+
+- A telepített `sdk.d.ts` 1482-1498. sora: "When set, this value REPLACES the subprocess
+  environment entirely ... it is not merged with `process.env`. Spread `process.env` yourself if the
+  subprocess still needs inherited variables like `PATH`, `HOME`".
+- A futásidejű `sdk.mjs`: `Cn=ne?{...ne}:{...process.env}`, utána csak a
+  `CLAUDE_CODE_ENTRYPOINT` és a `CLAUDE_AGENT_SDK_VERSION` pótlása (a mért 3 név pontosan ez).
+- A hivatalos TypeScript referencia `env` sora: "When set, this replaces the subprocess
+  environment instead of merging with `process.env`, so pass `{ ...process.env, YOUR_VAR: 'value'
+}` to keep inherited variables like `PATH`"
+  (<https://code.claude.com/docs/en/agent-sdk/typescript>).
+- A CHANGELOG `0.2.113`: "**Breaking**: `options.env` once again replaces `process.env` for the
+  CLI subprocess instead of overlaying it", és `0.3.149`: "corrected the `Options.env` docs to
+  state that the value replaces the subprocess environment"
+  (<https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md>).
+
+**Amit a mérés NEM igazol.** Hogy a valódi CLI `PATH` és `HOME` nélkül elbukik-e, és ha igen,
+milyen üzenettel: ehhez a valódi CLI kellene, ami a `claude-subscription` providernél valódi
+hitelesítést és hívást jelent. Ez a SPEC-012 valódi próbájának része (5. szekció), user engedéllyel.
+
+## 4. A hitelesítési precedencia (a tiltott változó lista forrása)
+
+Elsődleges forrás: <https://code.claude.com/docs/en/authentication>, "Authentication precedence".
+A sorrend: (1) felhő provider, ha `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX` vagy
+`CLAUDE_CODE_USE_FOUNDRY` be van állítva; (2) `ANTHROPIC_AUTH_TOKEN`; (3) `ANTHROPIC_API_KEY`; (4)
+`apiKeyHelper` (beállítás fájl, nem env); (5) `CLAUDE_CODE_OAUTH_TOKEN`; (6) Anthropic profil és
+federáció (`ANTHROPIC_PROFILE`, illetve együtt `ANTHROPIC_FEDERATION_RULE_ID` és
+`ANTHROPIC_ORGANIZATION_ID`, a "Named profile" és "Federation variables" sor szerint a `/login`
+felett); (7) a `/login` előfizetéses OAuth hitelesítése.
+
+Megerősítések:
+
+- <https://code.claude.com/docs/en/env-vars>: az `ANTHROPIC_API_KEY` sora "When set, this key is
+  used instead of your Claude Pro, Max, Team, or Enterprise subscription even if you are logged
+  in"; a `CLAUDE_CODE_OAUTH_TOKEN` sora "Alternative to `/login` for SDK and automated
+  environments".
+- <https://code.claude.com/docs/en/llm-gateway-connect>: "With `ANTHROPIC_AUTH_TOKEN`, the variable
+  takes precedence immediately."
+- Független: <https://github.com/anthropics/claude-code/issues/39126> ugyanezt a sorrendet idézi
+  (felhő provider, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY`, `apiKeyHelper`, előfizetés).
+
+Az env-vars oldal további provider választó változókat is felsorol (`CLAUDE_CODE_USE_ANTHROPIC_AWS`,
+`CLAUDE_CODE_USE_MANTLE`, `CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST`). Hogy ezek a precedencia 1. szintjén
+állnak-e, a precedencia lap nem mondja ki: **nem ellenőrzött**.
+
+## 5. Env fájl betöltés és indítás
+
+- `--env-file` (Node `v20.6.0` óta, `v24.10.0` óta nem kísérleti) és `--env-file-if-exists` (Node
+  `v22.9.0` óta): a fájlt az aktuális könyvtárhoz képest olvassa, és ha egy változó a környezetben
+  és a fájlban is szerepel, **a környezeté nyer**
+  (<https://nodejs.org/docs/latest-v26.x/api/cli.html#--env-filefile>). A
+  `process.loadEnvFile(path)` (`v20.12.0` óta, `v24.10.0` óta nem kísérleti) a programból hívható
+  párja (<https://nodejs.org/docs/latest-v26.x/api/process.html>). Mindkettő beépített, új
+  függőség nem kell. Második független megerősítés ebben a munkamenetben nem készült: **egy
+  hivatalos forrás**.
+- Vite: a `.env`, `.env.local`, `.env.[mode]` fájlokat az `envDir` (alapból a projekt gyökere)
+  alól tölti, a futáskor már létező környezeti változók a legerősebbek
+  (<https://github.com/vitejs/vite/blob/v8.2.2/docs/guide/env-and-mode.md>, 67-79. sor). Az
+  `apps/web/vite.config.ts` a `loadEnv(mode, process.cwd(), '')` hívással az ÖSSZES változót
+  betölti a config folyamatba (a `''` előtag), a kliensnek viszont csak a `VITE_` előtagú jut.
+- Turborepo: alapból `strict` env mód, a task csak a `globalEnv`, `env` és passthrough listákban
+  nevesített változókat látja, plusz egy beépített rendszer listát (`HOME`, `PATH`, ...)
+  (<https://turborepo.com/docs/crafting-your-repository/using-environment-variables>,
+  <https://turborepo.com/docs/reference/configuration>). A gyökér `turbo.json` `globalPassThroughEnv`
+  listájában ma nyolc név áll, `EASTER_*` közülük csak az `EASTER_DB_FILE`.
+
+## 6. M-144: a `bun run` munkakönyvtára
+
+**Módszer.** Eldobható workspace `/tmp` alatt, a gyökérben és egy `pkg` csomagban `"w": "pwd"`
+script: `bun run w` a gyökérben, a csomagban, és `bun run --filter p w` a gyökérből.
+
+**Eredmény.** Gyökér: a gyökér könyvtár; csomagban és `--filter` alatt: a csomag könyvtára. A
+szerver `repoRootDirectory` bemenete a `process.cwd()` (`apps/server/src/main.ts:4`), és ebből
+származik az alapértelmezett adatbázis útvonal (`.data/easter-workflow-builder.sqlite`,
+`apps/server/src/startup-sequence/run-startup-sequence.ts:47-50`). Egy `apps/server` csomag
+scriptből indított szerver tehát az `apps/server/.data/` alá nyitná az adatbázist.
+
+## 7. A MiniMax kulcs neve: a leíró és a kód eltérése
+
+- A `minimax` leíró `ANTHROPIC_AUTH_TOKEN` követelménye `process_env_passthrough` forrású
+  (`packages/provider-minimax/src/environment/required-environment.ts:17-25`), a `purpose` szöveg
+  szerint "A MINIMAX_API_KEY process env változó értéke megy Bearer tokenként".
+- A feloldás viszont a követelmény saját NEVÉT olvassa a folyamat környezetéből
+  (`packages/engine/src/provider-environment/resolve-required-environment-value.ts:31`), tehát a
+  szerver környezetében `ANTHROPIC_AUTH_TOKEN` néven kell állnia a kulcsnak; `MINIMAX_API_KEY`
+  néven a lépés `missing_provider_env` hibát adna.
+- A SPEC-000 leíró táblája is a `MINIMAX_API_KEY` névből való átvezetést írja
+  (`docs/spec/SPEC-000-provider-wire-measurement.md:720`).
+- A user munkapéldányának `.env` fájljában (csak a változónevek olvasva, érték nélkül) egyetlen név
+  áll: `MINIMAX_API_KEY`.
+- **A `tools/wire-probe` ugyanezt a nevet olvassa** (`tools/wire-probe/src/harness/environment.ts:13-33`,
+  `src/proxy.ts:39`). **Lezárva (SPEC-012 O-20, user döntés 2026-10-26):** a mérő eszköz is az
+  `ANTHROPIC_AUTH_TOKEN` nevet olvassa, a `.env` fájlban egyetlen név marad; a `tools/wire-probe/**` a
+  lefedettségből kizárt mérő eszköz (`vitest.config.ts:109`). A végrehajtás a PLAN-013 T-013-12 lépése.
+
+## 8. A kapcsolat teszt kimenő opciói
+
+A `testProviderConnection` a `query()` hívásnak kizárólag az `env` mezőt adja
+(`packages/engine/src/engine-port/create-engine.ts:195-198`), a promptja `'ping'` (`:33`): nincs
+`model`, nincs `maxTurns`, nincs `maxBudgetUsd`. Egy valódi kapcsolat teszt tehát a CLI
+alapértelmezett modelljével és korlát nélkül fut; a SPEC-012 valódi próbája ezért alapból nem hívja
+(O-17).
+
+## 9. A költség becslés a két providernél
+
+A `result.total_cost_usd` a `minimax` providernél nem a valós költség, hanem az SDK tartalék
+díjtételével számolt becslés, előfizetésnél listaáras becslés
+(`docs/research/2026-09-23-sdk-koltseg-becsles.md` 1. szekció). Az M-13 triviális prompttal
+`0.213 USD` becsült értéket jelentett (`docs/research/2026-08-26-spec000-kiertekeles.md:783-784`).
+A `maxBudgetUsd` a d.ts szerint akkor állítja meg a futást, ha a keret már túllépve ("The query will
+stop if this budget is exceeded", sdk.d.ts:1727-1730), tehát az első kört nem előzi meg.
+
+## 10. A forrásolt alapértékek (SPEC-012 O-10, user döntés 2026-10-26)
+
+A user döntése: "de akkor keress forrást! legyen default érték beállítva!". Minden változóhoz elsődleges
+forrást kerestem az alapértékre; a keresés eredménye az alábbi táblázat. **Ahol a forrás hiányzott, szám
+nem született** (10.5 ... 10.7); a hat ilyen változót a user második döntése ("webes keresés! mi az
+ajánlás!") a 13. szekció iparági ajánlásaival zárta le, a táblázat ezt tükrözi. A források elérése:
+2026-10-26.
+
+| Változó                                | Alapérték               | Forrás                                                                  | Megerősítések száma |
+| -------------------------------------- | ----------------------- | ----------------------------------------------------------------------- | ------------------- |
+| `EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS` | `15000`                 | 10.1                                                                    | elsődleges plusz 2  |
+| `EASTER_SERVER_PORT`                   | `3001`                  | user termékdöntés (10.2)                                                | belső, user döntés  |
+| `VITE_API_ORIGIN`                      | `http://localhost:5173` | Vite `server.host` és `server.port` alapértéke, user port döntés (10.3) | elsődleges plusz 1  |
+| `VITE_STREAM_ORIGIN`                   | `http://127.0.0.1:3001` | a szerver `127.0.0.1` bind címe a kódban, user port döntés (10.2, 10.4) | belső               |
+| `EASTER_LOG_ROTATION_SIZE`             | `10m`                   | 13.1 (10.5: a `pino-roll` nem ad alapértéket)                           | elsődleges plusz 2  |
+| `EASTER_LOG_ROTATION_FREQUENCY`        | `604800000`             | 13.1 (10.5: a `pino-roll` nem ad alapértéket)                           | elsődleges plusz 2  |
+| `EASTER_LOG_RETAINED_FILE_COUNT`       | `4`                     | 13.1 (10.5: a `pino-roll` nem ad alapértéket)                           | elsődleges plusz 2  |
+| `EASTER_LOG_DIRECTORY`                 | `.data/logs/server`     | user döntés 2026-10-26 (13.1; 10.7: nincs külső forrás)                 | belső, user döntés  |
+| `VITE_LIST_LIMIT`                      | `100`                   | 13.2 (10.6: szabvány nincs)                                             | elsődleges plusz 2  |
+| `VITE_STREAM_REPLAY_LIMIT`             | `100`                   | 13.3 (10.6: szabvány nincs)                                             | elsődleges plusz 2  |
+
+### 10.1 Az SSE életben tartó komment időköze: 15 másodperc
+
+- **Elsődleges:** WHATWG HTML Living Standard, 9.2.7 "Authoring notes" (Last Updated 26 October 2026,
+  <https://html.spec.whatwg.org/multipage/server-sent-events.html>): "Legacy proxy servers are known to,
+  in certain cases, drop HTTP connections after a short timeout. To protect against such proxy servers,
+  authors can include a comment line (one starting with a ':' character) every 15 seconds or so."
+- **Megerősítés 1:** az `axum` `KeepAlive::interval` dokumentációja: "Customize the interval between
+  keep-alive messages. Default is 15 seconds."
+  (<https://docs.rs/axum/latest/axum/response/sse/struct.KeepAlive.html>).
+- **Megerősítés 2:** az `sse-starlette` `EventSourceResponse` `ping` paraméterének alapértéke 15
+  másodperc (`DEFAULT_PING_INTERVAL = 15`, <https://github.com/sysid/sse-starlette/blob/main/sse_starlette/sse.py>,
+  <https://pypi.org/project/sse-starlette/3.6.0/>).
+- **Pontosítás.** A szabvány mondata irányérték ("or so"), nem kötelező szám; a `15000` ezredmásodperc a
+  szabvány szövegének szó szerinti átírása. A SPEC-006 M-13 és M-14 a Node időkorlátairól szól, erre a
+  kérdésre nem felel, ezért a SPEC-006 "nincs forrásunk" állítása a WHATWG szakasz nélkül született.
+  A szabvány a "legacy proxy" esetre ajánlja; hogy a helyi (proxy nélküli) használatban szükséges-e, nem
+  állítjuk.
+
+### 10.2 A szerver portja: 3001
+
+User termékdöntés 2026-09-05 (`.claude/CLAUDE.md` 11. szekció, SPEC-008 3., SPEC-006 O-1). Külső forrás
+nincs, és nem is kell: a döntés maga a forrás.
+
+### 10.3 A Vite dev szerver origin: `http://localhost:5173`
+
+- **Elsődleges:** <https://vite.dev/config/server-options>: `server.host` "Default: `'localhost'`",
+  `server.port` "Default: `5173`".
+- **Megerősítés (a telepített forrás):** `vite@8.2.2`, `dist/node/chunks/node.js:691` (`const
+DEFAULT_DEV_PORT = 5173;`) és `:26727-26729` (`port: DEFAULT_DEV_PORT`, `host: "localhost"`).
+- **Nem ellenőrzött:** a Vite dokumentáció szerint a `localhost` feloldott címe eltérhet attól, amire a
+  böngésző csatlakozik; az `Origin` fejlécet a böngésző a címsorban álló gazdanévből képezi. A literál
+  végső értékét a T-013-7 a futó dev szerveren mért `Origin` fejléccel igazolja.
+
+### 10.4 A szerver bind címe
+
+`apps/server/src/startup-sequence/continue-startup-with-database.ts:74`:
+`server.listen(config.port, '127.0.0.1', ...)`; a SPEC-006 3.5 2. pontja kimondja. A `VITE_STREAM_ORIGIN`
+alapértéke ezért `127.0.0.1`, nem `localhost`: a Node 17 óta a `localhost` feloldási sorrendje a rendszer
+szerinti, és egy csak IPv4 címre kötő szerverhez az IPv6 elsőbbség hibát adhat. Ez utóbbi mondat
+**nem ellenőrzött** ebben a környezetben (a Vite dokumentációja a `dns.setDefaultResultOrder` hatását
+említi, <https://vite.dev/config/server-options> "server.host" megjegyzése); a `127.0.0.1` választás a bind
+címhez igazodik, nem erre a mondatra.
+
+### 10.5 A `pino-roll` nem ad alapértéket a `size`, a `frequency` és a `limit.count` mezőre
+
+- **Elsődleges:** <https://github.com/mcollina/pino-roll/blob/main/README.md>: a `size?`, `frequency?`,
+  `limit?` mező opcionális, "Default:" sor csak az `extension` (`.log`) és a `symlink` (`false`) mellett
+  áll. A README `frequency: 'daily'` értéke a használati példában áll, nem alapérték.
+- **Megerősítés 1:** <https://www.npmjs.com/package/pino-roll> (4.0.0), ugyanaz a README.
+- **Megerősítés 2 (a telepített forrás, `pino-roll@4.0.0`):** `lib/utils.js:11-14` a `parseSize(undefined)`
+  `null`-t ad, `:29-46` a `parseFrequency(undefined)` `null`-t ad, `pino-roll.js:86` a `validateLimitOptions`
+  csak megadott `limit`-et ellenőriz, `:111` (`if (frequencySpec)`) az időalapú ütemezés, `:119` (`if (maxSize)`)
+  a méret figyelés és `:157` (`if (limit)`) a régi fájlok törlése csak megadott értéknél fut. **Elhagyott mező tehát "nincs ilyen szempontú rotáció, nincs törlés"**, szám nélkül.
+- **Mellékes lelet.** A telepített `parseFrequency` (`lib/utils.js:29-46`) csak a `daily`, `hourly` és szám
+  értéket ismeri, a `weekly` értékre kivételt dob; a GitHub `main` README-je már említi a `weekly` értéket
+  (a 4.0.0 npm README nem). A `server-config.ts` doc kommentje a `'weekly'` értéket is felsorolja
+  (`apps/server/src/server-config/server-config.ts`, `readRotationFrequency` fölött): ez a telepített
+  verzióra **nem ellenőrzött**, és a forrás szerint nem igaz. A SPEC-012 nem érinti, jelzés a usernek.
+- **Eredmény:** a `pino-roll` nem ad alapértéket. **Lezárva a 13.1 szekcióban** (user döntés 2026-10-26: iparági ajánlás, forrással).
+
+### 10.6 A lista és a visszajátszás lapmérete: nincs forrás
+
+- **A projekt saját forrásai:** SPEC-005 F-19 és O-2 ("a számot a kliens nevezi meg; a szerverben és a
+  protokollban nincs szállított érték"), SPEC-003 O-2 ("egy valós futás eseményméret eloszlásának mérése"),
+  SPEC-007 O-6. Egyik sem ad számot, a mérés nem készült el.
+- **Szabvány vagy hivatalos ajánlás:** nem találtam olyat, ami lapméretet ír elő. A JSON:API cursor
+  pagination profil kimondja, hogy a szerver választja az alapértelmezett lapméretet
+  (<https://jsonapi.org/profiles/ethanresnick/cursor-pagination/>: "the server MUST choose a 'default page
+  size'"); a Google AIP-158 ugyanezt ("the API chooses an appropriate default, which the API should
+  document", a példában 50, maximum 1000, <https://google.aip.dev/158>); a belgif minta sémája "minimum,
+  maximum and default values should be determined during API design", példa érték 20
+  (<https://github.com/belgif/openapi-common/blob/main/src/test/openapi/Pagination.yaml>). A szervezeti
+  útmutatók eltérő számokat adnak (api.gov.au `limit` 10, <https://api.gov.au/sections/pagination.html>;
+  NationalBankBelgium `limit` 10, <https://github.com/NationalBankBelgium/REST-API-Design-Guide/wiki/Pagination-Rules-and-metadata>).
+  Ezek más szolgáltatások saját döntései, egymásnak ellentmondanak, és nem a mi adatméretünkre szólnak.
+- **Miért nem választunk belőlük:** a `GET /api/workflows` kezelő a `limit` darabszámnál levágja a listát
+  (`apps/server/src/workflow-endpoint/list-workflows.ts:35`), nincs lapozás; egy indoklás nélküli kis szám
+  csendben elrejtene munkafolyamatokat.
+- **Eredmény:** szabvány vagy hivatalos ajánlás nincs. **Lezárva a 13.2 és 13.3 szekcióban** (user döntés 2026-10-26: iparági ajánlás, forrással).
+
+### 10.7 A napló útvonal előtag: nincs külső forrás
+
+A `pino-roll` `file` mezőjének nincs alapértéke (10.5, a README szerint a `file` a kötelező mező). A projekt
+belső precedense az adatbázis fejlesztői alapértéke a gitből kizárt `.data/` alatt (SPEC-003 10.1,
+`packages/db/src/database-file/default-database-file-path.ts`); ez termékdöntés volt, nem külső forrás,
+és a naplóra nem terjed ki. **Lezárva (user döntés 2026-10-26):** `.data/logs/server`, lásd 13.1.
+
+## 11. M-145: a Node `--watch` a szerveren (SPEC-012 O-6)
+
+**Módszer.** A worktree gyökeréből, `env -i` alapon (`PATH`, `HOME`, `EASTER_SERVER_PORT=3012`), ideiglenes
+`s.env` fájllal (`EASTER_SERVER_PORT=3011` és az öt másik kötelező változó, ideiglenes `EASTER_DB_FILE` és
+napló útvonal): `node --watch --env-file-if-exists=<s.env> apps/server/src/main.ts`, háttérben. Utána
+`touch` a `apps/server/src/main.ts`, a `packages/core/src/index.ts` és az `s.env` fájlon (tartalom változás
+nélkül), minden `touch` után 5-6 másodperc várakozás és `GET /api/providers`. Valódi provider hívás nincs.
+
+**Eredmény.**
+
+- A környezetben megadott `EASTER_SERVER_PORT=3012` nyert a fájlbeli `3011` ellen (a `3012` portra
+  `200`, a `3011` portra nincs kapcsolat): a környezet erősebb, mint az `--env-file-if-exists` fájl.
+- Mindhárom `touch` után a Node `Change detected in '<fájl>'` és `Restarting 'apps/server/src/main.ts'`
+  sort írt, és a szerver a következő kérésre ismét `200`-at adott.
+- Tehát a figyelő mód újraindítja a szervert a szerver forrás, egy workspace csomag forrása
+  (`packages/core`, szimbolikus linkelt csomag) **és az env fájl** változására is.
+- **Nem mértem:** mit tesz az újraindítás egy futó lépéssel (a Node `--watch-kill-signal` kapcsolója
+  Stability 1.1; a szerver `SIGTERM` kezelője 3 másodperces leállítási ablakkal fut, SPEC-006 8.2). A
+  figyelő mód ezért fejlesztői kényelem, nem a futó lépések megőrzésének eszköze.
+
+**Források.** <https://nodejs.org/docs/latest-v26.x/api/cli.html> (`--watch`: "By default, watch mode
+will watch the entry point and any required or imported module"; Added in v18.11.0, "Watch mode is now
+stable" v22.0.0); <https://nodejs.org/en/blog/announcements/v22-release-announce> ("From this release Watch
+Mode is considered stable"); <https://github.com/nodejs/node/commit/5a922232da> ("watch: mark as stable",
+Stability 1 -> 2). Az `--env-file-if-exists` leírása: <https://nodejs.org/api/cli.md> ("Behavior is the same
+as `--env-file`, but an error is not thrown if the file does not exist"; "the value from the environment
+takes precedence"). A `--watch` nem kombinálható `--check`, `--eval`, `--interactive` kapcsolóval, fájl
+útvonal argumentum kell (ugyanott).
+
+## 12. A hitelesítési precedencia újraolvasása (SPEC-012 O-2, O-3, O-4)
+
+Újraolvasva 2026-10-26-án (<https://code.claude.com/docs/en/authentication>, "Authentication precedence";
+<https://code.claude.com/docs/en/env-vars>). A 4. szekció sorrendje szó szerint megegyezik. További tények:
+
+- A `CLAUDE_CODE_OAUTH_TOKEN` az 5. szinten áll, a `/login` (7.) fölött, és a lap szerint "This token
+  authenticates with your Claude subscription and requires a Pro, Max, Team, or Enterprise plan", az
+  env-vars lap szerint "OAuth access token for claude.ai authentication. Alternative to /login for SDK and
+  automated environments". Ezért előfizetéses út: a `claude-subscription` providernél **nem tiltott** (O-3).
+- A `CLAUDE_CODE_USE_ANTHROPIC_AWS` ("Use Claude Platform on AWS") és a `CLAUDE_CODE_USE_MANTLE` ("Use the
+  Amazon Bedrock Mantle endpoint") az env-vars lapon provider választóként áll; a **precedencia listában
+  nem szerepelnek**, a rangjuk a `/login` mellett **nem ellenőrzött**. A tiltott listába a leírásuk
+  (provider választó) miatt kerülnek, nem igazolt rang alapján.
+- A `ANTHROPIC_PROFILE` ("Name of the Anthropic profile to authenticate with"), valamint az
+  `ANTHROPIC_FEDERATION_RULE_ID` és az `ANTHROPIC_ORGANIZATION_ID` együtt állítva "federation credentials,
+  which rank above your /login credential" (env-vars lap, és az authentication lap táblázata: "Above").
+- Az `apiKeyHelper` beállítás fájl, nem env változó, tehát a kimenő környezet szűrése nem érinti.
+- Független megerősítés a sorrendre: 4. szekció (llm-gateway-connect, claude-code #39126).
+
+## 13. Iparági alapértékek a hat forrás nélküli változóra (SPEC-012 11.2, user döntés 2026-10-26)
+
+A user döntése: "webes keresés! mi az ajánlás! nehogy már én találjak ki mindent, amikor ezeket az ipar
+már kitalálta!" A 10.5 ... 10.7 szekció azt találta, hogy a `pino-roll` nem ad alapértéket, és a
+lapméretre nincs szabvány. Ez a szekció az iparági bevett gyakorlatot keresi: a nagy rendszerek
+**szállított alapértékét vagy kimondott ajánlását** (nem példaértéket), elsődleges forrással és legalább
+két független megerősítéssel. A keresés Exa eszközzel, a források elérése: 2026-10-26.
+
+**A választás szabálya.** Ahol a források ugyanazt a számot adják, az az érték. Ahol eltérnek, a döntő
+szempont kimondva, és a nem választott érték a táblában marad. Példaérték (például egy `daemon.json`
+minta) nem számít alapértéknek.
+
+### 13.1 Napló forgatás
+
+**A jelöltek, szállított alapértékkel:**
+
+| Rendszer                                | Méret                      | Gyakoriság                             | Megőrzés                                       | Forrás                                                                                                                                                                      |
+| --------------------------------------- | -------------------------- | -------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `logrotate` szállított `logrotate.conf` | nincs                      | `weekly`                               | `rotate 4`                                     | upstream példa: <https://github.com/logrotate/logrotate/blob/master/examples/logrotate.conf>                                                                                |
+| Debian, Ubuntu (a csomag configja)      | nincs                      | `weekly`                               | `rotate 4`                                     | <https://ubuntumanual.org/configuring-log-rotation-of-apache2-and-other-logs/>; <https://askubuntu.com/questions/443232/log-file-rotation-setting>                          |
+| Red Hat Enterprise Linux                | nincs                      | `weekly`                               | `rotate 4`                                     | <https://docs.redhat.com/en/documentation/Red_Hat_Enterprise_Linux/6/html/deployment_guide/s2-log_rotation>; RHEL 4 útmutató: "rotate every week and keep four weeks worth" |
+| Kubernetes `kubelet`                    | `containerLogMaxSize` 10Mi | nincs                                  | `containerLogMaxFiles` 5 (az aktívval együtt)  | <https://kubernetes.io/docs/concepts/cluster-administration/logging/>; <https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/>                            |
+| Docker `local` driver                   | `max-size` 20m             | nincs                                  | `max-file` 5 (az aktívval együtt)              | <https://docs.docker.com/engine/logging/drivers/local/>                                                                                                                     |
+| `pm2-logrotate` (Node)                  | `max_size` 10M             | `rotateInterval` `0 0 * * *` (naponta) | `retain` 30 (forgatott fájl, az aktív mellett) | <https://github.com/keymetrics/pm2-logrotate/blob/master/README.md>; <https://www.npmjs.com/package/pm2-logrotate>                                                          |
+| Spring Boot (Log4j2 rolling policy)     | `max-file-size` 10MB       | nincs megnevezve                       | `max-history` 7                                | <https://docs.spring.io/spring-boot/reference/features/logging.html>                                                                                                        |
+
+**Idézetek (rövid):**
+
+- logrotate példa config: "rotate log files weekly / weekly", "keep 4 weeks worth of backlogs / rotate 4".
+  A RHEL 6 útmutató ugyanezt a két sort mutatja, és kimondja: "rotated log files are kept for four weeks".
+  A `logrotate(8)` oldal a `rotate` direktívára: "Log files are rotated count times before being removed"
+  (<https://manpages.debian.org/bookworm/logrotate/logrotate.8.en.html>), vagyis a `count` a forgatott
+  példányok száma, az aktív fájlon felül.
+- Kubernetes: "`containerLogMaxSize` (default 10Mi) and `containerLogMaxFiles` (default 5)"; a kubelet
+  config referencia: `containerLogMaxFiles` "Defines the maximum number of container log files that can be
+  present for a container ... The default value is 5", `containerLogMaxSize` "The default value is 10Mi".
+- Docker `local`: "`max-size` ... Defaults to 20m", "`max-file` ... The maximum number of log files that can
+  be present ... Defaults to 5"; a lap összegzése: "a 20M default size for each file and a default count of
+  5".
+- `pm2-logrotate`: "`max_size` (Defaults to `10M`)", "`retain` (Defaults to `30` file logs) ... if you have
+  retain = 7 you will have at most 7 rotated logs and your current one", "`rotateInterval` (Defaults to
+  `0 0 * * *` everyday at midnight)".
+- Spring Boot: "`logging.log4j2.rollingpolicy.max-file-size` ... (defaults to 10MB)",
+  "`logging.log4j2.rollingpolicy.max-history` ... (defaults to 7)".
+
+**Megvizsgált, de nem használható jelöltek:**
+
+- Docker `json-file`: `max-size` alapértéke -1 (korlátlan), `max-file` alapértéke 1 és csak `max-size`
+  mellett hat (<https://docs.docker.com/engine/logging/drivers/json-file/>); a `daemon.json` minta
+  `10m` / `3` értéke példa, nem alapérték.
+- `winston-daily-rotate-file`: `maxSize` és `maxFiles` alapértéke `null`, "If not set, no logs will be
+  removed" (<https://github.com/winstonjs/winston-daily-rotate-file/blob/master/README.md>); a
+  `rotating-file-stream` `size`, `interval`, `maxFiles`, `maxSize` alapértéke `null`
+  (<https://www.npmjs.com/package/rotating-file-stream>). Egyik sem ad számot.
+- `systemd-journald`: a határok a fájlrendszer százalékában állnak (`SystemMaxUse` 10 százalék, legfeljebb
+  4G; `MaxFileSec` egy hónap; `SystemMaxFiles` 100), tehát a méretet nem fordítják le egy fájl
+  méretére (<https://www.freedesktop.org/software/systemd/man/latest/journald.conf.html>). A `pino-roll`
+  nem ismeri a hónapot.
+- OWASP Logging Cheat Sheet: nem ad megőrzési számot. A "Disposal of logs" szakasz szerint a naplót nem
+  szabad "destroyed before the duration of the required data retention period", és nem szabad tovább
+  tartani; "Legal, regulatory and contractual obligations may impact on these periods"; a "Verification"
+  szakasz kéri: "Ensure logging cannot be used to deplete system resources, for example by filling up disk
+  space" (<https://github.com/OWASP/CheatSheetSeries/blob/master/cheatsheets/Logging_Cheat_Sheet.md>).
+  Ebből a korlát megléte következik (méret és darabszám), a szám nem.
+- `pino-roll` README és a telepített forrás: nincs alapérték (10.5). Az npm legfrissebb kiadása
+  `4.0.0` (<https://registry.npmjs.org/pino-roll/latest>, 2026-10-26), tehát a GitHub `main` README-jében
+  szereplő `weekly` kiadott verzióban nincs.
+
+**A választás.**
+
+| Változó                          | Érték                                 | Indok                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EASTER_LOG_ROTATION_SIZE`       | `10m`                                 | Három független rendszer szállított alapértéke ugyanaz a 10 mebibájt: kubelet (10Mi), `pm2-logrotate` (10M), Spring Boot (10MB). A `pino-roll` `m` utótagja 1024 négyzet bájt (`lib/utils.js:11-27`, M-146: `parseSize('10m')` = 10485760), azaz pontosan a kubelet 10Mi értéke. A Docker `local` 20m értéke egyetlen forrás, ezért nem döntő.                                                                                                                  |
+| `EASTER_LOG_RETAINED_FILE_COUNT` | `4`                                   | A forgatott példányok száma a `logrotate` `rotate 4` értéke (Debian, Ubuntu, RHEL, upstream), és ugyanaz a kubelet és a Docker `local` "5 fájl az aktívval együtt" értéke is (4 forgatott plusz 1 aktív). A `pino-roll` `limit.count` jelentése is "in addition to the active file" (README), tehát a számok közvetlenül megfelelnek. A `pm2-logrotate` 30 és a Spring 7 értéke egymásnak ellentmond, ezért a darabszámot nem döntik el.                        |
+| `EASTER_LOG_ROTATION_FREQUENCY`  | `604800000` (7 nap ezredmásodpercben) | A rendszer szintű szabvány a `weekly` (három disztribúció és az upstream példa, egyező `rotate 4` mellett). A `pino-roll` `4.0.0` a `weekly` értéket nem ismeri (`lib/utils.js:29-46`, a kiadott README sem), ezért a hét ezredmásodpercben. Az alkalmazás szintű `daily` (`pm2-logrotate`, Spring dátum minta) nem választott: a hozzájuk tartozó darabszám (30, illetve 7) nem egyezik, a `logrotate` és a kubelet viszont a `weekly` mellett egyező 4-et ad. |
+| `EASTER_LOG_DIRECTORY`           | `.data/logs/server`                   | **Nem iparági érték, user döntés 2026-10-26** ("a repo gyökerének `.data/logs/` mappája"). A `.data/` kizárt a gitből (`.gitignore:44`), és a `db` alapértelmezett fájlja is ott áll (`default-database-file-path.ts`). A változó fájl útvonal előtag (M-142): a napló `.data/logs/server.1.log`.                                                                                                                                                               |
+
+**M-146 (saját mérés, 2026-10-26).** A telepített `pino-roll@4.0.0` a választott értékekkel
+(`file: '.data/logs/server'`, `size: '10m'`, `frequency: 604800000`, `mkdir: true`, `limit.count: 4`), üres
+ideiglenes könyvtárban, Node `v26.7.0`. Eredmény: a `.data/logs` könyvtár létrejött (`mkdir: true`), a fájl
+`server.1.log`; `parseSize('10m')` = 10485760 bájt. **A hét határa:** `parseFrequency(604800000)` a hét
+elejét `2026-10-22T00:00:00.000Z`, a következőt `2026-10-29T00:00:00.000Z` értékre számolta; a forrás
+(`lib/utils.js:36-38`, `:56-58`) az időpontot `now - now % frequency` alakban számolja, tehát a határ az
+**Unix epochtól számolt hétszeres többszörös, UTC szerint csütörtök 00:00**, nem hétfő és nem helyi idő.
+A rotáció hetente tehát igaz, de csütörtök éjfélre (UTC) esik. A méret és az idő együtt is él: "Can be
+combined with frequency" (README), bármelyik előbb eléri a határát, forgat. A legrosszabb lemezigény:
+(4 forgatott plusz 1 aktív) szorozva 10 MiB, azaz 50 MiB.
+
+**Lelet, nem módosítottam (javaslat, nem döntés).** A `limit.count` a README szerint alapból csak a
+**jelenlegi folyamat** által létrehozott fájlokra érvényes ("When `false` or `undefined`, the `count`
+limit only applies to files generated by the current process"), a telepített forrásban
+`removeOldFiles` a `createdFileNames` listát törli (`lib/utils.js:205-211`). A
+`buildLogRotationOptions` (`packages/logger/src/log-rotation/build-log-rotation-options.ts`) nem állítja
+a `limit.removeOtherLogFiles` mezőt, tehát egy szerver újraindítás után a korábbi futások fájljai nem
+törlődnek: a darabszám korlát futásonként érvényes, nem a könyvtárra. Ha a korlátnak a könyvtárra kell
+szólnia, a `removeOtherLogFiles: true` mezőt kell beállítani; ez a SPEC-006 döntése, ezért itt nem
+nyúltam hozzá.
+
+### 13.2 `VITE_LIST_LIMIT`: 100
+
+A `GET /api/workflows` kezelő a `limit` darabszámnál levágja a listát, nincs lapozás
+(`apps/server/src/workflow-endpoint/list-workflows.ts:35`); a protokoll `limit` mezője pozitív egész, felső
+korlát nélkül (`packages/protocol/src/workflow/workflow-record.ts:66`, `run/run-record.ts:61`). A web
+a workflow listát és a futás előzményeket ugyanezzel az egy értékkel kéri.
+
+| Rendszer                             | Alapérték        | Felső korlát      | Forrás                                                                                                                                                                                                                    |
+| ------------------------------------ | ---------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stripe `limit`                       | 10               | 100               | <https://docs.stripe.com/api/pagination> ("default is 10", "ranging between 1 and 100")                                                                                                                                   |
+| GitLab `per_page`                    | 20               | 100               | <https://docs.gitlab.com/api/rest/> ("default: `20`, max: `100`")                                                                                                                                                         |
+| Spring Data `size`                   | 20               | 2000              | <https://docs.spring.io/spring-data/commons/reference/repositories/core-extensions-web.html> ("Defaults to 20"); a forrás `DEFAULT_MAX_PAGE_SIZE = 2000`                                                                  |
+| GitHub REST `per_page`               | 30               | 100               | <https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api> ("For most endpoints, the maximum value of `per_page` is `100`"); <https://docs.github.com/en/rest/issues/issues> ("Default: `30`") |
+| Jira Cloud `maxResults`              | 50               | végpontonként más | <https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/>; az Atlassian kimondja, hogy az alapérték és a maximum "not considered part of the API"                                                              |
+| Google AIP-158 `page_size`           | az API választja | az API választja  | <https://google.aip.dev/158> ("the API chooses an appropriate default, which the API should document"); a példában 50 és 1000                                                                                             |
+| Slack `limit` (`conversations.list`) | 100              | 1000 alatt        | <https://docs.slack.dev/reference/methods/conversations.list> ("Default: `100`"); <https://docs.slack.dev/apis/web-api/pagination> ("We recommend `100`-`200` results at a time")                                         |
+
+**Következtetés.** Alapértékre nincs egyetlen iparági szám: a szállított alapértékek 10 és 100 között
+szórnak (10, 20, 20, 30, 50, 100), tehát az "alapérték" nem dönt. Két dolog viszont egyezik:
+
+1. **A felső korlát.** A három legelterjedtebb REST API (GitHub, Stripe, GitLab) mind **100**-nál
+   korlátoz, a Slack alapértéke 100, és kimondott ajánlása "100-200".
+2. **A lapozás hiánya a mi oldalunkon.** A Google AIP-158 hátrányként nevezi meg, hogy egy kis alapértékkel
+   (példa: 50) bevezetett lapozás eltöri azt a klienst, amely mindent vár ("it was getting all resources,
+   and now is only getting the first 50"). A mi kezelőnk csendben levág, tehát minden, a gyűjtemény
+   méreténél kisebb érték sorokat rejt el.
+
+**Választás: 100.** A Slack alapértéke és ajánlásának alsó határa, a GitHub, Stripe és GitLab közös
+felső korlátja, vagyis a legnagyobb érték, amit a legelterjedtebb API-k módosítás nélkül elfogadnak. **Mennyire
+közeli:** ez nem egy "leggyakoribb alapérték" (azok 10 és 50 közt vannak), hanem a közös felső korlát és egy
+dokumentált ajánlás; a lapozás hiánya miatt a nagyobb érték az iparági minta szerinti óvatos irány. **A
+hatása nem szűnik meg:** 100 felett a lista továbbra is csendben levágódik, amit az érték nem old meg,
+csak a lapozás (nem ennek a specnek a hatóköre).
+
+### 13.3 `VITE_STREAM_REPLAY_LIMIT`: 100
+
+**Mit csinál a kódban.** A `replayLimit` a pótlás **lapmérete**, nem plafon: a szerver
+`readEventsSince(runId, kurzor, replayLimit)` hívást ismétel, amíg a lap tele jön vissza
+(`apps/server/src/stream-connection/handle-stream-connection.ts:131-153`), és az élő lecsapolás is így
+lapoz (`:185-198`). A web `fromEventId: 0` értékkel és ezzel a számmal iratkozik fel
+(`apps/web/src/run-view/RunViewScreen.tsx:455`). Egy futás teljes története tehát mindig újrajátszódik,
+a szám csak azt dönti el, hány sor jön egy adatbázis olvasásra. A protokoll mezője pozitív egész, felső
+korlát nélkül (`packages/protocol/src/event-stream/stream-subscription.ts:13`).
+
+**Közvetlenül alkalmazható iparági alapérték nincs.** Amit találtam:
+
+- **SSE hubok újrajátszása.** A Mercure a `Last-Event-ID` után mindent újrajátszik, lapozás nélkül; a Bolt
+  tároló megőrzési határának alapértéke "`size 0` default disables automatic retention limits"
+  (<https://mercure.rocks/docs/concepts/reconnection-and-history>, a specifikáció:
+  <https://mercure.rocks/spec>: "the hub SHOULD send all events published after the one bearing this
+  identifier"). Ez a mi "mindent újrajátszunk" viselkedésünkkel egyezik, de lapméretet nem ad, tehát
+  **számra nem használható**. Más hubot (Nchan, Pusher) nem vizsgáltam.
+- **Eseménynapló lapok, kurzoros olvasás.** Ugyanaz a művelet (időrendi, append-only napló egy lapja),
+  szállított alapértékkel: Slack `conversations.history` `limit` alapértéke 100, maximuma 999, ajánlása
+  "100-200" (<https://docs.slack.dev/reference/methods/conversations.history>,
+  <https://docs.slack.dev/apis/web-api/pagination>); Ably csatorna előzmény `limit` alapértéke 100,
+  maximuma 1000 (<https://ably.com/docs/pub-sub/api/javascript/rest/channel>: "Default: 100. Maximum:
+  1000"); Grafana Loki `query_range` `limit` alapértéke 100 ("The max number of entries to return. It
+  defaults to `100`", <https://grafana.com/docs/loki/latest/reference/loki-http-api>).
+
+**Választás: 100.** Három független, nagy rendszer ugyanazt a számot adja a legközelebbi analóg
+műveletre. **Mennyire közeli:** közepesen. A művelet ugyanaz (egy lap egy időrendi eseménynaplóból, kurzorral),
+a szerep is (sorok száma olvasásonként), de azok a kliens által lapozott REST hívások, a miénk szerver oldali
+ciklus egy SSE csatorna mögött; SSE specifikus lapméret iparági forrásban nem található. Mivel a szám
+nem plafon, a rossz érték nem veszít eseményt, csak olvasások számát változtatja.
+
+### 13.4 Összegzés
+
+| Változó                          | Érték               | Forrás típusa                                                                 | Közelség                                             |
+| -------------------------------- | ------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `EASTER_LOG_ROTATION_SIZE`       | `10m`               | három szállított alapérték (kubelet, pm2-logrotate, Spring)                   | közeli (fájlnapló forgatás)                          |
+| `EASTER_LOG_RETAINED_FILE_COUNT` | `4`                 | `logrotate` `rotate 4` (három disztribúció), kubelet és Docker `local` 5 fájl | közeli                                               |
+| `EASTER_LOG_ROTATION_FREQUENCY`  | `604800000`         | `logrotate` `weekly` (három disztribúció), ezredmásodpercben                  | közeli, a `weekly` név hiánya miatt számként         |
+| `EASTER_LOG_DIRECTORY`           | `.data/logs/server` | user döntés (nem iparági)                                                     | nem értelmezhető                                     |
+| `VITE_LIST_LIMIT`                | `100`               | Slack alapérték és ajánlás, GitHub, Stripe, GitLab közös maximuma             | közepes: közös korlát, nem közös alapérték           |
+| `VITE_STREAM_REPLAY_LIMIT`       | `100`               | Slack, Ably, Loki előzmény alapértéke                                         | közepes: ugyanaz a művelet, de kliens oldali lapozás |
+
+## 14. A PLAN-013 végrehajtása: mérések és eredmények
+
+A szekció a PLAN-013 lépéseinek saját, a végrehajtás közben futtatott méréseit tartalmazza. **Valódi
+provider hívás (MiniMax, Anthropic) egyik lépésben sem történt**; a T-013-10 (a valódi próba) a user
+engedélyére vár.
+
+### 14.1 T-013-1: a kiinduló fej
+
+Kiinduló fej: `b1cf92c` (`feat/spec-012-inditas-es-valodi-proba`, a `origin/main` `cbaff94` fölött). Tiszta
+munkakönyvtár. A kilenc kapu a kiinduló fejen nulla kilépési kóddal futott: `format:check`, `typecheck`
+(`TURBO_CONCURRENCY=1`), `lint` (`bun x turbo run lint --concurrency=1`), `test` (100 százalék mind a
+négy metrikán), `build`, `docs:check`, `check:casing`, `check:graph`, `check:db-drift`.
+
+### 14.2 T-013-2 és T-013-3: a regressziós teszt bukása és a javítás
+
+**A bukás a javítás előtti kódon (T-013-2).** Két új regressziós teszt, a mai (csak a blokk) kimenő `env`
+ellen futtatva (`bun run vitest run`, a `b1cf92c` termékkódján, a teszt `readAll` portot stubol):
+
+- `packages/engine/src/agent-step/run-agent-step.spec.ts`, "a kimenő env a folyamat környezetéből épül:
+  a PATH és a HOME átmegy, a tiltott név nem (SPEC-012 2.1 hiba)": bukott, `AssertionError: expected {} to
+strictly equal { PATH: '/usr/bin', HOME: '/home/teszt' }`; a kapott érték `{}`, tehát a `PATH` és a `HOME`
+  hiányzik.
+- `packages/engine/src/engine-port/create-engine.spec.ts`, `testProviderConnection`, "a kimenő env a lépésével
+  azonos szabállyal épül: a PATH és a HOME átmegy (SPEC-012 2.1 hiba)": bukott, ugyanazzal a `{}` értékkel.
+
+**A javítás (T-013-3).** A `ProcessEnvironmentPort` új `readAll` metódusa; az `apps/server` valódi
+implementációja a `process.env` `undefined` nélküli pillanatképe; a `provider-environment` téma új tiszta
+függvénye, a `buildOutgoingEnvironment` (alap, szűrés, ráírás), amit a `run-agent-step.ts` és a
+`create-engine.ts` kapcsolat teszt ága hív. A két regressziós teszt a javítás után zöld. A `minimax` leíró
+`ANTHROPIC_AUTH_TOKEN` követelményének `purpose` szövege az O-1 szerint átírva.
+
+### 14.3 T-013-4: a tiltott listák
+
+A tiltott listák a SPEC-012 3.2 táblái szerint bővültek (`claude-subscription`: tizenegy név, `minimax`: tizenhárom
+név). Minden új bejegyzés `reason` és nem üres `evidence` mezőt hordoz; az új bizonyíték konstans a
+`RESEARCH_AUTH_PRECEDENCE` (a 4. és 12. szekcióra). Az `ANTHROPIC_AWS` és `MANTLE` bejegyzések `reason`
+szövege a rang "nem ellenőrzött" voltát kimondja. A `CLAUDE_CODE_OAUTH_TOKEN` a `claude-subscription` mellett
+átmegy (O-3). Az őrök: `apps/server/src/provider-outgoing-environment/` (a két valódi leíró, minden név
+tételesen) és `apps/server/src/provider-environment-drift-protection/` (az O-5 szabály mindkét irányban).
+
+### 14.4 T-013-5: a kimenő env értéke nem szivárog, az alfolyamat szintű teszt
+
+**Az értékek nem jutnak eseménybe.** A `create-engine.spec.ts` új tesztje a port csonkban két ismert titok
+értéket ad (a `minimax` kulcsát és egy másik változót), lefuttat egy `start -> agent_step` futást, és a kiadott
+eseményeket (`harness.published`) valamint a tárolt `run_event` sorokat (`readEventsSince`) szövegként keresi;
+egyik érték sem fordul elő. Pozitív kontroll: a futtatóhoz kimenő `env` mindkét értéket tartalmazta. A
+`packages/engine` csomagnak nincs napló portja (`rg logger packages/engine/src` nulla találat), tehát a naplóban
+a motor oldalról nincs mit keresni; a szerver oldali napló maszkolását a `collect-secret-environment-values`
+meglévő tesztjei őrzik.
+
+**Az alfolyamat szintű teszt (M-143 mintája).** Időmérés a teszt megírása előtt: a `claude-subscription` valódi
+leírójából épült kimenő `env` mellett a valódi SDK `query()` hívás hamis CLI végrehajtható ellen ötször futott
+egymás után, hívásonként 26, 17, 17, 17 és 19 ms (a pillanatkép: Node `v26.7.0`, a `process.env` 36 változóval,
+az `ANTHROPIC_API_KEY` beállítva); az alfolyamat 35 nevet kapott, köztük a `PATH`-ot és a `HOME`-ot, az
+`ANTHROPIC_API_KEY` nélkül. A mért idő a teszt korlát (5000 ms) kétszázad része, ezért a teszt elkészült:
+`apps/server/src/provider-outgoing-environment/provider-outgoing-environment-subprocess.spec.ts`; egy teszt
+futása a vitest kimenete szerint 23 ms.
+
+### 14.5 T-013-6: a három script kézi ellenőrzése
+
+Saját mérés 2026-10-26-án, Node `v26.7.0`, Bun `1.4.0`, ideiglenes adatbázissal és naplóval, a szerver a `3011`
+porton (a hat kötelező változót a hívó adta, mert az alapértékek a T-013-7 tárgya), valódi provider hívás nélkül.
+
+- `bun run start:server`: `GET /api/providers` HTTP `200`; a script kimenete "`.env not found. Continuing
+without it.`" (az `--env-file-if-exists` hiányzó fájlnál nem hiba); `SIGINT`-re leáll.
+- `bun run dev:server`: `GET /api/providers` HTTP `200`; az `apps/server/src/main.ts` `touch`-olása után a Node
+  kiírta a "`Restarting 'apps/server/src/main.ts'`" sort, és a szerver újraindulva ismét `200`-at adott. A
+  figyelő mód futó lépéssel való viselkedése továbbra sem mért.
+- `bun run dev:web` (azaz `bun run --filter @easter-workflow-builder/web dev`): a csomag nevére szűrve elindult a
+  Vite (`VITE v8.2.2`, `http://localhost:5173/`). A böngészős ellenőrzés a telepített Chromium headless shell
+  ellen futott (Playwright, `http://localhost:5173/`): a `GET /api/workflows?limit=100` kérés a Vite proxyn át
+  lefutott, a lap a "Workflow-k" listát és az "Még nincs workflow." üres állapotot rajzolta ki, az SSE
+  kapcsolat jelzője "élő" volt.
+
+### 14.6 T-013-7: az alapértékek, a böngésző `Origin` fejléce, a `pino-roll` könyvtár szintű korlátja
+
+- **Alapértékek a kódban.** A szerver oldali `default-server-config.ts` és a web oldali
+  `default-frontend-config.ts` egy-egy csak olvasható objektum; az olvasók a hiányzó vagy üres változóra az
+  alapértéket adják, a megadott érvénytelen értékre hibaágat (`invalid_env_variable`, illetve a "nem pozitív egész
+  szám" hiba). Az e2e `webServer.env` blokkja változatlanul mind a négy `VITE_` változót megadja; ezt a
+  `playwright-web-server-environment` téma őrzi, a hiányzó kulcsra bukó negatív esettel.
+- **A böngésző `Origin` fejléce (saját mérés, 2026-10-26).** A futó Vite dev szerverre (`http://localhost:5173`)
+  headless Chromiummal navigálva, a szerveren `EASTER_STREAM_DEV_ORIGIN=http://localhost:5173` mellett, az SSE
+  (`GET /events`) kérés `Origin` fejléce `http://localhost:5173` volt, és a CORS ellenőrzés átment. A
+  `http://127.0.0.1:5173` cím eltérő origin: arra a szerver nem küld engedélyt, és a kapcsolat CORS hibával
+  elbukik. A `VITE_API_ORIGIN` alapértéke ezért `localhost`, és az `.env.example` `EASTER_STREAM_DEV_ORIGIN`
+  mintaértéke ugyanez. A 10.3 "nem ellenőrzött" jelölése ezzel lezárul az `Origin` fejléc tekintetében.
+- **`removeOtherLogFiles: true`.** A telepített `pino-roll` 4.0.0 `lib/utils.js` `removeOldFiles` függvénye
+  (205-211. sor) a `removeOtherLogFiles` hamis értékénél csak a `createdFileNames` listát (a jelenlegi folyamat
+  fájljait) vágja `count` darabra; igaz értéknél a könyvtár `baseFile` mintájú fájljait olvassa be. A README
+  `limit.removeOtherLogFiles` leírása: "When `true`, will remove files not created by the current process."
+  A `buildLogRotationOptions` ezért mindig igaz értéket ad; védelem: `build-log-rotation-options.spec.ts`.
+- **Az `.env.example` `ANTHROPIC_AUTH_TOKEN` sora kikommentelt.** A szerver `createProcessEnvironmentReader`
+  `read` metódusa `process.env[name] ?? null` alakú, tehát egy üres sztring (`ANTHROPIC_AUTH_TOKEN=`) nem hiányzó,
+  hanem üres értékként jutna a `minimax` provider kulcsába. A minta ezért nem tartalmaz üres hozzárendelést. A
+  függvény doc kommentje a "hiányzó/üres" esetet említi, a kód csak a hiányzót kezeli: lelet, nem módosítottam.
+
+### 14.7 T-013-9: a valódi provider próba eszköze, ellenőrzés valódi provider nélkül
+
+Az eszköz az `apps/server/measurement/` alatt áll (O-12), indítása `bun run probe:real-provider -- <providerId>
+[modelId]` (`node --env-file-if-exists=.env`). **Valódi provider hívás nem történt.** Az ellenőrzés három
+rétegű.
+
+- **Hamis ágenses szerver (a teszt kapun).** A `run-probe.spec.ts` a `stub-agent-server.ts` ellen fut: a
+  valódi `apps/server` HTTP réteg, útvonalak, stream nyilvántartás, motor és fájl adatbázis, kizárólag az
+  `agentQueryRunner` port hamis (a commitolt fixture üzenetsora, a `result` üzenethez hozzáadott szöveggel).
+  A próba a szerver gyermek folyamatot szabad porton, ideiglenes `EASTER_DB_FILE` és `EASTER_LOG_DIRECTORY`
+  mellett indította; a `minimax` futás összegzése: `runStatus: succeeded`, `stepStatus: succeeded`,
+  `resultSubtype: success`, `numTurns: 1`, `outputTextLength` a hamis szöveg hossza. A hamis ágens rögzítette
+  kérése: `maxTurns: 1`, nincs `maxBudgetUsd`, a `model` értéke `MiniMax-M3[1m]` (a leíró
+  `clientModelIdentifier` mezője, M-11, M-29, M-32). A teszt egy futásának ideje 0,54 és 0,60 s között volt
+  (hét teszt, összesen 2,9 s), a 5000 ms-os alapkorlát alatt, ezért időkorlát nem módosult. Hibás ágensre a
+  futás `failed`, az összegzés hibaosztályt hordoz; megszakított jelre a szerver leáll és az ideiglenes
+  könyvtár nem marad vissza; a korán kilépő szerver stderr szövegében a titok `REDACTED`.
+- **Valódi `src/main.ts` szerver, provider nélkül (kézi, 2026-10-26).** `ANTHROPIC_AUTH_TOKEN`,
+  `ANTHROPIC_API_KEY` és `MINIMAX_API_KEY` nélküli környezetben `node
+apps/server/measurement/real-provider-probe.ts minimax`: a szerver elindult, a `GET /api/providers` `200`
+  lett, a beállítás, a workflow és a gráf mentése lefutott, a stream feliratkozás és a futás indítása
+  lefutott, a futás `failed` lett `missing_provider_env` hibaosztállyal. A hiányzó kulcs miatt a motor a
+  `query()` hívás előtt megáll, tehát hálózati hívás nem volt. Kilépési kód 0, az összegzés a kimenet.
+  `SIGINT` a szerver indítása közben: a kimenet "A próba megszakadt: This operation was aborted", kilépési
+  kód 1, ideiglenes könyvtár és gyermek folyamat nem maradt. Érvénytelen provider azonosítóra a használati
+  üzenet és a 2-es kilépési kód jön.
+- **Leletek, amiket a stub elleni futás hozott felszínre.**
+  1. **A `claude-subscription` modell nélkül nem indítható.** A SPEC-012 5.1 táblázata szerint a lépésnek
+     ennél a providernél `modelId` mezője nincs, a motor viszont a három modellt író leírónál a futás
+     indításakor `422 model_not_selected` hibával elutasít. A próba ezért opcionális második argumentumot
+     (`modelId`) fogad; modell nélkül a hiba a próbában látszik, költség nélkül. A modell kiválasztása
+     termékdöntés, nyitott kérdés (a jelentésben).
+  2. **A lépés `output` mezője szöveges kimenetnél üres.** A motor `run-agent-step.ts` fájlja a
+     `structured_output` mezőt adja `output`-ként, ezért a SPEC-012 5.1 4. lépés "kimeneti szöveg hossza"
+     értéke az `sdk_result` esemény payloadjának `result` szövegéből jön (a payload a teljes SDK üzenet,
+     `normalize-sdk-message.ts`).
+- **Titokkezelés.** A kulcs értéke csak a folyamat környezetében van; a hibaüzenetek és a kimenet
+  `maskSecrets` függvényen mennek át; a gyermek szerver stderr-je memóriában gyűlik, lemezre nem kerül; az
+  ideiglenes könyvtár a futás végén törlődik. A commit előtti keresés a kulcs értékére: lásd a PLAN-013
+  T-013-11 lépését.
+
+### 14.8 T-013-11: a SPEC-012 9. kritérium tábla tételes ellenőrzése
+
+A teszt nevek a telepített fák fájljai. Az "kézi" jelölés a 14.5 és a 14.6 szekció saját méréseit jelenti.
+
+| Kritérium | Állapot  | Bizonyíték                                                                                                                                                                                                                                                                                                                                                                    |
+| --------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1         | teljesül | `packages/engine` `build-outgoing-environment.spec.ts`: alap (teljes környezet), szűrés, ráírás, ütközés, hibaág                                                                                                                                                                                                                                                              |
+| 2         | teljesül | `apps/server` `provider-outgoing-environment.spec.ts` (`claude-subscription` tiltott nevek, `CLAUDE_CODE_OAUTH_TOKEN` átmegy) és az alfolyamat szintű `provider-outgoing-environment-subprocess.spec.ts` (`PATH`, `HOME`)                                                                                                                                                     |
+| 3         | teljesül | ugyanott a `minimax` ágak: `ANTHROPIC_BASE_URL` a leíró literálja, a kulcs az `ANTHROPIC_AUTH_TOKEN` értéke, a `PATH` és a `HOME` átmegy, hiányzó kulcsra `missing_provider_env` név nélküli érték nélkül                                                                                                                                                                     |
+| 4         | teljesül | `create-engine.ts` `testProviderConnection` és `run-agent-step.ts` ugyanazt a `buildOutgoingEnvironment` függvényt hívja; `create-engine.spec.ts` "a kimenő env a lépésével azonos szabállyal épül"                                                                                                                                                                           |
+| 5         | teljesül | a regressziós teszt a javítás előtti kódon elbukott (14.2)                                                                                                                                                                                                                                                                                                                    |
+| 6         | teljesül | `provider-outgoing-environment.spec.ts` "a tiltott bejegyzések bizonyíték kényszere (AC6)"                                                                                                                                                                                                                                                                                    |
+| 7         | teljesül | `create-engine.spec.ts` "a kimenő env értékei nem kerülnek sem a kiadott eseményekbe, sem a tárolt run_event sorokba"                                                                                                                                                                                                                                                         |
+| 8         | teljesül | `provider-environment-drift-protection.spec.ts` (mindkét irány, a hiányzó védelmet jelző negatív eset)                                                                                                                                                                                                                                                                        |
+| 9         | teljesül | grep a fán (`node_modules`, `dist`, lefedettségi kimenetek nélkül): a `MINIMAX_API_KEY` csak magyarázó mondatban (`README.md`, `.env.example`, SPEC-000/006/011/012, `tools/wire-probe/CLAUDE.md`), a wire-probe regressziós tesztben (tiltott név állítása) és a `docs/research/` jegyzőkönyveiben, a `PLAN-000` történeti hivatkozásaiban áll; kódban, `turbo.json`-ban nem |
+| 10        | teljesül | `start:server`, `dev:server`, `dev:web` gyökér scriptek, kézi (14.5)                                                                                                                                                                                                                                                                                                          |
+| 11        | teljesül | kézi (14.5, 14.6): a lista betöltött a Vite proxyn át, az SSE jelző "élő", az `Origin` fejléc mérve                                                                                                                                                                                                                                                                           |
+| 12        | teljesül | `.env.example`, `apps/web/.env.example`: titok nincs (az `ANTHROPIC_AUTH_TOKEN` sor kikommentelt), az értékek a 4.2 táblával egyeznek, a megjegyzések forrást neveznek                                                                                                                                                                                                        |
+| 13        | teljesül | `README.md` (T-013-8)                                                                                                                                                                                                                                                                                                                                                         |
+| 14        | teljesül | a kilenc kapu zöld (14.9), az e2e nyolc shardja zöld, a `playwright-web-server-environment.spec.ts` őrzi a négy `VITE_` változót                                                                                                                                                                                                                                              |
+| 15        | teljesül | `server-config.spec.ts` (alapértékek, érvénytelen érték hibaág)                                                                                                                                                                                                                                                                                                               |
+| 16        | teljesül | `read-frontend-config` tesztek, `greppable-invariants.spec.ts` (8) kivétel pozitív és negatív esettel                                                                                                                                                                                                                                                                         |
+| 17        | teljesül | 14.6, mért `Origin` fejléc                                                                                                                                                                                                                                                                                                                                                    |
+| 18        | teljesül | `apps/server/measurement/` (14.7)                                                                                                                                                                                                                                                                                                                                             |
+| 19        | teljesül | a próba nem szerepel a kilenc kapuban és a CI fájlmintáiban; a `run-probe.spec.ts` csak a hamis ágenses szerverrel fut                                                                                                                                                                                                                                                        |
+| 20        | részben  | a kimenet `maskSecrets` függvényen megy (`mask-secrets.spec.ts`); a **kulcs értékére futtatott keresés** a futtató környezetben nem végezhető el, mert a valódi kulcs itt nincs (a hamis teszt érték `hamis-titok-nem-valodi`); a user saját `.env` fájlja a próba futása után keresendő                                                                                      |
+| 21        | nyitva   | a T-013-10 (a valódi futás) a user engedélyére vár; ezen a branchen nem futott                                                                                                                                                                                                                                                                                                |
+| 22, 23    | jelzés   | a SPEC-012 10. szekciója a gazdát és az átvezetés helyét (`feat/spec-009-beallitasok`) kimondja; itt nem változik                                                                                                                                                                                                                                                             |
+| 24        | teljesül | SPEC-004 11.3 10. és 11. sor, `packages/engine` `CLAUDE.md`, szabálykönyv 9. szekció, SPEC-000 leíró tábla sora átvezetve (a 11. szekció átvezetése a T-013-7 commitban); a SPEC-000 és a szabálykönyv 9. szekció egyezik: a maszkolt érték az `ANTHROPIC_AUTH_TOKEN`                                                                                                         |
+
+### 14.9 A merge kapu (2026-10-26)
+
+A kapu a `3a64107` fején futott; az ezt követő egyetlen commit kizárólag ezt a szekciót adja hozzá, ezért a
+`format:check` és a `docs:check` azon is újra lefutott.
+
+- **Kilenc kapu, kilépési kód 0 mindegyikre:** `format:check`, `typecheck` (a turbo gyorsítótárból, a bemenetek
+  azonosak a `c4493ce` utáni futással), `lint` (`bun x turbo run lint --concurrency=1`, 32/32 feladat),
+  `test` (`vitest run --coverage`: 616 tesztfájl, 6452 teszt, 100 százalék mind a négy metrikán),
+  `build`, `docs:check` (20/20), `check:casing`, `check:graph`, `check:db-drift`.
+- **Teljes e2e, nyolc shard**, egymás után, `flock /tmp/playwright-gep.lock` alatt, `--workers=3`, tiszta
+  `e2e/.nyc_output` és `coverage-e2e` mellett: 82, 81, 81, 81, 81, 81, 81, 81 sikeres teszt, összesen 649,
+  mind a nyolc shard kilépési kódja 0.
+- **`bun run coverage:e2e:report`: kilépési kód 0.** A mért érték: utasítás 99,53, ág 99,04, függvény 99,86,
+  sor 99,51 százalék, a küszöbök (99,35, 98,94, 99,73, 99,32) fölött; **a küszöb változatlan**. A fedetlen
+  tételek száma: 10 utasítás, 10 ág, 1 függvény, 10 sor; az alapvonal 14, 11, 2, 14, tehát egyik metrikán
+  sem nőtt (a `read-frontend-config.ts` négy fedetlen sora szándékos: az e2e `webServer.env` mind a négy
+  `VITE_` változót megadja, az alapérték ág unit teszttel fedett).
+- **Nem futott:** a `main` mozgásának ellenőrzése a sandboxban csak névtelen GitHub API lekérdezéssel
+  lehetséges (a `git fetch` SSH kulcs hiányában nem fut): `origin/main` = `cbaff94`, azonos a branch bázisával,
+  tehát bemergelni való nincs. A branch nincs a GitHubon (a push a user dolga), ezért PR és squash merge nem
+  történt.

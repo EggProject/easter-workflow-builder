@@ -31,7 +31,18 @@ interface PassthroughEnvironmentRequirement extends EnvironmentRequirementBase {
 }
 
 /**
- * Env követelmény, a `source` mezőn diszkriminálva. A két ág **nem ugyanazokat
+ * A process env változójából átvezetett követelmény, több elfogadott bemeneti névvel (SPEC-013
+ * 4.4): a `name` a kimenő név és az első helyen olvasott bemeneti név, utána az
+ * `alternativeNames` csökkenő elsőbbséggel. A feloldás az első beállított nevet veszi, a kimenő
+ * környezetbe mindig a `name` kerül.
+ */
+interface AlternativePassthroughEnvironmentRequirement extends EnvironmentRequirementBase {
+  readonly source: 'process_env_alternatives';
+  readonly alternativeNames: readonly [string, ...string[]];
+}
+
+/**
+ * Env követelmény, a `source` mezőn diszkriminálva. Az ágak **nem ugyanazokat
  * a mezőket** hordozza: a `literalValue` kizárólag a `literal` ágon létezik, és
  * ott kötelező. Így a feloldó oldalon (`packages/engine`
  * `resolveRequiredEnvironmentValue`) nem keletkezik olyan ág, ami hiányzó
@@ -39,4 +50,5 @@ interface PassthroughEnvironmentRequirement extends EnvironmentRequirementBase {
  * tiltott, mert típusilag sosem futna, és a 100 százalékos lefedettségi
  * küszöböt sem lehetne teljesíteni rá.
  */
-export type EnvironmentRequirement = LiteralEnvironmentRequirement | PassthroughEnvironmentRequirement;
+export type EnvironmentRequirement =
+  LiteralEnvironmentRequirement | PassthroughEnvironmentRequirement | AlternativePassthroughEnvironmentRequirement;

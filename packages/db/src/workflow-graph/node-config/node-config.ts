@@ -67,17 +67,13 @@ export interface FanOutNodeConfig {
 }
 
 /**
- * A `merge` mód alobjektuma: a bemenő ágak összefűzési szabálya. A SPEC-003
- * 4.3 egyetlen mezőjét sem nevezi meg, ezért a tárolt alak nyitott rekord
- * marad, és a typeguard is csak annyit követel meg, hogy objektum legyen.
- * Mezőt kitalálni tilos, a szabály rögzítése külön termékdöntés.
+ * A `merge` mód: a bemenő ágak kimeneteinek listája, elem sorrendben (SPEC-004
+ * 5.6). Nincs `settings` mezője, mert a SPEC-003 4.3 egyetlen beállítást sem
+ * nevez meg az összefűzési szabályra (user döntés 2026-10-26: a mező kikerült).
  */
-export type JoinMergeSettings = Readonly<Record<string, unknown>>;
-
 export interface JoinMergeNodeConfig {
   readonly type: 'join';
   readonly mode: 'merge';
-  readonly settings: JoinMergeSettings;
   readonly onUnhandledError: UnhandledErrorPolicy | null;
 }
 
@@ -113,8 +109,9 @@ export interface JoinUnselectedNodeConfig {
 }
 
 /**
-Ágak összezárása. Módonként egyetlen alobjektum áll, a `settings` kulcson; a
-választatlan, `mode: null` ágnak nincs `settings` mezője.
+Ágak összezárása. A `script` és az `ai_synthesis` módnál egyetlen alobjektum áll,
+a `settings` kulcson; a `merge` módnak és a választatlan, `mode: null` ágnak nincs
+`settings` mezője.
 */
 export type JoinNodeConfig =
   JoinMergeNodeConfig | JoinScriptNodeConfig | JoinAiSynthesisNodeConfig | JoinUnselectedNodeConfig;

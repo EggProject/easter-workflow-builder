@@ -243,6 +243,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
       retryAttempts: new Map(),
       failRunRequested: false,
       stopRequested: false,
+      stopController: new AbortController(),
     };
 
     return {
@@ -268,6 +269,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
       completion,
       requestStop: (targetStatus) => {
         execution.stopRequested = true;
+        execution.stopController.abort();
         stopTargetStatus ??= targetStatus;
       },
       stopTargetStatus: () => stopTargetStatus,

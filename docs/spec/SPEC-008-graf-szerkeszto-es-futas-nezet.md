@@ -432,12 +432,11 @@ Az utolsó két sor ugyanazt a határvonalat követi, mint a lépés szintjén: 
 
 **A séma írás négy szabálya az új témára is érvényes** (SPEC-005 7.3): minden bejövő objektum `z.strictObject`, nincs `.default()` és nincs `.transform()`, a kimenő alakok `.readonly()`, a tíz ág `z.discriminatedUnion` a `type` mezőn, és `.parse()` sehol nem fut, csak `.safeParse()`.
 
-**Két alak kimondottan nem szűkül**, mert a `db` oldalon sem szűkített, és egy szűkítés a sodródás védelmet azonnal megbuktatná:
+**Egy alak kimondottan nem szűkül**, mert a `db` oldalon sem szűkített, és egy szűkítés a sodródás védelmet azonnal megbuktatná:
 
-| Mező                           | Alak a `db` oldalon                 | Alak a sémában                          |
-| ------------------------------ | ----------------------------------- | --------------------------------------- |
-| `AgentStepConfig.agents`       | `Readonly<Record<string, unknown>>` | `z.record(z.string(), z.unknown())`     |
-| `JoinMergeNodeConfig.settings` | `Readonly<Record<string, unknown>>` | ugyanaz, a `db` saját indoklása szerint |
+| Mező                     | Alak a `db` oldalon                 | Alak a sémában                      |
+| ------------------------ | ----------------------------------- | ----------------------------------- |
+| `AgentStepConfig.agents` | `Readonly<Record<string, unknown>>` | `z.record(z.string(), z.unknown())` |
 
 #### A sodródás védelem, pontosan a meglévő hat minta szerint
 
@@ -1363,7 +1362,7 @@ A keretek és a mockok kizárólag a fixtúrában állnak, mert a szentesített 
 | Egy media queryhez olyan töréspont kellene, ami nincs a tokenek között               | a layout elcsúszik a design systemtől                                                         | a meglévő `media-query-breakpoint-invariant` regressziós teszt, ami az új CSS fájlokra is fut                                          |
 | A dev proxy bevezetése után az SSE is a proxyn menne                                 | a SPEC-005 5.8 döntése sérül, és egy nem mért kockázatot vállalnánk                           | a `streamOrigin` külön konfiguráció (3.3), plusz greppes kritérium, hogy a proxy szabály kulcsa `/api`                                 |
 | A `node-config` séma elcsúszik a `db` `NodeConfig` uniójától                         | a felület olyan alakot fogadna el, amit a szerver elutasít, vagy fordítva                     | a hat meglévő felsorolás mintája szerinti kétirányú sodródás védelem az `apps/server` csomagban, típusszintű és futásidejű ággal (5.3) |
-| A `node-config` séma szűkíti az `agents` vagy a `settings` rekord alakját            | a sodródás védelem azonnal megbukik a `typecheck` kapun                                       | az 5.3 kimondott szabálya: a két rekord alak a `db` oldali alakot veszi át, szűkítés nélkül                                            |
+| A `node-config` séma szűkíti az `agents` rekord alakját                              | a sodródás védelem azonnal megbukik a `typecheck` kapun                                       | az 5.3 kimondott szabálya: a rekord alak a `db` oldali alakot veszi át, szűkítés nélkül                                                |
 | Az `agents` űrlap mentése eldob egy ismeretlen kulcsot                               | csendes adatvesztés egy `Record<string, unknown>` mezőben                                     | az 5.2 ráolvasztó mentés szabálya, plusz unit teszt egy nem megerősített mezőt hordozó bejegyzésre                                     |
 | Az automatikus elrendezés kitalált távolságokkal dolgozik                            | forrás nélküli szám kerül a kódba                                                             | az 5.7: a dagre opciókat nem írjuk felül (M-93), a kártya méret pedig a PLAN-009 saját mérése (M-94)                                   |
 | Az elrendezés a `measured.width` értékből venné a kártya méretet                     | happy-dom alatt sosem futna le, a 100 százalékos küszöb elérhetetlen                          | az 5.7 egyetlen konstansa, plusz a 12.2 greppes invariáns, ami a `graph-auto-layout` témára is fut                                     |
@@ -1525,7 +1524,7 @@ Az utolsó korábbi nyitott tétel, az O-8 (az e2e lefedettségi küszöb új é
 
 ### A lezárt O-1, O-4 és O-6 döntések
 
-58. A `packages/protocol/src/node-config` téma a `workflow_node.config` mind a tíz ágát Zod sémával fedi, `z.discriminatedUnion` alakban a `type` mezőn, és a `WorkflowNodeInput.config` erre a sémára hivatkozik, nem `z.unknown()` értékre. A négy séma írási szabály (SPEC-005 7.3) sértetlen: `z.strictObject`, nincs `.default()` és `.transform()`, a kimenő alakok `.readonly()`, `.parse()` sehol nem fut. Az `AgentStepConfig.agents` és a `JoinMergeNodeConfig.settings` alakja **nem szűkül** a `db` oldali `Record<string, unknown>` alakhoz képest (5.3).
+58. A `packages/protocol/src/node-config` téma a `workflow_node.config` mind a tíz ágát Zod sémával fedi, `z.discriminatedUnion` alakban a `type` mezőn, és a `WorkflowNodeInput.config` erre a sémára hivatkozik, nem `z.unknown()` értékre. A négy séma írási szabály (SPEC-005 7.3) sértetlen: `z.strictObject`, nincs `.default()` és `.transform()`, a kimenő alakok `.readonly()`, `.parse()` sehol nem fut. Az `AgentStepConfig.agents` alakja **nem szűkül** a `db` oldali `Record<string, unknown>` alakhoz képest (5.3); a `JoinMergeNodeConfig.settings` mező 2026-10-26 óta nincs (user döntés).
 59. Az `apps/server` csomag új, megvalósítás nélküli regressziós teszt mappát kap, aminek a neve az, amit őriz, és ami a meglévő `enum-drift-protection` téma öt elemű mintáját követi: típusszintű kétirányú kölcsönös értékadhatóság a `protocol` és a `db` `NodeConfig` alakja között, plusz futásidejű ág mind a tíz ágra a `db` `isNodeConfig` guardján. A védelmet **szándékosan elrontott értékkel futtatott próba** igazolja, ami a `bun run typecheck` kaput megbuktatja (5.3).
 60. Az `agents` mező űrlapja a mérésben két független forrással fedett **tizenhárom** `AgentDefinition` mezőből tizenegyet szerkeszt, a `skills` és az `mcpServers` olvashatóan jelenik meg (szerkesztésük a SPEC-009 hatóköre); a nem megerősített `criticalSystemReminder_EXPERIMENTAL`, `observer` és `observerMessage` mező olvasható, és a panel megnevezi az okot. A mentés **ráolvaszt**, nem cserél: futtatott teszt igazolja, hogy egy ismeretlen kulcsot hordozó bejegyzés a szerkesztés után is megőrzi azt (5.2, M-90).
 61. A gráf szerkesztő elrendezés gombja a `@dagrejs/dagre@3.1.1` könyvtárral számol, tiszta függvényben, `@xyflow/react` import és DOM hivatkozás nélkül; a `rankdir` az egyetlen felülírt opció (`LR`), és a `nodesep`, a `ranksep`, az `edgesep`, a `marginx` és a `marginy` egyetlen sorban sem szerepel a kódban. Greppes teszt igazolja mind az ötöt (5.7, M-93).

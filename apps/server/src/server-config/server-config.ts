@@ -9,13 +9,14 @@ import {
   ENV_STREAM_DEV_ORIGIN,
   ENV_STREAM_KEEP_ALIVE_INTERVAL_MS,
 } from './environment-variable-name.ts';
+import { DEFAULT_SERVER_CONFIG } from './default-server-config.ts';
 
 /**
  * A szerver induláskor beolvasott konfigurációja (SPEC-006 4.2 1. lépés,
- * 9.1 `server-config` téma). Minden mező kötelező, alapérték nélkül,
- * kivéve a `devOrigin`-t (5.7, opcionális: hiányában nincs CORS) és a
- * `logLevel`-t (7.2, hiányában a pino dokumentált `'info'` alapértéke
- * érvényesül).
+ * 9.1 `server-config` téma). Minden mezőnek alapértéke van
+ * (`DEFAULT_SERVER_CONFIG`, SPEC-012 4.2), kivéve a `devOrigin`-t (5.7,
+ * opcionális: hiányában nincs CORS) és a `logLevel`-t (7.2, hiányában a pino
+ * dokumentált `'info'` alapértéke érvényesül).
  */
 export interface ServerConfig {
   readonly port: number;
@@ -28,28 +29,32 @@ export interface ServerConfig {
   readonly streamKeepAliveIntervalMs: number;
 }
 
-function missingVariableMessage(name: string): string {
-  return `A(z) "${name}" kötelező env változó hiányzik vagy üres (missing_env_variable).`;
-}
-
 function invalidVariableMessage(name: string): string {
   return `A(z) "${name}" env változó értéke érvénytelen (invalid_env_variable).`;
 }
 
-function readRequiredString(environment: EnvironmentReader, name: string): Outcome<string> {
+/**
+ * A hiányzó (nincs beállítva, vagy üres) env változó az alapértéket adja; a
+ * megadott értéket trimmelve adja tovább.
+ */
+function readStringOrDefault(environment: EnvironmentReader, name: string, defaultValue: string): string {
   const raw = environment[name];
   if (raw === undefined || raw.trim().length === 0) {
-    return { kind: 'error', message: missingVariableMessage(name) };
+    return defaultValue;
   }
-  return { kind: 'ok', value: raw.trim() };
+  return raw.trim();
 }
 
-function readPositiveInteger(environment: EnvironmentReader, name: string): Outcome<number> {
-  const raw = readRequiredString(environment, name);
-  if (raw.kind === 'error') {
-    return raw;
+function readPositiveIntegerOrDefault(
+  environment: EnvironmentReader,
+  name: string,
+  defaultValue: number,
+): Outcome<number> {
+  const raw = environment[name];
+  if (raw === undefined || raw.trim().length === 0) {
+    return { kind: 'ok', value: defaultValue };
   }
-  const parsed = Number(raw.value);
+  const parsed = Number(raw.trim());
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     return { kind: 'error', message: invalidVariableMessage(name) };
   }
@@ -58,21 +63,16 @@ function readPositiveInteger(environment: EnvironmentReader, name: string): Outc
 
 /**
  * A `pino-roll` `frequency` mezője szám (ezredmásodperc) vagy elnevezett
- * gyakoriság sztring lehet (`'daily'`, `'hourly'`, `'weekly'`). Az env
- * változó mindig sztring, ezért a numerikus alakot itt számmá alakítjuk;
- * a nem numerikus értéket (pl. `'daily'`) változatlanul, sztringként adjuk
- * tovább.
+ * gyakoriság sztring lehet (`'daily'`, `'hourly'`; a `pino-roll` 4.0.0 a
+ * `'weekly'` nevet nem ismeri, research 10.5). Az env változó mindig sztring,
+ * ezért a numerikus alakot itt számmá alakítjuk; a nem numerikus értéket
+ * (pl. `'daily'`) változatlanul, sztringként adjuk tovább. Hiányában az
+ * alapérték (szám) érvényesül.
  */
-function readRotationFrequency(environment: EnvironmentReader, name: string): Outcome<number | string> {
-  const raw = readRequiredString(environment, name);
-  if (raw.kind === 'error') {
-    return raw;
-  }
-  const parsed = Number(raw.value);
-  if (Number.isSafeInteger(parsed) && parsed > 0) {
-    return { kind: 'ok', value: parsed };
-  }
-  return { kind: 'ok', value: raw.value };
+function readRotationFrequency(environment: EnvironmentReader, name: string): number | string {
+  const raw = readStringOrDefault(environment, name, String(DEFAULT_SERVER_CONFIG.logRotationFrequency));
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : raw;
 }
 
 /**
@@ -81,32 +81,25 @@ function readRotationFrequency(environment: EnvironmentReader, name: string): Ou
  * pont): a kódban áll, itt nem szerepel.
  */
 export function readServerConfig(environment: EnvironmentReader): Outcome<ServerConfig> {
-  const port = readPositiveInteger(environment, ENV_SERVER_PORT);
+  const port = readPositiveIntegerOrDefault(environment, ENV_SERVER_PORT, DEFAULT_SERVER_CONFIG.port);
   if (port.kind === 'error') {
     return port;
   }
 
-  const logDirectory = readRequiredString(environment, ENV_LOG_DIRECTORY);
-  if (logDirectory.kind === 'error') {
-    return logDirectory;
-  }
-
-  const logRotationSize = readRequiredString(environment, ENV_LOG_ROTATION_SIZE);
-  if (logRotationSize.kind === 'error') {
-    return logRotationSize;
-  }
-
-  const logRotationFrequency = readRotationFrequency(environment, ENV_LOG_ROTATION_FREQUENCY);
-  if (logRotationFrequency.kind === 'error') {
-    return logRotationFrequency;
-  }
-
-  const logRetainedFileCount = readPositiveInteger(environment, ENV_LOG_RETAINED_FILE_COUNT);
+  const logRetainedFileCount = readPositiveIntegerOrDefault(
+    environment,
+    ENV_LOG_RETAINED_FILE_COUNT,
+    DEFAULT_SERVER_CONFIG.logRetainedFileCount,
+  );
   if (logRetainedFileCount.kind === 'error') {
     return logRetainedFileCount;
   }
 
-  const streamKeepAliveIntervalMs = readPositiveInteger(environment, ENV_STREAM_KEEP_ALIVE_INTERVAL_MS);
+  const streamKeepAliveIntervalMs = readPositiveIntegerOrDefault(
+    environment,
+    ENV_STREAM_KEEP_ALIVE_INTERVAL_MS,
+    DEFAULT_SERVER_CONFIG.streamKeepAliveIntervalMs,
+  );
   if (streamKeepAliveIntervalMs.kind === 'error') {
     return streamKeepAliveIntervalMs;
   }
@@ -118,9 +111,9 @@ export function readServerConfig(environment: EnvironmentReader): Outcome<Server
     kind: 'ok',
     value: {
       port: port.value,
-      logDirectory: logDirectory.value,
-      logRotationSize: logRotationSize.value,
-      logRotationFrequency: logRotationFrequency.value,
+      logDirectory: readStringOrDefault(environment, ENV_LOG_DIRECTORY, DEFAULT_SERVER_CONFIG.logDirectory),
+      logRotationSize: readStringOrDefault(environment, ENV_LOG_ROTATION_SIZE, DEFAULT_SERVER_CONFIG.logRotationSize),
+      logRotationFrequency: readRotationFrequency(environment, ENV_LOG_ROTATION_FREQUENCY),
       logRetainedFileCount: logRetainedFileCount.value,
       streamKeepAliveIntervalMs: streamKeepAliveIntervalMs.value,
       ...(developmentOrigin !== undefined &&

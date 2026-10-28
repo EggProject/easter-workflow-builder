@@ -285,7 +285,6 @@ A hibaágak és üzenetek nem változnak; csak az elfogadott alakok halmaza szű
 | Hely                                | Miért                                                                                                                                      |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `AgentStepConfig.agents`            | `Readonly<Record<string, unknown>>` (`agent-step-config.ts:72`)                                                                            |
-| `JoinMergeNodeConfig.settings`      | `JoinMergeSettings = Readonly<Record<string, unknown>>` (`node-config.ts:75`)                                                              |
 | `StructuredOutputConfig.schema`     | JSON Schema dokumentum, `unknown` (SPEC-003 4.6)                                                                                           |
 | `SandboxConfig` öt nyitott mezője   | `allowUnsandboxedCommands`, `network`, `filesystem`, `ignoreViolations`, `ripgrep`: a kulcs ismert, az érték nyitott (`sandbox-config.ts`) |
 | `sub_workflow.inputMapping` kulcsai | szabad nevű `Record<string, string>`                                                                                                       |
@@ -416,7 +415,7 @@ tehát az összes mező törlése után jön.
 - Az 5.2 szigorítás saját tesztet kap **mindkét oldalon** (a gyökér `CLAUDE.md` 7. szekciója szerint
   minden viselkedés teszttel fedett): a `db` `is-node-config.spec.ts` és `is-agent-step-config.spec.ts`
   fájlja minden típusra és beágyazott objektumra egy ismeretlen kulcsot elutasít; a szabad mezők
-  (`agents`, `JoinMergeNodeConfig.settings`, `schema`, a `SandboxConfig` nyitott mezői, `inputMapping`)
+  (`agents`, `schema`, a `SandboxConfig` nyitott mezői, `inputMapping`)
   tetszőleges kulcsot elfogadnak; a `workflow-repository.spec.ts` a `replaceGraph` és a `readGraph`
   hibaágát valós `:memory:` adatbázison; az `apps/server` `node-config-drift-protection` témája a
   protokoll és a `db` döntésének egyezését. Rontásos igazolás: a szigorítás visszavonására a tesztek

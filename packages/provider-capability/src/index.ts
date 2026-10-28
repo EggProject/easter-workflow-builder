@@ -23,8 +23,27 @@ export {
   DOC_CACHING,
   DOC_STREAMING,
   DOC_VISION,
+  DOC_MINIMAX_ANTHROPIC_API,
+  DOC_MINIMAX_OPENAI_API,
+  DOC_MINIMAX_CHAT_OPENAI,
+  DOC_MINIMAX_TEXT_GENERATION,
+  DOC_MINIMAX_RATE_LIMITS,
+  DOC_MINIMAX_CLAUDE_CODE_M_PLAN,
+  DOC_MINIMAX_CLAUDE_CODE_TOKEN_PLAN,
+  DOC_CLAUDE_CODE_TOOLS_ALT_PROVIDERS,
+  DOC_DIGITALAPPLIED_MINIMAX_FLASH_CLAUDE_CODE,
+  DOC_7MINAI_MINIMAX_M31_FLASH,
+  DOC_WOKEY_MINIMAX_M31_FLASH,
+  DOC_TYPINGMIND_MINIMAX_M31_FLASH,
+  DOC_CLOUDFLARE_MINIMAX_M31_FLASH,
+  DOC_FOUNDERMAG_MINIMAX_M31_FLASH,
 } from './evidence-sources/measurement-document/document-url.ts';
-export { RESEARCH_MINIMAX, RESEARCH_GATEWAY } from './evidence-sources/measurement-document/research-section.ts';
+export {
+  RESEARCH_MINIMAX,
+  RESEARCH_GATEWAY,
+  RESEARCH_AUTH_PRECEDENCE,
+  RESEARCH_MINIMAX_FLASH,
+} from './evidence-sources/measurement-document/research-section.ts';
 export type { MeasurementDocumentAnchor } from './evidence-sources/measurement-document/measurement-document.ts';
 export { measurementDocument } from './evidence-sources/measurement-document/measurement-document.ts';
 
@@ -39,6 +58,7 @@ export type { ModelsEndpointCapability } from './model-catalog/models-endpoint-c
 
 export type { EnvironmentRequirement } from './environment/environment-requirement.ts';
 export type { DisallowedEnvironmentRequirement } from './environment/disallowed-environment-requirement.ts';
+export { acceptedEnvironmentNames } from './environment/accepted-environment-names.ts';
 
 export type { ServerToolDescriptor } from './tool-support/server-tool-descriptor.ts';
 

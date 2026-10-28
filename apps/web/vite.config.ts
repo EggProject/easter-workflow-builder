@@ -16,6 +16,7 @@
 import { API_BASE_PATH } from '@easter-workflow-builder/protocol';
 import { defineConfig, loadEnv } from 'vite';
 import istanbul from 'vite-plugin-istanbul';
+import { DEFAULT_FRONTEND_CONFIG } from './src/frontend-config/default-frontend-config.ts';
 
 // A fejlesztoi proxy dontes (SPEC-008 3. szekcio). A REST hivas a Vite dev
 // szerver sajat originjere megy (VITE_API_ORIGIN), a szerver pedig az
@@ -25,13 +26,19 @@ import istanbul from 'vite-plugin-istanbul';
 // ra) - tehat nem uj env valtozo, hanem a mar letezo kliens config
 // ujrahasznositasa. A `timeout` mezot SZANDEKOSAN nem allitjuk be: az M-79
 // meres szerint nincs ket fuggetlen forras az ertekere (docs/research/
-// 2026-09-05-grafszerkeszto-es-transcript.md 2.4 szekcio).
+// 2026-09-05-grafszerkeszto-es-transcript.md 2.4 szekcio). Az env valtozo
+// hianyaban (nincs beallitva, vagy ures) a cel a kliens config alapertekevel
+// egyezik (SPEC-012 4.2): a literal egyetlen helye a
+// `default-frontend-config.ts`, ez a fajl nem tartalmaz origin literalt.
 export default defineConfig(({ mode }) => {
   const environment = loadEnv(mode, process.cwd(), '');
+  const { VITE_STREAM_ORIGIN: givenStreamOrigin = '' } = environment;
+  const proxyTarget =
+    givenStreamOrigin.trim().length === 0 ? DEFAULT_FRONTEND_CONFIG.streamOrigin : givenStreamOrigin.trim();
   return {
     server: {
       proxy: {
-        [API_BASE_PATH]: environment['VITE_STREAM_ORIGIN'],
+        [API_BASE_PATH]: proxyTarget,
       },
     },
     plugins: [

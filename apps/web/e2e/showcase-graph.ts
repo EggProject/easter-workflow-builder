@@ -116,7 +116,6 @@ const HUMAN_APPROVAL_CONFIG: NodeConfig = {
 const JOIN_CONFIG: NodeConfig = {
   type: 'join',
   mode: 'merge',
-  settings: {},
   onUnhandledError: null,
 };
 

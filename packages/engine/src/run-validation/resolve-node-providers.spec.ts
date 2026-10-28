@@ -96,7 +96,7 @@ describe('resolveNodeProviders', () => {
   });
 
   it('a merge módú join nem hordoz lépés szintű felülírást', () => {
-    const merge: ExecutableNodeConfig = { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' };
+    const merge: ExecutableNodeConfig = { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' };
     const configsById: ReadonlyMap<string, ExecutableNodeConfig> = new Map<string, ExecutableNodeConfig>([
       ['j', merge],
     ]);

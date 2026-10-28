@@ -40,7 +40,12 @@ const twoProvidersFetchFunction: FetchFunction = () =>
   Promise.resolve(
     Response.json([
       { id: 'claude-subscription', displayName: 'Claude előfizetés', models: [], requiredEnvNames: [] },
-      { id: 'minimax', displayName: 'MiniMax', models: ['MiniMax-M3'], requiredEnvNames: ['MINIMAX_API_KEY'] },
+      {
+        id: 'minimax',
+        displayName: 'MiniMax',
+        models: ['MiniMax-M3.1-Flash'],
+        requiredEnvNames: [['ANTHROPIC_BASE_URL'], ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY']],
+      },
     ]),
   );
 
@@ -201,7 +206,9 @@ describe('CreateWorkflowModal', () => {
 
     chooseOption(container, 'Provider', 'MiniMax');
 
-    expect(container.textContent).toContain('Szükséges környezeti változók: MINIMAX_API_KEY');
+    expect(container.textContent).toContain(
+      'Szükséges környezeti változók: ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN vagy ANTHROPIC_API_KEY',
+    );
   });
 
   it('env változót nem igénylő providerre ezt mondja ki, nem hagyja üresen', async () => {

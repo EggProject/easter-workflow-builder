@@ -62,7 +62,7 @@ Gyökér: `docs/measurements/2026-08-26-minimax/`. Mérési esetenként egy alk�
 ### Maszkolás
 
 - Az `authorization` és `x-api-key` headerek értéke `REDACTED`-re cserélődik.
-- A `MINIMAX_API_KEY` env változó értékének minden előfordulása minden rögzített szövegben `REDACTED`-re cserélődik, még a lemezre írás előtt, memóriában.
+- Az `ANTHROPIC_AUTH_TOKEN` env változó (a MiniMax kulcs, a korábbi `MINIMAX_API_KEY` helyett, SPEC-012 O-20 (b)) értékének minden előfordulása minden rögzített szövegben `REDACTED`-re cserélődik, még a lemezre írás előtt, memóriában.
 - Nyers, maszkolatlan artefaktum soha nem íródik lemezre. Nincs `raw/` mentés, amit később törölni kellene.
 - A kulcs csak env változóból jön, a mérési konfigban sem szerepel literálként.
 
@@ -74,7 +74,7 @@ Gyökér: `docs/measurements/2026-08-26-minimax/`. Mérési esetenként egy alk�
 | `meta.json` a beállításokkal                                    | bármi, ami a kulcs értékét tartalmazhatja |
 | `tools/wire-proxy/` forrás                                      | `.env` fájl                               |
 
-`.gitignore` bejegyzés kell a proxy naplójára és a `.env` fájlra. A commit előtt kötelező ellenőrzés: a mérési könyvtárban a `MINIMAX_API_KEY` értékére futtatott keresés nulla találatot ad.
+`.gitignore` bejegyzés kell a proxy naplójára és a `.env` fájlra. A commit előtt kötelező ellenőrzés: a mérési könyvtárban az `ANTHROPIC_AUTH_TOKEN` értékére futtatott keresés nulla találatot ad.
 
 ## 4. Mérési esetek
 
@@ -130,7 +130,7 @@ Options: {
   persistSession: false,
   env: {
     ANTHROPIC_BASE_URL: 'http://127.0.0.1:<port>/anthropic',
-    ANTHROPIC_AUTH_TOKEN: <MINIMAX_API_KEY értéke>,
+    ANTHROPIC_AUTH_TOKEN: <ANTHROPIC_AUTH_TOKEN értéke>,
   },
 }
 prompt: rövid, tool nélkül megválaszolható kérdés
@@ -717,7 +717,7 @@ A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModel
 | `id`, `displayName`                                     | known   | `'minimax'`                                                                                                                            | konfigdöntés               |
 | `sdkVersionPin`                                         | known   | a mérés `meta.json`-jából                                                                                                              | M-01                       |
 | `requiredEnv[ANTHROPIC_BASE_URL]`                       | known   | `literal`, `https://api.minimax.io/anthropic`, `secret: false`                                                                         | research 2. szekció        |
-| `requiredEnv[ANTHROPIC_AUTH_TOKEN]`                     | known   | `process_env_passthrough` a `MINIMAX_API_KEY` névből, `secret: true`                                                                   | research 2. és 3. szekció  |
+| `requiredEnv[ANTHROPIC_AUTH_TOKEN]`                     | known   | `process_env_passthrough` az `ANTHROPIC_AUTH_TOKEN` néven álló szerver env változóból, `secret: true` (SPEC-012 O-1)                   | research 2. és 3. szekció  |
 | `requiredEnv` további elemei                            | unknown | az env kapcsoló mátrix eredményéből áll össze                                                                                          | blokkolja M-08, M-14, M-07 |
 | `disallowedEnv`                                         | known   | `CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING`, `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING`, mindkettő kerülendő custom base URL mellett | research 3. szekció        |
 | `structuredOutput.strategies[emit_output_tool].usable`  | unknown | a `Stop` hook viselkedése MiniMax ellen nem ismert                                                                                     | blokkolja M-10             |
@@ -760,7 +760,7 @@ A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModel
 1. A `tools/wire-proxy/` mérőeszköz egyetlen paranccsal újrafuttatható, és a futás után minden mérési esethez létezik a 3. szekcióban felsorolt fájlkészlet a `docs/measurements/2026-08-26-minimax/M-<n>/` alatt.
 2. Mind a 18 mérési esethez (M-01 ... M-18) létezik legalább egy rögzített HTTP tranzakció, vagy a `meta.json`-ban indoklás, hogy miért nem volt reprodukálható.
 3. A Q1-Q12 táblázat minden sora lezárt: vagy konkrét mérési eset azonosítóval és megfigyeléssel eldöntve, vagy explicit `unknown` státusszal és indoklással. Tippelt lezárás nincs.
-4. A mérési könyvtárban a `MINIMAX_API_KEY` értékére futtatott szöveges keresés nulla találatot ad, és minden rögzített `authorization` és `x-api-key` header értéke `REDACTED`.
+4. A mérési könyvtárban az `ANTHROPIC_AUTH_TOKEN` értékére futtatott szöveges keresés nulla találatot ad, és minden rögzített `authorization` és `x-api-key` header értéke `REDACTED`.
 5. A `.gitignore` kizárja a proxy naplóját és a `.env` fájlt, a maszkolt artefaktumok viszont commitolva vannak.
 6. A `ProviderCapabilityDescriptor` típus szigorú TypeScript beállítással fordul, nincs benne `any`, nincs `as`, a leíró objektum `satisfies` operátorral kapcsolódik.
 7. A `Fact<T>` `known` ága nem üres bizonyítéklistát követel a típusrendszer szintjén, tehát bizonyíték nélküli `known` mező nem fordul le. Ezt egy szándékosan hibás minta fordítási hibája igazolja.

@@ -359,7 +359,7 @@ function openHarness(options: HarnessOptions = {}): Harness {
         return `id-${String(nextId)}`;
       },
     },
-    processEnvironment: { read: () => null },
+    processEnvironment: { read: () => null, readAll: () => ({}) },
   };
   const concurrencyGate = createConcurrencyGate(() => null);
   const supervisor = createRunSupervisor({
@@ -452,7 +452,7 @@ function fanOutNode(
   return nodeOf(id, { type: 'fan_out', itemsExpression, branchLabelTemplate: 'elem', onUnhandledError });
 }
 function joinMergeNode(id: string): WorkflowNodeInput {
-  return nodeOf(id, { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' });
+  return nodeOf(id, { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' });
 }
 function loopNode(id: string, continueExpression: string, maxIterations: number): WorkflowNodeInput {
   return nodeOf(id, { type: 'loop', maxIterations, continueExpression, onUnhandledError: 'fail_run' });

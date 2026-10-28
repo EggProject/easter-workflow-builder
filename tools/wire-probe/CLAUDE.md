@@ -21,14 +21,15 @@ fától teljesen független, a SPEC-001 3. szekció csomagtérképe nem is sorol
 
 ## Fájlok
 
-| Fájl                                  | Tartalom                                                                                   |
-| ------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `package.json`                        | csomag manifeszt: `proxy`/`probe`/`summary`/`typecheck`/`lint` script, nincs `test` script |
-| `tsconfig.json`                       | a `tooling/tsconfig/node.json` kiterjesztése                                               |
-| `src/proxy.ts`                        | a proxy belépési pontja (CLI: `bun run proxy`)                                             |
-| `src/probe.ts`                        | a harness belépési pontja (CLI: `bun run probe <eset...>`)                                 |
-| `src/summary.ts`                      | token-takarékos összefoglaló script (CLI: `bun run summary`)                               |
-| `src/no-shadowed-path-import.spec.ts` | regressziós Vitest teszt, lásd Szabályok                                                   |
+| Fájl                                  | Tartalom                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package.json`                        | csomag manifeszt: `proxy`/`probe`/`summary`/`typecheck`/`lint` script, nincs `test` script                                                                                                                                                                                                                                                                                                                                            |
+| `tsconfig.json`                       | a `tooling/tsconfig/node.json` kiterjesztése                                                                                                                                                                                                                                                                                                                                                                                          |
+| `src/proxy.ts`                        | a proxy belépési pontja (CLI: `bun run proxy`)                                                                                                                                                                                                                                                                                                                                                                                        |
+| `src/probe.ts`                        | a harness belépési pontja (CLI: `bun run probe <eset...>`)                                                                                                                                                                                                                                                                                                                                                                            |
+| `src/summary.ts`                      | token-takarékos összefoglaló script (CLI: `bun run summary`)                                                                                                                                                                                                                                                                                                                                                                          |
+| `src/no-shadowed-path-import.spec.ts` | regressziós Vitest teszt, lásd Szabályok                                                                                                                                                                                                                                                                                                                                                                                              |
+| `src/harness/environment.spec.ts`     | greppes regressziós Vitest teszt: a kulcs az `ANTHROPIC_AUTH_TOKEN` vagy az `ANTHROPIC_API_KEY` néven olvasott (az előbbi nyer, a `minimax-key-names.ts` sorrendje), a proxy és a `meta.json` mindkét név értékét maszkolja, a harness a CLI-nek csak `ANTHROPIC_AUTH_TOKEN` néven adja (az üres érték itt is hiányzónak számít, a szerverrel egyezően), a régi `MINIMAX_API_KEY` név sehol nem áll (SPEC-012 O-20 (b), SPEC-013 4.7) |
 
 Az `src/` alatti három mappa felelőssége:
 
@@ -63,7 +64,7 @@ gráf tagja, de más csomag nem importál innen semmit.
 - Nincs `test` npm script, tehát a mérések (`probe`/`proxy`/`summary`, valós API hívást
   tesznek) nem futnak a Turborepo `test` taskján keresztül CI-ben, és a CI nem is kap
   MiniMax API kulcsot.
-- **Kivétel: `src/no-shadowed-path-import.spec.ts`.** Ez az egyetlen Vitest teszt a
+- **Kivétel: `src/no-shadowed-path-import.spec.ts` és `src/harness/environment.spec.ts`.** Ez a két Vitest teszt a
   csomagban - regressziós teszt egy korábban talált valós bugra (két mérési eset fájlban
   egy helyi `const path = ...` eltakarta a `node:path` importot, temporal dead zone
   `ReferenceError` kockázatával). A gyökér `vitest.config.ts` a
@@ -73,7 +74,7 @@ gráf tagja, de más csomag nem importál innen semmit.
   `package.json`-ban és a `docs/research/2026-08-26-toolchain.md` "Rögzített verziók"
   táblázatában van. Ez a fájl csak a csomag nevére hivatkozik, számra nem: egy
   verzióemelésnél így csak egy helyen kell a számot módosítani.
-- **Futtatás.** Előfeltétel: a `MINIMAX_API_KEY` elérhető a repo gyökér `.env` fájljában,
+- **Futtatás.** Előfeltétel: az `ANTHROPIC_AUTH_TOKEN` vagy az `ANTHROPIC_API_KEY` (ha mindkettő áll, az előbbi nyer) elérhető a repo gyökér `.env` fájljában,
   vagy a `process.env`-ben.
 
   ```bash
@@ -112,10 +113,10 @@ gráf tagja, de más csomag nem importál innen semmit.
 - **Maszkolás.** Az `authorization` és `x-api-key` header értéke hossz- és
   utolsó-4-karakter-megtartó maszkot kap (`maskSecretValue`, `src/proxy/mask.ts`). A
   teljes szerializált tranzakció (és a harness `meta.json`-ja) még egyszer át van fésülve
-  a ténylegesen ismert `MINIMAX_API_KEY` értékre: minden előfordulás `REDACTED`-re
+  a ténylegesen ismert `ANTHROPIC_AUTH_TOKEN` értékre: minden előfordulás `REDACTED`-re
   cserélődik, memóriában, a lemezre írás előtt (`redactKnownSecrets`). Nyers, maszkolatlan
   artefaktum sosem íródik lemezre. Ellenőrzés commit előtt:
-  `grep -r "$MINIMAX_API_KEY" tools/wire-probe/artifacts/` nulla találatot kell adjon.
+  `grep -r "$ANTHROPIC_AUTH_TOKEN" tools/wire-probe/artifacts/` nulla találatot kell adjon.
 - **Ismert, ellenőrzött korlátozás.** A telepített SDK `Options` típusában **nincs**
   közvetlen "max kimenő token" mező. A részletes indoklás és a talált alternatívák
   (`maxTurns`, `maxBudgetUsd`, az alpha `taskBudget`, ami éppen az `output_config` mezőt

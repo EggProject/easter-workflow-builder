@@ -26,6 +26,7 @@ import { URL, fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { TransactionRecorder } from './proxy/recorder.ts';
 import type { StreamEventRecord } from './proxy/types.ts';
+import { MINIMAX_KEY_NAMES } from './harness/minimax-key-names.ts';
 
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 
@@ -36,8 +37,12 @@ const artifactsDirectory = process.env['WIRE_PROBE_ARTIFACTS_DIR'] ?? path.join(
 const upstreamUrl = new URL(upstream);
 const upstreamOrigin = `${upstreamUrl.protocol}//${upstreamUrl.host}`;
 
-const secretEnvironmentValue = process.env['MINIMAX_API_KEY'];
-const recorder = new TransactionRecorder(artifactsDirectory, secretEnvironmentValue ? [secretEnvironmentValue] : []);
+// A kulcs mindkét elfogadott neve alatt álló érték maszkolandó (SPEC-013 4.7).
+const secretEnvironmentValues = MINIMAX_KEY_NAMES.flatMap((name) => {
+  const value = process.env[name];
+  return value ? [value] : [];
+});
+const recorder = new TransactionRecorder(artifactsDirectory, secretEnvironmentValues);
 
 /**
 Node http/https headerobjektumot sík string->string alakra hoz (a value string vagy string[] lehet).

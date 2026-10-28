@@ -277,11 +277,10 @@ describe('NodeConfigSaveSchema: a kötelező szöveg mezők (SPEC-008 5.4, O-21)
     ]);
   });
 
-  it('a join merge mód nyitott settings rekordjának üres szövege nem kötelező mező', () => {
+  it('a join merge módnak nincs kötelező szöveg mezője', () => {
     const config = {
       type: 'join',
       mode: 'merge',
-      settings: { source: '', promptTemplate: '' },
       onUnhandledError: 'fail_run',
     };
 
@@ -334,7 +333,7 @@ const SAVABLE_CONFIG_BY_VARIANT: readonly {
     },
   },
   { variant: 'fan_out', config: { type: 'fan_out', itemsExpression: 'items', branchLabelTemplate: '{{item}}' } },
-  { variant: 'join merge', config: { type: 'join', mode: 'merge', settings: {} } },
+  { variant: 'join merge', config: { type: 'join', mode: 'merge' } },
   {
     variant: 'join script',
     config: { type: 'join', mode: 'script', settings: { source: 'x', runtime: 'expression' } },

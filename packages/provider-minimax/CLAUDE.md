@@ -2,21 +2,22 @@
 
 ## Mi ez a mappa
 
-A `minimax` provider kitöltött, mérési és dokumentációs bizonyítékokkal alátámasztott
-képességleírója. A `packages/providers` csomag szétbontásából jött létre (SPEC-002 5.6
+A `minimax` provider kitöltött, dokumentációs bizonyítékokkal alátámasztott képességleírója a
+`MiniMax-M3.1-Flash` modellre (SPEC-013, a korábbi modell helyére). A `packages/providers` csomag szétbontásából jött létre (SPEC-002 5.6
 szekció). Ide **nem** tartozik a két leíró (`minimax`, `claude-subscription`) összekapcsolása
 egyetlen rekordba: az az `@easter-workflow-builder/provider-registry` feladata.
 
 ## Fájlok
 
-| Mappa              | Felelősség                                                                                                                     |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `descriptor/`      | az összefogó `minimaxProvider` érték, minden mezője a többi téma egy-egy exportjára hivatkozik                                 |
-| `model-catalog/`   | `MiniMaxFamilyId`, `MiniMaxModelId`, `minimaxModels`                                                                           |
-| `environment/`     | `minimaxRequiredEnvironment`, `minimaxDisallowedEnvironment`                                                                   |
-| `tool-support/`    | `minimaxServerTools`                                                                                                           |
-| `limits/`          | `minimaxConcurrency`, `minimaxRateLimits`                                                                                      |
-| `request-shaping/` | `minimaxEffort`, `minimaxThinking`, `minimaxStructuredOutput`, `minimaxToolChoice`, `minimaxStreaming`, `minimaxPromptCaching` |
+| Mappa              | Felelősség                                                                                                                                               |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `descriptor/`      | az összefogó `minimaxProvider` érték, minden mezője a többi téma egy-egy exportjára hivatkozik; a `.spec.ts` a SPEC-013 3.2 táblázatát állítja mezőnként |
+| `measurement-gap/` | `notMeasuredOnFlash`: az előző modellre mért, a Flash-re nem mért mező `unknown` ténye, a megismétlendő mérés azonosítójával                             |
+| `model-catalog/`   | `MiniMaxFamilyId`, `MiniMaxModelId`, `minimaxModels`                                                                                                     |
+| `environment/`     | `minimaxRequiredEnvironment`, `minimaxDisallowedEnvironment`                                                                                             |
+| `tool-support/`    | `minimaxServerTools`                                                                                                                                     |
+| `limits/`          | `minimaxConcurrency`, `minimaxRateLimits`                                                                                                                |
+| `request-shaping/` | `minimaxEffort`, `minimaxThinking`, `minimaxStructuredOutput`, `minimaxToolChoice`, `minimaxStreaming`, `minimaxPromptCaching`                           |
 
 ## Függőségi irány
 
@@ -25,9 +26,12 @@ a bizonyítékok forráskatalógusa mind ott áll), L2 réteg (SPEC-002 4. szekc
 
 ## Szabályok
 
-**Tartalmi változás nincs.** Minden `Fact` `state`, `value` és `evidence` értéke bitre azonos
-maradt a `packages/providers/src/minimax` alatti eredeti tartalommal (SPEC-002 5.6 szekció,
-T-002-9 lépés).
+**Az előző modellre végzett mérés a Flash-re nem vihető át** (SPEC-013 3.2). Egy mező akkor
+`known`, ha egy Flash-re vonatkozó vagy modelltől független hivatalos forrás magát az értéket
+állítja, és két, a MiniMaxtól független forrás megerősíti; minden más mező `unknown`, a `blockedBy`
+mezőben a megismétlendő mérés azonosítójával. Ha nincs mérési eset, ami a mezőt lezárná (a rate limit
+`requestsPerMinute` és `tokensPerMinute`), a `blockedBy` üres, és a `reason` kimondja, hogy független
+forrás hiányzik.
 
 **A mérési próza nem ide tartozik.** A kódban csak stabil azonosító (`M-01` ... `M-36`), doksi
 URL vagy research szekció azonosító marad. A mérés leírása a `docs/research/` alatt van.

@@ -98,7 +98,7 @@ function seedFanOutWorkflow(database: DatabaseContext, itemsExpression: string):
           label: 'j',
           positionX: 0,
           positionY: 0,
-          config: { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' },
+          config: { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' },
         },
       ],
       [edgeOf('e1', 'start', 'fo'), edgeOf('e2', 'fo', 'j')],
@@ -164,6 +164,7 @@ describe('buildEngineDependencies', () => {
     expect(typeof dependencies.eventPublisher.publish).toBe('function');
     expect(typeof dependencies.idGenerator.nextId).toBe('function');
     expect(typeof dependencies.processEnvironment.read).toBe('function');
+    expect(typeof dependencies.processEnvironment.readAll).toBe('function');
   });
 
   it('a bekötött sablon és kifejezés port érvényes sablonra és kifejezésre ok eredményt ad (SPEC-010 3.1)', () => {

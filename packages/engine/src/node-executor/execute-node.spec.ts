@@ -137,7 +137,7 @@ function enginePorts(database: DatabaseContext, published: unknown[], runner: Ag
       sleep: () => Promise.resolve(),
     },
     idGenerator: { nextId: notCalled },
-    processEnvironment: { read: () => null },
+    processEnvironment: { read: () => null, readAll: () => ({}) },
   };
 }
 
@@ -411,7 +411,6 @@ describe('executeNode', () => {
     const request = plainRequest(runId, 'osszefuzes', {
       type: 'join',
       mode: 'merge',
-      settings: {},
       onUnhandledError: 'fail_run',
     });
 
@@ -505,6 +504,7 @@ describe('executeNode', () => {
       },
       failedErrorKind: 'provider_call_failed',
       failedAttempt: 1,
+      stopSignal: new AbortController().signal,
     };
 
     const outcome = settledOrThrow(await executeNode(request, dependenciesOf(database, [])));

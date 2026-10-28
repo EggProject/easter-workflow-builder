@@ -36,8 +36,7 @@ type UnknownRecord = Readonly<Record<string, unknown>>;
 // Az ellenőrzött objektumok zárt kulcslistái (SPEC-011 5.2): minden más kulcs
 // ismeretlen, és a guard elutasítja. A `Record<keyof T, true>` annotáció miatt
 // a fordító hibát ad, ha a típus egy mezővel bővül, de a lista nem. Ami szabad
-// marad: a `join` `merge` módjának `settings` belseje és a `sub_workflow`
-// `inputMapping` kulcsai (mindkettő nyitott rekord a típusban).
+// marad: a `sub_workflow` `inputMapping` kulcsai (nyitott rekord a típusban).
 const START_NODE_CONFIG_KEYS: Readonly<Record<keyof StartNodeConfig, true>> = {
   type: true,
   inputFields: true,
@@ -74,7 +73,6 @@ const FAN_OUT_NODE_CONFIG_KEYS: Readonly<Record<keyof FanOutNodeConfig, true>> =
 const JOIN_MERGE_NODE_CONFIG_KEYS: Readonly<Record<keyof JoinMergeNodeConfig, true>> = {
   type: true,
   mode: true,
-  settings: true,
   onUnhandledError: true,
 };
 
@@ -248,17 +246,16 @@ function isFanOutConfig(value: UnknownRecord): boolean {
 /**
  * A `join` három módja és a választatlan ág. Az `ai_synthesis` alobjektuma
  * pontosan az `AgentStepConfig`, a `script` módé ugyanaz a `ScriptConfig`,
- * mint a `script` node-é, a `merge` módé pedig nyitott alakú rekord (lásd
- * `node-config.ts`). A `mode: null` ágnak nincs `settings` mezője, tehát csak
- * az `onUnhandledError` érvényessége dönt (SPEC-008 5.4, O-33).
+ * mint a `script` node-é. A `merge` módnak és a `mode: null` ágnak nincs
+ * `settings` mezője, tehát náluk csak az `onUnhandledError` érvényessége dönt
+ * (SPEC-008 5.4, O-33).
  */
 function isJoinConfig(value: UnknownRecord): boolean {
   const settings = value['settings'];
   const isOnUnhandledErrorValid = isNullableUnhandledErrorPolicy(value['onUnhandledError']);
   switch (value['mode']) {
     case 'merge': {
-      // A `settings` nyitott rekord (`JoinMergeSettings`): a kulcsai szabadok.
-      return isRecordWithKnownKeys(value, JOIN_MERGE_NODE_CONFIG_KEYS) && isRecord(settings) && isOnUnhandledErrorValid;
+      return isRecordWithKnownKeys(value, JOIN_MERGE_NODE_CONFIG_KEYS) && isOnUnhandledErrorValid;
     }
     case 'script': {
       return (

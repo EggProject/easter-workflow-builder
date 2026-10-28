@@ -194,7 +194,7 @@ describe('validateProviderCapabilities', () => {
 
   it('a merge módú join nem agent lépés, tehát nem ellenőrzött', () => {
     const plans = new Map<string, NodePlan>([
-      ['osszefuzo', planOf({ type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' }, '9.9.9-masik')],
+      ['osszefuzo', planOf({ type: 'join', mode: 'merge', onUnhandledError: 'fail_run' }, '9.9.9-masik')],
     ]);
 
     expect(validateProviderCapabilities(plans, INSTALLED).kind).toBe('ok');

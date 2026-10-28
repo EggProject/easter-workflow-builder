@@ -127,7 +127,7 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   meglévő `enum-drift-protection` téma mintája: megvalósítás nélküli regressziós teszt,
   típusszintű kétirányú kölcsönös értékadhatóság a `typecheck` kapun, plusz futásidejű ág ott,
   ahol a `db` guardot exportál. **Ami a `db` oldalon `Record<string, unknown>`, azt a séma sem
-  szűkíti** (`AgentStepConfig.agents`, `JoinMergeNodeConfig.settings`), különben a védelem
+  szűkíti** (`AgentStepConfig.agents`), különben a védelem
   megbukna. Ez a SPEC-005 egy eredeti döntésének kimondott felülírása (SPEC-005 7.7,
   SPEC-008 5.3, user döntés 2026-09-05).
 - **A `protocol` a motor hibaosztályainak részhalmazát is duplikálhatja, ugyanezzel a
@@ -183,7 +183,7 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   pillanatkép node `config` ellenőrzése közös szabálya; a `protocol` olvasó és mentési sémái
   `z.strictObject` alapúak, tehát a két oldal ugyanarra az ismeretlen kulcs szabályra áll (user döntés
   2026-10-26, SPEC-011 5.2). Szabadon marad, mert a típus nyitott: `AgentStepConfig.agents`,
-  `JoinMergeNodeConfig.settings`, `StructuredOutputConfig.schema`, a `SandboxConfig` öt nyitott
+  `StructuredOutputConfig.schema`, a `SandboxConfig` öt nyitott
   mezőjének értéke, a `sub_workflow.inputMapping` és az `mcpServers` kulcsai. A védelem helye az
   `apps/server` `node-config-drift-protection` témája: a futásidejű ág a tíz típusra, a `join` négy
   ágára és a beágyazott objektumokra egy ismeretlen kulcsot mindkét oldalon elutasít, a szabadon maradó
@@ -516,24 +516,28 @@ CRUD felület**, csak választani lehet közülük: `claude-subscription` (Claud
 globális alapértelmezés, workflow felülírás, lépés felülírás. A provider választó komponens része
 a "Kapcsolat teszt" gomb. Forrás: gyökér `CLAUDE.md`.
 
-**A képesség leíró és a bizonyíték kényszer.** A MiniMax képességei szűkebbek az Anthropicénál:
-nincs strukturált kimenet, a `tool_choice` csak `auto`/`none` lehet, a `thinking` csak
-`adaptive`/`disabled`, az `effort` `output_config`-ként megy ki, amit a MiniMax elutasít. Ezért van
-`ProviderCapabilityDescriptor`. Minden képességmező háromállapotú `Fact<T>` burkolóban
+**A képesség leíró és a bizonyíték kényszer.** A MiniMax képességei eltérnek az Anthropicétól, és
+modellenként mások: a korábbi modellre mért korlátok (strukturált kimenet, `tool_choice`, `effort`) a
+`MiniMax-M3.1-Flash`-re nem vihetők át, a Flash leírójában ezek `unknown` mezők a megismétlendő
+méréssel, a Flash `thinking` módja csak `adaptive` (a `disabled` 400 választ kap), az `effort`
+dokumentáltan elfogadott (SPEC-013 3.2, 3.3). Ezért van `ProviderCapabilityDescriptor`. Minden képességmező háromállapotú `Fact<T>` burkolóban
 áll: vagy `known` egy **nem üres** bizonyítéklistával, vagy `unknown` indoklással és a blokkoló
 mérési eset azonosítójával. A nem üres lista típusszintű követelmény, tehát bizonyíték nélküli
 `known` mező **nem fordul le**. Képességet megtippelni tilos: minden mező mögött mérés vagy
 hivatkozott hivatalos doksi áll, különben `unknown` (SPEC-000 5., gyökér `CLAUDE.md`).
 
-**Hatókör: kizárólag a `MiniMax-M3`.** A többi MiniMax modellt tilos említeni dokumentumban,
-kódban, kommentben és a usernek szóló jelentésben is. Ha egy hivatkozott GitHub issue mégis másik
-modellről szól, a mondat ne nevezze meg a modellt, csak a kockázatot és a saját M3 mérésünk
-eredményét (gyökér `CLAUDE.md`).
+**Hatókör: kizárólag a `MiniMax-M3.1-Flash`** (user döntés 2026-10-27: a `MiniMax-M3` helyére lép,
+SPEC-013). A többi MiniMax modellt tilos említeni dokumentumban, kódban, kommentben és a usernek szóló
+jelentésben is. Kivétel: a `MiniMax-M3` a lecserélt modellként a SPEC-013-ban és a research fájljában,
+valamint történeti tényként a 2026-10-27 előtti research, spec és terv dokumentumokban, a commitolt v1
+pillanatkép fixtúrában és a `tools/wire-probe` mérési eseteiben állhat (SPEC-013 3.6, O-2). Ha egy
+hivatkozott GitHub issue mégis másik modellről szól, a mondat ne nevezze meg a modellt, csak a
+kockázatot és a saját mérésünk eredményét (gyökér `CLAUDE.md`).
 
 **SDK verzió frissítés előtt** a SPEC-000 mérései regresszióként futtatandók (gyökér `CLAUDE.md`).
 
-**Titok kezelés.** A kulcs csak env változóból jön, a mérési configban sem szerepel literálként.
-Az `authorization` és `x-api-key` header maszkolt, a `MINIMAX_API_KEY` értékének minden
+**Titok kezelés.** A kulcs csak env változóból jön, a mérési configban sem szerepel literálként. A megadott `Options.env` az alfolyamat teljes környezete (SPEC-012 2.1, M-143), ezért a lépés és a kapcsolat teszt kimenő környezete a szerver folyamat teljes környezete a provider tiltott neveinek levételével és a kötelező blokk ráírásával; a termék oldali titok az `ANTHROPIC_AUTH_TOKEN` vagy az `ANTHROPIC_API_KEY` néven érkező MiniMax kulcs, ami kifelé mindig `ANTHROPIC_AUTH_TOKEN` néven megy (SPEC-012 3.1, O-1, SPEC-013 4.).
+Az `authorization` és `x-api-key` header maszkolt, a két kulcsnév értékének minden
 előfordulása `REDACTED`-re cserélődik még a lemezre írás előtt, memóriában. Nyers, maszkolatlan
 artefaktum sosem íródik lemezre. Commit előtt kötelező ellenőrzés: a kulcs értékére futtatott
 keresés nulla találatot ad (SPEC-000 3., `tools/wire-probe` CLAUDE.md).
@@ -879,9 +883,16 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   proxyján megy (egyetlen szabály, a `target` a `VITE_STREAM_ORIGIN` env változóból jön, `timeout`
   mező nincs, mert nincs rá két független forrás), az SSE csatorna közvetlenül a backend originre
   kapcsolódik, a proxyt megkerülve; a CORS engedély ezért változatlanul kizárólag a `STREAM_PATH`
-  útvonalra szól. Az `apps/web/src` alatt nincs port szám és origin literál, a `VITE_API_ORIGIN` és
-  a `VITE_STREAM_ORIGIN` kötelező, alapérték nélkül. Védelem: a `greppable-invariants` (8) és (13)
-  (SPEC-008 3., SPEC-006 O-1 és 5.7, SPEC-007 O-4, 14. szekció alább).
+  útvonalra szól. Az `apps/web/src` alatt nincs port szám és origin literál, **egyetlen fájl
+  kivételével**: a `frontend-config/default-frontend-config.ts` a négy `VITE_` változó forrásolt
+  alapértékét hordozza (`VITE_API_ORIGIN` és `VITE_STREAM_ORIGIN` origin literál, `VITE_LIST_LIMIT` és
+  `VITE_STREAM_REPLAY_LIMIT` lapméret), a hiányzó vagy üres változóra ezt adja az olvasó, a megadott
+  érvénytelen lapméretre hibaágat. A `vite.config.ts` a proxy célját onnan importálja, tehát nem
+  tartalmaz literált. Ez a korábbi "kötelező, alapérték nélkül" szabály szűkítése (user döntés
+  2026-10-26, SPEC-012 4.2, a SPEC-007 45. kritériuma szerint). Védelem: a `greppable-invariants` (8)
+  (a kivétel útvonalra szól, pozitív és negatív esettel tesztelt) és (13), a `playwright-web-server-environment`
+  téma (a `webServer.env` mind a négy változót megadja, SPEC-012 4.6; SPEC-008 3., SPEC-006 O-1 és
+  5.7, SPEC-007 O-4, 14. szekció alább).
 - **Az elrendezés kártya méret konstansának egyetlen forrás szabálya.** A gráf szerkesztő
   csomópont kártyájának mérete (a `@dagrejs/dagre` elrendezés bemenete) egyetlen, mért
   konstansként áll a `graph-node-catalog` témában, amit a kártya CSS-e egy custom propertyn át

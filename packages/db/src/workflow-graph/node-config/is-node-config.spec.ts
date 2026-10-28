@@ -50,7 +50,7 @@ const validConfigs: readonly NodeConfig[] = [
     branchLabelTemplate: '{{item}}',
     onUnhandledError: 'fail_run',
   },
-  { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_branch' },
+  { type: 'join', mode: 'merge', onUnhandledError: 'fail_branch' },
   {
     type: 'join',
     mode: 'script',
@@ -174,13 +174,9 @@ describe('isNodeConfig', () => {
       'join: választatlan mód onUnhandledError érvénytelen',
       { type: 'join', mode: null, onUnhandledError: 'unknown_policy' },
     ],
-    ['join: merge alobjektum nem rekord', { type: 'join', mode: 'merge', settings: 'first' }],
     ['join: script alobjektum hibás', { type: 'join', mode: 'script', settings: { source: 'a', runtime: 'js' } }],
     ['join: ai_synthesis alobjektum hibás', { type: 'join', mode: 'ai_synthesis', settings: { promptTemplate: 7 } }],
-    [
-      'join: merge onUnhandledError érvénytelen',
-      { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'unknown_policy' },
-    ],
+    ['join: merge onUnhandledError érvénytelen', { type: 'join', mode: 'merge', onUnhandledError: 'unknown_policy' }],
     [
       'join: script onUnhandledError érvénytelen (isScriptConfig önmagában nem ellenőrzi)',
       {
@@ -336,6 +332,7 @@ describe('isNodeConfig', () => {
       },
     ],
     ['a választatlan join settings kulccsal', { type: 'join', mode: null, settings: {}, onUnhandledError: null }],
+    ['a join merge módja settings kulccsal', { type: 'join', mode: 'merge', settings: {}, onUnhandledError: null }],
   ];
 
   for (const [description, config] of nestedUnknownKeyCases) {
@@ -344,15 +341,7 @@ describe('isNodeConfig', () => {
     });
   }
 
-  it('a szabad mezők kulcsai tetszőlegesek: a join merge settings és a sub_workflow inputMapping', () => {
-    expect(
-      isNodeConfig({
-        type: 'join',
-        mode: 'merge',
-        settings: { [UNKNOWN_KEY]: { melyen: [1] }, masik: 'x' },
-        onUnhandledError: null,
-      }),
-    ).toBe(true);
+  it('a szabad mező kulcsai tetszőlegesek: a sub_workflow inputMapping', () => {
     expect(
       isNodeConfig({
         type: 'sub_workflow',

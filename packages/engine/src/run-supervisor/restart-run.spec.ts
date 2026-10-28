@@ -270,7 +270,7 @@ function createTrivialSupervisor(database: DatabaseContext): RunSupervisor {
     eventPublisher: { publish: () => {} },
     clock: { nowMs: () => 0, sleep: () => Promise.resolve() },
     idGenerator: { nextId: () => 'id-1' },
-    processEnvironment: { read: () => null },
+    processEnvironment: { read: () => null, readAll: () => ({}) },
   };
   return createRunSupervisor({
     ports,

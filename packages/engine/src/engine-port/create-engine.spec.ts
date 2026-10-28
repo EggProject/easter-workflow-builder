@@ -381,6 +381,7 @@ interface HarnessOptions {
   readonly processEnvironment?: EngineDependencies['processEnvironment'];
   readonly expressionEvaluator?: EngineDependencies['expressionEvaluator'];
   readonly templateRenderer?: EngineDependencies['templateRenderer'];
+  readonly clock?: EngineDependencies['clock'];
 }
 
 interface Harness {
@@ -412,23 +413,25 @@ function openHarness(options: HarnessOptions = {}): Harness {
       compile: () => ({ kind: 'ok', value: undefined }),
     },
     eventPublisher: publisher,
-    clock: (() => {
-      let now = 0;
-      return {
-        nowMs: () => {
-          now += 1;
-          return now;
-        },
-        sleep: () => Promise.resolve(),
-      };
-    })(),
+    clock:
+      options.clock ??
+      (() => {
+        let now = 0;
+        return {
+          nowMs: () => {
+            now += 1;
+            return now;
+          },
+          sleep: () => Promise.resolve(),
+        };
+      })(),
     idGenerator: {
       nextId: () => {
         nextId += 1;
         return `id-${String(nextId)}`;
       },
     },
-    processEnvironment: options.processEnvironment ?? { read: () => null },
+    processEnvironment: options.processEnvironment ?? { read: () => null, readAll: () => ({}) },
   };
   return { database, dependencies, engine: createEngine(dependencies), published };
 }
@@ -485,6 +488,43 @@ function approvalNode(id: string, timeoutMs: number | null): WorkflowNodeInput {
     timeoutMs,
     onUnhandledError: 'fail_run',
   });
+}
+
+function errorHandlerNode(id: string, maxAttempts: number, backoffMs: readonly number[]): WorkflowNodeInput {
+  return nodeOf(id, {
+    type: 'error_handler',
+    maxAttempts,
+    backoffMs,
+    handledErrorKinds: [],
+    onUnhandledError: 'fail_run',
+  });
+}
+
+/**
+ * A valódi óra viselkedése (`apps/server` `create-system-clock.ts`): a
+ * `sleep` addig tart, amíg a jel meg nem szakad, akkor elutasít. A `sleepMs`
+ * a hívások várakozási idejét rögzíti.
+ */
+function abortableClock(): { readonly clock: EngineDependencies['clock']; readonly sleepMs: number[] } {
+  let now = 0;
+  const sleepMs: number[] = [];
+  return {
+    clock: {
+      nowMs: () => {
+        now += 1;
+        return now;
+      },
+      sleep: (ms, signal) => {
+        sleepMs.push(ms);
+        return new Promise<void>((_resolve, reject) => {
+          signal.addEventListener('abort', () => {
+            reject(new Error('megszakítva'));
+          });
+        });
+      },
+    },
+    sleepMs,
+  };
 }
 
 function createWorkflow(
@@ -900,6 +940,30 @@ function shapeBNodes(outerExpression: string): readonly WorkflowNodeInput[] {
   ];
 }
 
+// Az `a1` agent lépés elbukik, az `on_error` élen álló `error_handler` egy
+// óra hosszú backoffra áll: ennyit a teszt sosem vár ki, a futásnak a
+// megszakítás jelére kell lezárulnia.
+async function startWaitingErrorHandler(): Promise<{
+  readonly harness: Harness;
+  readonly runId: string;
+  readonly sleepMs: readonly number[];
+}> {
+  const scripted = scriptedRunner(['fails_when_released']);
+  const waiting = abortableClock();
+  const harness = openHarness({ agentQueryRunner: scripted.runner, clock: waiting.clock });
+  const workflowId = createWorkflow(
+    harness.database,
+    'eh-varakozas',
+    [startNode('start'), agentNode('a1', 'hibas'), errorHandlerNode('eh', 2, [3_600_000]), agentNode('a2', 'jo')],
+    [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'a1', 'eh', 'on_error'), edgeOf('e3', 'a1', 'a2')],
+  );
+  const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+  await waitForStepRunning(harness.database, started.run.id, 'a1');
+  scripted.releaseFailure();
+  await waitForStepRunning(harness.database, started.run.id, 'eh');
+  return { harness, runId: started.run.id, sleepMs: waiting.sleepMs };
+}
+
 describe('createEngine', () => {
   it('VÉGPONTTÓL VÉGPONTIG: startRun egy egyszerű start -> agent_step gráfon succeeded futást ad', async () => {
     const harness = openHarness();
@@ -918,6 +982,65 @@ describe('createEngine', () => {
       'start',
       'a1',
     ]);
+  });
+
+  it('a kimenő env értékei nem kerülnek sem a kiadott eseményekbe, sem a tárolt run_event sorokba (SPEC-012 3.3, AC7)', async () => {
+    const providerSecret = 'TITKOS-SZOLGALTATOI-KULCS-7f3a';
+    const otherSecret = 'TITKOS-MASIK-VALTOZO-91bc';
+    let outgoingEnvironment: unknown;
+    const harness = openHarness({
+      processEnvironment: {
+        read: (name) => (name === 'ANTHROPIC_AUTH_TOKEN' ? providerSecret : null),
+        readAll: () => ({ PATH: '/usr/bin', ANTHROPIC_AUTH_TOKEN: providerSecret, MASIK_TITOK: otherSecret }),
+      },
+      descriptorLookup: (id) =>
+        descriptorOf(id, {
+          requiredEnv: [
+            {
+              name: 'ANTHROPIC_AUTH_TOKEN',
+              source: 'process_env_passthrough',
+              secret: true,
+              purpose: 'teszt',
+              evidence: [{ kind: 'measurement', id: 'M-01' }],
+            },
+          ],
+        }),
+      agentQueryRunner: {
+        run: (request) => {
+          outgoingEnvironment = request.options['env'];
+          return {
+            kind: 'ok',
+            value: { messages: messageIterable(successMessages(1)), interrupt: () => Promise.resolve() },
+          };
+        },
+      },
+    });
+    const workflowId = createWorkflow(
+      harness.database,
+      'env-titok',
+      [startNode('start'), agentNode('a1', 'sikeres')],
+      [edgeOf('e1', 'start', 'a1')],
+    );
+
+    const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+    const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+    // Pozitív kontroll: a titok tényleg kiment a runnernek, a kereső tehát nem vak.
+    expect(status).toBe('succeeded');
+    expect(outgoingEnvironment).toStrictEqual({
+      PATH: '/usr/bin',
+      ANTHROPIC_AUTH_TOKEN: providerSecret,
+      MASIK_TITOK: otherSecret,
+    });
+
+    const publishedText = JSON.stringify(harness.published);
+    const storedText = JSON.stringify(okOrThrow(harness.database.events.readEventsSince(started.run.id, 0, 1000)));
+    expect(publishedText.length).toBeGreaterThan(0);
+    expect(storedText.length).toBeGreaterThan(0);
+    for (const text of [publishedText, storedText]) {
+      expect(text).not.toContain(providerSecret);
+      expect(text).not.toContain(otherSecret);
+    }
   });
 
   describe('decideApproval', () => {
@@ -1054,6 +1177,26 @@ describe('createEngine', () => {
 
       expect(outcome.succeeded).toBe(false);
       expect(outcome.errorMessage).toContain('missing_provider_env');
+    });
+
+    it('a kimenő env a lépésével azonos szabállyal épül: a PATH és a HOME átmegy (SPEC-012 2.1 hiba)', async () => {
+      let capturedOptions: Readonly<Record<string, unknown>> | undefined;
+      const harness = openHarness({
+        agentQueryRunner: {
+          run: (request) => {
+            capturedOptions = request.options;
+            return {
+              kind: 'ok',
+              value: agentQueryOf(messageIterable([{ type: 'result', subtype: 'success' }])),
+            };
+          },
+        },
+        processEnvironment: { read: () => null, readAll: () => ({ PATH: '/usr/bin', HOME: '/home/teszt' }) },
+      });
+
+      okOrThrow(await harness.engine.testProviderConnection('minimax'));
+
+      expect(capturedOptions?.['env']).toStrictEqual({ PATH: '/usr/bin', HOME: '/home/teszt' });
     });
 
     it('az agentQueryRunner.run hibaágát succeeded: false eredménnyé alakítja', async () => {
@@ -2170,6 +2313,38 @@ describe('createEngine', () => {
       for (const runId of runIds) {
         expect(findRunFinishedStatus(harness.published, runId)).toBe('cancelled');
       }
+    });
+  });
+
+  describe('error_handler várakozása: megszakítás és szabályos leállás (SPEC-004 8.2 3. pont, 9., 10.2, user döntés 2026-10-26)', () => {
+    it('REGRESSZIÓ: a felhasználói megszakítás a backoff várakozás kivárása nélkül zár: a futás és a kezelő lépése cancelled', async () => {
+      const { harness, runId, sleepMs } = await startWaitingErrorHandler();
+
+      const interrupting = harness.engine.interruptRun(runId);
+      // A javítás előtt a várakozás jele sosem szakadt meg, a futás a backoff
+      // végéig `running` maradt.
+      const status = await waitForRunStatus(harness.database, runId, TERMINAL_RUN_STATUSES);
+      const summary = okOrThrow(await interrupting);
+
+      expect(status).toBe('cancelled');
+      expect(sleepMs).toStrictEqual([3_600_000]);
+      expect(summary.cancelledRunIds).toStrictEqual([runId]);
+      const rows = okOrThrow(harness.database.stepRuns.listStepRuns(runId));
+      expect(rows.find((row) => row.nodeId === 'eh')?.status).toBe('cancelled');
+      expect(rows.some((row) => row.nodeId === 'a1' && row.attempt === 2)).toBe(false);
+    });
+
+    it('REGRESSZIÓ: a szabályos leállás a backoff várakozás kivárása nélkül zár: a futás és a kezelő lépése interrupted', async () => {
+      const { harness, runId } = await startWaitingErrorHandler();
+
+      const shuttingDown = harness.engine.shutdown();
+      const status = await waitForRunStatus(harness.database, runId, TERMINAL_RUN_STATUSES);
+      const summary = okOrThrow(await shuttingDown);
+
+      expect(status).toBe('interrupted');
+      expect(summary.interruptedRunCount).toBe(1);
+      const rows = okOrThrow(harness.database.stepRuns.listStepRuns(runId));
+      expect(rows.find((row) => row.nodeId === 'eh')?.status).toBe('interrupted');
     });
   });
 

@@ -75,15 +75,8 @@ describe('findBlankRequiredTextField', () => {
     ).toBe('settings.promptTemplate');
   });
 
-  it('a join merge módjának nyitott settings rekordjában nincs kötelező mező', () => {
-    expect(
-      findBlankRequiredTextField({
-        type: 'join',
-        mode: 'merge',
-        settings: { source: '', promptTemplate: '' },
-        onUnhandledError: null,
-      }),
-    ).toBeUndefined();
+  it('a join merge módnak nincs kötelező szöveg mezője', () => {
+    expect(findBlankRequiredTextField({ type: 'join', mode: 'merge', onUnhandledError: null })).toBeUndefined();
   });
 
   it('a választatlan join (mode: null) átmegy: kötelező szöveg mezője nincs (SPEC-008 O-33)', () => {

@@ -493,6 +493,7 @@ function buildRequest(
       config,
       failedErrorKind: failure.errorKind,
       failedAttempt: failure.attempt,
+      stopSignal: execution.stopController.signal,
     },
   };
 }

@@ -101,7 +101,6 @@ export { validateErrorHandlerEdges } from './run-validation/validate-error-handl
 // `insufficient_backoff_list`, PLAN-005 T-005-24).
 export { validateErrorHandlerBackoff } from './run-validation/validate-error-handler-backoff.ts';
 export { validateUnhandledErrorPolicy } from './run-validation/validate-unhandled-error-policy.ts';
-export { validateJoinMergeSettings } from './run-validation/validate-join-merge-settings.ts';
 export { validateReservedBranchKeys } from './run-validation/validate-reserved-branch-keys.ts';
 export { resolveNodeProviders } from './run-validation/resolve-node-providers.ts';
 
@@ -140,6 +139,7 @@ export { validateSdkVersionMatch } from './capability-policy/validate-sdk-versio
 // `requiredEnv` és a `disallowedEnv` feldolgozása a `processEnvironment`
 // porton át, a lépés kimenő `Options.env` blokkjának összeállítása
 // (PLAN-005 T-005-14).
+export { buildOutgoingEnvironment } from './provider-environment/build-outgoing-environment.ts';
 export { buildProviderEnvironmentBlock } from './provider-environment/build-provider-environment-block.ts';
 export { resolveRequiredEnvironmentValue } from './provider-environment/resolve-required-environment-value.ts';
 
@@ -200,6 +200,7 @@ export type { SessionBearingInstance } from './agent-step/session-bearing-instan
 export type { SessionSourceNodes } from './agent-step/session-source-nodes.ts';
 export type { SessionBinding } from './agent-step/session-binding.ts';
 export type { AgentStepOptions } from './agent-step/agent-step-options.ts';
+export type { SdkThinkingConfig } from './agent-step/sdk-thinking-config.ts';
 export type { AgentStepCapabilityDecisions } from './agent-step/agent-step-capability-decisions.ts';
 export type { AgentStepOutcome } from './agent-step/agent-step-outcome.ts';
 export type { AgentStepExecution } from './agent-step/agent-step-execution.ts';

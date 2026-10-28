@@ -83,7 +83,7 @@ const FAN_OUT_CONFIG = {
   branchLabelTemplate: 'elem',
   onUnhandledError: 'fail_run',
 };
-const JOIN_MERGE_CONFIG = { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' };
+const JOIN_MERGE_CONFIG = { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' };
 const HUMAN_APPROVAL_CONFIG = {
   type: 'human_approval',
   title: 'Jóváhagyás',
@@ -495,16 +495,12 @@ describe('validateRun, a SPEC-004 4.7 táblázat tíz ellenőrzése', () => {
     });
   });
 
-  it('nem üres merge settings rekordra unsupported_join_merge_setting', () => {
-    const nodes = replacingNode(
-      baseNodes(),
-      node('j', 'join', { ...JOIN_MERGE_CONFIG, settings: { strategy: 'concat' } }),
-    );
+  it('REGRESSZIÓ: a merge módú join settings kulccsal malformed_node_config (a mező kikerült, user döntés 2026-10-26)', () => {
+    const nodes = replacingNode(baseNodes(), node('j', 'join', { ...JOIN_MERGE_CONFIG, settings: {} }));
 
     expect(validateBase(nodes)).toStrictEqual({
       kind: 'error',
-      message:
-        'A(z) j join node merge módja ismeretlen beállítási kulcsot hordoz: strategy (unsupported_join_merge_setting).',
+      message: 'A(z) j node configja nem érvényes node config (malformed_node_config).',
     });
   });
 });

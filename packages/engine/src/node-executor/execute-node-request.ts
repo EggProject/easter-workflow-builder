@@ -50,8 +50,10 @@ interface ExecuteNodeCommonFields {
  * **Miért van egyáltalán diszkrimináns a `config.type` mellett.** Az
  * `error_handler` node az egyetlen, aminek a végrehajtásához a node
  * configján és a példány adatain kívül a **hibát adó másik lépés** két adata
- * is kell (`failedErrorKind`, `failedAttempt`, SPEC-004 8.2 bevezető). Ha ez
- * a két mező a közös részben állna, opcionális lenne, és a diszpécser
+ * is kell (`failedErrorKind`, `failedAttempt`, SPEC-004 8.2 bevezető), és a
+ * futás leállításának jele (`stopSignal`), amin a backoff várakozása megszakad
+ * (9. szekció). Ha ez
+ * a három mező a közös részben állna, opcionális lenne, és a diszpécser
  * `error_handler` ágának egy olyan hiányzó-érték ágat kellene kezelnie, ami a
  * hívási szerződés szerint sosem fordul elő. A TypeScript viszont **nem szűkít beágyazott diszkriminánsra**
  * (`request.config.type` a `request` unióját nem szűkíti, a fordító
@@ -74,4 +76,5 @@ export type ExecuteNodeRequest =
       readonly config: ErrorHandlerNodeConfig;
       readonly failedErrorKind: EngineErrorKind;
       readonly failedAttempt: number;
+      readonly stopSignal: AbortSignal;
     });

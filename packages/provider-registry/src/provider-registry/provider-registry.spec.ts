@@ -76,11 +76,15 @@ describe('providerRegistry', () => {
     }
   });
 
-  it('minden unknown Fact indoklást és blokkoló mérést hordoz', () => {
+  // Üres `blockedBy` csak akkor megengedett, ha az indoklás kimondja, hogy független forrás hiányzik és nincs
+  // mérési eset, ami az értéket lezárná (SPEC-013 3.2, a Flash rate limit mezői).
+  it('minden unknown Fact indoklást és blokkoló mérést, vagy kimondott hiányzó független forrást hordoz', () => {
     expect(unknownFacts.length).toBeGreaterThan(0);
     for (const fact of unknownFacts) {
       expect(fact.reason.length).toBeGreaterThan(0);
-      expect(fact.blockedBy.length).toBeGreaterThan(0);
+      if (fact.blockedBy.length === 0) {
+        expect(fact.reason).toContain('független forrás hiányzik');
+      }
     }
   });
 

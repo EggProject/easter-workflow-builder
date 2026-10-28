@@ -85,7 +85,7 @@ describe('normalizeSdkMessage, a type/subtype leképezése kind értékre', () =
     const value = ok({
       type: 'assistant',
       message: { content: [] },
-      context_usage: { model: 'MiniMax-M3', total_tokens: 80_987 },
+      context_usage: { model: 'MiniMax-M3.1-Flash', total_tokens: 80_987 },
     });
     expect(value.kind).toBe('sdk_assistant');
     // És nincs olyan nyers `type`, amiből `sdk_context_usage` lenne: kitalált

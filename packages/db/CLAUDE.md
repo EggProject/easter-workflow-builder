@@ -75,7 +75,6 @@ zárja le majd egy külön lépés:
 | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `SandboxConfig.network`, `.filesystem`                                    | a hivatalos sandbox doksi szerint összetett objektum (allowlist, deny szabályok, `disabled` kapcsoló); az SDK `Options` alakja nem ismert |
 | `SandboxConfig.allowUnsandboxedCommands`, `.ignoreViolations`, `.ripgrep` | a lista és a logikai alak között nincs döntő forrás                                                                                       |
-| `JoinMergeSettings`                                                       | a SPEC-003 4.3 egyetlen mezőt sem nevez meg az összefűzési szabályra                                                                      |
 | `StartInputField.valueKind`                                               | a SPEC-003 nem sorolja fel az értékkészletet, ezért szabad szöveg                                                                         |
 | `AgentStepConfig.agents` értékei                                          | a research nem rögzíti az `AgentDefinition` mezőlistáját, és az SDK verzióhoz kötött                                                      |
 

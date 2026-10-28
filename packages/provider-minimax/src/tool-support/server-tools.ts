@@ -1,32 +1,5 @@
 import type { Fact, ServerToolDescriptor } from '@easter-workflow-builder/provider-capability';
+import { notMeasuredOnFlash } from '../measurement-gap/not-measured-on-flash.ts';
 
-// A web_search szerver oldali tool kimegy a dróton, de a MiniMax nem futtatja le.
-export const minimaxServerTools: Fact<readonly ServerToolDescriptor[]> = {
-  state: 'known',
-  value: [
-    {
-      wireType: 'web_search_20250305',
-      name: 'web_search',
-      available: {
-        state: 'known',
-        value: false,
-        evidence: [
-          { kind: 'measurement', id: 'M-17' },
-          { kind: 'measurement', id: 'M-25' },
-        ],
-      },
-      clientToolName: {
-        state: 'known',
-        value: 'WebSearch',
-        evidence: [
-          { kind: 'measurement', id: 'M-17' },
-          { kind: 'measurement', id: 'M-25' },
-        ],
-      },
-    },
-  ],
-  evidence: [
-    { kind: 'measurement', id: 'M-17' },
-    { kind: 'measurement', id: 'M-25' },
-  ],
-};
+// A szerver oldali eszközök elérhetősége a Flash-re nem mért; a motor konzervatívan nem tilt (SPEC-004 11.2).
+export const minimaxServerTools: Fact<readonly ServerToolDescriptor[]> = notMeasuredOnFlash(['M-17', 'M-25']);

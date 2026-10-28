@@ -131,7 +131,7 @@ const WORKFLOW_NODES: Readonly<Record<WorkflowNodeInput['type'], WorkflowNodeInp
     label: 'Összefésülés',
     positionX: 0,
     positionY: 0,
-    config: { type: 'join', mode: 'merge', settings: {}, onUnhandledError: null },
+    config: { type: 'join', mode: 'merge', onUnhandledError: null },
   },
   loop: {
     id: 'n-loop',
