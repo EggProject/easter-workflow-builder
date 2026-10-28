@@ -6,7 +6,7 @@ import type { SafeParsableSchema } from './safe-parsable-schema.ts';
 
 export interface RequestRouteWithZipBodyInput<TValue> {
   readonly routeId: ZipBodyRouteId;
-  readonly parameters?: Readonly<Record<string, string>>;
+  readonly parameters: Readonly<Record<string, string>>;
   /**
    * A fájl bájtjai, ahogy a böngésző adja (`File` is `Blob`): a törzs nyers
    * ZIP csomag, nem JSON.
@@ -29,7 +29,7 @@ export function requestRouteWithZipBody<TValue>(
 ): Promise<RouteOutcome<TValue>> {
   return performRouteRequest({
     routeId: input.routeId,
-    parameters: input.parameters ?? {},
+    parameters: input.parameters,
     query: undefined,
     hasBody: true,
     body: undefined,

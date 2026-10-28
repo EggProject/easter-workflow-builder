@@ -39,6 +39,11 @@ const TAVOLI: McpServerDefinitionRecord = {
   definition: { type: 'http', url: 'https://mcp.example.test', authEnvName: null },
 };
 
+const ESEMENY: McpServerDefinitionRecord = {
+  name: 'esemeny',
+  definition: { type: 'sse', url: 'https://sse.example.test', authEnvName: 'MCP_TOKEN' },
+};
+
 const ENVIRONMENT_NAMES: readonly string[] = ['GITHUB_TOKEN_CEG', 'GITHUB_TOKEN_SAJAT', 'MCP_TOKEN'];
 
 interface MockState {
@@ -47,6 +52,8 @@ interface MockState {
   readonly deletes: string[];
   isSaveFailing: boolean;
   isEnvironmentFailing: boolean;
+  isListFailing: boolean;
+  isDeleteFailing: boolean;
 }
 
 const mockState: MockState = {
@@ -55,6 +62,8 @@ const mockState: MockState = {
   deletes: [],
   isSaveFailing: false,
   isEnvironmentFailing: false,
+  isListFailing: false,
+  isDeleteFailing: false,
 };
 
 function lastPathSegment(url: URL): string {
@@ -76,6 +85,8 @@ test.beforeEach(async ({ page }) => {
   mockState.deletes.length = 0;
   mockState.isSaveFailing = false;
   mockState.isEnvironmentFailing = false;
+  mockState.isListFailing = false;
+  mockState.isDeleteFailing = false;
   await mockIdleStream(page);
   await installApiMocks(page, [
     mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([]))),
@@ -88,7 +99,11 @@ test.beforeEach(async ({ page }) => {
         ? route.fulfill(jsonBody({ code: 'internal', message: 'belső hiba' }, 500))
         : route.fulfill(jsonBody(ENVIRONMENT_NAMES)),
     ),
-    mockRoute('listMcpServerDefinitions', async (route) => route.fulfill(jsonBody(mockState.servers))),
+    mockRoute('listMcpServerDefinitions', async (route) =>
+      mockState.isListFailing
+        ? route.fulfill(jsonBody({ code: 'internal', message: 'belső hiba' }, 500))
+        : route.fulfill(jsonBody(mockState.servers)),
+    ),
     mockRoute('saveMcpServerDefinition', async (route, url) => {
       const name = lastPathSegment(url);
       const body: unknown = route.request().postDataJSON();
@@ -105,6 +120,10 @@ test.beforeEach(async ({ page }) => {
     mockRoute('deleteMcpServerDefinition', async (route, url) => {
       const name = lastPathSegment(url);
       mockState.deletes.push(name);
+      if (mockState.isDeleteFailing) {
+        await route.fulfill(jsonBody({ code: 'not_found', message: 'nincs ilyen szerver' }, 404));
+        return;
+      }
       mockState.servers = mockState.servers.filter((server) => server.name !== name);
       await route.fulfill({ status: 204 });
     }),
@@ -347,4 +366,80 @@ test('az utolsó szerver törlése után az üres állapot jelenik meg, a Hozzá
 
   await expect(card(page).getByText('Még nincs MCP szerver.')).toBeVisible();
   await expect(card(page).getByRole('button', { name: 'MCP szerver hozzáadása', exact: true })).toBeVisible();
+});
+
+test('szerkesztésnél az sse szerver URL és Authorization mezője, és a nullázott Authorization fejléces http szerver "nincs" választása töltődik be', async ({
+  page,
+}) => {
+  mockState.servers = [ESEMENY, TAVOLI];
+  await page.goto('/settings');
+
+  await row(page, 'esemeny').getByRole('button', { name: 'Szerkesztés: esemeny' }).click();
+  const sseModal = dialog(page, 'MCP szerver szerkesztése');
+  await expect(sseModal.getByRole('combobox', { name: 'Típus', exact: true })).toHaveText('sse (távoli szerver)');
+  await expect(sseModal.getByRole('textbox', { name: 'URL', exact: true })).toHaveValue('https://sse.example.test');
+  await expect(
+    sseModal.getByRole('combobox', { name: 'Authorization fejléc: szerver oldali változó', exact: true }),
+  ).toHaveText('MCP_TOKEN');
+  await sseModal.getByRole('button', { name: 'Mégse', exact: true }).click();
+  await expect(sseModal).toBeHidden();
+
+  await row(page, 'tavoli').getByRole('button', { name: 'Szerkesztés: tavoli' }).click();
+  const httpModal = dialog(page, 'MCP szerver szerkesztése');
+  await expect(
+    httpModal.getByRole('combobox', { name: 'Authorization fejléc: szerver oldali változó', exact: true }),
+  ).toHaveText('nincs');
+});
+
+test('a hozzárendelés nélküli deklarált változó a soron csak a nevével áll, és az argumentum címke eltávolítható, a PUT törzs már nem tartalmazza', async ({
+  page,
+}) => {
+  const modal = await openAddModal(page);
+
+  await modal.getByRole('textbox', { name: 'Név', exact: true }).fill('egyszeru');
+  await modal.getByRole('textbox', { name: 'Parancs', exact: true }).fill('npx');
+  const argumentsField = modal.getByRole('textbox', { name: 'Argumentumok', exact: true });
+  await argumentsField.fill('-y');
+  await argumentsField.press('Enter');
+  await argumentsField.fill('felesleges');
+  await argumentsField.press('Enter');
+  await modal.getByRole('button', { name: 'Eltávolítás: felesleges', exact: true }).click();
+  await expect(modal.getByRole('button', { name: 'Eltávolítás: felesleges', exact: true })).toHaveCount(0);
+  await expect(modal.getByRole('status').filter({ hasText: 'Eltávolítva: felesleges' })).toHaveCount(1);
+  const declared = modal.getByRole('textbox', { name: 'Deklarált környezeti változók', exact: true });
+  await declared.fill('SAJAT_VALTOZO');
+  await declared.press('Enter');
+  await modal.getByRole('button', { name: 'Mentés', exact: true }).click();
+  await expect(modal).toBeHidden();
+
+  expect(savedDefinition(0)).toMatchObject({
+    type: 'stdio',
+    command: 'npx',
+    args: ['-y'],
+    envNames: ['SAJAT_VALTOZO'],
+  });
+  await expect(row(page, 'egyszeru')).toContainText('stdio: npx -y');
+  await expect(row(page, 'egyszeru')).toContainText('Változók: SAJAT_VALTOZO');
+  await expect(row(page, 'egyszeru')).not.toContainText('←');
+});
+
+test('a központi lista betöltési hibája danger Alert a kártyán, hozzáadás gomb nélkül', async ({ page }) => {
+  mockState.isListFailing = true;
+  await page.goto('/settings');
+
+  await expect(card(page).getByRole('alert')).toHaveClass(/\balert--danger\b/u);
+  await expect(card(page).getByRole('group')).toHaveCount(0);
+});
+
+test('a törlés hibája danger Alert a modálisban, a modális nyitva marad, a sor megmarad', async ({ page }) => {
+  mockState.isDeleteFailing = true;
+  await page.goto('/settings');
+
+  await row(page, 'github').getByRole('button', { name: 'Törlés: github' }).click();
+  const modal = dialog(page, 'MCP szerver törlése');
+  await modal.getByRole('button', { name: 'Törlés', exact: true }).click();
+
+  await expect(modal.getByRole('alert')).toHaveClass(/\balert--danger\b/u);
+  await expect(modal).toBeVisible();
+  await expect(row(page, 'github')).toBeVisible();
 });

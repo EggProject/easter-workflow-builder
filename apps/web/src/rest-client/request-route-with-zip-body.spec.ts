@@ -36,7 +36,7 @@ describe('requestRouteWithZipBody', () => {
     expect(new Headers(capturedInit?.headers).get('Content-Type')).toBe('application/zip');
   });
 
-  it('a paraméterek nélküli hívás útvonal hibát ad, fetch nélkül', async () => {
+  it('az útvonal paraméter nélküli (üres) hívás útvonal hibát ad, fetch nélkül', async () => {
     let wasCalled = false;
     const fetchFunction: FetchFunction = () => {
       wasCalled = true;
@@ -45,6 +45,7 @@ describe('requestRouteWithZipBody', () => {
 
     const outcome = await requestRouteWithZipBody({
       routeId: 'uploadSkill',
+      parameters: {},
       body: new Blob([]),
       responseSchema: passthroughSchema,
       fetchFunction,

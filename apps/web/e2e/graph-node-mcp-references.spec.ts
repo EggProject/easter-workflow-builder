@@ -38,6 +38,13 @@ const SERVERS: readonly McpServerDefinitionRecord[] = [
     definition: { type: 'http', url: 'https://mcp.example.test', authEnvName: 'TAVOLI_AUTH' },
   },
 ];
+const SZELEVENY_SERVERS: readonly McpServerDefinitionRecord[] = [
+  { name: 'esemeny', definition: { type: 'sse', url: 'https://sse.example.test', authEnvName: null } },
+  {
+    name: 'egyszeru',
+    definition: { type: 'stdio', command: 'npx', args: [], envNames: ['SAJAT_VALTOZO'], envBindings: {} },
+  },
+];
 const ENVIRONMENT_NAMES: readonly string[] = ['GITHUB_TOKEN_CEG', 'GITHUB_TOKEN_SAJAT', 'TAVOLI_AUTH'];
 
 const WORKFLOW: WorkflowDetail = {
@@ -407,4 +414,49 @@ test('a szerver környezeti nevek betöltési hibája danger Alert a bejelölt s
 
   await expect(region.getByRole('alert')).toBeVisible();
   await expect(region.getByRole('checkbox', { name: 'tavoli', exact: true })).toBeChecked();
+});
+
+test('az sse szerver és a hozzárendelés nélküli deklarált változó alapértelmezés feliratai: "nincs", illetve a deklarált név', async ({
+  page,
+}) => {
+  await openEditor(page, graphWith(agentStepConfig(undefined, {})), [], {
+    listServers: async (route) => route.fulfill(jsonBody(SZELEVENY_SERVERS)),
+  });
+  const region = await openStepMcp(page);
+
+  await toggle(region, 'esemeny');
+  await toggle(region, 'egyszeru');
+
+  await expect(
+    region.getByRole('combobox', { name: 'esemeny: Authorization fejléc szerver oldali változója' }),
+  ).toHaveText('központi alapértelmezés (nincs)');
+  await expect(region.getByRole('combobox', { name: 'egyszeru: SAJAT_VALTOZO szerver oldali változója' })).toHaveText(
+    'központi alapértelmezés (SAJAT_VALTOZO)',
+  );
+});
+
+test('a felülírásban tárolt, de a szerver környezetéből eltávolított név megmarad opcióként, jelzéssel', async ({
+  page,
+}) => {
+  await openEditor(
+    page,
+    graphWith(agentStepConfig({ github: { envBindings: { GITHUB_TOKEN: 'ELTAVOLITOTT' }, authEnvName: null } }, {})),
+    [],
+  );
+  const region = await openStepMcp(page);
+
+  await expect(githubSelect(region)).toHaveText('ELTAVOLITOTT (nincs a szerver környezetében)');
+});
+
+test('az agent definíció olyan `mcpServerReferences` értéke, amelynek egyik bejegyzése érvénytelen, megnevezve jelenik meg', async ({
+  page,
+}) => {
+  await openEditor(
+    page,
+    graphWith(agentStepConfig(undefined, { kutato: { ...KUTATO, mcpServerReferences: { github: 'rossz' } } })),
+    [],
+  );
+  const region = await openDefinitionMcp(page);
+
+  await expect(region.getByText('A tárolt érték alakja érvénytelen')).toBeVisible();
 });
