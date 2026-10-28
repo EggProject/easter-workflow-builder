@@ -1,4 +1,4 @@
-import { parseDocument } from 'yaml';
+import { parseDocument, type Document } from 'yaml';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
 import { skillUploadFailure } from './skill-upload-failure.ts';
@@ -12,6 +12,22 @@ const FRONTMATTER_FENCE = '---';
  */
 export interface SkillManifest {
   readonly description: string;
+}
+
+/**
+ * A YAML dokumentum JavaScript értéke, vagy `undefined`, ha az átalakítás dob:
+ * a `yaml` csomag a túl sok alias feloldását (alias bomba) a `toJS()`
+ * hívásban utasítja el kivétellel (a telepített csomag `Document.js` `toJS`:
+ * `maxAliasCount` alapból 100; `Alias.js`: "Excessive alias count"), és ez nem
+ * lehet kezeletlen kivétel
+ * (PLAN-012 T-012-27, ZIP 4. találat).
+ */
+function toPlainValue(document: Document): { readonly value: unknown } | undefined {
+  try {
+    return { value: document.toJS() };
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -34,7 +50,11 @@ export function readSkillManifest(content: string, skillName: string): Outcome<S
   if (document.errors.length > 0) {
     return skillUploadFailure('skill_manifest_invalid', 'A SKILL.md frontmattere nem olvasható YAML');
   }
-  const frontmatter: unknown = document.toJS();
+  const converted = toPlainValue(document);
+  if (converted === undefined) {
+    return skillUploadFailure('skill_manifest_invalid', 'A SKILL.md frontmattere nem alakítható át (túl sok alias)');
+  }
+  const frontmatter = converted.value;
   if (!isRecord(frontmatter)) {
     return skillUploadFailure('skill_manifest_invalid', 'A SKILL.md frontmattere nem kulcs-érték leképezés');
   }

@@ -8,7 +8,23 @@ const errorClassOf = (content: string, name = 'pdf-tools'): string | undefined =
     : undefined;
 };
 
+// Alias bomba: minden szint kilencszer hivatkozza az előzőt, a teljes kifejtés 9^4 elem (ZIP 4. találat).
+const ALIAS_BOMB = [
+  '---',
+  'a: &a [x, x, x, x, x, x, x, x, x]',
+  'b: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a]',
+  'c: &c [*b, *b, *b, *b, *b, *b, *b, *b, *b]',
+  'd: &d [*c, *c, *c, *c, *c, *c, *c, *c, *c]',
+  'description: ok',
+  '---',
+  '',
+].join('\n');
+
 describe('readSkillManifest', () => {
+  it('az alias bombát hordozó frontmatter skill_manifest_invalid, nem kezeletlen kivétel (ZIP 4. találat)', () => {
+    expect(errorClassOf(ALIAS_BOMB)).toBe('skill_manifest_invalid');
+  });
+
   it('a description értékét adja, name nélkül is (O-37: a hiány elfogadott)', () => {
     expect(readSkillManifest('---\ndescription: PDF kezelés\n---\n# Törzs\n', 'pdf-tools')).toStrictEqual({
       kind: 'ok',

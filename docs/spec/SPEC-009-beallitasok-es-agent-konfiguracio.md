@@ -330,7 +330,11 @@ részletek, a táblák és a mérő eszközök: `docs/research/2026-10-28-spec-0
   - `GET /api/skills` (`listSkills`): `200`, `SkillSummary` lista név szerint rendezve; a
     `SkillSummary` mezői `name` (a tárolt, puszta név), `description` (a frontmatterből; kívülről elrontott
     könyvtárnál üres szöveg), `sizeBytes` (a fájlok összmérete), `modifiedAtMs` (a skill könyvtár
-    módosítási ideje, epoch ezredmásodperc).
+    módosítási ideje, epoch ezredmásodperc). A lista elemenként hibatűrő (PLAN-012 T-012-27): a nem
+    olvasható vagy könyvtárként álló `SKILL.md`, a hibás vagy alias bombát hordozó frontmatter üres
+    leírást ad, a méret az olvasható szabályos fájloké (a nem olvasható almappa, a nem `stat`-olható fájl és
+    a szimbolikus link nem számít), és csak a meg sem nyitható (`stat` hibát adó) skill könyvtár marad ki a
+    listából; egyetlen elem sem buktatja a teljes választ.
   - `PUT /api/skills/:name` (`uploadSkill`, a route tábla sorában `requestBody: 'application/zip'`): a
     törzs nyers ZIP; sikerre `200` és a feltöltött skill `SkillSummary` eleme, felülíráskor is (a
     megerősítés a felület dolga, O-16); minden elutasítás `422` `unprocessable`, a törzs `errorClass`
@@ -454,7 +458,7 @@ bejegyzést), megnevezett hibával, és semmi nem marad a skill könyvtárban.
    | Korlát                                        | Alapérték               | Forrás                                                                                                                                                                                                                           |
    | --------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
    | a kicsomagolt fájlok összmérete               | 30 000 000 bájt (30 MB) | az Anthropic Skills API korlátja: "Maximum Skill upload size: 30 MB (all files combined, uncompressed)" (research 7.1); a decimális MB a szigorúbb olvasat, a bináris (30 MiB) mellett is a korláton belül marad                 |
-   | a feltöltött törzs (a zip) mérete             | 30 000 000 bájt         | levezetett: a zip a kicsomagolt tartalom plusz a fejlécek; a törzs olvasó a korláton túl olvasást megszakítja (research 7.4)                                                                                                     |
+   | a feltöltött törzs (a zip) mérete             | 30 000 000 bájt         | levezetett: a zip a kicsomagolt tartalom plusz a fejlécek; a törzs olvasó a korlát fölötti bájtokat nem tartja meg, de a törzset végigolvassa (research 7.4)                                                                     |
    | a bejegyzések száma (fájl és könyvtár együtt) | 1024                    | SEI CERT IDS04-J megfelelő megoldása (`TOOMANY = 1024`); a Sonar S5042 mintája 10000-et ad, a kettő közül a szigorúbb, mert egy skill jellemzően néhány fájl (research 7.2)                                                      |
    | tömörítési arány                              | nincs külön korlát      | a kicsomagolás közben számolt összméret a kicsomagolást a korlátnál megállítja (CERT IDS04-J módszere); a Sonar arány küszöbét a Sonar maga "rather arbitrarily" választottnak mondja, és ép fájlokat is blokkolt (research 7.3) |
 
