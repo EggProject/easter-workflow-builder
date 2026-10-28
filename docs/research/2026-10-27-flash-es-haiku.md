@@ -172,6 +172,10 @@ magyarázó mondatának cseréjét támasztja alá (SPEC-013 3.5).
 
 ## 9. Nem ellenőrzött pontok összesítve
 
+**2026-10-28:** az 1. pont (a dróton suffix nélkül megy ki), a 2. pont (`{"type":"adaptive"}`, kikapcsolt
+thinking mellett a mező elmarad), az 5. pont (a kliens alap effortja `high`) és a 3. pont egy része mérve:
+[`2026-10-28-flash-meresek.md`](2026-10-28-flash-meresek.md).
+
 1. A pinelt CLI a `MiniMax-M3.1-Flash[1m]` azonosítóból a dróton utótag nélküli azonosítót küld-e
    (az M3-ra M-11 mérte).
 2. A pinelt CLI a Flash-nél küld-e `thinking` mezőt, és milyen alakban (6. szekció 3. pont).

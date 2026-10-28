@@ -47,7 +47,9 @@ describe('a motor a MiniMax-M3.1-Flash leíróval', () => {
     expect(outcome.status === 'failed' ? outcome.errorKind : undefined).toBe('thinking_mode_unsupported');
   });
 
-  it('modell nélkül a Flash-t választja, a kimenő azonosító a suffixes alak, delta nélkül (AC5, 3.4)', () => {
+  // A Flash mérések után (docs/research/2026-10-28-flash-meresek.md): delta események és a szerver oldali
+  // web_search elérhető, tehát a WebSearch nem kerül tiltólistára, és a jelölés sem "nem igazolt" (SPEC-013 O-7).
+  it('modell nélkül a Flash-t választja, a kimenő azonosító a suffixes alak, delta eseményekkel (AC5, 3.4, O-7)', () => {
     const outcome = validateAgentStepCapabilities(agentStepConfig(), providerRegistry.minimax);
 
     expect(outcome.status).toBe('ok');
@@ -56,10 +58,10 @@ describe('a motor a MiniMax-M3.1-Flash leíróval', () => {
       outgoingModel: 'MiniMax-M3.1-Flash[1m]',
       modelIdentifierUnproven: false,
     });
-    expect(decisions?.includePartialMessages).toBe(false);
+    expect(decisions?.includePartialMessages).toBe(true);
     expect(decisions?.disallowedServerTools).toStrictEqual({
       disallowedTools: [],
-      serverToolAvailabilityUnproven: true,
+      serverToolAvailabilityUnproven: false,
     });
   });
 
@@ -73,5 +75,20 @@ describe('a motor a MiniMax-M3.1-Flash leíróval', () => {
       'adaptive',
       'low',
     ]);
+  });
+
+  it('strukturált kimenetnél a maxTurns alsó korlátja a Flash-re mért körszám (M-03-flash)', () => {
+    const structuredOutput = { strategy: 'sdk_output_format', schema: { type: 'object' } } as const;
+    const tooFew = validateAgentStepCapabilities(
+      agentStepConfig({ structuredOutput, maxTurns: 2 }),
+      providerRegistry.minimax,
+    );
+    const enough = validateAgentStepCapabilities(
+      agentStepConfig({ structuredOutput, maxTurns: 3 }),
+      providerRegistry.minimax,
+    );
+
+    expect(tooFew.status === 'failed' ? tooFew.errorKind : undefined).toBe('insufficient_max_turns');
+    expect(enough.status).toBe('ok');
   });
 });
