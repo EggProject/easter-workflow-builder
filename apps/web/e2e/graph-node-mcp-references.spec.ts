@@ -143,8 +143,18 @@ function parseSavedGraph(body: unknown): ReplaceGraphRequest {
   return parsed.data;
 }
 
-function savedConfig(putBodies: readonly unknown[], index: number): unknown {
-  return parseSavedGraph(putBodies[index]).nodes.find((node) => node.id === 'n2')?.config;
+/**
+ * A mentett agent lépés konfigurációja. A hivatkozásokra pontos egyenlőséget
+ * (`toEqual`) állító tesztek használják: a részhalmaz illesztés (`toMatchObject`)
+ * az `envBindings: {}` állításnál egy üres szöveggel tárolt bejegyzést
+ * (`{ GITHUB_TOKEN: '' }`) is átengedne.
+ */
+function savedStepConfig(putBodies: readonly unknown[], index: number): Extract<NodeConfig, { type: 'agent_step' }> {
+  const config = parseSavedGraph(putBodies[index]).nodes.find((node) => node.id === 'n2')?.config;
+  if (config?.type !== 'agent_step') {
+    throw new Error('a mentett n2 csomópont nem agent lépés');
+  }
+  return config;
 }
 
 interface EditorMocks {
@@ -253,12 +263,10 @@ test('a lépés a központi listából választ, a felülírások a szerver olda
   await saveButton(page).click();
   await expect(page.getByText('Gráf mentve')).toBeVisible();
   expect(putBodies).toHaveLength(1);
-  expect(savedConfig(putBodies, 0)).toMatchObject({
-    mcpServers: LEGACY_MCP_SERVERS,
-    mcpServerReferences: {
-      github: { envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_SAJAT' }, authEnvName: null },
-      tavoli: { envBindings: {}, authEnvName: 'GITHUB_TOKEN_SAJAT' },
-    },
+  expect(savedStepConfig(putBodies, 0).mcpServers).toEqual(LEGACY_MCP_SERVERS);
+  expect(savedStepConfig(putBodies, 0).mcpServerReferences).toEqual({
+    github: { envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_SAJAT' }, authEnvName: null },
+    tavoli: { envBindings: {}, authEnvName: 'GITHUB_TOKEN_SAJAT' },
   });
 
   // A központi alapértelmezés opció törli a felülírást, a jelölés levétele a hivatkozást.
@@ -267,9 +275,9 @@ test('a lépés a központi listából választ, a felülírások a szerver olda
   await toggle(region, 'tavoli');
   await saveButton(page).click();
   await expect.poll(() => putBodies.length).toBe(2);
-  expect(savedConfig(putBodies, 1)).toMatchObject({
-    mcpServers: LEGACY_MCP_SERVERS,
-    mcpServerReferences: { github: { envBindings: {}, authEnvName: null } },
+  expect(savedStepConfig(putBodies, 1).mcpServers).toEqual(LEGACY_MCP_SERVERS);
+  expect(savedStepConfig(putBodies, 1).mcpServerReferences).toEqual({
+    github: { envBindings: {}, authEnvName: null },
   });
 });
 
@@ -310,19 +318,17 @@ test('a központi listából törölt, de hivatkozott szerver "hiányzik" jelzé
 
   await saveButton(page).click();
   await expect(page.getByText('Gráf mentve')).toBeVisible();
-  expect(savedConfig(putBodies, 0)).toMatchObject({
-    mcpServerReferences: {
-      github: { envBindings: {}, authEnvName: null },
-      torolt: { envBindings: {}, authEnvName: null },
-    },
+  expect(savedStepConfig(putBodies, 0).mcpServerReferences).toEqual({
+    github: { envBindings: {}, authEnvName: null },
+    torolt: { envBindings: {}, authEnvName: null },
   });
 
   await toggle(region, 'torolt (hiányzik a központi listából)');
   await expect(missing).toBeAttached({ attached: false });
   await saveButton(page).click();
   await expect.poll(() => putBodies.length).toBe(2);
-  expect(savedConfig(putBodies, 1)).toMatchObject({
-    mcpServerReferences: { github: { envBindings: {}, authEnvName: null } },
+  expect(savedStepConfig(putBodies, 1).mcpServerReferences).toEqual({
+    github: { envBindings: {}, authEnvName: null },
   });
 });
 
@@ -338,11 +344,9 @@ test('az agent definíció `mcpServerReferences` mezője ugyanígy szerkeszthet�
 
   await saveButton(page).click();
   await expect(page.getByText('Gráf mentve')).toBeVisible();
-  expect(savedConfig(putBodies, 0)).toMatchObject({
-    mcpServers: LEGACY_MCP_SERVERS,
-    agents: {
-      kutato: { ...KUTATO, mcpServerReferences: { tavoli: { envBindings: {}, authEnvName: 'GITHUB_TOKEN_CEG' } } },
-    },
+  expect(savedStepConfig(putBodies, 0).mcpServers).toEqual(LEGACY_MCP_SERVERS);
+  expect(savedStepConfig(putBodies, 0).agents).toEqual({
+    kutato: { ...KUTATO, mcpServerReferences: { tavoli: { envBindings: {}, authEnvName: 'GITHUB_TOKEN_CEG' } } },
   });
 });
 
@@ -361,10 +365,8 @@ test('az agent definíció érvénytelen alakú `mcpServerReferences` értéke m
   await toggle(region, 'github');
   await saveButton(page).click();
   await expect(page.getByText('Gráf mentve')).toBeVisible();
-  expect(savedConfig(putBodies, 0)).toMatchObject({
-    agents: {
-      kutato: { ...KUTATO, mcpServerReferences: { github: { envBindings: {}, authEnvName: null } } },
-    },
+  expect(savedStepConfig(putBodies, 0).agents).toEqual({
+    kutato: { ...KUTATO, mcpServerReferences: { github: { envBindings: {}, authEnvName: null } } },
   });
 });
 
