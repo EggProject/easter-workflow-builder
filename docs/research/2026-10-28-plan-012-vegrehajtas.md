@@ -162,3 +162,131 @@ törzsel válaszol).
 Döntés kérdés: az egy fennmaradó tétel elfogadása e2e-vel nem elérhető tételként, vagy a T-012-14 alapérték
 átalakítása (termékkód terv döntés). A szabálykönyv 8. szekciója ilyen kategóriát ismer, de a fedetlen darabszám
 növekedése itt tényleges, ezért a döntést nem hoztam meg.
+
+A 2.5 szekció nyitott kérdése lezárult, lásd a 3. szekció 3.4 pontját: az alapérték függvény megszűnt, a
+fedetlen tételek száma visszaállt a kiinduló értékre.
+
+## 3. T-012-24 és T-012-25: hibamondatok és e2e a skill és MCP felületekre
+
+Mérés és munka a `feat/spec-009-beallitasok` ágon, a `d477355` fejről indulva. A kilenc kapu az utolsó
+termékkód változás után zöld (3.6).
+
+### 3.1 T-012-24: a leképezés ellenőrzése
+
+A `protocol-error-class-message.ts` `Record<ProtocolErrorClass, string>` leképezése kimerítő (a `skill_not_found`,
+a `mcp_server_not_found`, a `missing_mcp_server_env` és a SPEC-009 5.4 tizenöt feltöltési osztálya mind benne
+áll); a unit teszt táblázata a zárt szótár minden tagját pontosan egyszer fedi, és ellenőrzi az írásjelet. A tizenöt
+mondat a SPEC-009 5.4 táblázat "A mondat tárgya" oszlopával egyezik (például "A csomag túl nagy.", "Hiányzik a
+SKILL.md."). Új hiány nem volt, kódot nem kellett írni.
+
+Ami hiányzott, az az e2e a futás indításának három motor hibájára: `rest-error-class.spec.ts`, három új teszt
+(`skill_not_found`, `mcp_server_not_found`, `missing_mcp_server_env`), mindegyik a lábléc danger `Alert` blokkját
+állítja a saját mondatra, `.alert--danger` osztállyal, a szerver belső szövege és a hibaosztály neve nélkül.
+
+### 3.2 T-012-25: új és kiegészített e2e
+
+- `apps/web/e2e/skill-library-settings.spec.ts` (új, 12 teszt): lista (név, leírás, üres leírás mondata, méret, a
+  két kockázat mondata), betöltés csontváz és hiba, új feltöltés (a `PUT` a névre megy, a törzs bájtról bájtra a
+  fájl, `Content-Type: application/zip`, a lista újratöltődik, az űrlap kiürül), név és fájl hiba a mező alatt, a
+  fájl eltávolítása, felülírás megerősítő `Modal` (Mégse nem küld, Felülírás küld), a "túl nagy" és a "hiányzó
+  SKILL.md" mondat az `Alert` blokkban, mind a tizenöt osztály mondata egy tesztben, a feltöltés alatti tiltás és
+  `aria-busy`, törlés megerősítés (Mégse, Törlés `DELETE`), a törlés hibája, az üres állapot.
+- `mcp-server-settings.spec.ts` (+4 teszt): sse szerkesztés és a nullázott Authorization "nincs" választása, a
+  hozzárendelés nélküli változó a soron, az argumentum címke eltávolítása (a bejelentés a `status` régióban), a lista
+  betöltési hibája, a törlés hibája.
+- `graph-node-mcp-references.spec.ts` (+3 teszt): sse szerver és hozzárendelés nélküli változó alapértelmezés
+  felirata, az eltávolított szerver oldali név jelzése, az érvénytelen bejegyzésű hivatkozás megnevezése.
+- `graph-node-skills.spec.ts`: nem kellett bővíteni (az összes ága fedett).
+
+### 3.3 Egy valódi hiba, amit az e2e talált
+
+A `SkillUploadForm` a sikeres feltöltés után kiürítette a név mezőt, de a `TextField` "érintett" jelölése megmaradt,
+ezért az üres név azonnal a névszabály hibáját mutatta a mező alatt. A javítás: a mező külön `key` számlálót kap, ami
+csak siker után lép (a fájl eltávolítása nem törli az érintettséget). Védelem: a `SkillUploadForm.spec.tsx` "új
+névvel" tesztje (a mező elhagyása után a siker után nincs `.field__error`; a javítás nélkül elbukik) és az e2e
+feltöltés tesztje (`alert` darabszám nulla).
+
+Egy megfigyelés, javítás nélkül: a kattintás előtt elhagyott, érvénytelen név mezőn a hiba megjelenése eltolja a
+gombot, ezért a Playwright `click` a lenyomás és az elengedés között más elemre kerülhet. A teszt emiatt az üres
+űrlapra kattint (a mező érintetlen), nem a kitöltött, érvénytelen névre. Ez a repó több űrlapján közös viselkedés,
+nem a skill feltöltés sajátja.
+
+### 3.4 A T-012-19 e2e rés lezárása és a fedetlen tételek
+
+- `ProviderOptionsContext` alapértéke: a `testConnection` `undefined` (puszta adat), a `ProviderSelect` a kezelőt
+  `testConnection && (...)` alakkal építi, ami ág nélkül szűkít, és a gomb `disabled` feltétele kibővült a
+  `handleTest === undefined` operandussal (az e2e-ben kiértékelődik). Az `unavailableProviderConnectionTester`
+  fájl és spec törölve. Felhasználónak látható viselkedés nem változott; a gomb a szolgáltató nélküli (csak
+  önálló komponens tesztben létező) esetben tiltott.
+- `request-route-with-zip-body.ts`: a `parameters` kötelező lett (az egyetlen hívó mindig ad), a `?? {}` ág
+  megszűnt (e2e úton elérhetetlen volt).
+- A `RunViewHeaderSkeleton.tsx` nincs a fedetlen fájlok között a teljes futás végén, és a kiinduló öt fájl
+  (1.3 szekció) egyike sem változott.
+
+### 3.5 A teljes e2e és a lefedettség
+
+Nyolc shard, tiszta nyers könyvtár (`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e apps/web/test-results`),
+a shardok sorban, `flock /tmp/playwright-gep.lock` alatt: 93 + 92 x 7 = **737 e2e teszt, mind zöld** (kiinduló 649,
+a T-012-19 után 688). `bun run coverage:e2e:report` kilépési kód **0**, a küszöb nem változott.
+
+| Metrika    | Fedett / összes | Arány (%) | Fedetlen | Kiinduló fedetlen (1.3) |
+| ---------- | --------------- | --------- | -------- | ----------------------- |
+| statements | 2662 / 2672     | 99,62     | 10       | 10                      |
+| branches   | 1307 / 1317     | 99,24     | 10       | 10                      |
+| functions  | 933 / 934       | 99,89     | 1        | 1                       |
+| lines      | 2551 / 2561     | 99,60     | 10       | 10                      |
+
+A fedetlen tételek ugyanaz az öt fájl, mint a kiinduló állapotban (`app-mount/mount-app.tsx`,
+`frontend-config/read-frontend-config.ts`, `graph-editor/is-valid-connection.ts`,
+`rest-client/perform-route-request.ts`, `stream-client/use-stream-connection.ts`), tételszámra is azonosak.
+
+A köztes futás (a skill és a hibamondat e2e után, az MCP kiegészítés előtt) 13 / 21 / 2 / 13 fedetlent mutatott, és a
+küszöböt (branches) nem teljesítette; a hiány a T-012-22 és T-012-23 lépések fedetlen ágaiból jött (MCP kártya,
+hivatkozás mező, `request-route-with-zip-body`), ezeket a 3.2 pont kiegészítései és a 3.4 pont szerinti átalakítás
+fedte le. A küszöböt nem módosítottuk.
+
+Unit: 714 tesztfájl, **7474 teszt**, mind zöld, 100 százalék mind a négy metrikán (`bun run test` kilépési kód 0).
+
+### 3.6 Szándékos rontások
+
+Minden rontás egy ideiglenes termékkód hiba, a megfelelő spec futtatásával; a rontás előtt a teszt zöld volt, a
+rontásra legalább egy új teszt elbukott, utána a fájl visszaállt.
+
+| Jel     | Mit rontottunk                                                              | Bukó teszt                                          |
+| ------- | --------------------------------------------------------------------------- | --------------------------------------------------- |
+| R1      | `SkillRow`: az üres leírás mondata helyett üres szöveg                      | lista                                               |
+| R2      | feltöltés `Content-Type`: `application/json`                                | új feltöltés                                        |
+| R3      | feltöltés törzse üres `Blob`                                                | új feltöltés                                        |
+| R4      | feltöltés után nincs lista újratöltés                                       | új feltöltés, felülírás, feltöltés alatt            |
+| R5      | siker után a fájl kiválasztás megmarad                                      | új feltöltés                                        |
+| R6      | a név mező `key` nélkül (a 3.3 hiba visszahozva)                            | új feltöltés                                        |
+| R7      | azonos névre nincs felülírás megerősítés                                    | felülírás                                           |
+| R8      | törlés siker után a modális nem zár                                         | törlés                                              |
+| R9      | törlés hiba `Alert` elhagyva                                                | törlés hiba                                         |
+| R10     | `skill_archive_too_large` mondata megváltoztatva                            | "túl nagy" és a tizenöt osztály tesztje             |
+| R11     | a fájl eltávolítása nem csinál semmit                                       | fájl eltávolítás                                    |
+| R12     | a Feltöltés gomb a feltöltés alatt nem tiltott                              | feltöltés alatti tiltás                             |
+| R13     | a névszabály nem érvényesül (bármi elfogadva)                               | üres űrlap, hiba a mező alatt                       |
+| R14     | a hiányzó fájl hibája nem jelenik meg                                       | üres űrlap, fájl eltávolítás                        |
+| R15     | az üres állapot feltétele hibás                                             | utolsó skill törlése                                |
+| R16     | a lista betöltési hibája nem jelenik meg                                    | betöltés alatt és hiba                              |
+| R17     | a betöltés csontváz `aria-busy` nélkül                                      | betöltés alatt és hiba                              |
+| R18-R20 | `skill_not_found`, `mcp_server_not_found`, `missing_mcp_server_env` mondata | az adott osztály futás indítás tesztje              |
+| R21     | a `ProviderSelect` kezelője mindig `undefined`                              | 5 teszt a `settings-screen` és `node-inspector` e2e |
+| R22     | MCP törlés hiba `Alert` elhagyva                                            | MCP törlés hiba                                     |
+| R23     | MCP lista betöltési hiba `Alert` elhagyva                                   | MCP lista hiba                                      |
+| R24     | tárolt, de eltávolított név jelzése elhagyva                                | eltávolított név jelzése                            |
+| R25     | sse szerkesztés: az Authorization mező üres                                 | sse szerkesztés                                     |
+| R26     | hozzárendelés nélküli változó is nyíllal                                    | hozzárendelés nélküli változó                       |
+| R27     | az eltávolítás bejelentésének szövege más                                   | argumentum eltávolítás                              |
+| R28     | `definition.authEnvName ?? 'nincs'` helyett más felirat                     | sse alapértelmezés felirata                         |
+| R29     | üres alapértelmezésnél nem a deklarált név a felirat                        | sse alapértelmezés felirata                         |
+| R30     | az érvénytelen bejegyzés nem jelzi a hivatkozás alakját                     | érvénytelen bejegyzés                               |
+
+A rontásokat a `/tmp/ront/ront.py` segédszkript futtatta (ideiglenes, nem a repóé): kicseréli a termékkód egy
+szövegét, lefuttatja a megadott spec fájlt, kiírja a bukó teszteket, és visszaállítja a fájlt.
+
+### 3.7 Kapuk
+
+`format:check`, `typecheck` (`TURBO_CONCURRENCY=1`), `lint` (`--concurrency=1`), `test`, `build`, `docs:check`,
+`check:casing`, `check:graph`, `check:db-drift`: mind kilépési kód 0 a végső termékkód fején.
