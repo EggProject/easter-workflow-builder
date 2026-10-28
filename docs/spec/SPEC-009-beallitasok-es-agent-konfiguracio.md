@@ -757,8 +757,8 @@ lépés mezőjének alakján oldja fel (6.2, M-147): az SDK `AgentMcpServerSpec`
 
 ### 7.1 `settingSources` és `strictMcpConfig` (O-20, H-41)
 
-**Döntés (user döntés 2026-10-26):** minden agent lépés `settingSources: []` és `strictMcpConfig: true`
-opcióval fut. A lépés így pontosan azt látja, amit a workflow beállít (plusz a skill könyvtár a plugin
+**Döntés (user döntés 2026-10-26):** minden agent lépés és a kapcsolat teszt `settingSources: []` és
+`strictMcpConfig: true` opcióval fut. A lépés így pontosan azt látja, amit a workflow beállít (plusz a skill könyvtár a plugin
 úton, 5.1). Ma a motor egyiket sem adja át, ezért a d.ts `:2010` szerint a szerver gép
 `~/.claude/settings.json`, a `cwd` alatti `.claude/` beállítás és `CLAUDE.md`, valamint minden ott
 felfedezett skill és MCP szerver érvényesül a workflow-ban beállítottakon felül.
@@ -808,7 +808,9 @@ doksi szerint ezeket a `settingSources` sem vezérli); erre forrásolt kapcsoló
 
 **Megvalósítva (T-012-12):** a `settingSources: []` és a `strictMcpConfig: true` a motor
 `buildAgentStepOptions` függvényének mindig kimenő mezője, az `AgentStepOptions` típusban literál típussal
-(üres tuple, `true`); az auto memory változója a `buildOutgoingEnvironment` negyedik lépése, a
+(üres tuple, `true`), és a kapcsolat teszt (`testProviderConnection`) `query()` hívásának is (T-012-27:
+a független átvizsgálás szerint a kapcsolat teszt addig izoláció nélkül futott, tehát más hitelesítést
+és a gép saját MCP szervereit és hookjait láthatta, mint a lépés); az auto memory változója a `buildOutgoingEnvironment` negyedik lépése, a
 `requiredEnv[]` ráírása után, ezért a lépés és a kapcsolat teszt (`testProviderConnection`) blokkjában is
 áll.
 
@@ -987,8 +989,9 @@ T-012-8-ban, mert az "olvashatatlan YAML" elutasításához YAML elemző kell; a
 
 ### Izoláció és környezet
 
-22. Az agent lépés `Options` objektuma minden lépésnél tartalmazza a `settingSources: []` és a
-    `strictMcpConfig: true` mezőt (motor unit teszt, szerver végponttól végpontig).
+22. Az agent lépés és a kapcsolat teszt `Options` objektuma minden lépésnél és minden tesztnél
+    tartalmazza a `settingSources: []` és a `strictMcpConfig: true` mezőt (motor unit teszt, szerver
+    végponttól végpontig).
 23. A kimenő `env` blokk minden agent lépésnél és a kapcsolat tesztnél `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`
     értéket hordoz, a szerver környezetében álló más érték mellett is (O-39; unit teszt az `Options.env`
     blokkon).

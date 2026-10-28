@@ -1436,6 +1436,30 @@ describe('createEngine', () => {
       });
     });
 
+    it('a lépéssel azonos izolációval fut: settingSources [], strictMcpConfig true (SPEC-009 7.1, O-20)', async () => {
+      let capturedOptions: Readonly<Record<string, unknown>> | undefined;
+      const harness = openHarness({
+        agentQueryRunner: {
+          run: (request) => {
+            capturedOptions = request.options;
+            return {
+              kind: 'ok',
+              value: agentQueryOf(messageIterable([{ type: 'result', subtype: 'success' }])),
+            };
+          },
+        },
+        processEnvironment: { read: () => null, readAll: () => ({}) },
+      });
+
+      okOrThrow(await harness.engine.testProviderConnection('minimax'));
+
+      expect(capturedOptions).toStrictEqual({
+        env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
+        settingSources: [],
+        strictMcpConfig: true,
+      });
+    });
+
     it('az agentQueryRunner.run hibaágát succeeded: false eredménnyé alakítja', async () => {
       const harness = openHarness({
         agentQueryRunner: runnerReturning({ kind: 'error', message: 'teszt: nem indult el a kapcsolat' }),

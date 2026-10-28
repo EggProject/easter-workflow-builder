@@ -169,7 +169,10 @@ export function createEngine(dependencies: EngineDependencies): Engine {
    * `AgentQueryRunner` port nem exponál modell-listázást (nincs
    * `supportedModels()` metódus a porton, `@easter-workflow-builder/agent`
    * `AgentQuery` típusa, SPEC-004 3.3), ezért a teszt egy útja ez az egy
-   * (SPEC-009 O-1).
+   * (SPEC-009 O-1). A lépéssel azonos izolációval fut (`settingSources: []`,
+   * `strictMcpConfig: true`, SPEC-009 7.1, O-20): enélkül a d.ts szerint
+   * minden beállítás forrás betöltődik, és a teszt más hitelesítést, MCP
+   * szervert és hookot láthatna, mint a lépés.
    */
   async function testProviderConnection(providerId: ProviderId): Promise<Outcome<ConnectionTestResult>> {
     const descriptor = dependencies.providerDescriptorLookup(providerId);
@@ -185,7 +188,7 @@ export function createEngine(dependencies: EngineDependencies): Engine {
 
     const query = dependencies.agentQueryRunner.run({
       prompt: CONNECTION_TEST_PROMPT,
-      options: { env: environmentBlock.value },
+      options: { env: environmentBlock.value, settingSources: [], strictMcpConfig: true },
     });
     if (query.kind === 'error') {
       return { kind: 'ok', value: { succeeded: false, errorMessage: query.message } };
