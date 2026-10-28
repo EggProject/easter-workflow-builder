@@ -94,6 +94,26 @@ describe('readServerConfig', () => {
     });
   });
 
+  it.each([
+    ['zárójeles', '/srv/skillek(1)', 'skillek(1)'],
+    ['vesszős', '/srv/rossz,nev', 'rossz,nev'],
+    ['szóközzel kezdődő', '/srv/ skillek', ' skillek'],
+    ['a gyökér', '/', ''],
+  ])(
+    'a(z) %s könyvtárnevű skill könyvtár invalid_env_variable hibát ad, a plugin névvel (SPEC-009 5.1, M-136 5b)',
+    (_label, directory, pluginName) => {
+      expect(readServerConfig({ [ENV_SKILL_LIBRARY_DIRECTORY]: directory })).toStrictEqual({
+        kind: 'error',
+        message: `A(z) "EASTER_SKILL_LIBRARY_DIRECTORY" env változó értéke érvénytelen: a könyvtár neve ("${pluginName}") a skill plugin neve, ami nem lehet üres, nem kezdődhet szóközzel, és nem tartalmazhat zárójelet, vesszőt vagy vezérlő karaktert (invalid_env_variable).`,
+      });
+    },
+  );
+
+  it('a relatív skill könyvtár plugin nevét a feloldott útvonal utolsó tagja adja', () => {
+    expect(readServerConfig({ [ENV_SKILL_LIBRARY_DIRECTORY]: 'skillek/..' }).kind).toBe('ok');
+    expect(readServerConfig({ [ENV_SKILL_LIBRARY_DIRECTORY]: 'skillek/../rossz,nev' }).kind).toBe('error');
+  });
+
   it('a skill könyvtár értékét trimmelve adja', () => {
     const outcome = readServerConfig({ [ENV_SKILL_LIBRARY_DIRECTORY]: '  .data/skills ' });
     expect(outcome.kind === 'ok' && outcome.value.skillLibraryDirectory).toBe('.data/skills');

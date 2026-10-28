@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -68,6 +68,30 @@ describe('runStartupSequence', () => {
     await runStartupSequence({ EASTER_SERVER_PORT: 'nem-szam' }, process.cwd());
 
     expect(process.exitCode).toBe(1);
+  });
+
+  it('érvénytelen plugin nevű skill könyvtárra nem indul el: a hibát a szabványos hibakimenetre írja, a kilépési kód 1 (SPEC-009 5.1)', async () => {
+    const logDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'easter-server-log-'));
+    const written: string[] = [];
+    const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: string | Uint8Array) => {
+      written.push(String(chunk));
+      return true;
+    });
+    try {
+      await runStartupSequence(
+        {
+          ...baseEnvironment(3999, logDirectory),
+          EASTER_SKILL_LIBRARY_DIRECTORY: path.join(logDirectory, 'rossz,nev'),
+        },
+        process.cwd(),
+      );
+    } finally {
+      writeSpy.mockRestore();
+    }
+
+    expect(process.exitCode).toBe(1);
+    expect(written.join('')).toContain('("rossz,nev") a skill plugin neve');
+    expect(written.join('')).toContain('(invalid_env_variable)');
   });
 
   it('olyan adatbázis útvonalra, aminek a könyvtára nem hozható létre, fatal naplóz és 1-re állítja a kilépési kódot', async () => {

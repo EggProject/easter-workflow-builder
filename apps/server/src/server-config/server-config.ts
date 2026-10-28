@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { EnvironmentReader, Outcome } from '@easter-workflow-builder/core';
 import {
   ENV_LOG_DIRECTORY,
@@ -14,6 +15,7 @@ import {
   ENV_STREAM_KEEP_ALIVE_INTERVAL_MS,
 } from './environment-variable-name.ts';
 import { DEFAULT_SERVER_CONFIG } from './default-server-config.ts';
+import { isValidSkillPluginName } from './is-valid-skill-plugin-name.ts';
 
 /**
  * A szerver induláskor beolvasott konfigurációja (SPEC-006 4.2 1. lépés,
@@ -44,6 +46,10 @@ function missingVariableMessage(name: string): string {
 
 function invalidVariableMessage(name: string): string {
   return `A(z) "${name}" env változó értéke érvénytelen (invalid_env_variable).`;
+}
+
+function invalidSkillPluginNameMessage(pluginName: string): string {
+  return `A(z) "${ENV_SKILL_LIBRARY_DIRECTORY}" env változó értéke érvénytelen: a könyvtár neve ("${pluginName}") a skill plugin neve, ami nem lehet üres, nem kezdődhet szóközzel, és nem tartalmazhat zárójelet, vesszőt vagy vezérlő karaktert (invalid_env_variable).`;
 }
 
 /**
@@ -120,6 +126,13 @@ export function readServerConfig(environment: EnvironmentReader): Outcome<Server
   const skillLibraryDirectory = readStringOrDefault(environment, ENV_SKILL_LIBRARY_DIRECTORY, '');
   if (skillLibraryDirectory.length === 0) {
     return { kind: 'error', message: missingVariableMessage(ENV_SKILL_LIBRARY_DIRECTORY) };
+  }
+  // A plugin neve az abszolút útvonal utolsó tagja (a relatív érték az induló könyvtárhoz képest
+  // oldódik fel, ugyanúgy, mint a `continueStartupWithDatabase`-ben), és a `query()` az érvénytelen
+  // alakra dob (M-136 5b), ezért a szerver ilyenkor el sem indul (SPEC-009 5.1).
+  const skillPluginName = path.basename(path.resolve(skillLibraryDirectory));
+  if (!isValidSkillPluginName(skillPluginName)) {
+    return { kind: 'error', message: invalidSkillPluginNameMessage(skillPluginName) };
   }
 
   const skillMaxArchiveBytes = readPositiveIntegerOrDefault(

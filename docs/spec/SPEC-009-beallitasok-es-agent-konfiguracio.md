@@ -303,7 +303,13 @@ részletek, a táblák és a mérő eszközök: `docs/research/2026-10-28-spec-0
   `EASTER_SKILL_LIBRARY_DIRECTORY` env változó (T-012-8; az `EASTER_*` névminta, SPEC-006 4. szekció).
   Hiányában vagy üres értékénél a szerver nem indul (`missing_env_variable`); ez a SPEC-012 4.2 "minden
   értéknek van alapértéke" szabályának kimondott, egyetlen kivétele. Relatív érték a szerver induló
-  könyvtárához képest abszolút útvonalra oldódik. A könyvtár egy plugin gyökér:
+  könyvtárához képest abszolút útvonalra oldódik. A gyökér könyvtárneve a plugin neve (5.3), és a
+  `query()` az érvénytelen alakú `<plugin>:<név>` skill elemre dob (M-136 5b), ezért a szerver induláskor
+  ellenőrzi: a név nem üres, nem kezdődik szóközzel, és nem tartalmaz zárójelet, vesszőt vagy C0, C1
+  vezérlő karaktert (a pinelt SDK `sdk.mjs` névellenőrzésének szó szerinti szabálya); különben nem indul,
+  `invalid_env_variable` hibával, ami a könyvtár nevét is megnevezi (`apps/server` `server-config` téma,
+  `isValidSkillPluginName`). Hogy a `:` vagy más jel a plugin névben a CLI-nél gondot okoz-e, **nem
+  ellenőrzött**; a szabály csak azt utasítja el, amit az SDK forrása elutasít. A könyvtár egy plugin gyökér:
   `<gyökér>/skills/<név>/SKILL.md`; a kicsomagolás ideiglenes mappái (`<gyökér>/.staging-*`) a `skills`
   mappán kívül állnak.
 - **Betöltés:** a motor `plugins: [{ type: 'local', path: <gyökér> }]` opciót ad az agent lépésnek
