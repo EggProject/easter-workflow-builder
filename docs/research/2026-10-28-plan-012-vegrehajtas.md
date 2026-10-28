@@ -290,3 +290,81 @@ szövegét, lefuttatja a megadott spec fájlt, kiírja a bukó teszteket, és vi
 
 `format:check`, `typecheck` (`TURBO_CONCURRENCY=1`), `lint` (`--concurrency=1`), `test`, `build`, `docs:check`,
 `check:casing`, `check:graph`, `check:db-drift`: mind kilépési kód 0 a végső termékkód fején.
+
+## 4. Adverzariális átvizsgálás (T-012-27)
+
+### 4.1 ZIP: a skill feltöltés, lista és törlés találatai
+
+Egy független átvizsgálás tizenegy találatot adott a `apps/server` `skill-endpoint` és `http-server`
+témájára (a reprodukciós szkriptek a repón kívül, `/tmp/adv-zip/` alatt álltak). Minden javított bug
+mellett regressziós unit teszt áll; mindegyik a javítás előtti kódon bukik (saját futtatás: a termékfájlok
+`HEAD` előtti változatával a felsorolt tesztek bukottak, a javítással zöldek). A teszt nevek a
+`<spec fájl> › <describe> > <it>` alakban állnak, rövidítve.
+
+| #   | Találat                                                                                                                                          | Javítás                                                                                                                                                                                                                                                  | Commit    | Teszt                                                                                                                                                                                                                                                                      |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | két egyidejű feltöltés ugyanarra a névre: `ENOTEMPTY`/`ENOENT` kivétel (500), árva `.staging-*-<uuid>` könyvtár                                  | névenkénti soros zár (`skill-name-lock.ts`, folyamaton belüli ígéret lánc), a csere és a törlés ugyanazon a záron; a `previous` könyvtár a `finally` ágban minden kimenetel után törlődik                                                                | `0b07acc` | `upload-skill.spec.ts` › egyidejű írások: "a csere a név zárján fut", "nyolc párhuzamos felülírás mind sikeres", "egyidejű feltöltés és törlés a HTTP úton"; `skill-name-lock.spec.ts` (4 teszt)                                                                           |
+| 2   | Unicode normalizálási ütközés (NFC és NFD név) macOS-en felülírás; a `mkdir` hívások a `try` blokkon kívül                                       | az ütközés kulcsa `normalize('NFC').toLowerCase()`; minden fájlrendszer hívás a bejegyzésenkénti `try` blokkban (`writeEntry`)                                                                                                                           | `2941298` | `find-path-collision.spec.ts` › "két csak Unicode normalizálásban eltérő útvonal ütközik"; `extract-skill-archive.spec.ts` › "2. két, csak Unicode normalizálásban eltérő útvonal"                                                                                         |
+| 3   | a fájlrendszer hibák besorolása: a könyvtár ág `ENAMETOOLONG` 500, a fájl ágon minden fájlrendszer hiba (`EACCES` is) `skill_archive_unreadable` | `isFileSystemError` guard és `classifyFileSystemWriteError` tábla: `ENAMETOOLONG` `skill_archive_unreadable` (O-50 addig), `EEXIST`/`ENOTDIR`/`EISDIR` `skill_archive_path_collision`, minden más továbbdobva, a szerver belső hiba útján 500 `internal` | `2941298` | `extract-skill-archive.spec.ts` › "3. a túl hosszú nevű könyvtár bejegyzés", "3. a túl hosszú nevű fájl és a túl hosszú nevű szülő könyvtár", "3. a szerver oldali fájlrendszer hiba (EACCES)"; `classify-file-system-write-error.spec.ts`; `is-file-system-error.spec.ts` |
+| 4   | YAML alias bomba: a `document.toJS()` dobása kezeletlen                                                                                          | `toPlainValue` elkapja, `skill_manifest_invalid`                                                                                                                                                                                                         | `0c17e14` | `read-skill-manifest.spec.ts` › "az alias bombát hordozó frontmatter skill_manifest_invalid"                                                                                                                                                                               |
+| 5   | a lista (`GET /api/skills`) egy elrontott elemre bukik (`Promise.all`)                                                                           | `summarizeSkillDirectory` elemenként hibatűrő (leírás, méret saját bejárással); a lista `Promise.allSettled`, a `stat` hibás elem kimarad                                                                                                                | `0c17e14` | `list-skills.spec.ts` › "egy kívülről elrontott elem nem buktatja a listát", "a meg sem nyitható elem kimarad"; `summarize-skill-directory.spec.ts` › kívülről elrontott könyvtár (4 teszt)                                                                                |
+| 6   | a záró rekord alulhazudott bejegyzésszáma: a többi bejegyzés csendben kimarad                                                                    | a beolvasott központi könyvtár rekordok összhossza a deklarált központi könyvtár mérettel (ZIP64 esetén a ZIP64 rekordéval) egyezik, különben `skill_archive_unreadable` (`read-declared-central-directory-size.ts`)                                     | `2941298` | `extract-skill-archive.spec.ts` › "6. a záró rekordban alulhazudott bejegyzésszám", "6. a ZIP64 záró rekordos csomag"; `read-declared-central-directory-size.spec.ts`                                                                                                      |
+| 7   | adatot hordozó könyvtár bejegyzés; a csak a helyi fejlécben titkosítottat jelző bejegyzés                                                        | a nem nulla kicsomagolt méretű könyvtár `skill_archive_entry_type_unsupported`; a fájl helyi fejlécének 0. bitje `skill_archive_entry_encrypted`                                                                                                         | `2941298` | `extract-skill-archive.spec.ts` › "7. az adatot hordozó könyvtár bejegyzés", "7. a csak a helyi fejlécben titkosítottat jelző fájl"                                                                                                                                        |
+| 8   | nincs induláskori takarítás                                                                                                                      | `removeStagingLeftovers` a kapcsolatok fogadása előtt (`continueStartupWithDatabase`)                                                                                                                                                                    | `0b07acc` | `remove-staging-leftovers.spec.ts` (2 teszt); `continue-startup-with-database.spec.ts` › "a kapcsolatok fogadása előtt törli a skill könyvtár gyökerének .staging-* maradékait"                                                                                            |
+| 9   | a `PUT` névellenőrzése a törzs teljes beolvasása után fut                                                                                        | a `BinaryRouteHandler` `accept(parameters)` lépése a törzs olvasása előtt dönt; névhibára a törzs megtartás nélkül (nulla korláttal) végigolvasva, a válasz 422                                                                                          | `0b07acc` | `upload-skill.spec.ts` › "a névszabálynak meg nem felelő vagy hiányzó névre az accept a törzs nélkül skill_name_invalid"; `create-http-server.spec.ts` › "a paraméterek elutasításakor a hibaválasz a törzs feldolgozása nélkül jön"                                       |
+| 10  | SPEC-009 5.4 6. pont táblája: "a törzs olvasó a korláton túl olvasást megszakítja", a kód végigolvas                                             | a tábla a kódhoz igazítva (a döntött viselkedés a végigolvasás)                                                                                                                                                                                          | `0c17e14` | dokumentáció, teszt nem tartozik hozzá                                                                                                                                                                                                                                     |
+| 11  | a nem szöveg frontmatter `name` (`123`, `null`) `skill_name_mismatch`                                                                            | termékdöntés, nem változott: SPEC-009 14.9 O-51                                                                                                                                                                                                          | `2941298` | nincs (a viselkedés változatlan)                                                                                                                                                                                                                                           |
+
+### 4.2 Forrás alapú döntések
+
+- **6. találat, felismerhetőség a `yauzl` 3.4.0 forrásából.** A `ZipFile.prototype._readEntry`
+  (`index.js` 282. sor) a 284. sorban `self.entryCount === self.entriesRead` feltételnél leáll; a záró
+  rekord 12. bájtján álló központi könyvtár méretet a `yauzl` nem olvassa és nem ellenőrzi, a
+  `readEntryCursor` mező a `@types/yauzl` 3.4.0 szerint `boolean` típusú, tehát `as` nélkül nem
+  használható. A kicsomagoló ezért a pufferből maga olvassa a deklarált méretet, a `yauzl` keresésével
+  azonos módon (a legutolsó aláírás a fájl utolsó 22 bájtja előtt, ZIP64 helymutatónál a ZIP64 rekord 40. bájtja), és a bejegyzésenkénti `46 + fileNameLength + extraFieldLength + fileCommentLength` összeggel
+  hasonlítja össze (APPNOTE 4.3.12, 4.3.14, 4.3.16).
+- **7. találat, a helyi fejléc olcsó elérése.** A `ZipFile.prototype.readLocalFileHeader` (`index.js` 635.
+  sor) a helyi fejléc 30 bájtját és a nevet olvassa, a `generalPurposeBitFlag` mezővel; a kicsomagolás a
+  `openReadStream` hívásban ugyanezt a fejlécet amúgy is beolvassa (`minimal: true`), tehát a többlet
+  bejegyzésenként egy 30 bájtos és egy név hosszú olvasás a memóriabeli pufferből.
+- **7. találat, az osztály.** A SPEC-009 5.4 táblájának "deklarált és tényleges méret eltér" sora a `yauzl`
+  `validateEntrySizes` ellenőrzésére szól, ami könyvtár bejegyzésre nem fut (az adatát a kicsomagoló nem
+  olvassa); a könyvtár név és a nem nulla tartalom ellentmondásos típus, ezért az 1. pont osztálya
+  (`skill_archive_entry_type_unsupported`), a spec 5.4 1. pontjában rögzítve. A deflate tömörítésű üres
+  könyvtár (nulla kicsomagolt méret) elfogadott, ezért a feltétel a kicsomagolt méret, nem a tömörített.
+- **4. találat.** A telepített `yaml` 2.9.1 `Document.js` `toJS` hívása a `maxAliasCount` értékét
+  alapból 100-ra állítja, az `Alias.js` túllépéskor "Excessive alias count indicates a resource exhaustion
+  attack" kivételt dob; a kivétel elkapása elég, korlátot nem állítunk.
+
+### 4.3 Korlátok és nyitott pontok
+
+- **O-50 (SPEC-009 14.9):** a túl hosszú név vagy túl mély útvonal osztálya termékdöntés; addig
+  `skill_archive_unreadable`, fájl és könyvtár bejegyzésre egyaránt.
+- **O-51 (SPEC-009 14.9):** a nem szöveg frontmatter `name` osztálya termékdöntés; addig
+  `skill_name_mismatch`.
+- **A 6. találat összehangolt hazugsága.** Ha a záró rekord a bejegyzésszámot ÉS a központi könyvtár
+  méretét is az első bejegyzésekhez igazítja, a további rekordok rejtve maradnak, és ezt az ellenőrzés nem
+  látja. Lezárná: a központi könyvtár vége (eltolás plusz méret) és a záró rekord (ZIP64 esetén a ZIP64
+  rekord) kezdete közti rés vizsgálata. Nem készült el, mert a találat a bejegyzésszám hazugságáról szólt.
+- **Digitális aláírás rekord.** Az APPNOTE 4.3.12 szerint a központi könyvtár végén digitális aláírás
+  rekord állhat; ha a deklarált méret azt is tartalmazza, az ilyen csomag `skill_archive_unreadable`
+  lesz. Valódi eszköz kimenetén nem ellenőrzött.
+- **`EEXIST`, `ENOTDIR`, `EISDIR`.** A saját ütközés ellenőrzés után Linuxon nem idézhető elő, ezért csak a
+  besoroló tábla unit tesztje fedi; a macOS fájlrendszer kis-nagybetű összevonásának a `toLowerCase`
+  kulcstól eltérő esetei nem ellenőrzöttek.
+- **A zár folyamaton belüli.** Két szerver folyamat ugyanarra a skill könyvtárra nem sorosodik; a SPEC-009
+  5.1 egyetlen szerver folyamatot ír le.
+- **A lista kimaradó eleme nem naplózódik.** A `stat` hibás skill könyvtár csendben kimarad, mert a
+  végpont kezelők nem kapnak loggert (a `create-http-server.ts` naplózási modellje).
+- **A jogosultság tesztek** (`chmod`) nem root futtatót feltételeznek; a sandbox futtatója nem root
+  (`id -u`: 1045).
+
+### 4.4 Kapuk
+
+Minden commit előtt a kilenc kapu nulla kilépési kóddal futott (`format:check`, `typecheck`
+`TURBO_CONCURRENCY=1`, `lint` `--concurrency=1`, `test` 100 százalékos lefedettséggel mind a négy metrikán,
+`build`, `docs:check`, `check:casing`, `check:graph`, `check:db-drift`). Az e2e nem futott újra: a
+változás kizárólag az `apps/server` csomagot érinti, az `apps/web` e2e tesztjei minden REST hívást
+`page.route()` mockkal szolgálnak ki (szabálykönyv 11. szekció), tehát a szerver kódja az e2e
+lefedettségben nem szerepel.
