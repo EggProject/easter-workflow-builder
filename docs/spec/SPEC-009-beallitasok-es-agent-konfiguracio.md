@@ -357,13 +357,20 @@ könyvtártól; a zip kezelő a `yauzl` (O-33, lezárva). Mindegyik elutasítás
 bejegyzést), megnevezett hibával, és semmi nem marad a skill könyvtárban.
 
 1. **Bejegyzés típus.** Csak könyvtár és szabályos fájl fogadható el. Szimbolikus link, eszköz fájl,
-   FIFO és bármi más típus elutasítva. A típus a zip bejegyzés metaadatából (Unix mód) olvasott; a
-   pontos mező és bitkiosztás a PLAN-012 F0-ban a választott könyvtár dokumentációjából kerül ki.
+   FIFO és bármi más típus elutasítva. A típus a zip bejegyzés metaadatából (Unix mód) olvasott
+   (T-012-8, `apps/server` `skill-endpoint/resolve-zip-entry-kind.ts`): Unix gazdán (a `yauzl` `Entry`
+   `versionMadeBy` mezőjének felső bájtja 3, APPNOTE 4.4.2) az `externalFileAttributes` felső 16 bitje a
+   `st_mode`, ennek fájltípus mezője (`0o170000` maszk) könyvtár (`0o040000`) vagy szabályos fájl
+   (`0o100000`) lehet; nem Unix gazdán, vagy üres típus mezőnél a `/` végű név a könyvtár (APPNOTE
+   4.4.17). Ha a Unix típus és a név ellentmond, a bejegyzés nem támogatott.
 2. **Útvonal.** A bejegyzés neve nem lehet abszolút (`/` vagy meghajtó jel kezdet), nem tartalmazhat `..`
    szegmenst, visszaper (`\`) jelet és NUL bájtot. A kicsomagolás célja a feloldott abszolút útvonal
    alapján a cél könyvtáron belül marad (a fenti névszabály mellett ez a második védvonal). Ha
    a választott könyvtár beépített fájlnév ellenőrzést ad (például a `yauzl` `validateFileName` függvénye), az sem váltja ki a saját
-   ellenőrzést.
+   ellenőrzést. A megvalósítás (T-012-8) a `decodeStrings: false` opcióval a nevet maga dekódolja
+   (`getFileNameLowLevel`, a `strictFileNames` megfelelőjével, tehát a visszaper nem cserélődik `/`-re),
+   így a beépített ellenőrzés nem előzi meg a sajátot; az üres és a `.` szegmens is tiltott, mert
+   ugyanarra a helyre több név mutatna, és a 3. pont ütközés ellenőrzése a kanonikus névre épül.
 3. **Ütközés.** Két azonos útvonalú bejegyzés, és két, csak kis-nagybetűben eltérő útvonalú bejegyzés
    elutasítva (a kis-nagybetűt nem érzékeny fájlrendszeren, pl. macOS-en, az egyik felülírná a másikat;
    a fejlesztői gép macOS, `.claude/CLAUDE.md` 12. szekció).
@@ -372,7 +379,11 @@ bejegyzést), megnevezett hibával, és semmi nem marad a skill könyvtárban.
    minden bejegyzés ebben a mappában áll; a mappa nevét a rendszer lecsípi, a skill neve a feltöltéskor
    megadott név. Pontosan egy `SKILL.md` kötelező a skill gyökerében. Hiánya, több példánya, olvashatatlan YAML frontmatter, üres `description` vagy a
    `description` 1024 karakter fölött: elutasítás (az Agent Skills specifikáció és a platform doksi
-   szerint a `description` kötelező, nem üres, legfeljebb 1024 karakter, 2.2).
+   szerint a `description` kötelező, nem üres, legfeljebb 1024 karakter, 2.2). A frontmatter a fájl első
+   `---` sorától a következő `---` sorig tart, és a `yaml` csomag (`parseDocument`, a `errors` tömbje)
+   olvassa; a hossz UTF-16 kódegységben számolt, mert a forrás a karakter fogalmát nem pontosítja, és ez
+   a szigorúbb olvasat (T-012-8). A többszörös `SKILL.md` (két azonos nevű bejegyzés) az elrendezés
+   ellenőrzésében, a 3. pont ütközése előtt dől el, hogy a saját osztálya elérhető legyen.
 5. **Név.** A feltöltéskor megadott név szabálya a dokumentált `name` szabály (2.2): 1-64 karakter,
    kisbetű, szám és kötőjel, nem kezdődik vagy végződik kötőjellel, nincs `--`, nem tartalmazza az
    "anthropic" és "claude" szót. Ha a frontmatter `name` mezője meg van adva és eltér a megadott
@@ -701,7 +712,9 @@ A skill könyvtár a fájlrendszeren áll (O-9), ezért a skillhez nincs tábla.
 központi MCP definíciók **új DB táblában** állnak (migráció, `check:db-drift` kapu), és a lépés tárolt
 alakja a JSON dokumentum egy új, elhagyható mezőjével bővül (O-42). Új workspace csomag nincs (a 19 marad, a
 `package-layer.ts` réteg térképe nem változik); a `yauzl` és a `@types/yauzl` az `apps/server`
-függősége.
+függősége, mellettük a `yaml` (a `SKILL.md` frontmatter elemzése, 5.4 4. pont; technikai döntés a
+T-012-8-ban, mert az "olvashatatlan YAML" elutasításához YAML elemző kell; a verziók a
+`docs/research/2026-08-26-toolchain.md` "Skill könyvtár csomagok" szekciójában).
 
 ---
 
