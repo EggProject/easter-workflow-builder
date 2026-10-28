@@ -535,3 +535,23 @@ a lines számokat a nyers adatból újra előállított `json-summary` riport ad
 ### 4.10 Felület: kapuk
 
 Minden commit előtt a kilenc kapu nulla kilépési kóddal futott, a 4.4 szerinti módon.
+
+### 4.11 Felület: a két maradék találat (a 4.8 két "nem változott" pontja)
+
+Kiinduló fej: `fdaf7d8`. Mindkét javítás külön, a kilenc kapun zöld commit.
+
+| #   | Találat                                                                                                          | Commit    | Teszt (régi kódon bukik)                                                                                                                                                                                                                                                                                                                     |
+| --- | ---------------------------------------------------------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 9   | Az MCP szerver mentése utáni újratöltés hibája némán elnyelődött, az új szerver nem látszott a listában          | `a3a163f` | `merge-mcp-server.spec.ts` (4), `use-mcp-server-library.spec.tsx` (2 új, 1 bővített), `McpServerSettingsCard.spec.tsx` (2), e2e `mcp-server-settings.spec.ts`: a mentés utáni újratöltés hibája danger Alert a kártyán, az új szerver a PUT válaszából a listában marad, és az azonos nevű következő hozzáadás felülírás figyelmeztetést kap |
+| 10  | A workflow létrehozó modális Létrehozás gombja "Létrehozás..." feliratot váltott, nem a közös `isLoading` mintát | `459cb8c` | `create-workflow-modal.spec.tsx` (aria-busy, tiltott, `is-loading`, a felirat nem változik), e2e `workflow-list.spec.ts`: a létrehozás alatt a Létrehozás gomb tiltott és betöltést jelez                                                                                                                                                    |
+
+**A 9. találat.** A `saveServer` a `skill-upload` mintájára (`b1896bb`) a PUT válaszát `mergeMcpServer` hívással azonnal a
+listába illeszti (név szerinti, UTF-16 kódegység sorrend, azonos név esetén csere; a név ASCII, tehát a szerver bináris
+`ORDER BY name` sorrendjével egyezik), és csak utána tölt újra egy külön `reloadRequest` állapottal; az újratöltés hibája a
+kártyán danger `Alert` a lista és a Hozzáadás gomb között. A törlés útja nem tölt újra (a sor helyben kikerül), ott a hiba nem
+nyelődhetett el. A régi kódon az e2e teszt az új szerver sorát nem találta, a hook unit tesztjei a `reloadState` hiányán buktak.
+
+**A teljes e2e a két javítás után** (fej `459cb8c`, a 4.9 módszerével): 740 teszt, mind zöld; a fedetlen tételek 10 / 10 / 1 / 10
+(statements 10/2692, branches 10/1327, functions 1/942, lines 10/2577), egyik metrikán sem nőtt. A kritérium tábla
+lépés (T-012-28) egy további e2e tesztet hozott, a teljes futás utána 741 teszt, a fedetlen tételek változatlanok
+(`docs/research/2026-10-28-spec-009-kriterium-tabla.md` 3. szekció).

@@ -121,6 +121,14 @@ describe('SettingsScreen', () => {
     expect(container.querySelector('.settings-screen')?.children).toHaveLength(6);
   });
 
+  it('mind a hat kártya a képernyő közvetlen card gyereke, és egyik kártyában sincs második card (kártya a kártyában nélkül, AC1)', async () => {
+    await render(createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false }).fetchFunction);
+
+    const children = [...(container.querySelector('.settings-screen')?.children ?? [])];
+    expect(children.map((child) => child.classList.contains('card'))).toEqual([true, true, true, true, true, true]);
+    expect(container.querySelectorAll(':scope .card .card')).toHaveLength(0);
+  });
+
   it('a provider listát, a beállítást, a korlátokat, a skill listát, az MCP szerver listát és a szerver környezet neveit egyszer tölti be, kártyánként ismételt kérés nélkül', async () => {
     const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
     await render(fetchFunction);
