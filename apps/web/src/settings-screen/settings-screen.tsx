@@ -68,6 +68,7 @@ export function SettingsScreen(properties: Readonly<SettingsScreenProperties>): 
       <RunLogSettingsCard settingsState={settingsState} saveSettings={saveSettings} />
       <SkillLibrarySettingsCard
         skillsState={skillLibrary.state}
+        reloadState={skillLibrary.reloadState}
         uploadSkill={skillLibrary.uploadSkill}
         deleteSkill={skillLibrary.deleteSkill}
       />

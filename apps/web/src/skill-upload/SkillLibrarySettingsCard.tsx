@@ -11,6 +11,12 @@ import './skill-upload.css';
 
 export interface SkillLibrarySettingsCardProperties {
   readonly skillsState: RequestState<readonly SkillSummary[]>;
+  /**
+   * A feltöltés utáni újratöltés állapota (`useSkillLibrary`): a hibája danger
+   * `Alert` a lista és az űrlap között, a lista közben a `PUT` válaszával
+   * bővített állapotban marad.
+   */
+  readonly reloadState: RequestState<readonly SkillSummary[]>;
   readonly uploadSkill: (name: string, archive: Blob) => Promise<RouteOutcome<SkillSummary>>;
   readonly deleteSkill: (name: string) => Promise<RouteOutcome<undefined>>;
 }
@@ -23,10 +29,10 @@ export interface SkillLibrarySettingsCardProperties {
  * A kártya kimondja a feltöltés két kockázatát: a skill fájl nem tartalmazhat
  * titkot, és a csomag futtatható fájlt is hordozhat, amit az agent a szerver
  * gép felhasználójának jogosultságával futtathat (5.1). A betöltés alatt
- * csontváz, a betöltés hibája danger `Alert`. Kártya a kártyában nincs.
+ * csontváz, a betöltés és a feltöltés utáni újratöltés hibája danger `Alert`. Kártya a kártyában nincs.
  */
 export function SkillLibrarySettingsCard(properties: Readonly<SkillLibrarySettingsCardProperties>): ReactElement {
-  const { skillsState, uploadSkill, deleteSkill } = properties;
+  const { skillsState, reloadState, uploadSkill, deleteSkill } = properties;
   const headingId = useId();
   const [skillToDelete, setSkillToDelete] = useState<SkillSummary | undefined>(undefined);
 
@@ -52,6 +58,7 @@ export function SkillLibrarySettingsCard(properties: Readonly<SkillLibrarySettin
         ) : (
           skills.map((skill) => <SkillRow key={skill.name} skill={skill} onDelete={setSkillToDelete} />)
         )}
+        {reloadState.status === 'failure' && <Alert variant="danger">{reloadState.message}</Alert>}
         <SkillUploadForm skills={skills} uploadSkill={uploadSkill} />
       </>
     );

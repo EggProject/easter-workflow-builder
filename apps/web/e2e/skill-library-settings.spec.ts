@@ -286,6 +286,35 @@ test('azonos nevű skill feltöltése megerősítést kér: a Mégse nem küld s
   await expect(card(page).getByRole('group')).toHaveCount(2);
 });
 
+test('a feltöltés utáni újratöltés hibája danger Alert, az új skill a PUT válaszából a listában marad, és az azonos nevű következő feltöltés megerősítést kér', async ({
+  page,
+}) => {
+  await installMocks(page, async (route) => {
+    mockState.listCalls += 1;
+    await (mockState.listCalls === 1
+      ? route.fulfill(jsonBody(mockState.skills))
+      : route.fulfill(jsonBody({ code: 'internal', message: 'belső hiba' }, 500)));
+  });
+  await page.goto('/settings');
+  await expect(card(page)).toBeVisible();
+
+  await fillName(page, 'gamma');
+  await chooseArchive(page);
+  await submit(page);
+
+  await expect(row(page, 'gamma')).toBeVisible();
+  await expect(card(page).getByRole('group')).toHaveText([/alfa/u, /beta/u, /gamma/u]);
+  await expect(card(page).getByRole('alert')).toHaveClass(/\balert--danger\b/u);
+  expect(mockState.listCalls).toBe(2);
+
+  await fillName(page, 'gamma');
+  await chooseArchive(page);
+  await submit(page);
+
+  await expect(dialog(page, 'Skill felülírása')).toContainText('Már van gamma nevű skill');
+  expect(mockState.uploads).toHaveLength(1);
+});
+
 test('a szerver elutasítása "A csomag túl nagy." és "Hiányzik a SKILL.md." mondattal áll az űrlap alatti danger Alert blokkban, a lista változatlan, belső szöveg nélkül (AC11)', async ({
   page,
 }) => {

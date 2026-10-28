@@ -8,6 +8,7 @@ import { emptyResponseSchema } from '../rest-client/empty-response-schema.ts';
 import { requestRouteWithZipBody } from '../rest-client/request-route-with-zip-body.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import type { RouteOutcome } from '../rest-client/route-outcome.ts';
+import { mergeSkill } from './merge-skill.ts';
 
 export interface UseSkillLibraryResult {
   /**
@@ -17,8 +18,19 @@ export interface UseSkillLibraryResult {
    */
   readonly state: RequestState<readonly SkillSummary[]>;
   /**
+   * A feltöltés utáni háttér újratöltés állapota: `failure`, ha a szerver
+   * sorrendjét hozó `GET` elbukott (a lista ilyenkor a `PUT` válaszával
+   * bővített, utolsó ismert állapot). Külön állapot, hogy az újratöltés ne
+   * váltsa csontvázra a listát és az űrlapot.
+   */
+  readonly reloadState: RequestState<readonly SkillSummary[]>;
+  /**
    * `PUT /api/skills/{name}` nyers ZIP törzzsel (SPEC-009 5.1): siker után a
-   * lista újratöltődik, mert a szerver a név szerinti sorrendet adja.
+   * `PUT` válasza azonnal a listába kerül (név szerint rendezve, azonos név
+   * cseréjével), utána a lista újratöltődik a szerver sorrendjéért. Az
+   * azonnali beillesztés nélkül egy elbukó újratöltés után az azonos nevű
+   * következő feltöltés a régi listában keresne, és a felülírás megerősítése
+   * kimaradna.
    */
   readonly uploadSkill: (name: string, archive: Blob) => Promise<RouteOutcome<SkillSummary>>;
   /**
@@ -34,8 +46,10 @@ export interface UseSkillLibraryResult {
  */
 export function useSkillLibrary(apiOrigin: string, fetchFunction: FetchFunction): UseSkillLibraryResult {
   const loadRequest = useRequestState<readonly SkillSummary[]>();
+  const reloadRequest = useRequestState<readonly SkillSummary[]>();
   const [skills, setSkills] = useState<readonly SkillSummary[]>([]);
   const { run } = loadRequest;
+  const { run: runReload } = reloadRequest;
 
   const fetchSkills = useCallback(async (): Promise<RouteOutcome<readonly SkillSummary[]>> => {
     const outcome = await requestRouteWithoutBody({
@@ -65,11 +79,13 @@ export function useSkillLibrary(apiOrigin: string, fetchFunction: FetchFunction)
         apiOrigin,
       });
       if (outcome.kind === 'ok') {
-        await fetchSkills();
+        const uploaded = outcome.value;
+        setSkills((previous) => mergeSkill(previous, uploaded));
+        await runReload(fetchSkills);
       }
       return outcome;
     },
-    [apiOrigin, fetchFunction, fetchSkills],
+    [apiOrigin, fetchFunction, fetchSkills, runReload],
   );
 
   const deleteSkill = useCallback(
@@ -92,5 +108,5 @@ export function useSkillLibrary(apiOrigin: string, fetchFunction: FetchFunction)
   const state: RequestState<readonly SkillSummary[]> =
     loadRequest.state.status === 'success' ? { status: 'success', value: skills } : loadRequest.state;
 
-  return { state, uploadSkill, deleteSkill };
+  return { state, reloadState: reloadRequest.state, uploadSkill, deleteSkill };
 }

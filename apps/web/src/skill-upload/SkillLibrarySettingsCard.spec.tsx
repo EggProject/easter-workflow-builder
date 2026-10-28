@@ -35,6 +35,7 @@ describe('SkillLibrarySettingsCard', () => {
       root.render(
         <SkillLibrarySettingsCard
           skillsState={success([ALFA, BETA])}
+          reloadState={{ status: 'idle' }}
           uploadSkill={vi.fn()}
           deleteSkill={vi.fn()}
           {...overrides}
@@ -97,6 +98,23 @@ describe('SkillLibrarySettingsCard', () => {
 
     expect(container.querySelector('.alert--danger')?.textContent).toContain('A szerver nem érhető el.');
     expect(container.querySelector('form')).toBeNull();
+  });
+
+  it('az újratöltés hibája danger Alert a lista és az űrlap között, a lista és az űrlap megmarad', () => {
+    render({ reloadState: { status: 'failure', message: 'A skill lista nem töltődött újra.' } });
+
+    const alert = container.querySelector('.alert--danger');
+    expect(alert?.textContent).toContain('A skill lista nem töltődött újra.');
+    expect(container.querySelectorAll('.preference-row')).toHaveLength(2);
+    expect(container.querySelector('form.skill-upload-form')).not.toBeNull();
+  });
+
+  it('az újratöltés közbeni és sikeres állapotában nincs Alert', () => {
+    render({ reloadState: { status: 'pending' } });
+    expect(container.querySelector('.alert')).toBeNull();
+
+    render({ reloadState: success([ALFA]) });
+    expect(container.querySelector('.alert')).toBeNull();
   });
 
   it('a sor Törlés gombja a megerősítő modálist nyitja a skill nevével, a törlés a modálisból megy', async () => {

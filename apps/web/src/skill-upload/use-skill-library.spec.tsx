@@ -95,6 +95,63 @@ describe('useSkillLibrary', () => {
     expect(current().state).toEqual({ status: 'success', value: [ALFA, BETA, GAMMA] });
   });
 
+  it('siker után a PUT válasza azonnal a listában van, az újratöltés hibája pedig a reloadState hibája, a lista megmarad', async () => {
+    let isUploaded = false;
+    await mount((_input, init) => {
+      if (init.method === 'PUT') {
+        isUploaded = true;
+        return Promise.resolve(Response.json(BETA));
+      }
+      return isUploaded
+        ? Promise.resolve(Response.json({ code: 'internal', message: 'belső hiba' }, { status: 500 }))
+        : Promise.resolve(Response.json([ALFA, GAMMA]));
+    });
+    expect(current().reloadState).toEqual({ status: 'idle' });
+
+    await act(async () => {
+      await current().uploadSkill('beta', new Blob([]));
+    });
+
+    expect(current().state).toEqual({ status: 'success', value: [ALFA, BETA, GAMMA] });
+    expect(current().reloadState.status).toBe('failure');
+  });
+
+  it('az azonos nevű feltöltés a régi sort cseréli a listában, az újratöltés hibája mellett is', async () => {
+    const replaced: SkillSummary = { ...ALFA, description: 'Cserélt leírás.', sizeBytes: 999 };
+    let isUploaded = false;
+    await mount((_input, init) => {
+      if (init.method === 'PUT') {
+        isUploaded = true;
+        return Promise.resolve(Response.json(replaced));
+      }
+      return isUploaded ? Promise.reject(new Error('nincs hálózat')) : Promise.resolve(Response.json([ALFA, BETA]));
+    });
+
+    await act(async () => {
+      await current().uploadSkill('alfa', new Blob([]));
+    });
+
+    expect(current().state).toEqual({ status: 'success', value: [replaced, BETA] });
+  });
+
+  it('a sikeres újratöltés a reloadState success állapota, és a szerver sorrendjét adja', async () => {
+    let skills: readonly SkillSummary[] = [ALFA];
+    await mount((_input, init) => {
+      if (init.method === 'PUT') {
+        skills = [ALFA, BETA, GAMMA];
+        return Promise.resolve(Response.json(BETA));
+      }
+      return Promise.resolve(Response.json(skills));
+    });
+
+    await act(async () => {
+      await current().uploadSkill('beta', new Blob([]));
+    });
+
+    expect(current().reloadState).toEqual({ status: 'success', value: [ALFA, BETA, GAMMA] });
+    expect(current().state).toEqual({ status: 'success', value: [ALFA, BETA, GAMMA] });
+  });
+
   it('a sikertelen feltöltés hibaágat ad, és a lista változatlan marad, újratöltés nélkül', async () => {
     const requests: string[] = [];
     await mount((input, init) => {
