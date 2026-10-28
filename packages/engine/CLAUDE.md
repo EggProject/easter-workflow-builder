@@ -336,14 +336,14 @@ A `StepStartedPayload` három opcionális jelölő mezője (`strategyUnproven`,
 származik, és a T-005-9-ben jelzett, tervezett bővítés beváltása. Az utolsó szándékosan logikai,
 nem névlista: a bizonytalanság éppen azt jelentheti, hogy a tool nevek sem ismertek.
 
-**A `run-validation` téma határa: a SPEC-004 11.2 provider validáció bedrótozása egy későbbi
-lépésre vár.** A SPEC-004 4.8 3. lépése a gráf validációt és a provider validációt egyetlen
+**A `run-validation` téma határa: a SPEC-004 11.2 provider validáció nem a `validateRun`-ban,
+hanem a `run-supervisor` `validateProviderCapabilities` hívásában fut.** A SPEC-004 4.8 3. lépése a gráf validációt és a provider validációt egyetlen
 blokként nevezi meg, és a `capability-policy` téma (T-005-13) a leírótól függő ellenőrzéseket már
 megírta. A `validateRun` mégis csak a **gráf** oldalt drótozza be, plusz a 4.8 2. lépésének
 provider **feloldását**; a leíró alapú ellenőrzések (`validateModelId`, `resolveThinkingMode`,
 `resolveEffortInclusion`, `resolveStructuredOutputStrategy`, `validateMaxTurnsFloor`,
-`validateForcedToolChoiceRisk`, `validateSdkVersionMatch`) hívása a **T-005-19 `agent-step`
-lépésre** marad. Az indok nem a lépés mérete: ezek a függvények nem `Outcome<void>` ellenőrzések,
+`validateForcedToolChoiceRisk`, `validateSdkVersionMatch`) hívása nem a `validateRun` dolga: a
+T-005-19 `agent-step` lépés tervezte, és a T-005-25 óta a `run-supervisor` végzi (lásd lent). Az indok nem a lépés mérete: ezek a függvények nem `Outcome<void>` ellenőrzések,
 hanem **döntéseket** adnak vissza (`CapabilityFieldInclusion`, `StructuredOutputStrategyDecision`,
 `ModelIdentifierDecision`, `DisallowedServerToolsDecision`), amiket az `Options` objektum
 összeállítása fogyaszt, és amikből a `StepStartedPayload` három `unproven` jelölője származik. Ha

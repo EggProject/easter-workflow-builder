@@ -26,17 +26,18 @@ minta (`aria-token-list`, `class-name-list`, `component-boundary-invariant`,
 egyik sem a SPEC-007 12.2 UI témái közé tartozik, hanem a SPEC-002 6.2 5. pontja szerinti
 konfigurációs invariáns saját mappában.
 
-**A SPEC-008 F3, F4 és F5 fázisa (PLAN-009) folyamatban bővíti a gráf szerkesztővel, a futás
-nézettel és a transcript panellel.** Eddig elkészült témák: `graph-node-catalog` (T-009-14,
+**A SPEC-008 F3, F4 és F5 fázisa (PLAN-009, lezárva) bővítette a gráf szerkesztővel, a futás
+nézettel és a transcript panellel.** Az elkészült témák: `graph-node-catalog` (T-009-14,
 tizenhetedik), `graph-node-card` (T-009-15, tizennyolcadik), `graph-editor` (T-009-16,
 tizenkilencedik), `node-inspector` (T-009-18, huszadik), `graph-auto-layout` (T-009-19,
 huszonegyedik), `run-graph` (T-009-20, huszonkettedik), `run-view` (T-009-20, huszonharmadik),
 `run-control` (T-009-23, huszonnegyedik), `run-event-row` (T-009-24, huszonötödik),
 `transcript-panel` (T-009-25, huszonhatodik) és `approval-prompt` (T-009-27, huszonhetedik). A
-SPEC-008 11.2 szekciója tíz témát ír elő, ezzel mind a tíz elkészült; a végleges
-"huszonnégy téma" végösszeg (SPEC-008 DoD 2.) és a jelen tényleges darabszám (tizenkettő
-SPEC-007 UI + hét invariáns + tizenkét SPEC-008 + a saját kiegészítés `themed-skeleton` =
-harminckettő) közötti eltérés a PLAN-009 T-009-32 (F8) zárásának hatóköre, nem ezé a lépésé. A
+SPEC-008 11.2 szekciója tíz témát ír elő, ezzel mind a tíz elkészült; a "huszonnégy téma"
+végösszeg (SPEC-008 DoD 2.) és a tényleges darabszám (tizenkettő SPEC-007 UI + nyolc invariáns +
+tizenkét SPEC-008 + a saját kiegészítés `themed-skeleton` és `branch-iteration-list` (T-009-61) =
+harmincnégy `src/` téma mappa) közötti eltérést a spec szándékosan nem számolja (SPEC-008
+11.1 szekció vége: kitalált szám ide nem kerül). A
 `run-control` téma a SPEC-008 11.2 táblázatán FELÜLI, tizenegyedik SPEC-008 téma: a spec a futás
 vezérlését a `run-view` témába sorolta, de az indítás modálisa a SZERKESZTŐBŐL nyílik (SPEC-008
 6.5), tehát a két képernyő közös fogalma, nem az egyiké. A tizenkettedik, szintén a 11.2

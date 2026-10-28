@@ -877,7 +877,7 @@ fájlban van**, pontonként a kérdéssel, a válasszal, a bizonyítékkal (forr
 a következménnyel. Az alábbi táblázat csak az állást összegzi.
 
 **20-ból 19 lezárva, 1 nyitva (V-14).** Feltételezéssel lezárt pont nincs: a nyitva
-maradó pontok is explicit, indokolt nyitva-jelöléssel szerepelnek, nem hallgatólagos
+maradó pont is explicit, indokolt nyitva-jelöléssel szerepel, nem hallgatólagos
 feltételezéssel lezárva. A V-18 és a V-19 az elfogadási kritériumok tételes auditja során
 merült fel, utólag, a V-1 ... V-17 lezárása után. A V-20 még később, egy éles GitHub Actions
 futás bukásából merült fel, nem auditból.
@@ -902,10 +902,10 @@ futás bukásából merült fel, nem auditból.
 | V-16 | A wrapper scriptek csonkolási határa                                     | **Lezárva, projekt döntéssel, mérésre támaszkodva.** Marad 50. Dokumentált szabály erre nincs, ezt kimondjuk; a mérés a nagyságrendi keretet adja.                                                                                                                                                                                                                                                                                                                       |
 | V-17 | Az artefaktum retenciós napszám                                          | **Lezárva, projekt döntéssel.** Nem állítunk explicit értéket, a repository alapértelmezése érvényesül. Ajánlott napszámra dokumentált forrás nincs.                                                                                                                                                                                                                                                                                                                     |
 | V-18 | A `//#test` gyökér-szkópolt task `dependsOn` értéke                      | **Lezárva, méréssel.** `[]` a helyes érték, a spec eredeti `^typecheck` javaslata a root taskra nem alkalmazható (lásd 5. szekció, `turbo run test --dry=json` mérés).                                                                                                                                                                                                                                                                                                   |
-| V-19 | A Playwright smoke teszt tényleges böngésző-futtatása ebben a sandboxban | **Lezárva, méréssel.** Lefut. Az eredeti "nem javítható környezeti korlát" lezárás téves volt: egyetlen rendszerkönyvtár (`libxdamage1`) hiányzott, amit root nélkül is lehet telepíteni (`apt-get download` plusz `dpkg -x`, `LD_LIBRARY_PATH`), a repó módosítása nélkül; a `bun run test:e2e` valódi Chromiumon zölden fut.                                                                                                                                           |
+| V-19 | A Playwright smoke teszt tényleges böngésző-futtatása ebben a sandboxban | **Lezárva, méréssel.** A böngésző elindul: az egyetlen hiányzó rendszerkönyvtár (`libXdamage.so.1`, csomag `libxdamage1`) root nélkül, `apt-get download` plusz `dpkg -x` és `LD_LIBRARY_PATH` útján pótolható, a repó módosítása nélkül; a smoke teszt zölden lefut, a `bun run test:e2e` valódi Chromiumon zölden fut. A korábbi "nem javítható környezeti korlát" lezárás téves volt. Lásd lent.                                                                      |
 | V-20 | A Turborepo cache találat és az e2e lefedettségi riport ütközése         | **Lezárva, méréssel.** Cache találatkor a Playwright nem fut, és a nyers e2e coverage könyvtár nem állt helyre, mert nem szerepelt a `test:e2e` task `outputs` mezőjében, ezért a rákövetkező `nyc report` `ENOENT` hibával bukott. Javítva: `outputs` plusz `e2e/.nyc_output/**`, `inputs` plusz `!**/e2e/.nyc_output/**` negáció, a hibák a `tooling/scripts/e2e-coverage.sh` wrapperben a stderr-re mennek. Éles CI futás bukásából merült fel, helyben reprodukálva. |
 
-### A nyitva maradt pont
+### A nyitva maradt pont és a V-19 lezárása
 
 **V-14.** Ami igazolt: a Bun globális cache könyvtára `~/.bun/install/cache`
 ([Bun global cache](https://bun.com/docs/pm/global-cache)), az `oven-sh/setup-bun` kizárólag a Bun
@@ -918,6 +918,16 @@ A lezárásához egy PR kell, ami legalább kétszer lefuttatja a workflow-t, é
 `Cache Bun global cache` plusz `Install dependencies` lépés együttes idejét. Ha nem nyer időt, a
 lépés elhagyandó. Ez nem blokkolja a spec elfogadását: a hivatalosan dokumentált `.turbo` cache
 ettől függetlenül működik.
+
+**V-19 (lezárva, méréssel).** Az `apps/web` Playwright csomagja, a `playwright.config.ts` és a
+`webServer` konfiguráció helyes, és a böngésző elindul. A sandbox rootless konténer (`sudo` és
+`apt-get install` nem használható), de a Chromiumhoz az egyetlen hiányzó rendszerkönyvtár
+(`libXdamage.so.1`) root nélkül is pótolható: `apt-get download` plusz `dpkg -x`, majd
+`LD_LIBRARY_PATH`. Ez kizárólag környezeti változó, a repóban semmit nem kell módosítani, ezért a CI-re
+nincs hatása; `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS`-et nem használunk. A korábbi, "a
+Chromium ebben a sandboxban nem indítható, nem javítható" lezárás téves volt. Mérés, parancsok és
+ellenpróba: `docs/research/2026-08-26-spec001-ellenorzesek.md` V-19 szekció; a buktató a
+`.claude/CLAUDE.md` 12. szekciójában ("Playwright rootless konténerben").
 
 ### Lezárt döntés
 
@@ -967,7 +977,7 @@ ettől függetlenül működik.
 38. A `tools/wire-probe` `typecheck` és `lint` taskja a Turborepo gráfban nulla kilépési kóddal fut, és a mérőeszköz forrása nem igényelt `any` vagy `as` bevezetést a szigorítás miatt.
 39. A repo gyökerében és minden workspace csomag gyökerében van `CLAUDE.md`, a 14. szekció kötelező szekcióival, alkönyvtárban (téma vagy tárgykör mappában) nincs, és egyik sem tartalmaz olyan verziószámot, ami a research fájlban is szerepel.
 40. A `CLAUDE.md` teljességet ellenőrző script létezik, és a teljes repón nulla kilépési kóddal fut.
-41. A 15. szekció mind a 20 `V-*` pontja rendezett: vagy dokumentált forrásra hivatkozó döntéssel lezárva, vagy saját, most futtatott mérésre hivatkozva lezárva, vagy - V-14 esetén - explicit, indokolt nyitva-jelöléssel, ami arra hivatkozik, hogy a kérdés csak GitHub Actions runneren mérhető. Feltételezéssel (mérés vagy dokumentáció nélkül) lezárt pont nincs.
+41. A 15. szekció mind a 20 `V-*` pontja rendezett: vagy dokumentált forrásra hivatkozó döntéssel lezárva, vagy saját, most futtatott mérésre hivatkozva lezárva, vagy - V-14 esetén - explicit, indokolt nyitva-jelöléssel, ami a végrehajtási környezet igazolt korlátjára hivatkozik: a kérdés csak GitHub Actions runneren mérhető. Feltételezéssel (mérés vagy dokumentáció nélkül) lezárt pont nincs.
 42. A D-1 döntés lezárva: a user döntése alapján nincsenek TypeScript projekt referenciák a csomagok között, a build sorrendet kizárólag a `turbo.json` `dependsOn` mezője adja.
 43. A `.github/actions/setup` lokális composite action létezik, és a `gate` mátrix mind a hat eleme, a `test`, a `build` és az `e2e` job is ezen keresztül állítja be a Bun 1.4.0-t, a Node 26.7.0-t, a Bun globális cache-t és a Turborepo `.turbo` cache-t, mielőtt lefuttatná a `bun install --frozen-lockfile` parancsot. A `turbo-cache-scope` bemenet kötelező, és jobonként/mátrixelemenként eltérő értéket kap, mert egy `actions/cache` kulcsot csak egy job tud sikeresen menteni. A composite action a Playwright böngészőket nem cache-eli.
 44. A workflow gyökér szintű `concurrency` blokkja `group: ${{ github.workflow }}-${{ github.ref }}` és `cancel-in-progress: true` értékkel fut: ugyanazon ág (PR vagy `main`) egy időben csak egy futása aktív, egy újabb push törli a még futó korábbit.

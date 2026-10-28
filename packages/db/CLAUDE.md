@@ -2,10 +2,9 @@
 
 ## Mi ez a mappa
 
-Drizzle séma, migrációk, repository-k (SPEC-003). A csomag téma mappánként épül fel; ez a fájl
-a végrehajtás alatt folyamatosan bővül, ahogy egy-egy téma mappa elkészül. A barrel
-(`src/index.ts`) a `sqlite-connection` téma óta valódi exportot ad, a korábbi placeholder
-(`IS_DB_PLACEHOLDER`) megszűnt (SPEC-002 6.6 6. szabálya, T-003-9).
+Drizzle séma, migrációk, repository-k (SPEC-003). A csomag téma mappánként épült fel (PLAN-003
+lezárva). A barrel (`src/index.ts`) a `sqlite-connection` téma óta valódi exportot ad, a korábbi
+placeholder (`IS_DB_PLACEHOLDER`) megszűnt (SPEC-002 6.6 6. szabálya, T-003-9).
 
 ## Fájlok
 
@@ -252,8 +251,8 @@ is használ. A barrel csak a `WorkflowRunRepository`, `StartRunInput`, `StartRun
 **A `StartRunInput` alakja, a spec nem volt kimerítő.** A `graphSnapshotDocument` már kész,
 feloldott `GraphSnapshotDocument`: a háromszintű provider feloldást és a pillanatkép
 ÖSSZEÁLLÍTÁSÁT (a workflow gráfjának kiolvasását és dokumentummá alakítását) a motor
-(`@easter-workflow-builder/engine`) végzi egy későbbi specifikációban, a `startRun` csak a kész
-dokumentumot fogadja. A `providerId` (`ProviderId`, kötelező) szintén a motor által már feloldott
+(`@easter-workflow-builder/engine`) végzi (a feloldás a `resolveEffectiveProvider`, SPEC-004 11.1), a
+`startRun` csak a kész dokumentumot fogadja. A `providerId` (`ProviderId`, kötelező) szintén a motor által már feloldott
 érték. Az al-workflow hívás szülő kontextusát a `parent?: StartRunParentContext` mező hordozza
 (`{ rootRunId, depth, workflowAncestry }`), NEM külön `parentRunId` mező: a `workflow_run`
 táblának nincs ilyen oszlopa (a szülő-gyerek kapcsolatot a `step_run.sub_workflow_run_id` fogja
@@ -263,22 +262,14 @@ saját, most generált `id`, `depth` `0`, `workflowAncestry` a `[workflowId]` eg
 (SPEC-003 4.8 szekció). Ha megadja, a repository ebből vezeti le a gyerek futás mezőit: azonos
 `rootRunId`, `depth + 1`, `[...szülő lista, workflowId]`.
 
-**NYITOTT PONT: a `no_default_provider` hibaosztály (40. kritérium fele) elérhetetlen a `db`
-rétegben, ez SZÁNDÉKOSAN nincs javítva (T-003-28 átvizsgálás).** A `StartRunInput.providerId`
-kötelező, már feloldott `ProviderId` - a fenti bekezdés szerint ez a motor felelőssége, nem a
-`startRun`-é. A `startRun` emiatt sosem kerül abba a helyzetbe, hogy az `app_setting.
-default_provider_id`-ből kellene kitöltenie egy üres mezőt, tehát a 4.13 szekcióban leírt
-`no_default_provider` hibaág a mai kódban logikailag elérhetetlen, előidézhetetlen teszttel.
-
-- **Mi a viselkedés addig.** Ha a hívó (a motor, egy KÉSŐBBI specifikációban) nem tud
-  feloldani egy providert, a döntés az ő felelőssége marad: vagy maga olvassa ki az
-  `AppSettingRepository.readSettings()` `defaultProviderId` mezőjét és NULL esetén állítja
-  meg a folyamatot a hívó oldalán, vagy egy jövőbeli `startRun` bemeneti alak bővítés adja át
-  ezt a döntést a `db` rétegnek.
-- **Mi zárná le.** Egy architekturális döntés arról, hogy a `startRun` maga oldjon-e fel egy
-  hiányzó `providerId`-t az `app_setting` táblából, vagy ez a motor felelőssége marad - ez a
-  `StartRunInput` alakját érintené, tehát redesign, nem mechanikus javítás, ezért a T-003-28
-  ezt NEM hajtja végre magától, hanem user döntést igényel.
+**A `no_default_provider` hibaosztály (40. kritérium fele) nem a `db` rétegben ágazik, ez szándékos
+(T-003-28 átvizsgálás).** A `StartRunInput.providerId` kötelező, már feloldott `ProviderId` - a fenti
+bekezdés szerint ez a motor felelőssége, nem a `startRun`-é. A `startRun` emiatt sosem kerül abba a
+helyzetbe, hogy az `app_setting.default_provider_id`-ből kellene kitöltenie egy üres mezőt, tehát a
+4.13 szekcióban leírt `no_default_provider` hibaág a `db` kódjában logikailag elérhetetlen,
+előidézhetetlen teszttel, ezért nincs is ott. A feloldást és a hibát a motor adja: a
+`resolveEffectiveProvider` (`packages/engine/src/provider-resolution/`, SPEC-004 11.1) a három szint
+egyikéből sem talált értéknél `no_default_provider` hibát ad.
 
 **A pillanatkép beszúrás bájt-egyezése (45. kritérium), a kritikus tervezési döntés.** A
 `graph_snapshot.document` Drizzle oszlop `mode: 'json'`, tehát a típusos `insert(graphSnapshotTable)`

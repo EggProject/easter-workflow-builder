@@ -41,8 +41,8 @@ export interface StartRunParentContext {
  * kész, feloldott dokumentum: a háromszintű provider feloldást és a
  * pillanatkép összeállítását (a workflow gráfjának kiolvasását és
  * `GraphSnapshotDocument`-té alakítását) a motor (`@easter-workflow-builder/engine`)
- * végzi egy későbbi specifikációban, ez a repository csak a már kész
- * dokumentumot fogadja.
+ * végzi (`resolveEffectiveProvider`, SPEC-004 11.1), ez a repository csak a
+ * már kész dokumentumot fogadja.
  *
  * A `providerId` a futásra feloldott, befagyasztott provider (4.8 szekció,
  * `workflow_run.provider_id` NOT NULL): ezt is a motor adja meg, már

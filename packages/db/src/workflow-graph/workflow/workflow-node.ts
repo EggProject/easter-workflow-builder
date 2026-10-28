@@ -4,8 +4,8 @@ import { workflowTable } from './workflow.ts';
 /**
  * A `workflow_node` tábla (SPEC-003 4.2 szekció). A `type` és a `config`
  * oszlop a séma szintjén szándékosan tág (`text`, illetve `unknown` JSON): a
- * `NodeType` unió és a node config unió a `workflow-graph` téma egy későbbi
- * lépésében (T-003-11) készül el, a szűkítést ott typeguard végzi a
+ * `NodeType` unió (`node-type/node-type.ts`) és a node config unió a
+ * `workflow-graph` témában áll, a szűkítést ott typeguard végzi a
  * repository határon, nem `CHECK` constraint.
  */
 export const workflowNodeTable = sqliteTable(
