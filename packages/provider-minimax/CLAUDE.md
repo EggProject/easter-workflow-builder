@@ -28,12 +28,13 @@ a bizonyítékok forráskatalógusa mind ott áll), L2 réteg (SPEC-002 4. szekc
 
 **Az előző modellre végzett mérés a Flash-re nem vihető át** (SPEC-013 3.2). Egy mező akkor
 `known`, ha egy Flash-re vonatkozó vagy modelltől független hivatalos forrás magát az értéket
-állítja, és két, a MiniMaxtól független forrás megerősíti; minden más mező `unknown`, a `blockedBy`
-mezőben a megismétlendő mérés azonosítójával. Ha nincs mérési eset, ami a mezőt lezárná (a rate limit
+állítja, és két, a MiniMaxtól független forrás megerősíti, vagy ha a Flash-re megismételt mérés
+(`M-xx-flash`, `docs/research/2026-10-28-flash-meresek.md`) igazolja; minden más mező `unknown`, a
+`blockedBy` mezőben a megismétlendő vagy a kérdést eldöntő mérés azonosítójával. Ha nincs mérési eset, ami a mezőt lezárná (a rate limit
 `requestsPerMinute` és `tokensPerMinute`), a `blockedBy` üres, és a `reason` kimondja, hogy független
 forrás hiányzik.
 
-**A mérési próza nem ide tartozik.** A kódban csak stabil azonosító (`M-01` ... `M-36`), doksi
+**A mérési próza nem ide tartozik.** A kódban csak stabil azonosító (`M-01` ... `M-39`, a Flash-re megismételtek `M-xx-flash` alakban), doksi
 URL vagy research szekció azonosító marad. A mérés leírása a `docs/research/` alatt van.
 
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés

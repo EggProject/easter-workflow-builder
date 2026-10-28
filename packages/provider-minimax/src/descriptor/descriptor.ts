@@ -5,7 +5,6 @@ import { minimaxEffort } from '../request-shaping/effort.ts';
 import type { MiniMaxFamilyId } from '../model-catalog/family-id.ts';
 import type { MiniMaxModelId } from '../model-catalog/model-id.ts';
 import { minimaxModels } from '../model-catalog/models.ts';
-import { notMeasuredOnFlash } from '../measurement-gap/not-measured-on-flash.ts';
 import { minimaxPromptCaching } from '../request-shaping/prompt-caching.ts';
 import { minimaxRateLimits } from '../limits/rate-limits.ts';
 import { minimaxRequiredEnvironment } from '../environment/required-environment.ts';
@@ -15,22 +14,38 @@ import { minimaxStructuredOutput } from '../request-shaping/structured-output.ts
 import { minimaxThinking } from '../request-shaping/thinking.ts';
 import { minimaxToolChoice } from '../request-shaping/tool-choice.ts';
 
-// A fő kérés header listáját az előző modellre mérték, a Flash-re nem (SPEC-013 3.2).
-const anthropicBetaHeaders: Fact<readonly string[]> = notMeasuredOnFlash(['M-01', 'M-11', 'M-14', 'M-32']);
+// A fő kérés header listája suffixes modellazonosítóval mérve (a suffix nélküli alakból csak a context-1m elem hiányzik).
+const anthropicBetaHeaders: Fact<readonly string[]> = {
+  state: 'known',
+  value: [
+    'claude-code-20250219',
+    'context-1m-2025-08-07',
+    'interleaved-thinking-2025-05-14',
+    'thinking-token-count-2026-05-13',
+    'context-management-2025-06-27',
+    'prompt-caching-scope-2026-01-05',
+    'mid-conversation-system-2026-04-07',
+    'effort-2025-11-24',
+  ],
+  evidence: [
+    { kind: 'measurement', id: 'M-01-flash' },
+    { kind: 'measurement', id: 'M-11-flash' },
+  ],
+};
 
 /**
  * A `minimax` provider képességleírója a `MiniMax-M3.1-Flash` modellre (SPEC-013). Minden
- * `known` mező mögött a Flash-re vonatkozó vagy modelltől független hivatalos dokumentáció áll,
- * bizonyíték az `evidence` mezőben; az előző modellre végzett mérések a Flash-re nem vihetők át,
- * ezért azok mezői `unknown`, a megismétlendő mérés azonosítójával.
+ * `known` mező mögött a Flash-re vonatkozó vagy modelltől független hivatalos dokumentáció, vagy a
+ * Flash-re megismételt mérés (`M-xx-flash`) áll, bizonyíték az `evidence` mezőben; az előző modellre
+ * végzett, a Flash-re meg nem ismételt mérések mezői `unknown`, a megismétlendő mérés azonosítójával.
  * A mérés részletei a `docs/research` alatt vannak, ide nem kerülnek át.
  */
 export const minimaxProvider = {
   id: 'minimax',
   displayName: 'MiniMax',
   sdkVersionPin: '0.3.245',
-  // A dátum a dokumentáció ellenőrzéséé, nem drótszintű mérésé (SPEC-013 3.1).
-  measuredAt: '2026-10-27',
+  // A Flash drótszintű méréseinek dátuma; a nem mért mezők a 2026-10-27-i dokumentáció ellenőrzésből jönnek.
+  measuredAt: '2026-10-28',
   requiredEnv: minimaxRequiredEnvironment,
   disallowedEnv: minimaxDisallowedEnvironment,
   structuredOutput: minimaxStructuredOutput,
@@ -42,10 +57,25 @@ export const minimaxProvider = {
   serverTools: minimaxServerTools,
   models: minimaxModels,
   modelsEndpoint: {
-    directHttpReachable: notMeasuredOnFlash(['M-35']),
-    // A kapcsolat teszt módja ettől nem változik: unknown mellett minimal_query (research 7.).
-    calledBySdk: notMeasuredOnFlash(['M-12', 'M-36']),
-    listedModelCount: notMeasuredOnFlash(['M-35']),
+    directHttpReachable: {
+      state: 'known',
+      value: true,
+      evidence: [{ kind: 'measurement', id: 'M-35-flash' }],
+    },
+    // Az SDK egyik mért kérés sorozatban sem hívta meg ezt a végpontot; a kapcsolat teszt módja minimal_query.
+    calledBySdk: {
+      state: 'known',
+      value: false,
+      evidence: [
+        { kind: 'measurement', id: 'M-12-flash' },
+        { kind: 'measurement', id: 'M-36-flash' },
+      ],
+    },
+    listedModelCount: {
+      state: 'known',
+      value: 9,
+      evidence: [{ kind: 'measurement', id: 'M-35-flash' }],
+    },
   },
   rateLimits: minimaxRateLimits,
   concurrency: minimaxConcurrency,

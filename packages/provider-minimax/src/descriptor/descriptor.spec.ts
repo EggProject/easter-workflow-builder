@@ -22,7 +22,8 @@ import {
 import { minimaxProvider } from './descriptor.ts';
 
 /**
- * A SPEC-013 3.2 táblázata mezőnként, a valódi leírón (PLAN-014 T-014-3, AC2, AC3).
+ * A SPEC-013 3.2 táblázata mezőnként, a valódi leírón (PLAN-014 T-014-3, AC2, AC3), a Flash-re
+ * megismételt mérések szerint frissítve (docs/research/2026-10-28-flash-meresek.md 4. szekció).
  */
 
 function sourceOf(reference: EvidenceReference): string {
@@ -50,11 +51,13 @@ describe('a minimax leíró a MiniMax-M3.1-Flash modellt írja le (SPEC-013 3.1)
     expect(minimaxProvider.models).toHaveLength(1);
     expect(model?.id).toBe('MiniMax-M3.1-Flash');
     expect(model?.family).toBe('M3.1-Flash');
-    expect(minimaxProvider.measuredAt).toBe('2026-10-27');
+    expect(minimaxProvider.measuredAt).toBe('2026-10-28');
   });
 });
 
-describe('a known mezők a Flash forrásaira épülnek (SPEC-013 3.2)', () => {
+const strategy = minimaxProvider.structuredOutput.strategies[0];
+
+describe('a known mezők a Flash forrásaira és a Flash mérésekre épülnek (SPEC-013 3.2)', () => {
   it.each([
     [
       'clientModelIdentifier',
@@ -66,6 +69,7 @@ describe('a known mezők a Flash forrásaira épülnek (SPEC-013 3.2)', () => {
         DOC_CLAUDE_CODE_TOOLS_ALT_PROVIDERS,
         DOC_DIGITALAPPLIED_MINIMAX_FLASH_CLAUDE_CODE,
         RESEARCH_MINIMAX_FLASH,
+        'M-11-flash',
       ],
     ],
     [
@@ -137,6 +141,65 @@ describe('a known mezők a Flash forrásaira épülnek (SPEC-013 3.2)', () => {
       'CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS',
       [DOC_ENV_VARS],
     ],
+    ['imageInput', model?.imageInput, true, ['M-23-flash']],
+    ['listedByModelsEndpoint', model?.listedByModelsEndpoint, true, ['M-35-flash']],
+    ['thinking.wireShape', minimaxProvider.thinking.wireShape, '{"type":"adaptive"}', ['M-01-flash', 'M-05-flash']],
+    ['thinking.sendsBudgetTokens', minimaxProvider.thinking.sendsBudgetTokens, false, ['M-05-flash', 'M-06-flash']],
+    [
+      'thinking.streamEventTypes',
+      minimaxProvider.thinking.streamEventTypes,
+      ['content_block_start', 'thinking_delta', 'signature_delta', 'content_block_stop'],
+      ['M-01-flash', 'M-03-flash'],
+    ],
+    ['structuredOutput usable', strategy?.usable, true, ['M-03-flash']],
+    // eslint-disable-next-line unicorn/no-null -- a "nincs blokkoló" érték a leíróban null (structured-output-strategy.ts)
+    ['structuredOutput blockingWireDetail', strategy?.blockingWireDetail, null, ['M-03-flash']],
+    ['structuredOutput observedRoundTrips', strategy?.observedRoundTrips, [3], ['M-03-flash']],
+    [
+      'structuredOutput.outputConfigAlwaysSent',
+      minimaxProvider.structuredOutput.outputConfigAlwaysSent,
+      true,
+      ['M-01-flash', 'M-26-flash'],
+    ],
+    [
+      'structuredOutput.outputConfigWireField',
+      minimaxProvider.structuredOutput.outputConfigWireField,
+      'output_config.effort',
+      ['M-01-flash', 'M-26-flash'],
+    ],
+    [
+      'toolChoice.rejectionBehaviour',
+      minimaxProvider.toolChoice.rejectionBehaviour,
+      'silently_dropped',
+      ['M-34-flash'],
+    ],
+    [
+      'toolChoice.sdkSendsForcedChoice',
+      minimaxProvider.toolChoice.sdkSendsForcedChoice,
+      false,
+      ['M-03-flash', 'M-17-flash'],
+    ],
+    ['streaming.sse', minimaxProvider.streaming.sse, true, ['M-05-flash', 'M-09-flash']],
+    ['streaming.toolInputDelta', minimaxProvider.streaming.toolInputDelta, 'input_json_delta', ['M-09-flash']],
+    ['streaming.sdkReassemblesToolInput', minimaxProvider.streaming.sdkReassemblesToolInput, true, ['M-09-flash']],
+    ['modelsEndpoint.directHttpReachable', minimaxProvider.modelsEndpoint.directHttpReachable, true, ['M-35-flash']],
+    ['modelsEndpoint.calledBySdk', minimaxProvider.modelsEndpoint.calledBySdk, false, ['M-12-flash', 'M-36-flash']],
+    ['modelsEndpoint.listedModelCount', minimaxProvider.modelsEndpoint.listedModelCount, 9, ['M-35-flash']],
+    [
+      'anthropicBetaHeaders',
+      minimaxProvider.anthropicBetaHeaders,
+      [
+        'claude-code-20250219',
+        'context-1m-2025-08-07',
+        'interleaved-thinking-2025-05-14',
+        'thinking-token-count-2026-05-13',
+        'context-management-2025-06-27',
+        'prompt-caching-scope-2026-01-05',
+        'mid-conversation-system-2026-04-07',
+        'effort-2025-11-24',
+      ],
+      ['M-01-flash', 'M-11-flash'],
+    ],
   ] as const)('%s', (_name, fact, value, sources) => {
     expect(fact?.state).toBe('known');
     if (fact?.state !== 'known') {
@@ -147,43 +210,45 @@ describe('a known mezők a Flash forrásaira épülnek (SPEC-013 3.2)', () => {
     expect(evidenceSources).toStrictEqual(sources);
   });
 
+  it('a web_search szerver oldali tool elérhető, a kliens oldali neve WebSearch (M-17-flash)', () => {
+    const tools = minimaxProvider.serverTools;
+    expect(tools.state).toBe('known');
+    if (tools.state !== 'known') {
+      return;
+    }
+    expect(tools.evidence.map((reference) => sourceOf(reference))).toStrictEqual(['M-17-flash']);
+    expect(tools.value).toHaveLength(1);
+    const [webSearch] = tools.value;
+    expect([webSearch?.wireType, webSearch?.name]).toStrictEqual(['web_search_20250305', 'web_search']);
+    expect(webSearch?.available).toStrictEqual({
+      state: 'known',
+      value: true,
+      evidence: [{ kind: 'measurement', id: 'M-17-flash' }],
+    });
+    expect(webSearch?.clientToolName).toStrictEqual({
+      state: 'known',
+      value: 'WebSearch',
+      evidence: [{ kind: 'measurement', id: 'M-17-flash' }],
+    });
+  });
+
   it('a rate limit sor a Flash-re vonatkozik', () => {
     expect(minimaxProvider.rateLimits.buckets[0]?.appliesTo).toStrictEqual(['MiniMax-M3.1-Flash']);
   });
 });
 
-describe('az előző modellre mért mezők unknown állapotúak, a megismétlendő méréssel (SPEC-013 3.2)', () => {
-  const strategy = minimaxProvider.structuredOutput.strategies[0];
+// A Flash-re lefuttatott, de a kérdést el nem döntő esetek mezői saját indoklást kapnak (thinking signature, tool_choice).
+describe('a Flash-re nem mért vagy a méréssel el nem döntött mezők unknown állapotúak, a blokkoló méréssel (SPEC-013 3.2)', () => {
   const caching = minimaxProvider.promptCaching;
   const cachingMeasurements = ['M-08', 'M-15', 'M-24', 'M-33'];
 
   it.each([
     ['effectiveContextWindowOnWire', model?.effectiveContextWindowOnWire, ['M-20']],
     ['maxOutputTokensWireCeiling', model?.maxOutputTokensWireCeiling, ['M-22']],
-    ['imageInput', model?.imageInput, ['M-23', 'M-16']],
     ['videoInput', model?.videoInput, ['M-16', 'M-23']],
-    ['listedByModelsEndpoint', model?.listedByModelsEndpoint, ['M-35']],
-    ['thinking.wireShape', minimaxProvider.thinking.wireShape, ['M-01', 'M-05']],
-    ['thinking.sendsBudgetTokens', minimaxProvider.thinking.sendsBudgetTokens, ['M-05', 'M-06']],
-    ['thinking.streamEventTypes', minimaxProvider.thinking.streamEventTypes, ['M-05']],
     ['thinking.interleavedSignatureRequired', minimaxProvider.thinking.interleavedSignatureRequired, ['M-05']],
-    ['structuredOutput usable', strategy?.usable, ['M-02', 'M-03']],
-    ['structuredOutput blockingWireDetail', strategy?.blockingWireDetail, ['M-03']],
-    ['structuredOutput observedRoundTrips', strategy?.observedRoundTrips, ['M-03']],
-    ['structuredOutput.defaultStrategy', minimaxProvider.structuredOutput.defaultStrategy, ['M-02', 'M-03', 'M-19']],
-    [
-      'structuredOutput.outputConfigAlwaysSent',
-      minimaxProvider.structuredOutput.outputConfigAlwaysSent,
-      ['M-01', 'M-04', 'M-26'],
-    ],
-    [
-      'structuredOutput.outputConfigWireField',
-      minimaxProvider.structuredOutput.outputConfigWireField,
-      ['M-01', 'M-04'],
-    ],
-    ['toolChoice.accepted', minimaxProvider.toolChoice.accepted, ['M-03', 'M-34']],
-    ['toolChoice.rejectionBehaviour', minimaxProvider.toolChoice.rejectionBehaviour, ['M-34']],
-    ['toolChoice.sdkSendsForcedChoice', minimaxProvider.toolChoice.sdkSendsForcedChoice, ['M-03', 'M-17']],
+    ['structuredOutput.defaultStrategy', minimaxProvider.structuredOutput.defaultStrategy, ['M-19']],
+    ['toolChoice.accepted', minimaxProvider.toolChoice.accepted, ['M-34']],
     ['promptCaching.mode', caching.mode, ['M-15', 'M-20', 'M-24', 'M-33']],
     ['promptCaching.explicitBreakpointLimit', caching.explicitBreakpointLimit, cachingMeasurements],
     ['promptCaching.ttlSeconds', caching.ttlSeconds, cachingMeasurements],
@@ -191,14 +256,7 @@ describe('az előző modellre mért mezők unknown állapotúak, a megismétlend
     ['promptCaching.usageFields', caching.usageFields, cachingMeasurements],
     ['promptCaching.disableEnvVar', caching.disableEnvVar, cachingMeasurements],
     ['promptCaching.callerBreakpointSurvivesDisable', caching.callerBreakpointSurvivesDisable, cachingMeasurements],
-    ['streaming.sse', minimaxProvider.streaming.sse, ['M-05', 'M-09']],
-    ['streaming.toolInputDelta', minimaxProvider.streaming.toolInputDelta, ['M-09']],
-    ['streaming.sdkReassemblesToolInput', minimaxProvider.streaming.sdkReassemblesToolInput, ['M-09']],
     ['streaming.streamDisableable', minimaxProvider.streaming.streamDisableable, ['M-24']],
-    ['serverTools', minimaxProvider.serverTools, ['M-17', 'M-25']],
-    ['modelsEndpoint.directHttpReachable', minimaxProvider.modelsEndpoint.directHttpReachable, ['M-35']],
-    ['modelsEndpoint.calledBySdk', minimaxProvider.modelsEndpoint.calledBySdk, ['M-12', 'M-36']],
-    ['modelsEndpoint.listedModelCount', minimaxProvider.modelsEndpoint.listedModelCount, ['M-35']],
     ['rateLimits RPM', minimaxProvider.rateLimits.buckets[0]?.requestsPerMinute, []],
     ['rateLimits TPM', minimaxProvider.rateLimits.buckets[0]?.tokensPerMinute, []],
     ['rateLimits.retryAfterHeader', minimaxProvider.rateLimits.retryAfterHeader, ['M-18', 'M-36']],
@@ -206,7 +264,6 @@ describe('az előző modellre mért mezők unknown állapotúak, a megismétlend
     ['concurrency.measuredSubagentCap', minimaxProvider.concurrency.measuredSubagentCap, ['M-31']],
     ['concurrency.observedMaxConcurrentRequests', minimaxProvider.concurrency.observedMaxConcurrentRequests, ['M-31']],
     ['concurrency.measuredMaxConcurrentSteps', minimaxProvider.concurrency.measuredMaxConcurrentSteps, ['M-39']],
-    ['anthropicBetaHeaders', minimaxProvider.anthropicBetaHeaders, ['M-01', 'M-11', 'M-14', 'M-32']],
   ] as const)('%s', (_name, fact, blockedBy) => {
     expect(fact?.state).toBe('unknown');
     expect(fact === undefined ? undefined : blockedByOf(fact)).toStrictEqual(blockedBy);

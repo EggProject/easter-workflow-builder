@@ -8,9 +8,8 @@ import type { CaseRunOutcome, MeasurementCase } from '../harness/types.ts';
 import { buildBaseOptions, DEFAULT_PROMPT, executeQuery } from '../harness/runner.ts';
 
 /**
- * A MiniMax-M3 dokumentált ajánlott (131072) és max (524288) kimenő token
- * értéke a research modelltáblázatából
- * (docs/research/2026-08-26-agent-sdk-minimax.md:138). A 4096 és 32000 a
+ * A MiniMax-M3.1-Flash dokumentált ajánlott (131072) és max (524288) kimenő token
+ * értéke (docs/research/2026-10-27-flash-es-haiku.md 2. szekció). A 4096 és 32000 a
  * kliens alapértéke alatti/körüli összehasonlító pont.
  */
 const OUTPUT_TOKEN_VALUES: readonly string[] = ['4096', '32000', '131072', '524288'];
