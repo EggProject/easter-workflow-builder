@@ -116,7 +116,6 @@ export { resolveNodeProviders } from './run-validation/resolve-node-providers.ts
 // stratégia választás következménye, ezért az `Options` összeállításához
 // tartozik (`agent-step` téma, T-005-19).
 export type { CapabilityFieldInclusion } from './capability-policy/capability-field-inclusion.ts';
-export type { ConnectionTestMode } from './capability-policy/connection-test-mode.ts';
 export type { StructuredOutputStrategyDecision } from './capability-policy/structured-output-strategy-decision.ts';
 export type { ModelIdentifierDecision } from './capability-policy/model-identifier-decision.ts';
 export type { DisallowedServerToolsDecision } from './capability-policy/disallowed-server-tools-decision.ts';
@@ -132,7 +131,6 @@ export { resolveDisallowedServerTools } from './capability-policy/resolve-disall
 export { shouldIncludePartialMessages } from './capability-policy/should-include-partial-messages.ts';
 export { resolveConcurrencySuggestion } from './capability-policy/resolve-concurrency-suggestion.ts';
 export { RATE_LIMIT_RETRY_POLICY } from './capability-policy/rate-limit-retry-policy.ts';
-export { resolveConnectionTestMode } from './capability-policy/resolve-connection-test-mode.ts';
 export { validateSdkVersionMatch } from './capability-policy/validate-sdk-version-match.ts';
 
 // provider-environment: a SPEC-004 11.3 táblázat 10. és 11. sora, a

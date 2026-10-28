@@ -192,6 +192,8 @@ A 17. végpont válasza a `requestedAtMs` mezőt is hordozza, tehát a felület 
 
 **A providerekhez nincs CRUD**, csak választani lehet közülük (`.claude/CLAUDE.md` 9.): a 19. végpont olvasás, és nincs `POST`, `PATCH` vagy `DELETE` párja. A `ProviderSummary` a megjelenítéshez szükséges mezőket viszi (azonosító, megjelenítendő név, a modellek listája, és a kötelező env változók **neve**), és **soha nem visz env változó értéket** (SPEC-004 11.3 10. sor, `.claude/CLAUDE.md` 9. "Titok kezelés"). A képességleíró `Fact` mezőinek bizonyíték listáját sem visszük ki: az mérési narratíva, aminek a helye a `docs/research/` alatt van, nem a dróton.
 
+**A `ConnectionTestResponse` két mezőt visz: `succeeded` és `errorMessage` (`null` sikernél).** A korábbi `mode` mező és a `ConnectionTestModeSchema` megszűnt (SPEC-009 O-1): a kapcsolat teszt egyetlen úton fut, egy minimális `query()` hívással, és a `z.strictObject` miatt a megszűnt mezőt tartalmazó válasz érvénytelen.
+
 **E. Beállítás (5 végpont)**
 
 | #   | Metódus és útvonal                                     | Kérés                                                               | Válasz                       | Motor vagy repository                                                      | Saját hibaágai                 |

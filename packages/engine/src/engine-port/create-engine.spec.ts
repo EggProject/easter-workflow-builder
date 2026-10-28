@@ -1106,7 +1106,7 @@ describe('createEngine', () => {
   });
 
   describe('testProviderConnection', () => {
-    it('sikeres result üzenet esetén succeeded: true, a mode a leíróból jön (sdk_model_list)', async () => {
+    it('sikeres result üzenet esetén succeeded: true, hibaüzenet nélkül', async () => {
       // A `system`/`init` üzenet a `result`-tól eltérő, NEM `isSdkResultMessage`
       // ágon fut át (`drainConnectionTestStream` ág-lefedettsége), mielőtt a
       // valódi `result` üzenet lezárja a folyamot - ugyanaz a kétüzenetes alak,
@@ -1119,37 +1119,11 @@ describe('createEngine', () => {
       );
       const harness = openHarness({
         agentQueryRunner: runnerReturning({ kind: 'ok', value: successQuery }),
-        descriptorLookup: (id) => descriptorOf(id, { calledBySdk: knownFact(true) }),
       });
 
       const outcome = okOrThrow(await harness.engine.testProviderConnection('minimax'));
 
-      expect(outcome).toStrictEqual({ succeeded: true, mode: 'sdk_model_list', errorMessage: null });
-    });
-
-    it('a mode minimal_query, ha a leíró calledBySdk mezője known hamis - a hívás akkor is lefut', async () => {
-      const successQuery = agentQueryOf(messageIterable([{ type: 'result', subtype: 'success' }]));
-      const harness = openHarness({
-        agentQueryRunner: runnerReturning({ kind: 'ok', value: successQuery }),
-        descriptorLookup: (id) => descriptorOf(id, { calledBySdk: knownFact(false) }),
-      });
-
-      const outcome = okOrThrow(await harness.engine.testProviderConnection('minimax'));
-
-      expect(outcome.mode).toBe('minimal_query');
-      expect(outcome.succeeded).toBe(true);
-    });
-
-    it('unknown calledBySdk esetén is minimal_query módot használ', async () => {
-      const successQuery = agentQueryOf(messageIterable([{ type: 'result', subtype: 'success' }]));
-      const harness = openHarness({
-        agentQueryRunner: runnerReturning({ kind: 'ok', value: successQuery }),
-        descriptorLookup: (id) => descriptorOf(id, { calledBySdk: unknownFact<boolean>() }),
-      });
-
-      const outcome = okOrThrow(await harness.engine.testProviderConnection('minimax'));
-
-      expect(outcome.mode).toBe('minimal_query');
+      expect(outcome).toStrictEqual({ succeeded: true, errorMessage: null });
     });
 
     it('hiányzó kötelező env változó esetén succeeded: false, a hívás el sem indul', async () => {

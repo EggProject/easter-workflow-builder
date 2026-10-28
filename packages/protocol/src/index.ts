@@ -96,8 +96,8 @@ export { ApprovalDecisionRequestSchema, PendingApprovalSchema } from './approval
 // provider: a provider összefoglaló alakja és a kapcsolat teszt válasza.
 export type { ProviderSummary } from './provider/provider-summary.ts';
 export { ProviderSummarySchema } from './provider/provider-summary.ts';
-export type { ConnectionTestMode, ConnectionTestResponse } from './provider/connection-test-response.ts';
-export { ConnectionTestModeSchema, ConnectionTestResponseSchema } from './provider/connection-test-response.ts';
+export type { ConnectionTestResponse } from './provider/connection-test-response.ts';
+export { ConnectionTestResponseSchema } from './provider/connection-test-response.ts';
 
 // settings: a beállítás rekord, a részleges frissítés kérése, a párhuzamossági korlát
 // nézete a beállított értékkel és a mért javaslattal.

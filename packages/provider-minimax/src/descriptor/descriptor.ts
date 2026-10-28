@@ -43,7 +43,7 @@ export const minimaxProvider = {
   models: minimaxModels,
   modelsEndpoint: {
     directHttpReachable: notMeasuredOnFlash(['M-35']),
-    // A kapcsolat teszt módja ettől nem változik: unknown mellett minimal_query (research 7.).
+    // A kapcsolat teszt ettől nem függ: egyetlen útja van (SPEC-009 O-1, research 7.).
     calledBySdk: notMeasuredOnFlash(['M-12', 'M-36']),
     listedModelCount: notMeasuredOnFlash(['M-35']),
   },

@@ -2,8 +2,6 @@ import { describeError, type Outcome } from '@easter-workflow-builder/core';
 import { INSTALLED_AGENT_SDK_VERSION, isSdkResultMessage } from '@easter-workflow-builder/agent';
 import type { ProviderId } from '@easter-workflow-builder/provider-capability';
 import { resolveConcurrencySuggestion } from '../capability-policy/resolve-concurrency-suggestion.ts';
-import { resolveConnectionTestMode } from '../capability-policy/resolve-connection-test-mode.ts';
-import type { ConnectionTestMode } from '../capability-policy/connection-test-mode.ts';
 import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-gate.ts';
 import type { ConcurrencyLimitLookup } from '../concurrency-gate/concurrency-limit-lookup.ts';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
@@ -56,10 +54,7 @@ function buildConcurrencyLimitLookup(dependencies: EngineDependencies): Concurre
  * (F-6). A függvény sosem dob: a folyam olvasása közbeni kivételt elkapja és
  * `succeeded: false` eredménnyé alakítja.
  */
-async function drainConnectionTestStream(
-  messages: AsyncIterable<unknown>,
-  mode: ConnectionTestMode,
-): Promise<ConnectionTestResult> {
+async function drainConnectionTestStream(messages: AsyncIterable<unknown>): Promise<ConnectionTestResult> {
   try {
     let resultSubtype: string | undefined;
     for await (const message of messages) {
@@ -68,15 +63,15 @@ async function drainConnectionTestStream(
       }
     }
     if (resultSubtype === undefined) {
-      return { succeeded: false, mode, errorMessage: 'Az üzenetfolyam result üzenet nélkül ért véget' };
+      return { succeeded: false, errorMessage: 'Az üzenetfolyam result üzenet nélkül ért véget' };
     }
     if (resultSubtype !== 'success') {
-      return { succeeded: false, mode, errorMessage: `A result üzenet subtype értéke ${resultSubtype}` };
+      return { succeeded: false, errorMessage: `A result üzenet subtype értéke ${resultSubtype}` };
     }
     // eslint-disable-next-line unicorn/no-null -- a `ConnectionTestResult.errorMessage` mezője `string | null`, sikeres kapcsolat tesztnél a NULL a valódi "nincs hiba" érték
-    return { succeeded: true, mode, errorMessage: null };
+    return { succeeded: true, errorMessage: null };
   } catch (error) {
-    return { succeeded: false, mode, errorMessage: describeError(error) };
+    return { succeeded: false, errorMessage: describeError(error) };
   }
 }
 
@@ -169,19 +164,15 @@ export function createEngine(dependencies: EngineDependencies): Engine {
   }
 
   /**
-   * A kapcsolat teszt (SPEC-004 11.3 táblázat 16. sora): a
-   * `resolveConnectionTestMode` döntése (`sdk_model_list` vagy
-   * `minimal_query`) itt kizárólag DIAGNOSZTIKAI adat, a `ConnectionTestResult
-   * .mode` mezőben - a tényleges hívás MINDKÉT ágon ugyanaz a minimális
-   * `query()` hívás, mert a motorba befecskendezett `AgentQueryRunner` port
-   * nem exponál modell-listázást (nincs `supportedModels()` metódus a porton,
-   * `@easter-workflow-builder/agent` `AgentQuery` típusa, SPEC-004 3.3). Ez
-   * tudatos egyszerűsítés, nem elfogadott végállapot - lásd
-   * `packages/engine/CLAUDE.md` "Szabályok" szakaszát.
+   * A kapcsolat teszt (SPEC-004 11.3 táblázat 16. sora): egyetlen, minimális
+   * `query()` hívás a leíróhoz tartozó env blokkal. A motorba befecskendezett
+   * `AgentQueryRunner` port nem exponál modell-listázást (nincs
+   * `supportedModels()` metódus a porton, `@easter-workflow-builder/agent`
+   * `AgentQuery` típusa, SPEC-004 3.3), ezért a teszt egy útja ez az egy
+   * (SPEC-009 O-1).
    */
   async function testProviderConnection(providerId: ProviderId): Promise<Outcome<ConnectionTestResult>> {
     const descriptor = dependencies.providerDescriptorLookup(providerId);
-    const mode = resolveConnectionTestMode(descriptor.modelsEndpoint);
 
     const environmentBlock = buildOutgoingEnvironment(
       descriptor.requiredEnv,
@@ -189,7 +180,7 @@ export function createEngine(dependencies: EngineDependencies): Engine {
       dependencies.processEnvironment,
     );
     if (environmentBlock.kind === 'error') {
-      return { kind: 'ok', value: { succeeded: false, mode, errorMessage: environmentBlock.message } };
+      return { kind: 'ok', value: { succeeded: false, errorMessage: environmentBlock.message } };
     }
 
     const query = dependencies.agentQueryRunner.run({
@@ -197,10 +188,10 @@ export function createEngine(dependencies: EngineDependencies): Engine {
       options: { env: environmentBlock.value },
     });
     if (query.kind === 'error') {
-      return { kind: 'ok', value: { succeeded: false, mode, errorMessage: query.message } };
+      return { kind: 'ok', value: { succeeded: false, errorMessage: query.message } };
     }
 
-    return { kind: 'ok', value: await drainConnectionTestStream(query.value.messages, mode) };
+    return { kind: 'ok', value: await drainConnectionTestStream(query.value.messages) };
   }
 
   /**
