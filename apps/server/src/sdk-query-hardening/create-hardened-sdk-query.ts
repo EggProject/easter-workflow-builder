@@ -11,7 +11,9 @@ const MCP_CONFIG_FILE_NAME = 'mcp-config.json';
  * Az Agent SDK `query()` függvényének burkolója (SPEC-009 6.4, O-45, O-52, user döntés 2026-10-28).
  *
  * Ha az `Options` `mcpServers` rekordot hordoz, a rekord egy lépésenkénti ideiglenes könyvtár
- * (`mkdtemp`, a Node dokumentációja szerint `0700` jogú) `0600` jogú fájljába kerül
+ * (`mkdtemp`: a libuv a POSIX `mkdtemp(3)` hívást használja, ami `mkdir(pathname, S_IRWXU)`, azaz
+ * `0700` joggal hoz létre, <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mkdtemp.html>)
+ * `0600` jogú fájljába kerül
  * (`{ "mcpServers": ... }`, a CLI `--mcp-config` fájl alakja), és az `extraArgs` `mcp-config` kulcsa
  * mutat rá; a CLI a parancssorban így csak az útvonalat látja (mérve: research
  * `2026-10-28-plan-012-vegrehajtas.md` 4.5). A könyvtár a folyam lezárásakor törlődik (kimerülés,
