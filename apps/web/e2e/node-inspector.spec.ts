@@ -881,7 +881,6 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     const kutatoTools = await openAccordion(kutatoGroup, 'Eszközök és környezet');
     await kutatoTools.getByLabel('Engedélyezett eszközök').fill('Read');
     await kutatoTools.getByLabel('Tiltott eszközök').fill('Bash');
-    await chooseSelectOption(page, kutatoTools.getByRole('combobox', { name: 'Memória hatóköre' }), 'project');
     await kutatoTools.getByLabel('Kezdő üzenet').fill('Szia!');
 
     // A `skills` mező `'all'` értéke a módválasztón "minden feltöltött skill".
@@ -909,7 +908,6 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     await expect(reopenedLimits.getByLabel('Max. körök száma')).toHaveValue('4');
     await expect(reopenedLimits.getByRole('checkbox', { name: 'Háttérben fut' })).toBeChecked();
     const reopenedTools = await openAccordion(reopenedKutato, 'Eszközök és környezet');
-    await expectSelectedLabel(reopenedTools.getByRole('combobox', { name: 'Memória hatóköre' }), 'project');
     await expect(reopenedTools.getByLabel('Kezdő üzenet')).toHaveValue('Szia!');
   });
 

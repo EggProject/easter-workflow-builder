@@ -1,4 +1,5 @@
 import type { AgentStepConfig, McpServerDefinitionRecord } from '@easter-workflow-builder/db';
+import { isString } from '@easter-workflow-builder/typeguards';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { ProcessEnvironmentPort } from '../engine-port/process-environment-port.ts';
 import type { SkillLibrarySnapshot } from '../engine-port/skill-library-snapshot.ts';
@@ -34,8 +35,10 @@ export type OutgoingAgentsResolution =
  *   elem, mert az `AgentMcpServerSpec` objektum ága az al-agent saját
  *   szerverét adja (M-147 B3), a szöveg ága viszont csak a lépés szerverére
  *   mutathat, amit az al-agent enélkül is örököl (B1, B4, B5); a régi
- *   `mcpServers` lista elemei elöl, változatlanul maradnak;
- * - minden más mező változatlan, a `mcpServerReferences` kulcs nem megy ki.
+ *   `mcpServers` listából csak a szöveg (név) elemek maradnak elöl, a
+ *   közvetlen szerver objektum nem megy ki (O-53, user döntés 2026-10-28);
+ * - a `memory` mező nem megy ki (O-53), minden más mező változatlan, a
+ *   `mcpServerReferences` kulcs nem megy ki.
  *
  * Érvénytelen alakú definícióra (`parseAgentDefinition`) `malformed_node_config`,
  * a csomópont és az agent nevével. A futás indítása (`validateMcpServerReferences`)
@@ -66,14 +69,22 @@ export function resolveOutgoingAgents(
     }
     // `Object.fromEntries`, mert a név szabály a `__proto__` nevet is engedi (`resolveMcpServers`).
     const serverEntries = Object.entries(servers.value).map((entry) => Object.fromEntries([entry]));
-    const legacyServers: readonly unknown[] = Array.isArray(parsed.rest['mcpServers']) ? parsed.rest['mcpServers'] : [];
+    // O-53 (user döntés 2026-10-28): a régi lista csak a név elemeivel megy ki, a közvetlen szerver
+    // objektum (ami a központi listát megkerülné) és a `memory` mező (a gép agent memória
+    // könyvtárának betöltése) nem.
+    const rest = Object.fromEntries(
+      Object.entries(parsed.rest).filter(([key]) => key !== 'mcpServers' && key !== 'memory'),
+    );
+    const legacyValue = parsed.rest['mcpServers'];
+    const legacyNames: readonly unknown[] = Array.isArray(legacyValue) ? legacyValue.filter(isString) : [];
+    const outgoingServers = [...legacyNames, ...serverEntries];
     hasSkillReferences ||= parsed.skills !== null;
     outgoing.push([
       agentName,
       {
-        ...parsed.rest,
+        ...rest,
         ...(parsed.skills !== null && { skills: qualifySkillNames(parsed.skills, library) }),
-        ...(serverEntries.length > 0 && { mcpServers: [...legacyServers, ...serverEntries] }),
+        ...(outgoingServers.length > 0 && { mcpServers: outgoingServers }),
       },
     ]);
   }

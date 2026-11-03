@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import { AgentDefinitionEntryFields } from './AgentDefinitionEntryFields.tsx';
 import { UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS } from './agent-definition-field-table.ts';
 import { FieldErrorsContext } from './field-errors-context.ts';
@@ -262,35 +263,54 @@ describe('AgentDefinitionEntryFields', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ tools: ['WebSearch', 'WebFetch'] }));
   });
 
-  it('a zárt lista (memory) kiválasztása frissíti a mezőt', () => {
+  it('a nem támogatott memory mező a tárolt értéket és az okot mutatja, és eltávolítható (O-53)', () => {
     const onChange = vi.fn();
     act(() => {
       root.render(
         <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={onChange} />,
       );
     });
-    chooseOption(container, 'Memória hatóköre', 'local');
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ memory: 'local' }));
+    expect(container.textContent).toContain('project');
+    expect(container.textContent).toContain('nem támogatott mező: a gép agent memória könyvtárát töltené be');
+    const removeButton = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Memória hatóköre eltávolítása',
+    );
+    act(() => {
+      removeButton?.click();
+    });
+    const nextValue: unknown = onChange.mock.calls[0]?.[0];
+    expect(isRecord(nextValue) && Object.hasOwn(nextValue, 'memory')).toBe(false);
+    expect(isRecord(nextValue) && nextValue['initialPrompt']).toBe('szia');
   });
 
-  it('a zárt lista üres értékű opciója üríti a mezőt', () => {
-    const onChange = vi.fn();
+  it('a hiányzó memory kulcsnál nincs nem támogatott sor és eltávolító gomb', () => {
+    const withoutMemory = Object.fromEntries(Object.entries(FULL_ENTRY).filter(([key]) => key !== 'memory'));
     act(() => {
       root.render(
-        <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={onChange} />,
+        <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={withoutMemory} onChange={vi.fn()} />,
       );
     });
-    chooseOption(container, 'Memória hatóköre', 'nincs megadva');
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ memory: '' }));
+    expect(container.textContent).not.toContain('Memória hatóköre');
   });
 
-  it('a régi `mcpServers` mező olvasható, és a régi alakot nevezi meg', () => {
-    act(() => {
-      root.render(
-        <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={vi.fn()} />,
+  it('a régi `mcpServers` mező a közvetlen alakot nevezi meg, és a mentési hiba a mező alatt jelenik meg (O-53)', () => {
+    const errors = new Map([['agents.kutato.mcpServers', 'Ez a mező nem támogatott.']]);
+    const entry = { ...FULL_ENTRY, mcpServers: [{ sajat: { command: 'x' } }] };
+    for (const isSaveAttempted of [false, true]) {
+      act(() => {
+        root.render(
+          <FieldErrorVisibilityContext.Provider value={isSaveAttempted}>
+            <FieldErrorsContext.Provider value={errors}>
+              <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={entry} onChange={vi.fn()} />
+            </FieldErrorsContext.Provider>
+          </FieldErrorVisibilityContext.Provider>,
+        );
+      });
+      expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+        isSaveAttempted ? 'Ez a mező nem támogatott.' : undefined,
       );
-    });
-    expect(container.textContent).toContain('a régi, lépésenkénti alak');
+    }
+    expect(container.textContent).toContain('a régi, közvetlen alak');
     expect(container.textContent).not.toContain('SPEC-009');
   });
 

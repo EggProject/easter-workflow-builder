@@ -3,6 +3,7 @@ import { BLANK_FIELD_MESSAGE } from './blank-field-message.ts';
 import { findBlankTextFields } from './find-blank-text-fields.ts';
 import { findInvalidMcpServerReferenceEnvironmentNames } from './find-invalid-mcp-server-reference-environment-names.ts';
 import { findNonPositiveIntegerFields } from './find-non-positive-integer-fields.ts';
+import { findUnsupportedAgentDefinitionFields } from './find-unsupported-agent-definition-fields.ts';
 import { NodeConfigSchema, type NodeConfig } from './node-config.ts';
 import { REQUIRED_TEXT_FIELD_PATHS } from './required-text-field-paths.ts';
 
@@ -19,6 +20,12 @@ const NOT_POSITIVE_INTEGER_MESSAGE = 'A mező értéke nem pozitív egész szám
  */
 const INVALID_ENV_NAME_MESSAGE =
   'A változó név betűvel vagy aláhúzással kezdődik, és csak betűt, számot és aláhúzást tartalmaz.';
+
+/**
+ * Az agent definíció nem támogatott mezőjének hibaüzenete (SPEC-009 6.2, O-53).
+ */
+const UNSUPPORTED_AGENT_FIELD_MESSAGE =
+  'Ez a mező nem támogatott: a futás nem adja ki, a mentéshez el kell távolítani.';
 
 /**
  * A lépés alakú konfig a node-on belül (az `mcpServerReferences` helye): az
@@ -83,7 +90,7 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
 }
 
 /**
- * A mentési séma (SPEC-008 5.4): a `NodeConfigSchema` olvasó séma plusz négy
+ * A mentési séma (SPEC-008 5.4): a `NodeConfigSchema` olvasó séma plusz hat
  * írás oldali szabály, egyetlen `superRefine` hívásban:
  *
  * 1. a kötelező szöveg mezők nem üresek (user döntés 2026-09-28, O-21);
@@ -94,7 +101,11 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  * 5. a lépés `mcpServerReferences` hivatkozásainak `envBindings` értéke és nem
  *    `null` `authEnvName` mezője env változó név alakú (SPEC-009 6.1,
  *    T-012-27); az agent definíciók azonos mezőjét a motor indításkori
- *    validációja ellenőrzi, mert az `agents` rekord itt szűkítetlen.
+ *    validációja ellenőrzi, mert az `agents` rekord itt szűkítetlen;
+ * 6. az agent definíciókban nincs `memory` mező és nem szöveg elemű régi
+ *    `mcpServers` lista (SPEC-009 6.2, O-53, user döntés 2026-10-28); a
+ *    szabálynak nincs `db` oldali párja, az olvasó út a tárolt adatot
+ *    változatlanul elfogadja, a motor a két mezőt nem adja ki.
  *
  * **A szabályok a konfig típushibája mellett is lefutnak** (user döntés
  * 2026-10-16, "Egyszerre látsszon mind", SPEC-008 81. kritérium): a zod
@@ -161,6 +172,13 @@ export const NodeConfigSaveSchema = NodeConfigSchema.superRefine(
           code: 'custom',
           path: [...agentStep.prefix, ...fieldPath],
           message: INVALID_ENV_NAME_MESSAGE,
+        });
+      }
+      for (const fieldPath of findUnsupportedAgentDefinitionFields(agentStep.value)) {
+        context.addIssue({
+          code: 'custom',
+          path: [...agentStep.prefix, ...fieldPath],
+          message: UNSUPPORTED_AGENT_FIELD_MESSAGE,
         });
       }
     }

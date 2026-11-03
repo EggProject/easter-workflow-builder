@@ -119,6 +119,35 @@ describe('resolveOutgoingAgents', () => {
     });
   });
 
+  it('a régi lista közvetlen szerver objektuma és a memory mező nem megy ki, a név elem igen (O-53)', () => {
+    const resolved = resolveOutgoingAgents(
+      'a1',
+      {
+        regi: {
+          description: 'd',
+          prompt: 'p',
+          memory: 'user',
+          mcpServers: ['lepes-szerver', { inline: { command: 'kerulo', env: { TITOK: 'literal' } } }],
+        },
+        csakObjektum: { description: 'd', prompt: 'p', mcpServers: [{ inline: { command: 'kerulo' } }] },
+      },
+      LIBRARY,
+      [],
+      environmentOf({}),
+    );
+
+    expect(resolved).toStrictEqual({
+      kind: 'ok',
+      value: {
+        definitions: {
+          regi: { description: 'd', prompt: 'p', mcpServers: ['lepes-szerver'] },
+          csakObjektum: { description: 'd', prompt: 'p' },
+        },
+        hasSkillReferences: false,
+      },
+    });
+  });
+
   it('az érvénytelen alakú definícióra malformed_node_config, a csomópont és az agent nevével', () => {
     expect(resolveOutgoingAgents('a1', { segito: { skills: 7 } }, LIBRARY, [], environmentOf({}))).toStrictEqual({
       kind: 'error',

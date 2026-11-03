@@ -1,4 +1,12 @@
-import { LEGACY_MCP_SERVERS_REASON } from './legacy-mcp-servers-reason.ts';
+/**
+ * A két nem támogatott agent definíció mező indoka (SPEC-009 6.2, O-53, user döntés 2026-10-28): a
+ * futás egyiket sem adja ki, a mentési séma elutasítja, a panel a tárolt értéket mutatja és
+ * eltávolítható.
+ */
+const UNSUPPORTED_MEMORY_REASON =
+  'nem támogatott mező: a gép agent memória könyvtárát töltené be, a futás nem adja ki; a mentéshez távolítsd el';
+const UNSUPPORTED_AGENT_MCP_SERVERS_REASON =
+  'a régi, közvetlen alak: a futás csak a név elemeit adja ki, a szerver objektumot nem, és az objektum elemmel a gráf nem menthető; az MCP szervert a fenti listából válaszd';
 
 /**
  * Az `agents` mező egy bejegyzésének (`AgentDefinition`-szerű `unknown`
@@ -25,9 +33,8 @@ export type AgentDefinitionFieldControl =
   | { readonly kind: 'number' }
   | { readonly kind: 'boolean' }
   | { readonly kind: 'string-list' }
-  | { readonly kind: 'select'; readonly options: readonly string[] }
   | { readonly kind: 'skills' }
-  | { readonly kind: 'readonly'; readonly reason: string };
+  | { readonly kind: 'unsupported'; readonly reason: string };
 
 export interface AgentDefinitionFieldDescriptor {
   readonly key: string;
@@ -87,7 +94,7 @@ export const AGENT_DEFINITION_FIELD_TABLE = [
     key: 'memory',
     label: 'Memória hatóköre',
     group: 'környezet',
-    control: { kind: 'select', options: ['user', 'project', 'local'] },
+    control: { kind: 'unsupported', reason: UNSUPPORTED_MEMORY_REASON },
     required: false,
   },
   { key: 'initialPrompt', label: 'Kezdő üzenet', group: 'környezet', control: { kind: 'textarea' }, required: false },
@@ -102,7 +109,7 @@ export const AGENT_DEFINITION_FIELD_TABLE = [
     key: 'mcpServers',
     label: 'MCP szerverek',
     group: 'MCP szerverek',
-    control: { kind: 'readonly', reason: LEGACY_MCP_SERVERS_REASON },
+    control: { kind: 'unsupported', reason: UNSUPPORTED_AGENT_MCP_SERVERS_REASON },
     required: false,
   },
 ] as const satisfies readonly AgentDefinitionFieldDescriptor[];

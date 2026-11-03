@@ -1,4 +1,12 @@
-import { Accordion, AccordionItem, Checkbox, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
+import {
+  Accordion,
+  AccordionItem,
+  Button,
+  Checkbox,
+  FieldErrorVisibilityContext,
+  TextAreaField,
+  TextField,
+} from '@easter-workflow-builder/ui';
 import { isBoolean, isNumber, isRecord, isString, isStringArray } from '@easter-workflow-builder/typeguards';
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
 import {
@@ -63,6 +71,7 @@ function renderFieldControl(
   field: AgentDefinitionFieldDescriptor,
   record: Readonly<Record<string, unknown>>,
   setField: (key: string, fieldValue: unknown) => void,
+  removeField: (key: string) => void,
   error: string | undefined,
 ): ReactElement {
   const rawValue = record[field.key];
@@ -131,23 +140,6 @@ function renderFieldControl(
         />
       );
     }
-    case 'select': {
-      return (
-        <SelectField
-          size="sm"
-          label={field.label}
-          options={[
-            { value: '', label: 'nincs megadva' },
-            ...control.options.map((option) => ({ value: option, label: option })),
-          ]}
-          placeholder="nincs megadva"
-          value={isString(rawValue) ? rawValue : ''}
-          onChange={(nextValue) => {
-            setField(field.key, nextValue);
-          }}
-        />
-      );
-    }
     case 'skills': {
       return (
         <SkillsField
@@ -158,12 +150,31 @@ function renderFieldControl(
         />
       );
     }
-    case 'readonly': {
+    case 'unsupported': {
+      // A tárolt értéket mutatja és eltávolítható (O-53); hiányzó kulcsnál nincs mit mutatni.
+      if (!Object.hasOwn(record, field.key)) {
+        return <></>;
+      }
       return (
         <div className="field">
           <span className="field__label">{field.label}</span>
           <p>{describeUnknownValue(rawValue)}</p>
           <p className="node-inspector__reason">{control.reason}</p>
+          {error !== undefined && (
+            <p className="field__error" role="alert">
+              {error}
+            </p>
+          )}
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              removeField(field.key);
+            }}
+          >
+            {field.label} eltávolítása
+          </Button>
         </div>
       );
     }
@@ -192,6 +203,13 @@ export function AgentDefinitionEntryFields(properties: Readonly<AgentDefinitionE
   // útvonala (`agents.x.description.prompt`) előtagként az `x` bejegyzés
   // `description` mezőjére is illeszkedne.
   const fieldErrors = useContext(FieldErrorsContext);
+  // A nem támogatott mező nem beviteli elem, tehát nem lehet érintett: a hibája csak a mentés
+  // kísérlete után látszik (`.claude/CLAUDE.md` 11. szekció, a mező alatti hiba szabálya).
+  const isSaveAttempted = useContext(FieldErrorVisibilityContext);
+  const errorOf = (field: AgentDefinitionFieldDescriptor): string | undefined =>
+    field.control.kind === 'unsupported' && !isSaveAttempted
+      ? undefined
+      : fieldErrors.get(`${fieldPathPrefix}${field.key}`);
 
   if (!isRecord(value)) {
     return <p role="alert">Ez a bejegyzés nem objektum alakú, itt nem szerkeszthető.</p>;
@@ -202,12 +220,14 @@ export function AgentDefinitionEntryFields(properties: Readonly<AgentDefinitionE
     onChange({ ...record, [key]: fieldValue });
   }
 
+  function removeField(key: string): void {
+    onChange(Object.fromEntries(Object.entries(record).filter(([existingKey]) => existingKey !== key)));
+  }
+
   return (
     <div className="node-inspector__group agent-definition-entry-fields">
       {AGENT_DEFINITION_FIELD_TABLE.filter((field) => field.group === 'kötelező').map((field) => (
-        <div key={field.key}>
-          {renderFieldControl(field, record, setField, fieldErrors.get(`${fieldPathPrefix}${field.key}`))}
-        </div>
+        <div key={field.key}>{renderFieldControl(field, record, setField, removeField, errorOf(field))}</div>
       ))}
       <Accordion>
         {ACCORDION_PANELS.map((panel) => (
@@ -222,9 +242,7 @@ export function AgentDefinitionEntryFields(properties: Readonly<AgentDefinitionE
                 />
               )}
               {AGENT_DEFINITION_FIELD_TABLE.filter((field) => panel.groups.includes(field.group)).map((field) => (
-                <div key={field.key}>
-                  {renderFieldControl(field, record, setField, fieldErrors.get(`${fieldPathPrefix}${field.key}`))}
-                </div>
+                <div key={field.key}>{renderFieldControl(field, record, setField, removeField, errorOf(field))}</div>
               ))}
               {panel.groups.includes('MCP szerverek') && (
                 <>

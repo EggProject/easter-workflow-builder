@@ -821,3 +821,30 @@ describe('NodeConfigSaveSchema: az MCP hivatkozás szerver oldali nevei env vál
     }
   });
 });
+
+describe('NodeConfigSaveSchema: az agent definíció memory mezője és közvetlen MCP objektuma nem menthető (SPEC-009 6.2, O-53)', () => {
+  function agentStepWithAgents(agents: unknown): unknown {
+    return { type: 'agent_step', ...VALID_AGENT_STEP_SETTINGS, agents, onUnhandledError: 'fail_run' };
+  }
+
+  it('a memory és a nem szöveg elemű mcpServers a mező útvonalán bukik, a szöveg elem átmegy', () => {
+    const parsed = NodeConfigSaveSchema.safeParse(
+      agentStepWithAgents({
+        a: { description: 'd', prompt: 'p', memory: 'user' },
+        b: { description: 'd', prompt: 'p', mcpServers: [{ sajat: { command: 'x' } }] },
+        c: { description: 'd', prompt: 'p', mcpServers: ['lepes'] },
+      }),
+    );
+
+    expect(parsed.error?.issues.map((issue) => issue.path)).toStrictEqual([
+      ['agents', 'a', 'memory'],
+      ['agents', 'b', 'mcpServers'],
+    ]);
+  });
+
+  it('az olvasó NodeConfigSchema a tárolt memory mezőt elfogadja (a régi gráf olvasható marad)', () => {
+    expect(
+      NodeConfigSchema.safeParse(agentStepWithAgents({ a: { description: 'd', prompt: 'p', memory: 'user' } })).success,
+    ).toBe(true);
+  });
+});
