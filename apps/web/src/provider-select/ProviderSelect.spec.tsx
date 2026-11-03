@@ -203,7 +203,7 @@ describe('ProviderSelect', () => {
     expect(alert?.textContent).toContain('A kapcsolat teszt sikeres.');
   });
 
-  it('a sikertelen teszt danger Alertben a motor szövegével jelenik meg', async () => {
+  it('a sikertelen teszt danger Alertben a saját magyar mondattal jelenik meg, a motor nyers szövege nélkül (O-55)', async () => {
     const { tester, resolve } = deferredTester();
     render({ value: 'minimax', testConnection: tester });
     clickOn(testButton());
@@ -214,10 +214,13 @@ describe('ProviderSelect', () => {
     expect(alert?.classList.contains('alert--danger')).toBe(true);
     expect(alert?.getAttribute('role')).toBe('alert');
     expect(alert?.querySelector('.alert__title')?.textContent).toBe('A kapcsolat teszt sikertelen');
-    expect(alert?.querySelector('.alert__message')?.textContent).toBe('Hiányzik az ANTHROPIC_AUTH_TOKEN');
+    expect(alert?.querySelector('.alert__message')?.textContent).toBe(
+      'A szerver nem kapott sikeres választ a providertől. Ellenőrizd a provider env változóit a szerveren.',
+    );
+    expect(alert?.textContent).not.toContain('ANTHROPIC_AUTH_TOKEN');
   });
 
-  it('a szöveg nélküli sikertelen teszt csak a címet mutatja', async () => {
+  it('a szöveg nélküli sikertelen teszt is a saját mondatot mutatja', async () => {
     const { tester, resolve } = deferredTester();
     render({ value: 'minimax', testConnection: tester });
     clickOn(testButton());
@@ -225,7 +228,7 @@ describe('ProviderSelect', () => {
     await resolve(succeededOutcome({ succeeded: false, errorMessage: null }));
 
     expect(container.querySelector('.alert__title')?.textContent).toBe('A kapcsolat teszt sikertelen');
-    expect(container.querySelector('.alert__message')).toBeNull();
+    expect(container.querySelector('.alert__message')?.textContent).toContain('Ellenőrizd a provider env változóit');
   });
 
   it('a hívás hibája danger Alertben a REST réteg magyar mondatával jelenik meg', async () => {

@@ -44,6 +44,15 @@ export interface ProviderSelectProperties extends Pick<
  * magyar szöveg; a megjelenítése termékdöntésre vár (SPEC-009 14.9 O-55). A
  * hívás hibája a REST réteg magyar mondata.
  */
+/**
+ * A sikertelen kapcsolat teszt saját magyar mondata (SPEC-009 O-55, a szabálykönyv 11. szekció "A REST
+ * hívás hibája ... a szerver belső szövege nélkül" szabálya szerint): a válasz `errorMessage` mezője
+ * az SDK vagy a folyam olvasásának nyers szövege is lehet (`create-engine.ts` `describeError`), ezért
+ * a felületre nem kerül.
+ */
+const CONNECTION_TEST_FAILURE_SENTENCE =
+  'A szerver nem kapott sikeres választ a providertől. Ellenőrizd a provider env változóit a szerveren.';
+
 function renderTestResult(state: RequestState<ConnectionTestResponse>): ReactElement | undefined {
   if (state.status === 'failure') {
     return <Alert variant="danger">{state.message}</Alert>;
@@ -53,7 +62,7 @@ function renderTestResult(state: RequestState<ConnectionTestResponse>): ReactEle
       <Alert variant="success">A kapcsolat teszt sikeres.</Alert>
     ) : (
       <Alert variant="danger" title="A kapcsolat teszt sikertelen">
-        {state.value.errorMessage ?? undefined}
+        {CONNECTION_TEST_FAILURE_SENTENCE}
       </Alert>
     );
   }

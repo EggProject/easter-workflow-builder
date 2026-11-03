@@ -485,7 +485,7 @@ test('az alapértelmezett provider mentése alatt a választó "Mentés…" feli
   await expect(page.getByRole('button', { name: 'Kapcsolat teszt' })).toBeEnabled();
 });
 
-test('a kapcsolat teszt futása alatt a gomb betöltés állapotú és tiltott, a sikertelen teszt a motor szövegével danger Alert, a választás váltása elrejti', async ({
+test('a kapcsolat teszt futása alatt a gomb betöltés állapotú és tiltott, a sikertelen teszt saját mondattal danger Alert, a motor szövege nélkül (O-55), a választás váltása elrejti', async ({
   page,
 }) => {
   mockState.settings = { defaultProviderId: 'minimax', persistStreamDeltas: false, builtinSkillsEnabled: true };
@@ -504,7 +504,8 @@ test('a kapcsolat teszt futása alatt a gomb betöltés állapotú és tiltott, 
   gate.open();
   const failure = page.getByRole('alert');
   await expect(failure).toContainText('A kapcsolat teszt sikertelen');
-  await expect(failure).toContainText('Hiányzik az ANTHROPIC_AUTH_TOKEN');
+  await expect(failure).toContainText('Ellenőrizd a provider env változóit a szerveren.');
+  await expect(failure).not.toContainText('ANTHROPIC_AUTH_TOKEN');
   await expect(failure).toHaveClass(/\balert--danger\b/);
   await expect(testButton).toBeEnabled();
   await expect(testButton).not.toHaveAttribute('aria-busy');
@@ -513,7 +514,7 @@ test('a kapcsolat teszt futása alatt a gomb betöltés állapotú és tiltott, 
   await expect(failure).toBeHidden();
 });
 
-test('a motor üzenet nélküli sikertelen kapcsolat tesztje is danger Alert, csak a címmel', async ({ page }) => {
+test('a motor üzenet nélküli sikertelen kapcsolat tesztje is danger Alert, a saját mondattal', async ({ page }) => {
   mockState.settings = { defaultProviderId: 'minimax', persistStreamDeltas: false, builtinSkillsEnabled: true };
   mockState.connectionResult = CONNECTION_FAILED_WITHOUT_MESSAGE;
   await page.goto('/settings');
@@ -521,7 +522,8 @@ test('a motor üzenet nélküli sikertelen kapcsolat tesztje is danger Alert, cs
   await page.getByRole('button', { name: 'Kapcsolat teszt' }).click();
 
   const failure = page.getByRole('alert');
-  await expect(failure).toHaveText('A kapcsolat teszt sikertelen');
+  await expect(failure).toContainText('A kapcsolat teszt sikertelen');
+  await expect(failure).toContainText('Ellenőrizd a provider env változóit a szerveren.');
   await expect(failure).toHaveClass(/\balert--danger\b/);
 });
 
