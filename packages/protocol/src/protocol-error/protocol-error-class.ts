@@ -58,6 +58,9 @@ export const ProtocolErrorClassSchema = z.enum([
   // listában, illetve a hozzárendelt szerver oldali env változó nincs beállítva
   'mcp_server_not_found',
   'missing_mcp_server_env',
+  // SPEC-009 6.4 (O-46, user döntés 2026-10-28): egy hivatkozott MCP szerver
+  // nem csatlakozott, a lépés megnevezett hibával áll meg
+  'mcp_server_connection_failed',
   // SPEC-005 4.2 18. végpont: a jóváhagyás már el van döntve
   'already_decided',
   // SPEC-009 5.4: a skill feltöltés elutasítási okai (O-41)

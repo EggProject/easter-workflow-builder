@@ -9,6 +9,7 @@ import { formatEngineErrorMessage } from '../engine-error/format-engine-error-me
 import { buildOutgoingEnvironment } from '../provider-environment/build-outgoing-environment.ts';
 import { hasMcpServerReferences } from '../mcp-server-resolution/has-mcp-server-references.ts';
 import { resolveMcpServers } from '../mcp-server-resolution/resolve-mcp-servers.ts';
+import { findFailedMcpServers } from '../mcp-server-resolution/find-failed-mcp-servers.ts';
 import { resolveOutgoingAgents } from '../agent-definition/resolve-outgoing-agents.ts';
 import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { AgentStepExecution } from './agent-step-execution.ts';
@@ -162,6 +163,7 @@ async function consumeStream(
   dependencies: EngineDependencies,
   query: AgentQuery,
   attachment: SessionAttachment,
+  mcpServerNames: readonly string[],
 ): Promise<Outcome<AgentStepExecution>> {
   let resultMessage: SdkResultMessage | undefined;
 
@@ -170,6 +172,19 @@ async function consumeStream(
       const handled = handleStreamMessage(message, request, dependencies, attachment);
       if (handled.kind === 'error') {
         return handled;
+      }
+      // SPEC-009 6.4, O-46: egy kiadott MCP szerver sikertelen kapcsolódása a lépést megállítja. A
+      // megszakítás után a ciklus elhagyása lezárja a folyamot (az iterátor `return()` hívása).
+      const failedServers = isSdkSystemInitMessage(message) ? findFailedMcpServers(message, mcpServerNames) : [];
+      if (failedServers.length > 0) {
+        await query.interrupt();
+        return preStreamFailure(
+          'mcp_server_connection_failed',
+          formatEngineErrorMessage(
+            'mcp_server_connection_failed',
+            `A(z) ${request.instance.nodeId} csomópont MCP szervere nem csatlakozott: ${failedServers.map((name) => `"${name}"`).join(', ')}`,
+          ),
+        );
       }
       if (isSdkResultMessage(message)) {
         resultMessage = message;
@@ -324,7 +339,13 @@ export async function runAgentStep(
 
   agentQueryRegistry.register(request.runId, request.stepRunId, query.value);
   try {
-    return await consumeStream(request, dependencies, query.value, toSessionAttachment(sessionBinding.value));
+    return await consumeStream(
+      request,
+      dependencies,
+      query.value,
+      toSessionAttachment(sessionBinding.value),
+      Object.keys(mcpServers.value),
+    );
   } finally {
     agentQueryRegistry.unregister(request.stepRunId);
   }

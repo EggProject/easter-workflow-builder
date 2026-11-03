@@ -84,6 +84,10 @@ export type EngineErrorKind =
   // indításakor és a lépés futtatásakor is ellenőrzött.
   | 'mcp_server_not_found'
   | 'missing_mcp_server_env'
+  // SPEC-009 6.4 (O-46, user döntés 2026-10-28): egy kiadott MCP szerver nem
+  // csatlakozott (az `init` üzenet `failed` vagy `needs-auth` állapota); a lépés
+  // futtatás közben, megnevezett hibával áll meg.
+  | 'mcp_server_connection_failed'
   // 7.: a párhuzamossági szabályozó, ismeretlen azonosító felszabadítása
   | 'unknown_concurrency_slot'
   // 9. szekció zárómondat, PLAN-005 T-005-27: a `restartRun` művelet - az

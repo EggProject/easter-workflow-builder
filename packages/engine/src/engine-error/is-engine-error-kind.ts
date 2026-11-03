@@ -53,6 +53,7 @@ const ENGINE_ERROR_KIND_KEYS: Readonly<Record<EngineErrorKind, true>> = {
   missing_provider_env: true,
   skill_not_found: true,
   mcp_server_not_found: true,
+  mcp_server_connection_failed: true,
   missing_mcp_server_env: true,
   unknown_concurrency_slot: true,
   run_execution_failed: true,

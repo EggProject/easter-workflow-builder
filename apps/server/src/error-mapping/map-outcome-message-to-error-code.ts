@@ -76,6 +76,9 @@ const ENGINE_VALIDATION_ERROR_CLASSES = [
   'skill_not_found',
   'mcp_server_not_found',
   'missing_mcp_server_env',
+  // O-46: a lépés futása közben keletkezik, a futás eseményein megy ki; a szótár
+  // tagjaként a motor többi osztályával azonos kódra képződik.
+  'mcp_server_connection_failed',
 ] satisfies readonly EngineErrorKind[];
 
 /**

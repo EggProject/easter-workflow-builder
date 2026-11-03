@@ -50,6 +50,7 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
   'missing_provider_env',
   'skill_not_found',
   'mcp_server_not_found',
+  'mcp_server_connection_failed',
   'missing_mcp_server_env',
   'unknown_concurrency_slot',
   'run_execution_failed',

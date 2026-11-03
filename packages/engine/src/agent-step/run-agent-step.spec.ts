@@ -11,6 +11,7 @@ import type {
   SnapshotNode,
 } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import { buildExecutableGraph } from '../run-graph/build-executable-graph.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
@@ -617,6 +618,73 @@ describe('runAgentStep', () => {
     const events = okOrThrow(database.events.readEventsForStep(stepRunId, 100));
     expect(JSON.stringify(events)).not.toContain('mcp-titok');
 
+    database.close();
+  });
+
+  it('a nem csatlakozott MCP szerver a lépést megnevezett hibával megállítja, a folyam tovább nem olvasódik (O-46)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'docs',
+        definition: { type: 'http', url: 'http://127.0.0.1:4100/mcp', authEnvName: null },
+      }),
+    );
+    const interruptSpy = vi.fn(() => Promise.resolve());
+    const consumed: unknown[] = [];
+    async function* generate(): AsyncGenerator {
+      yield {
+        type: 'system',
+        subtype: 'init',
+        session_id: 'session-mcp',
+        uuid: 'mcp-1',
+        mcp_servers: [{ name: 'docs', status: 'failed' }],
+      };
+      consumed.push('tovabb');
+      yield* fixtureMessages('sikeres');
+    }
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: { run: () => ({ kind: 'ok', value: { messages: generate(), interrupt: interruptSpy } }) },
+    });
+    const config = agentStepConfig({ mcpServerReferences: { docs: { envBindings: {}, authEnvName: null } } });
+
+    const execution = okOrThrow(
+      await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry),
+    );
+
+    expect(execution.outcome).toStrictEqual({
+      status: 'failed',
+      errorKind: 'mcp_server_connection_failed',
+      errorMessage: 'A(z) a csomópont MCP szervere nem csatlakozott: "docs" (mcp_server_connection_failed).',
+    });
+    expect(interruptSpy).toHaveBeenCalledTimes(1);
+    expect(consumed).toStrictEqual([]);
+    database.close();
+  });
+
+  it('a csatlakozott MCP szerver mellett a lépés lefut (O-46)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'docs',
+        definition: { type: 'http', url: 'http://127.0.0.1:4100/mcp', authEnvName: null },
+      }),
+    );
+    const messages = fixtureMessages('sikeres').map((message: unknown) =>
+      isRecord(message) && message['subtype'] === 'init'
+        ? { ...message, mcp_servers: [{ name: 'docs', status: 'connected' }] }
+        : message,
+    );
+    const dependencies = dependenciesOf({ database, agentQueryRunner: fakeRunner(messages, newCapture()) });
+    const config = agentStepConfig({ mcpServerReferences: { docs: { envBindings: {}, authEnvName: null } } });
+
+    const execution = okOrThrow(
+      await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry),
+    );
+
+    expect(execution.outcome.status).toBe('succeeded');
     database.close();
   });
 

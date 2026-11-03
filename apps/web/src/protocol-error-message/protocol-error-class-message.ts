@@ -45,6 +45,7 @@ const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>
   expression_evaluation_failed: 'A workflow egyik kifejezése hibás, ezért a futás nem indítható.',
   skill_not_found: 'Egy lépés olyan skillre hivatkozik, ami nincs a skill könyvtárban.',
   mcp_server_not_found: 'Egy lépés olyan MCP szerverre hivatkozik, ami nincs a Beállítások MCP szerver listájában.',
+  mcp_server_connection_failed: 'Egy lépés MCP szervere nem csatlakozott, ezért a lépés leállt.',
   missing_mcp_server_env: 'Egy lépés MCP szerveréhez rendelt szerver oldali env változó nincs beállítva.',
   already_decided: 'Ezt a jóváhagyást már eldöntötték.',
   // SPEC-009 5.4 tábla: a skill feltöltés elutasítási okai (O-41, user döntés 2026-10-28).

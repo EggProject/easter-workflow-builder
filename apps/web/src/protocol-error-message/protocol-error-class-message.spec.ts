@@ -52,6 +52,7 @@ describe('protocolErrorClassMessage', () => {
       'Egy lépés olyan MCP szerverre hivatkozik, ami nincs a Beállítások MCP szerver listájában.',
     ],
     ['missing_mcp_server_env', 'Egy lépés MCP szerveréhez rendelt szerver oldali env változó nincs beállítva.'],
+    ['mcp_server_connection_failed', 'Egy lépés MCP szervere nem csatlakozott, ezért a lépés leállt.'],
     ['already_decided', 'Ezt a jóváhagyást már eldöntötték.'],
     ['skill_archive_unreadable', 'A feltöltött fájl nem érvényes ZIP csomag.'],
     [
