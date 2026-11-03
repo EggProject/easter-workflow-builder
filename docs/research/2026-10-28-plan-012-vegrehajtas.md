@@ -612,3 +612,52 @@ nem változtatta: az `apps/web/package.json` és az `apps/web/src` a `main` két
 **Feljegyzés, nem lépés:** a mért százalék mind a négy metrikán a küszöb felett van, a fedetlen darabszám nem nőtt,
 tehát a 8. szekció ratchet szabálya szerint a küszöb felfelé követhetné a mért értéket; ez ebben a PR-ban nem
 történt meg.
+
+## 6. A 2026-10-28-i döntések végrehajtása (T-012-30, SPEC-009 14.10)
+
+### 6.1 M-148: az MCP config fájlból és az indító program, a beágyazott CLI ellen
+
+**Felállás.** A pinelt `@anthropic-ai/claude-agent-sdk` `0.3.245` beágyazott CLI binárisa (`2.1.245`),
+`env -i PATH=/usr/bin:/bin HOME=<üres könyvtár> ANTHROPIC_BASE_URL=http://127.0.0.1:9` (lezárt helyi port,
+kimenő hívás nincs) `ANTHROPIC_API_KEY=<jelölő, nem titok>` `EASTER_PROBE_SECRET=<jelölő>` mellett,
+`-p --output-format stream-json --verbose --setting-sources= --strict-mcp-config --mcp-config <fájl>`;
+a fájlt a `hardenAgentOptions` állította elő egy stdio szerverből (a 3. szekció `mcp-stdio-csonk.mjs`
+csonkja, `env: { DEKLARALT_VALTOZO }`), `0600` joggal. Az első `system`/`init` üzenetet olvastuk.
+
+**Eredmény.** (1) A szerver `connected` állapotú, az eszköze (`mcp__stdio-csonk__ping`) a listában áll:
+a CLI a fájl alapú configot elfogadja, az indító programon át a stdio protokoll működik. (2) A csonk
+jelentése szerint a gyerek környezetének nevei pontosan `DEKLARALT_VALTOZO`, `HOME`, `PATH`; sem a
+provider kulcs, sem a jelölő, sem a CLI saját változói nem érkeztek meg. (3) Nem létező parancsra az
+indító 127-tel kilép, az `init` állapota `failed`. Valódi API hívás nem futott.
+
+**Forrás.** A telepített `sdk.mjs` a nem `sdk` típusú `mcpServers` rekordot `--mcp-config <JSON>`
+argumentumként, az `extraArgs` kulcsait `--<kulcs> <érték>` argumentumként adja (4.5); a d.ts `extraArgs`
+leírása: "Additional CLI arguments to pass to Claude Code. Keys are argument names (without --)". Hogy
+a CLI a fájlt csak induláskor olvassa-e, nem ellenőrzött; ezért a törlés a folyam lezárásakor fut.
+
+### 6.2 M-149: a beépített skillek kikapcsolása
+
+Ugyanazzal a felállással, `--mcp-config` nélkül: az `init` `skills` tömbje alapból 15 nevet hordoz
+(beépített skillek, például `simplify`, `claude-api`, `loop`); `CLAUDE_CODE_DISABLE_BUNDLED_SKILLS=1`
+mellett csak a `doctor` marad. A `--settings '{"disableBundledSkills":true}'` ugyanezt adja. A d.ts
+`Settings.disableBundledSkills` leírása: "Disable the skills and workflows that ship with Claude Code
+... Plugins, .claude/skills/, and .claude/commands/ are unaffected. Equivalent to
+CLAUDE_CODE_DISABLE_BUNDLED_SKILLS=1." A motor az env utat használja (egyetlen kulcs a kimenő env
+blokkban). Hogy a `doctor` miért marad, nem ellenőrzött.
+
+### 6.3 O-59: a mért hiba és a regresszió
+
+A Beállítások skill feltöltés űrlapján egy még nem érintett, érvénytelen név után a "Feltöltés" gomb
+első kattintása elveszett: a lenyomás elhagyja a mezőt, a megjelenő hibaüzenet a gombot lejjebb tolja,
+a felengedés már nem a gombon történik. Saját e2e futás a javítás előtt: 320 és 1440 pixelen is csak a
+név hibája jelent meg, a hiányzó fájl hibája (ami csak beküldésből jön) nem. A javítás után mindkét
+méreten mindkét hiba megjelenik (`skill-library-settings.spec.ts` O-59 tesztjei); a párhuzamossági
+korlát mezőjén a gomb helye a kattintás előtt és után azonos (`settings-screen.spec.ts` O-59).
+
+### 6.4 O-57: a `__MACOSX/` bejegyzések és a korlátok
+
+A kihagyott bejegyzés nem íródik ki és nem olvasódik, ezért a bejegyzésenkénti ellenőrzés (útvonal,
+titkosítás, tömörítés, típus) és a kicsomagolt méret korlát nem vonatkozik rá; a bejegyzésszám korlát és
+a központi könyvtár deklarált méretének egyeztetése a csomag egészének szerkezeti ellenőrzése, a yauzl
+a kihagyott bejegyzés központi könyvtár rekordját is beolvassa, ezért abba beleszámít (biztonsági
+szempont: a korlát a beolvasott rekordok számát és méretét fogja meg).
