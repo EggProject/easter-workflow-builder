@@ -90,6 +90,28 @@ describe('extractSkillArchive: sikeres kicsomagolás', () => {
     expect(await readFile(path.join(directory, 'ref', 'b.md'), 'utf8')).toBe('b');
   });
 
+  it('a macOS __MACOSX/ bejegyzései kimaradnak, a legfelső mappa mellett is (O-57)', async () => {
+    const { outcome, directory } = await extractInto(
+      buildTestZipArchive([
+        testZipDirectoryEntry('csomag/'),
+        manifestEntry('csomag/'),
+        testZipDirectoryEntry('__MACOSX/'),
+        testZipDirectoryEntry('__MACOSX/csomag/'),
+        testZipFileEntry('__MACOSX/csomag/._SKILL.md', 'appledouble'),
+        testZipFileEntry('__MACOSX/../kilogo.txt', 'x'),
+      ]),
+    );
+
+    expect(outcome.kind).toBe('ok');
+    expect(await readdir(directory)).toStrictEqual(['SKILL.md']);
+  });
+
+  it('a __MACOSX/ bejegyzés a bejegyzések számába beleszámít (O-57)', async () => {
+    expect(await rejectionOf([...entriesOfCount(1024), testZipFileEntry('__MACOSX/._SKILL.md', 'x')])).toBe(
+      'skill_archive_too_many_entries',
+    );
+  });
+
   it('a zip Unix módja nem érvényesül: a futtatható bitekkel csomagolt fájl sem futtatható (5.4 8. pont)', async () => {
     const executable = testZipFileEntry('x.sh', 'x', { externalFileAttributes: 0o10_0777 * UNIX_MODE_FACTOR });
     const { directory } = await extractInto(buildTestZipArchive([manifestEntry(), executable]));

@@ -9,6 +9,7 @@ import { classifyFileSystemWriteError } from './classify-file-system-write-error
 import { classifyZipReadError } from './classify-zip-read-error.ts';
 import { findPathCollision } from './find-path-collision.ts';
 import { isFileSystemError } from './is-file-system-error.ts';
+import { isMacOsMetadataEntry } from './is-mac-os-metadata-entry.ts';
 import { isUnsafeEntryPath } from './is-unsafe-entry-path.ts';
 import type { PlannedZipEntry } from './planned-zip-entry.ts';
 import { readDeclaredCentralDirectorySize } from './read-declared-central-directory-size.ts';
@@ -88,11 +89,17 @@ async function planEntries(
   try {
     for await (const entry of zipFile.eachEntry()) {
       const entryPath = getFileNameLowLevel(entry.generalPurposeBitFlag, entry.fileNameRaw, entry.extraFields, true);
-      const outcome = planEntry(entry, entryPath, targetDirectory);
-      if (outcome.kind === 'error') {
-        return outcome;
+      // A `__MACOSX/` bejegyzés nem íródik ki és nem olvasódik (O-57), ezért a bejegyzésenkénti
+      // ellenőrzés (útvonal, titkosítás, tömörítés, típus) és a kicsomagolt méret korlát nem vonatkozik
+      // rá; a bejegyzések száma és a központi könyvtár mérete viszont a teljes csomag szerkezeti
+      // ellenőrzése, abba beleszámít.
+      if (!isMacOsMetadataEntry(entryPath)) {
+        const outcome = planEntry(entry, entryPath, targetDirectory);
+        if (outcome.kind === 'error') {
+          return outcome;
+        }
+        planned.push(outcome.value);
       }
-      planned.push(outcome.value);
       centralDirectoryBytes +=
         CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.fileNameLength + entry.extraFieldLength + entry.fileCommentLength;
     }
