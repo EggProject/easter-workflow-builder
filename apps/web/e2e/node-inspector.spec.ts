@@ -50,6 +50,8 @@ const AGENT_STEP_CONFIG: NodeConfig = {
       prompt: 'Kutass alaposan.',
       skills: 'all',
       observer: 'megfigyelo-ertek',
+      // A régi, ma már nem támogatott mező (SPEC-009 O-53): a panel mutatja és eltávolítható.
+      memory: 'project',
     },
     legacy: 'régi, nem objektum alakú bejegyzés',
   },
@@ -914,6 +916,27 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     await expect(reopenedLimits.getByRole('checkbox', { name: 'Háttérben fut' })).toBeChecked();
     const reopenedTools = await openAccordion(reopenedKutato, 'Eszközök és környezet');
     await expect(reopenedTools.getByLabel('Kezdő üzenet')).toHaveValue('Szia!');
+  });
+
+  test('a nem támogatott memory mező a tárolt értékkel és az okkal áll, és eltávolítható (SPEC-009 O-53)', async ({
+    page,
+  }) => {
+    const panel = await openNode(page, 'n-agent');
+    const agentsGroup = await openAccordion(panel, 'Al-agentek (agents)');
+    const kutatoGroup = agentsGroup.getByRole('group', { name: 'kutato', exact: true });
+    await kutatoGroup.getByRole('button', { name: 'Kibontás' }).click();
+    const kutatoTools = await openAccordion(kutatoGroup, 'Eszközök és környezet');
+
+    await expect(kutatoTools.getByText('nem támogatott mező: a gép agent memória könyvtárát töltené be')).toBeVisible();
+    await expect(kutatoTools.getByText('project', { exact: true })).toBeVisible();
+    await kutatoTools.getByRole('button', { name: 'Memória hatóköre eltávolítása' }).click();
+
+    await expect(kutatoTools.getByRole('button', { name: 'Memória hatóköre eltávolítása' })).toBeAttached({
+      attached: false,
+    });
+    await expect(kutatoTools.getByText('nem támogatott mező: a gép agent memória könyvtárát töltené be')).toBeAttached({
+      attached: false,
+    });
   });
 
   test('agent hozzáadása üres vagy ütköző névvel tiltott, érvényes névvel felvehető; átnevezés és törlés', async ({
