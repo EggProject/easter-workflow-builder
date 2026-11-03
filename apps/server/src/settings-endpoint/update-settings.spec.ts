@@ -117,6 +117,20 @@ describe('createUpdateSettingsHandler', () => {
     expect(result.kind).toBe('error');
   });
 
+  it('a setBuiltinSkillsEnabled hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+    const database = openMemoryDatabase();
+    database.close();
+    const handler = createUpdateSettingsHandler(database);
+
+    const result = await handler({
+      parameters: {},
+      query: new URLSearchParams(),
+      body: { builtinSkillsEnabled: false },
+    });
+
+    expect(result.kind).toBe('error');
+  });
+
   it('a záró readSettings hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
     const database = openMemoryDatabase();
     database.close();
