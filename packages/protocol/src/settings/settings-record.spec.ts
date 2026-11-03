@@ -4,13 +4,20 @@ import { SettingsRecordSchema, UpdateSettingsRequestSchema } from './settings-re
 
 describe('SettingsRecordSchema', () => {
   it('elfogadja a kitöltött beállítást', () => {
-    expect(SettingsRecordSchema.safeParse({ defaultProviderId: 'minimax', persistStreamDeltas: false }).success).toBe(
-      true,
-    );
+    expect(
+      SettingsRecordSchema.safeParse({
+        defaultProviderId: 'minimax',
+        persistStreamDeltas: false,
+        builtinSkillsEnabled: true,
+      }).success,
+    ).toBe(true);
   });
 
   it('elfogadja a beállítatlan default providert (null)', () => {
-    expect(SettingsRecordSchema.safeParse({ defaultProviderId: null, persistStreamDeltas: true }).success).toBe(true);
+    expect(
+      SettingsRecordSchema.safeParse({ defaultProviderId: null, persistStreamDeltas: true, builtinSkillsEnabled: true })
+        .success,
+    ).toBe(true);
   });
 
   it('elutasítja, ha a persistStreamDeltas mező hiányzik', () => {

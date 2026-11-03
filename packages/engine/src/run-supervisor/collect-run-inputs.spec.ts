@@ -18,7 +18,7 @@ const WORKFLOW: Outcome<WorkflowRecord> = {
 const GRAPH: Outcome<WorkflowGraph> = { kind: 'ok', value: { nodes: [], edges: [] } };
 const SETTINGS: Outcome<AppSettingsRecord> = {
   kind: 'ok',
-  value: { defaultProviderId: 'minimax', persistStreamDeltas: false },
+  value: { defaultProviderId: 'minimax', persistStreamDeltas: false, builtinSkillsEnabled: true },
 };
 
 describe('collectRunInputs', () => {

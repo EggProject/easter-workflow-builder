@@ -7,8 +7,8 @@ import type { RouteOutcome } from '../rest-client/route-outcome.ts';
 import { RunLogSettingsCard, type RunLogSettingsCardProperties } from './RunLogSettingsCard.tsx';
 
 /* eslint-disable unicorn/no-null -- a SettingsRecord `defaultProviderId` mezője a dróton ténylegesen `null` értéket hordoz (packages/protocol/src/settings/settings-record.ts). */
-const OFF: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false };
-const ON: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: true };
+const OFF: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true };
+const ON: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: true, builtinSkillsEnabled: true };
 /* eslint-enable unicorn/no-null */
 
 function success<TValue>(value: TValue): RequestState<TValue> {

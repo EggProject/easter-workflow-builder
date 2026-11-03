@@ -9,6 +9,7 @@ import { useSkillLibrary } from '../skill-upload/use-skill-library.ts';
 import { ConcurrencyLimitsSettingsCard } from './ConcurrencyLimitsSettingsCard.tsx';
 import { EditorSettingsCard } from './EditorSettingsCard.tsx';
 import { ProviderSettingsCard } from './ProviderSettingsCard.tsx';
+import { BuiltinSkillsSettingsCard } from './BuiltinSkillsSettingsCard.tsx';
 import { RunLogSettingsCard } from './RunLogSettingsCard.tsx';
 import { useConcurrencyLimits } from './use-concurrency-limits.ts';
 import { useProviderList } from './use-provider-list.ts';
@@ -66,6 +67,7 @@ export function SettingsScreen(properties: Readonly<SettingsScreenProperties>): 
         clearLimit={concurrencyLimits.clearLimit}
       />
       <RunLogSettingsCard settingsState={settingsState} saveSettings={saveSettings} />
+      <BuiltinSkillsSettingsCard settingsState={settingsState} saveSettings={saveSettings} />
       <SkillLibrarySettingsCard
         skillsState={skillLibrary.state}
         reloadState={skillLibrary.reloadState}

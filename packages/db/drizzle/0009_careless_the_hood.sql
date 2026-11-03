@@ -1,0 +1,1 @@
+ALTER TABLE `app_setting` ADD `builtin_skills_enabled` integer DEFAULT true NOT NULL;

@@ -19,7 +19,7 @@ import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { chooseSelectOption } from './select-field.ts';
 import { mockIdleStream } from './sse-mock.ts';
 
-const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false };
+const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true };
 
 const PROVIDERS: readonly ProviderSummary[] = [];
 

@@ -57,6 +57,7 @@ describe('a motor thinking mezője az SDK ThinkingConfig alakja', () => {
       agents: { definitions: {}, hasSkillReferences: false },
       sessionBinding: { mode: 'isolated' },
       skillLibrary: { rootDirectory: '/skillek', pluginName: 'skillek', skillNames: [] },
+      builtinSkillsEnabled: true,
     });
 
     const sdkThinking: Options['thinking'] = options.thinking;
@@ -107,6 +108,7 @@ describe('a motor skill mezői az SDK Options alakjai', () => {
       agents: { definitions: {}, hasSkillReferences: false },
       sessionBinding: { mode: 'isolated' },
       skillLibrary: { rootDirectory: '/skillek', pluginName: 'skillek', skillNames: ['alfa'] },
+      builtinSkillsEnabled: true,
     });
 
     const plugin: SdkPluginConfig | undefined = options.plugins?.[0];
@@ -156,6 +158,7 @@ describe('a motor izolációs mezői az SDK Options alakjai', () => {
       agents: { definitions: {}, hasSkillReferences: false },
       sessionBinding: { mode: 'isolated' },
       skillLibrary: { rootDirectory: '/skillek', pluginName: 'skillek', skillNames: [] },
+      builtinSkillsEnabled: true,
     });
 
     const settingSources: Options['settingSources'] = [...options.settingSources];

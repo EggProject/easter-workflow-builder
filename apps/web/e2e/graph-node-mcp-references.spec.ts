@@ -56,7 +56,7 @@ const WORKFLOW: WorkflowDetail = {
   updatedAtMs: 1,
 };
 
-const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false };
+const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true };
 
 const LEGACY_MCP_SERVERS = { regi: { type: 'stdio', command: 'regi-parancs', args: [], envNames: [] } } as const;
 

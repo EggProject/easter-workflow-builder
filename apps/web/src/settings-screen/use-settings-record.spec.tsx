@@ -8,8 +8,8 @@ import { useSettingsRecord, type UseSettingsRecordResult } from './use-settings-
 
 const API_ORIGIN = 'https://api.example.test';
 
-const INITIAL: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false };
-const SAVED: SettingsRecord = { defaultProviderId: 'minimax', persistStreamDeltas: false };
+const INITIAL: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true };
+const SAVED: SettingsRecord = { defaultProviderId: 'minimax', persistStreamDeltas: false, builtinSkillsEnabled: true };
 
 describe('useSettingsRecord', () => {
   let container: HTMLDivElement;

@@ -318,6 +318,12 @@ export async function runAgentStep(
     return preStreamFailure('no_resumable_session', sessionBinding.message);
   }
 
+  // A beépített skillek kapcsolója (SPEC-009 O-44) a lépés indulásakor érvényes értékkel hat.
+  const settings = dependencies.database.settings.readSettings();
+  if (settings.kind === 'error') {
+    return settings;
+  }
+
   const query = dependencies.agentQueryRunner.run({
     prompt: prompt.value,
     options: buildAgentStepOptions({
@@ -328,6 +334,7 @@ export async function runAgentStep(
       agents: agents.value,
       sessionBinding: sessionBinding.value,
       skillLibrary,
+      builtinSkillsEnabled: settings.value.builtinSkillsEnabled,
     }),
   });
   if (query.kind === 'error') {

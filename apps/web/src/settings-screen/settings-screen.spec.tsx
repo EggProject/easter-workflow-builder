@@ -67,6 +67,7 @@ function createFetchFunction(initial: SettingsRecord): { readonly fetchFunction:
         record = {
           defaultProviderId: parsed.data.defaultProviderId ?? record.defaultProviderId,
           persistStreamDeltas: parsed.data.persistStreamDeltas ?? record.persistStreamDeltas,
+          builtinSkillsEnabled: parsed.data.builtinSkillsEnabled ?? record.builtinSkillsEnabled,
         };
       }
     }
@@ -107,30 +108,49 @@ describe('SettingsScreen', () => {
     );
   }
 
-  it('a kártyákat egymás alatt, a SPEC-009 3.1 sorrendjében rajzolja (Provider, Párhuzamossági korlát, Futás napló, Skill könyvtár, MCP szerverek, majd a gráf szerkesztő)', async () => {
-    await render(createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false }).fetchFunction);
+  it('a kártyákat egymás alatt, a SPEC-009 3.1 sorrendjében rajzolja (Provider, Párhuzamossági korlát, Futás napló, Beépített skillek, Skill könyvtár, MCP szerverek, majd a gráf szerkesztő)', async () => {
+    await render(
+      createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true })
+        .fetchFunction,
+    );
 
     expect(headings()).toEqual([
       'Provider',
       'Párhuzamossági korlát',
       'Futás napló',
+      'Beépített skillek',
       'Skill könyvtár',
       'MCP szerverek',
       'Gráf szerkesztő',
     ]);
-    expect(container.querySelector('.settings-screen')?.children).toHaveLength(6);
+    expect(container.querySelector('.settings-screen')?.children).toHaveLength(7);
   });
 
-  it('mind a hat kártya a képernyő közvetlen card gyereke, és egyik kártyában sincs második card (kártya a kártyában nélkül, AC1)', async () => {
-    await render(createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false }).fetchFunction);
+  it('mind a hét kártya a képernyő közvetlen card gyereke, és egyik kártyában sincs második card (kártya a kártyában nélkül, AC1)', async () => {
+    await render(
+      createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true })
+        .fetchFunction,
+    );
 
     const children = [...(container.querySelector('.settings-screen')?.children ?? [])];
-    expect(children.map((child) => child.classList.contains('card'))).toEqual([true, true, true, true, true, true]);
+    expect(children.map((child) => child.classList.contains('card'))).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
     expect(container.querySelectorAll(':scope .card .card')).toHaveLength(0);
   });
 
   it('a provider listát, a beállítást, a korlátokat, a skill listát, az MCP szerver listát és a szerver környezet neveit egyszer tölti be, kártyánként ismételt kérés nélkül', async () => {
-    const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
+    const { fetchFunction, requests } = createFetchFunction({
+      defaultProviderId: null,
+      persistStreamDeltas: false,
+      builtinSkillsEnabled: true,
+    });
     await render(fetchFunction);
 
     expect(requests.toSorted((left, right) => left.localeCompare(right))).toEqual([
@@ -144,7 +164,11 @@ describe('SettingsScreen', () => {
   });
 
   it('a provider választása PUT /api/settings hívással mentődik, és a válasz után a képernyő az új értéket mutatja', async () => {
-    const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
+    const { fetchFunction, requests } = createFetchFunction({
+      defaultProviderId: null,
+      persistStreamDeltas: false,
+      builtinSkillsEnabled: true,
+    });
     await render(fetchFunction);
     expect(container.querySelector('.alert--warning')).not.toBeNull();
 
@@ -167,7 +191,11 @@ describe('SettingsScreen', () => {
   });
 
   it('a korlát mentése a sor providerére küld PUT hívást, és a válasz után a sor az új értéket mutatja', async () => {
-    const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
+    const { fetchFunction, requests } = createFetchFunction({
+      defaultProviderId: null,
+      persistStreamDeltas: false,
+      builtinSkillsEnabled: true,
+    });
     const limitFetchFunction: FetchFunction = (input, init) => {
       if (init.method === 'PUT' && input.endsWith('/api/settings/concurrency-limits/claude-subscription')) {
         requests.push('PUT limit');
@@ -204,7 +232,11 @@ describe('SettingsScreen', () => {
   });
 
   it('a delta kapcsoló váltása PUT /api/settings hívást küld a persistStreamDeltas mezővel, és a válasz után a kapcsoló az új értéket mutatja', async () => {
-    const { fetchFunction, requests } = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false });
+    const { fetchFunction, requests } = createFetchFunction({
+      defaultProviderId: null,
+      persistStreamDeltas: false,
+      builtinSkillsEnabled: true,
+    });
     await render(fetchFunction);
     const toggle = container.querySelector<HTMLInputElement>('input[role="switch"]');
     expect(toggle?.checked).toBe(false);
@@ -223,7 +255,11 @@ describe('SettingsScreen', () => {
     let skills: readonly SkillSummary[] = [];
     let putBody: unknown;
     let putContentType: string | undefined;
-    const base = createFetchFunction({ defaultProviderId: null, persistStreamDeltas: false }).fetchFunction;
+    const base = createFetchFunction({
+      defaultProviderId: null,
+      persistStreamDeltas: false,
+      builtinSkillsEnabled: true,
+    }).fetchFunction;
     const fetchFunction: FetchFunction = (input, init) => {
       if (input.endsWith('/api/skills')) {
         return Promise.resolve(Response.json(skills));

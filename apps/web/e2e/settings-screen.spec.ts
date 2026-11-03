@@ -56,9 +56,13 @@ const WORKFLOW: WorkflowDetail = {
   updatedAtMs: 1,
 };
 
-const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false };
+const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true };
 
-const SETTINGS_WITH_DELTAS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: true };
+const SETTINGS_WITH_DELTAS: SettingsRecord = {
+  defaultProviderId: null,
+  persistStreamDeltas: true,
+  builtinSkillsEnabled: true,
+};
 
 const CONNECTION_OK: ConnectionTestResponse = { succeeded: true, errorMessage: null };
 
@@ -328,6 +332,7 @@ test.beforeEach(async ({ page }) => {
         mockState.settings = {
           defaultProviderId: parsed.data.defaultProviderId ?? mockState.settings.defaultProviderId,
           persistStreamDeltas: parsed.data.persistStreamDeltas ?? mockState.settings.persistStreamDeltas,
+          builtinSkillsEnabled: parsed.data.builtinSkillsEnabled ?? mockState.settings.builtinSkillsEnabled,
         };
       }
       await route.fulfill(jsonBody(mockState.settings));
@@ -444,7 +449,11 @@ test('a Kapcsolat teszt gomb alapértelmezés nélkül tiltott és megindokolt, 
 });
 
 test('a mentett alapértelmezett provider betöltéskor kiválasztva áll, warning nélkül', async ({ page }) => {
-  mockState.settings = { defaultProviderId: 'claude-subscription', persistStreamDeltas: false };
+  mockState.settings = {
+    defaultProviderId: 'claude-subscription',
+    persistStreamDeltas: false,
+    builtinSkillsEnabled: true,
+  };
   await page.goto('/settings');
 
   await expectSelectedLabel(page.getByRole('combobox', { name: PROVIDER_LABEL }), 'Claude Code');
@@ -479,7 +488,7 @@ test('az alapértelmezett provider mentése alatt a választó "Mentés…" feli
 test('a kapcsolat teszt futása alatt a gomb betöltés állapotú és tiltott, a sikertelen teszt a motor szövegével danger Alert, a választás váltása elrejti', async ({
   page,
 }) => {
-  mockState.settings = { defaultProviderId: 'minimax', persistStreamDeltas: false };
+  mockState.settings = { defaultProviderId: 'minimax', persistStreamDeltas: false, builtinSkillsEnabled: true };
   await page.goto('/settings');
   const select = page.getByRole('combobox', { name: PROVIDER_LABEL });
   await expectSelectedLabel(select, 'MiniMax');
@@ -505,7 +514,7 @@ test('a kapcsolat teszt futása alatt a gomb betöltés állapotú és tiltott, 
 });
 
 test('a motor üzenet nélküli sikertelen kapcsolat tesztje is danger Alert, csak a címmel', async ({ page }) => {
-  mockState.settings = { defaultProviderId: 'minimax', persistStreamDeltas: false };
+  mockState.settings = { defaultProviderId: 'minimax', persistStreamDeltas: false, builtinSkillsEnabled: true };
   mockState.connectionResult = CONNECTION_FAILED_WITHOUT_MESSAGE;
   await page.goto('/settings');
 
@@ -808,6 +817,22 @@ test('a kapcsoló váltása azonnal PUT hívás a persistStreamDeltas mezővel, 
   await expect(page.getByRole('status').filter({ hasText: 'Nincs alapértelmezett provider' })).toBeVisible();
 });
 
+test('a Beépített skillek kapcsolója bekapcsolt alapértékkel áll, és a váltása PUT hívás a builtinSkillsEnabled mezővel (SPEC-009 O-44)', async ({
+  page,
+}) => {
+  await page.goto('/settings');
+  const card = page.getByRole('region', { name: 'Beépített skillek', exact: true });
+  const builtinSwitch = card.getByRole('switch', { name: 'Beépített skillek elérhetők' });
+  await expect(builtinSwitch).toBeChecked();
+  await expect(builtinSwitch).toHaveAccessibleDescription(/az ezután induló lépésekre hat/);
+
+  await card.locator('.ctrl__switch').click();
+  await expect(builtinSwitch).not.toBeChecked();
+  expect(mockState.updateBodies).toEqual([{ builtinSkillsEnabled: false }]);
+  // A Futás napló kapcsolója érintetlen.
+  await expect(page.getByRole('switch', { name: DELTA_SWITCH_LABEL })).not.toBeChecked();
+});
+
 test('a mentés alatt a kapcsoló tiltott és a régi értéket mutatja, "Mentés…" jelzéssel; a válasz után az új érték áll', async ({
   page,
 }) => {
@@ -970,7 +995,7 @@ for (const theme of ['light', 'dark'] as const) {
         await page.setViewportSize({ width, height: 900 });
       });
 
-      test('mind a hat kártya és a vezérlői a nézetablakban állnak, átfedés és túllógás nélkül, kifestve', async ({
+      test('mind a hét kártya és a vezérlői a nézetablakban állnak, átfedés és túllógás nélkül, kifestve', async ({
         page,
       }) => {
         mockState.limits = [CLAUDE_LIMIT, { ...MINIMAX_LIMIT, configuredMaxConcurrentSteps: 2 }];
@@ -987,6 +1012,7 @@ for (const theme of ['light', 'dark'] as const) {
           'Provider',
           'Párhuzamossági korlát',
           'Futás napló',
+          'Beépített skillek',
           'Skill könyvtár',
           'MCP szerverek',
           'Gráf szerkesztő',

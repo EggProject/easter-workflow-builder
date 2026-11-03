@@ -17,8 +17,12 @@ const PROVIDERS: readonly ProviderSummary[] = [
   },
 ];
 
-const NO_DEFAULT: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false };
-const MINIMAX_DEFAULT: SettingsRecord = { defaultProviderId: 'minimax', persistStreamDeltas: false };
+const NO_DEFAULT: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true };
+const MINIMAX_DEFAULT: SettingsRecord = {
+  defaultProviderId: 'minimax',
+  persistStreamDeltas: false,
+  builtinSkillsEnabled: true,
+};
 
 const ROW_LABEL = 'Globális alapértelmezett provider';
 

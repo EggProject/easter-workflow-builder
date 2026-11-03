@@ -122,7 +122,11 @@ const WORKFLOW_DETAIL = {
   createdAtMs: 0,
   updatedAtMs: 0,
 };
-const SETTINGS_RECORD = { defaultProviderId: 'claude-subscription', persistStreamDeltas: false };
+const SETTINGS_RECORD = {
+  defaultProviderId: 'claude-subscription',
+  persistStreamDeltas: false,
+  builtinSkillsEnabled: true,
+};
 const PROVIDER_SUMMARIES = [
   { id: 'claude-subscription', displayName: 'Claude előfizetés', models: [], requiredEnvNames: [] },
   {

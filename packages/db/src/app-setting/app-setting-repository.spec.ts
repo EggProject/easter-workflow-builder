@@ -70,6 +70,7 @@ describe('createAppSettingRepository', () => {
       const settings = okOrThrow(repository.readSettings());
       expect(settings.defaultProviderId).toBeNull();
       expect(settings.persistStreamDeltas).toBe(false);
+      expect(settings.builtinSkillsEnabled).toBe(true);
 
       sqlite.close();
     });
@@ -141,6 +142,41 @@ describe('createAppSettingRepository', () => {
       const settingsAfter = okOrThrow(repository.readSettings());
       expect(settingsAfter.defaultProviderId).toBe('minimax');
       expect(settingsAfter.persistStreamDeltas).toBe(false);
+
+      sqlite.close();
+    });
+  });
+
+  describe('setBuiltinSkillsEnabled (SPEC-009 O-44)', () => {
+    it('üres táblán hozza létre a sort, a többi mező a séma szintű alapértékét kapja', () => {
+      const { sqlite, repository } = openRepository();
+
+      okOrThrow(repository.setBuiltinSkillsEnabled(false));
+
+      expect(okOrThrow(repository.readSettings())).toStrictEqual({
+        // eslint-disable-next-line unicorn/no-null -- a tárolt alapértelmezett provider hiánya a dróton `null`
+        defaultProviderId: null,
+        persistStreamDeltas: false,
+        builtinSkillsEnabled: false,
+      });
+
+      sqlite.close();
+    });
+
+    it('meglévő sort frissít, a többi mező megmarad; a többi beállító a kapcsolót nem írja felül', () => {
+      const { sqlite, repository } = openRepository();
+
+      okOrThrow(repository.setBuiltinSkillsEnabled(false));
+      okOrThrow(repository.setDefaultProvider('minimax'));
+      okOrThrow(repository.setPersistStreamDeltas(true));
+      expect(okOrThrow(repository.readSettings()).builtinSkillsEnabled).toBe(false);
+
+      okOrThrow(repository.setBuiltinSkillsEnabled(true));
+      expect(okOrThrow(repository.readSettings())).toStrictEqual({
+        defaultProviderId: 'minimax',
+        persistStreamDeltas: true,
+        builtinSkillsEnabled: true,
+      });
 
       sqlite.close();
     });

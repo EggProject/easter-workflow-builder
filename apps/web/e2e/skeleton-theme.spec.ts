@@ -26,7 +26,7 @@ const WORKFLOW: WorkflowDetail = {
   createdAtMs: 1,
   updatedAtMs: 1,
 };
-const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false };
+const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true };
 /* eslint-enable unicorn/no-null */
 
 test('a betöltés csontváza sötét témában a "skel--ink" módosítót kapja, élő témaváltásnál is', async ({ page }) => {

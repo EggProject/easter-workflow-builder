@@ -98,7 +98,11 @@ const WORKFLOW: WorkflowDetail = {
   updatedAtMs: 1,
 };
 
-const SETTINGS: SettingsRecord = { defaultProviderId: 'minimax', persistStreamDeltas: false };
+const SETTINGS: SettingsRecord = {
+  defaultProviderId: 'minimax',
+  persistStreamDeltas: false,
+  builtinSkillsEnabled: true,
+};
 
 /* eslint-enable unicorn/no-null */
 

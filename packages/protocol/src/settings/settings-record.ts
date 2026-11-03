@@ -10,6 +10,7 @@ export const SettingsRecordSchema = z
   .strictObject({
     defaultProviderId: z.string().nullable(),
     persistStreamDeltas: z.boolean(),
+    builtinSkillsEnabled: z.boolean(),
   })
   .readonly();
 
@@ -24,6 +25,7 @@ export type SettingsRecord = z.infer<typeof SettingsRecordSchema>;
 export const UpdateSettingsRequestSchema = z.strictObject({
   defaultProviderId: z.string().optional(),
   persistStreamDeltas: z.boolean().optional(),
+  builtinSkillsEnabled: z.boolean().optional(),
 });
 
 export type UpdateSettingsRequest = z.infer<typeof UpdateSettingsRequestSchema>;

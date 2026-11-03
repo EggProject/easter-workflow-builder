@@ -621,6 +621,41 @@ describe('runAgentStep', () => {
     database.close();
   });
 
+  it('a kikapcsolt beépített skillek a kimenő env blokkba a kikapcsoló változót teszik (SPEC-009 O-44)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(database.settings.setBuiltinSkillsEnabled(false));
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+    });
+
+    okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry));
+
+    const outgoingEnvironment = captured.request?.options['env'];
+    expect(isRecord(outgoingEnvironment) && outgoingEnvironment['CLAUDE_CODE_DISABLE_BUNDLED_SKILLS']).toBe('1');
+    database.close();
+  });
+
+  it('a beállítás olvasásának adatbázis hibája az Outcome hibaágán megy tovább, futtatás nélkül', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const dependencies = dependenciesOf({
+      database: {
+        ...database,
+        settings: { ...database.settings, readSettings: () => ({ kind: 'error', message: 'zárva' }) },
+      },
+      agentQueryRunner: { run: notCalled },
+    });
+
+    expect(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry)).toStrictEqual({
+      kind: 'error',
+      message: 'zárva',
+    });
+    database.close();
+  });
+
   it('a nem csatlakozott MCP szerver a lépést megnevezett hibával megállítja, a folyam tovább nem olvasódik (O-46)', async () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRun(database);

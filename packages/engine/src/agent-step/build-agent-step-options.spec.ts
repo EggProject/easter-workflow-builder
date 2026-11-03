@@ -63,6 +63,7 @@ function optionsFor(skills: AgentStepConfig['skills']): ReturnType<typeof buildA
     agents: NO_AGENTS,
     sessionBinding: isolated,
     skillLibrary: LIBRARY,
+    builtinSkillsEnabled: true,
   });
 }
 
@@ -76,6 +77,7 @@ describe('buildAgentStepOptions', () => {
       agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
 
     expect(options).toStrictEqual({
@@ -92,6 +94,21 @@ describe('buildAgentStepOptions', () => {
     });
   });
 
+  it('kikapcsolt beépített skilleknél az env blokk a CLAUDE_CODE_DISABLE_BUNDLED_SKILLS=1 taggal bővül (SPEC-009 O-44)', () => {
+    const options = buildAgentStepOptions({
+      config: agentStepConfig(),
+      decisions: decisions(),
+      environmentBlock: { PROVIDER_BASE_URL: 'https://pelda' },
+      mcpServers: {},
+      agents: NO_AGENTS,
+      sessionBinding: isolated,
+      skillLibrary: LIBRARY,
+      builtinSkillsEnabled: false,
+    });
+
+    expect(options.env).toStrictEqual({ PROVIDER_BASE_URL: 'https://pelda', CLAUDE_CODE_DISABLE_BUNDLED_SKILLS: '1' });
+  });
+
   it('isolated módban nincs resume és nincs forkSession mező', () => {
     const options = buildAgentStepOptions({
       config: agentStepConfig(),
@@ -101,6 +118,7 @@ describe('buildAgentStepOptions', () => {
       agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
 
     expect(Object.hasOwn(options, 'resume')).toBe(false);
@@ -116,6 +134,7 @@ describe('buildAgentStepOptions', () => {
       agents: NO_AGENTS,
       sessionBinding: { mode: 'continued', resume: 'session-1', forkSession: true },
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
 
     expect(options.resume).toBe('session-1');
@@ -147,6 +166,7 @@ describe('buildAgentStepOptions', () => {
       agents: { definitions: { elemzo: {} }, hasSkillReferences: false },
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
 
     expect(options.permissionMode).toBe('default');
@@ -174,6 +194,7 @@ describe('buildAgentStepOptions', () => {
       agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
 
     expect(options.thinking).toStrictEqual({ type: 'disabled' });
@@ -188,6 +209,7 @@ describe('buildAgentStepOptions', () => {
       agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
 
     expect(Object.hasOwn(options, 'thinking')).toBe(false);
@@ -204,6 +226,7 @@ describe('buildAgentStepOptions', () => {
       agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
 
     expect(options.disallowedTools).toStrictEqual(['Bash', 'KliensKereses']);
@@ -220,6 +243,7 @@ describe('buildAgentStepOptions', () => {
       agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
 
     expect(options.outputFormat).toStrictEqual({ type: 'json_schema', schema: { type: 'object' } });
@@ -236,6 +260,7 @@ describe('buildAgentStepOptions', () => {
       agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
     const masodik = buildAgentStepOptions({
       config,
@@ -249,6 +274,7 @@ describe('buildAgentStepOptions', () => {
       agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
 
     expect(elso).not.toStrictEqual(masodik);
@@ -294,6 +320,7 @@ describe('buildAgentStepOptions', () => {
         agents: { definitions, hasSkillReferences: true },
         sessionBinding: isolated,
         skillLibrary: LIBRARY,
+        builtinSkillsEnabled: true,
       });
 
       expect(options.plugins).toStrictEqual([{ type: 'local', path: '/var/skillek' }]);
@@ -318,6 +345,7 @@ describe('buildAgentStepOptions', () => {
       agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
 
     expect(options.mcpServers).toBe(mcpServers);
@@ -334,6 +362,7 @@ describe('buildAgentStepOptions', () => {
       agents: NO_AGENTS,
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
+      builtinSkillsEnabled: true,
     });
 
     expect(Object.hasOwn(options, 'mcpServers')).toBe(false);

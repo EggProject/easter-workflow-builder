@@ -57,7 +57,7 @@ const WORKFLOW: WorkflowDetail = {
   updatedAtMs: 1,
 };
 
-const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false };
+const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true };
 
 const SNAPSHOT: RunSnapshotResponse = {
   version: 1,

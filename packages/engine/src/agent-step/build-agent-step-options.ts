@@ -16,7 +16,8 @@ import { qualifySkillNames } from '../agent-definition/qualify-skill-names.ts';
  * feloldott MCP szerverek (`resolveMcpServers`, a `database` és a
  * `processEnvironment` porton át), az agent definíciók kimenő alakja
  * (`resolveOutgoingAgents`), a session kötés (`resolveSessionBinding`)
- * és a skill könyvtár állapota (a `skillLibrary` porton át). Így az
+ * és a skill könyvtár állapota (a `skillLibrary` porton át), valamint a
+ * beépített skillek globális kapcsolója (a `database` port beállításaiból). Így az
  * összeállítás maga tiszta függvény marad: sem portot, sem adatbázist nem
  * érint.
  */
@@ -28,7 +29,17 @@ export interface BuildAgentStepOptionsInput {
   readonly agents: OutgoingAgents;
   readonly sessionBinding: SessionBinding;
   readonly skillLibrary: SkillLibrarySnapshot;
+  readonly builtinSkillsEnabled: boolean;
 }
+
+/**
+ * A CLI beépített skilljeit kikapcsoló env változó (SPEC-009 O-44, user döntés 2026-10-28): a
+ * telepített `sdk.d.ts` `Settings.disableBundledSkills` leírása szerint "Equivalent to
+ * CLAUDE_CODE_DISABLE_BUNDLED_SKILLS=1"; mérve a beágyazott CLI `init` üzenetén (M-149, research
+ * `2026-10-28-plan-012-vegrehajtas.md`): a változóval a beépített skillek eltűnnek, a feltöltött
+ * (`plugins`) skilleket nem érinti a leírás szerint.
+ */
+const DISABLE_BUNDLED_SKILLS_VARIABLE = 'CLAUDE_CODE_DISABLE_BUNDLED_SKILLS';
 
 /**
  * A session mezők (SPEC-004 6.3 táblázat): `isolated` módban egyáltalán nem
@@ -118,7 +129,8 @@ function thinkingFields(
  *    a `disallowedTools` a lépés saját listája **plusz** a leíró szerint nem
  *    működő szerver oldali toolok kliens neve (12. sor), az
  *    `includePartialMessages` a 13. sor, az `env` a
- *    `provider-environment` téma blokkja (10. és 11. sor), a
+ *    `provider-environment` téma blokkja (10. és 11. sor), kikapcsolt beépített
+ *    skilleknél a `CLAUDE_CODE_DISABLE_BUNDLED_SKILLS=1` taggal (O-44), a
  *    `persistSession` pedig minden lépésnél `true` (6.3, 32. elfogadási
  *    kritérium). A `settingSources: []` és a `strictMcpConfig: true` az
  *    izoláció (SPEC-009 7.1, O-20 (a)): a lépés nem olvassa a szerver gép
@@ -154,7 +166,9 @@ export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentS
     disallowedTools: [...config.disallowedTools, ...decisions.disallowedServerTools.disallowedTools],
     additionalDirectories: config.additionalDirectories,
     agents: input.agents.definitions,
-    env: input.environmentBlock,
+    env: input.builtinSkillsEnabled
+      ? input.environmentBlock
+      : { ...input.environmentBlock, [DISABLE_BUNDLED_SKILLS_VARIABLE]: '1' },
     includePartialMessages: decisions.includePartialMessages,
     persistSession: true,
     settingSources: [],

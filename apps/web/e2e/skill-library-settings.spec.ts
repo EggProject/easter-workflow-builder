@@ -13,7 +13,7 @@ import { createRequestGate } from './request-gate.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { mockIdleStream } from './sse-mock.ts';
 
-const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false };
+const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true };
 
 const ALFA: SkillSummary = { name: 'alfa', description: 'Alfa leírás', sizeBytes: 2048, modifiedAtMs: 1 };
 const BETA: SkillSummary = { name: 'beta', description: '', sizeBytes: 100, modifiedAtMs: 2 };

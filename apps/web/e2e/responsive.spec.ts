@@ -84,7 +84,11 @@ const EDITOR_WORKFLOW: WorkflowDetail = {
   updatedAtMs: 1,
 };
 
-const EDITOR_SETTINGS: SettingsRecord = { defaultProviderId: 'claude-subscription', persistStreamDeltas: false };
+const EDITOR_SETTINGS: SettingsRecord = {
+  defaultProviderId: 'claude-subscription',
+  persistStreamDeltas: false,
+  builtinSkillsEnabled: true,
+};
 
 // A futás nézet fixture-jei (2026-09-15, T-009-22): a rajz és a transcript
 // panel a --ep-screen-lg fölött egy nem törő flex sor, a --ep-screen-md alatt

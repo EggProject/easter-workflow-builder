@@ -22,7 +22,7 @@ export function createUpdateSettingsHandler(database: DatabaseContext): RouteHan
       return Promise.resolve({ kind: 'error', message: zodErrorToProtocolErrorBody(parsedBody.error).message });
     }
 
-    const { defaultProviderId, persistStreamDeltas } = parsedBody.data;
+    const { defaultProviderId, persistStreamDeltas, builtinSkillsEnabled } = parsedBody.data;
 
     if (defaultProviderId !== undefined) {
       if (!isProviderId(defaultProviderId)) {
@@ -36,6 +36,13 @@ export function createUpdateSettingsHandler(database: DatabaseContext): RouteHan
 
     if (persistStreamDeltas !== undefined) {
       const set = database.settings.setPersistStreamDeltas(persistStreamDeltas);
+      if (set.kind === 'error') {
+        return Promise.resolve(set);
+      }
+    }
+
+    if (builtinSkillsEnabled !== undefined) {
+      const set = database.settings.setBuiltinSkillsEnabled(builtinSkillsEnabled);
       if (set.kind === 'error') {
         return Promise.resolve(set);
       }
