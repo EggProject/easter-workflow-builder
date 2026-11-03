@@ -71,6 +71,7 @@ export const minimaxProvider = {
         { kind: 'measurement', id: 'M-36-flash' },
       ],
     },
+    // A mérés napjára (measuredAt) szóló érték: a lista a szolgáltatás kínálatával változik, nem stabil tény.
     listedModelCount: {
       state: 'known',
       value: 9,

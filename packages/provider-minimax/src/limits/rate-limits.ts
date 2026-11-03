@@ -23,12 +23,14 @@ export const minimaxRateLimits: RateLimitCapability<MiniMaxModelId> = {
   // Egyetlen mért kérés sem kapott 429 választ, ezért a header ismeretlen marad, szándékos kimerítést nem végzünk.
   retryAfterHeader: {
     state: 'unknown',
-    reason: 'Egyetlen mért kérés sem kapott 429 választ, ezért a header ismeretlen marad.',
+    reason:
+      'Egyetlen mért kérés sem kapott 429 választ, ezért a header ismeretlen marad. A Flash-re a passzív header leltár is lefutott 429 nélkül; a mezőt ezért olyan mérés zárná, amiben a szolgáltatás 429 választ ad.',
     blockedBy: ['M-18', 'M-36'],
   },
   rateLimitHeaders: {
     state: 'unknown',
-    reason: 'A mért válaszok headerei között nincs rate limit jellegű elem, de 429 hiányában ez nem bizonyíték.',
+    reason:
+      'A mért válaszok headerei között nincs rate limit jellegű elem, de 429 hiányában ez nem bizonyíték. A Flash-re a passzív header leltár is lefutott 429 nélkül; a mezőt ezért olyan mérés zárná, amiben a szolgáltatás 429 választ ad.',
     blockedBy: ['M-18', 'M-36'],
   },
 };

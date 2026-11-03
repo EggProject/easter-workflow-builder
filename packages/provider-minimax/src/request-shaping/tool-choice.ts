@@ -7,11 +7,12 @@ export const minimaxToolChoice: ToolChoiceCapability = {
       'A Flash két azonos any kérésre ellentmondó választ adott (tool_use, majd szöveg), a none egy mintája auto kontroll nélkül nem választható el a modell saját döntésétől.',
     blockedBy: ['M-34'],
   },
-  // A tool típusú kényszerítést a Flash 200 válasszal, tool_use blokk nélkül csendben eldobja.
+  // A tool típusú kényszerítésre két mintában 200 válasz jött tool_use blokk nélkül, de a viselkedés nem determinisztikus.
   rejectionBehaviour: {
-    state: 'known',
-    value: 'silently_dropped',
-    evidence: [{ kind: 'measurement', id: 'M-34-flash' }],
+    state: 'unknown',
+    reason:
+      'A tool típusú kényszerítésre két mintában tool_use nélküli szöveg jött, de az any kényszerítés két azonos kérésre ellentmondó választ adott (tool_use, majd szöveg), tehát a viselkedés nem determinisztikus, és a tool esethez nincs azonos promptú auto kontroll, így a csendes eldobás a modell saját döntésétől nem választható el.',
+    blockedBy: ['M-34'],
   },
   // A kimenő kérések tool_choice mezője hiányzik vagy auto, kényszerített választás nincs.
   sdkSendsForcedChoice: {
