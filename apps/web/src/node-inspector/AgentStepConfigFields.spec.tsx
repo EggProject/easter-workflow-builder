@@ -172,7 +172,7 @@ describe('AgentStepConfigFields', () => {
     });
 
     expect(testConnection).toHaveBeenCalledWith('minimax');
-    expect(container.querySelector('.alert--danger')?.textContent).toContain('Hiányzik a kulcs');
+    expect(container.querySelector('.alert--danger')?.textContent).toContain('Ellenőrizd a provider env változóit a szerveren.');
   });
 
   it('szolgáltató nélkül (a kontextus alapértéke) megadott providernél is tiltott a Kapcsolat teszt gomb', () => {
