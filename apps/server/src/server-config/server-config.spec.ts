@@ -27,8 +27,8 @@ const VALID_ENVIRONMENT: EnvironmentReader = {
   [ENV_SKILL_LIBRARY_DIRECTORY]: '/srv/skills',
 };
 
-// A kötelező skill könyvtár (SPEC-009 5.1) az egyetlen alapérték nélküli mező.
-const ONLY_REQUIRED: EnvironmentReader = { [ENV_SKILL_LIBRARY_DIRECTORY]: '/srv/skills' };
+// Csak a skill könyvtár megadva (SPEC-009 5.1, O-49): minden más mező az alapértékét kapja.
+const ONLY_SKILL_LIBRARY: EnvironmentReader = { [ENV_SKILL_LIBRARY_DIRECTORY]: '/srv/skills' };
 
 /**
  * Egy kulcs kihagyásával másolja az env olvasót, hogy a hiányzó mező
@@ -47,6 +47,7 @@ const DEFAULTS_VALUE = {
   logRotationSize: '10m',
   logRotationFrequency: 604_800_000,
   logRetainedFileCount: 4,
+  skillLibraryDirectory: '.data/skills',
   skillMaxArchiveBytes: 30_000_000,
   skillMaxUnpackedBytes: 30_000_000,
   skillMaxEntryCount: 1024,
@@ -76,8 +77,8 @@ describe('readServerConfig', () => {
     expect(DEFAULT_SERVER_CONFIG).toStrictEqual(DEFAULTS_VALUE);
   });
 
-  it('csak a kötelező skill könyvtárral minden más alapértéket ad, a gyakoriság szám', () => {
-    expect(readServerConfig(ONLY_REQUIRED)).toStrictEqual({
+  it('csak a skill könyvtárral minden más alapértéket ad, a gyakoriság szám', () => {
+    expect(readServerConfig(ONLY_SKILL_LIBRARY)).toStrictEqual({
       kind: 'ok',
       value: { ...DEFAULTS_VALUE, skillLibraryDirectory: '/srv/skills' },
     });
@@ -87,11 +88,9 @@ describe('readServerConfig', () => {
     ['hiányzó', {}],
     ['üres', { [ENV_SKILL_LIBRARY_DIRECTORY]: '' }],
     ['csak szóköz', { [ENV_SKILL_LIBRARY_DIRECTORY]: ' '.repeat(3) }],
-  ])('a(z) %s skill könyvtár missing_env_variable hibát ad, alapérték nélkül (SPEC-009 5.1)', (_label, environment) => {
-    expect(readServerConfig(environment)).toStrictEqual({
-      kind: 'error',
-      message: 'A(z) "EASTER_SKILL_LIBRARY_DIRECTORY" kötelező env változó hiányzik vagy üres (missing_env_variable).',
-    });
+  ])('a(z) %s skill könyvtár az alapértékre esik vissza (SPEC-009 5.1, O-49)', (_label, environment) => {
+    const outcome = readServerConfig(environment);
+    expect(outcome.kind === 'ok' && outcome.value.skillLibraryDirectory).toBe('.data/skills');
   });
 
   it.each([
@@ -130,7 +129,7 @@ describe('readServerConfig', () => {
       [ENV_SKILL_MAX_ARCHIVE_BYTES]: '',
       [ENV_SKILL_MAX_UNPACKED_BYTES]: ' ',
       [ENV_SKILL_MAX_ENTRY_COUNT]: '',
-      ...ONLY_REQUIRED,
+      ...ONLY_SKILL_LIBRARY,
     });
     expect(outcome).toStrictEqual({ kind: 'ok', value: { ...DEFAULTS_VALUE, skillLibraryDirectory: '/srv/skills' } });
   });

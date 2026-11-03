@@ -10,6 +10,9 @@
  * `logRotationFrequency` ezredmásodperc (7 nap), mert a `pino-roll` 4.0.0 a
  * `weekly` nevet nem ismeri.
  *
+ * A skill könyvtár útvonala (SPEC-009 5.1, O-49, user döntés 2026-10-28) az
+ * adatbázis és a napló `.data` könyvtára alatt áll, ugyanabban a mintában.
+ *
  * A három skill korlát (SPEC-009 5.4 6. pont, O-34,
  * `docs/research/2026-10-26-spec-009-forrasok.md`): a kicsomagolt összméret
  * az Anthropic Skills API korlátja, decimális olvasatban (7.1); a törzs mérete
@@ -23,6 +26,7 @@ export const DEFAULT_SERVER_CONFIG = {
   logRotationSize: '10m',
   logRotationFrequency: 604_800_000,
   logRetainedFileCount: 4,
+  skillLibraryDirectory: '.data/skills',
   skillMaxArchiveBytes: 30_000_000,
   skillMaxUnpackedBytes: 30_000_000,
   skillMaxEntryCount: 1024,

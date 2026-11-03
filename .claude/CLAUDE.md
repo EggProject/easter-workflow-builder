@@ -1538,19 +1538,13 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ## 14. Ellentmondás esetén
 
-**Nyitott tétel: egy.**
+**Nyitott tétel jelenleg nincs.**
 
-1. **A skill könyvtár kötelező env változója kontra a „minden értéknek van alapértéke” szabály
-   (SPEC-009 14.9, O-49, 2026-10-28).** A két forrás: a SPEC-009 5.1 az `EASTER_SKILL_LIBRARY_DIRECTORY`
-   változót kötelezőnek írja, alapérték nélkül (hiányában a szerver nem indul, `missing_env_variable`),
-   a SPEC-012 4.2 szerint viszont minden konfigurációs értéknek alapértéke van a kódban, és a SPEC-012
-   a kivételt nem nevezi meg. A SPEC-009 5.1 ezt „kimondott, egyetlen kivételnek” írja, de a SPEC-012
-   szövege nem változott, és nincs rá user döntés. **Mi a viselkedés addig:** a SPEC-009 szerint a
-   változó kötelező (kód, `.env.example` és `apps/server` `server-config` ezt valósítja meg). **Mi
-   zárná le:** a user döntése (kötelező marad, és a SPEC-012 4.2 kivételt kap; vagy forrásolt
-   alapértéket kap a könyvtár útvonala), majd az átvezetés a SPEC-009 5.1, a SPEC-012 4.2, a
-   `.env.example` és a `server-config` fájlba. A tételt a SPEC-009 14.9 hordozza, itt a 14. szekció
-   eljárása szerint szerepel.
+A 2026-10-28-i tétel (SPEC-009 14.9 O-49: a skill könyvtár kötelező env változója kontra a SPEC-012
+4.2 "minden értéknek van alapértéke" szabálya) 2026-10-28-án lezárult: a user döntése szerint a
+könyvtár útvonala forrásolt alapértéket kap (`.data/skills`), és az `EASTER_SKILL_LIBRARY_DIRECTORY`
+változóval felülírható. Átvezetve: SPEC-009 5.1 és 14.9, SPEC-012 4.2, `.env.example`, `README.md`,
+`apps/server` `server-config` téma.
 
 Az alábbi bekezdések a korábban lezárt tételek története.
 

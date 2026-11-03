@@ -22,9 +22,7 @@ cp apps/web/.env.example apps/web/.env
 ```
 
 A két `.env` fájl kizárt a gitből, titok csak oda kerül. A minták értéke egyezik a kódbeli
-alapértékkel, tehát a másolás nélkül is ugyanezek érvényesek (lásd "Alapértékek és felülírásuk"),
-egyetlen kivétellel: az `EASTER_SKILL_LIBRARY_DIRECTORY` kötelező, ezért a szerver a `.env` másolása
-nélkül (vagy az érték megadása nélkül) nem indul.
+alapértékkel, tehát a másolás nélkül is ugyanezek érvényesek (lásd "Alapértékek és felülírásuk").
 
 **Ha a `.env` fájlodban a `MINIMAX_API_KEY` sor áll, nevezd át `ANTHROPIC_AUTH_TOKEN`-re vagy
 `ANTHROPIC_API_KEY`-re.** A MiniMax kulcs e két név bármelyikén érkezhet a szerverhez (SPEC-013 4.1); a
@@ -67,6 +65,7 @@ források a `docs/research/2026-10-26-helyi-inditas-es-valodi-proba.md` fájlban
 | `EASTER_LOG_ROTATION_SIZE`             | `10m`                   | 10 MiB                                                                                      |
 | `EASTER_LOG_ROTATION_FREQUENCY`        | `604800000`             | 7 nap ezredmásodpercben (UTC csütörtök 00:00 határ); a `daily` és `hourly` név is megadható |
 | `EASTER_LOG_RETAINED_FILE_COUNT`       | `4`                     | forgatott példányok az aktív fájlon felül, a teljes könyvtárra                              |
+| `EASTER_SKILL_LIBRARY_DIRECTORY`       | `.data/skills`          | a feltöltött skillek könyvtára, egy plugin gyökér (SPEC-009 5.1, O-49)                      |
 | `EASTER_SKILL_MAX_ARCHIVE_BYTES`       | `30000000`              | a feltöltött skill ZIP csomag legnagyobb mérete bájtban (pozitív egész)                     |
 | `EASTER_SKILL_MAX_UNPACKED_BYTES`      | `30000000`              | a kicsomagolt skill fájlok legnagyobb összmérete bájtban (pozitív egész)                    |
 | `EASTER_SKILL_MAX_ENTRY_COUNT`         | `1024`                  | a skill ZIP csomag bejegyzéseinek legnagyobb száma (pozitív egész)                          |
@@ -74,12 +73,6 @@ források a `docs/research/2026-10-26-helyi-inditas-es-valodi-proba.md` fájlban
 | `VITE_STREAM_ORIGIN`                   | `http://127.0.0.1:3001` | az SSE csatorna és a proxy célja                                                            |
 | `VITE_LIST_LIMIT`                      | `100`                   | a lista végpontok lapmérete; **100 fölött a lista levágódik**, lapozás nincs                |
 | `VITE_STREAM_REPLAY_LIMIT`             | `100`                   | a stream visszajátszás lapmérete, nem plafon                                                |
-
-**Kötelező, alapérték nélkül: `EASTER_SKILL_LIBRARY_DIRECTORY`** a feltöltött skillek könyvtára
-(SPEC-009 5.1); hiányában vagy üres értékénél a szerver nem indul. A `.env.example` mintában
-`.data/skills` áll, tehát a `cp .env.example .env` után a szerver indul. Hogy ez a kivétel marad-e
-(vagy a könyvtár forrásolt alapértéket kap), a SPEC-012 4.2 és a SPEC-009 5.1 ütközése miatt
-user döntésre vár (SPEC-009 O-49).
 
 Opcionális, alapérték nélkül: `EASTER_STREAM_DEV_ORIGIN` (hiányában a szerver nem küld CORS
 fejlécet; a minta `http://localhost:5173`), `EASTER_DB_FILE` (hiányában

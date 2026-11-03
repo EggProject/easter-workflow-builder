@@ -33,9 +33,8 @@ export const ENV_LOG_LEVEL = 'EASTER_LOG_LEVEL';
 export const ENV_STREAM_KEEP_ALIVE_INTERVAL_MS = 'EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS';
 
 /**
- * A skill könyvtár gyökere (SPEC-009 5.1, O-9): kötelező, alapérték nélkül
- * (a SPEC-009 5.1 kimondott döntése, a SPEC-012 4.2 "minden értéknek van
- * alapértéke" szabályának egyetlen kivétele). A gyökér egy plugin gyökér: a
+ * A skill könyvtár gyökere (SPEC-009 5.1, O-9, O-49): opcionális, az alapértéke
+ * a `default-server-config.ts` fájlban áll (SPEC-012 4.2). A gyökér egy plugin gyökér: a
  * skillek a `<gyökér>/skills/<név>/` alatt állnak.
  */
 export const ENV_SKILL_LIBRARY_DIRECTORY = 'EASTER_SKILL_LIBRARY_DIRECTORY';

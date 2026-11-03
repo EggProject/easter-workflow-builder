@@ -22,8 +22,7 @@ import { isValidSkillPluginName } from './is-valid-skill-plugin-name.ts';
  * 9.1 `server-config` téma). Minden mezőnek alapértéke van
  * (`DEFAULT_SERVER_CONFIG`, SPEC-012 4.2), kivéve a `devOrigin`-t (5.7,
  * opcionális: hiányában nincs CORS), a `logLevel`-t (7.2, hiányában a pino
- * dokumentált `'info'` alapértéke érvényesül) és a `skillLibraryDirectory`-t
- * (SPEC-009 5.1: kötelező, alapérték nélkül; hiányában a szerver nem indul).
+ * dokumentált `'info'` alapértéke érvényesül).
  */
 export interface ServerConfig {
   readonly port: number;
@@ -38,10 +37,6 @@ export interface ServerConfig {
   readonly skillMaxArchiveBytes: number;
   readonly skillMaxUnpackedBytes: number;
   readonly skillMaxEntryCount: number;
-}
-
-function missingVariableMessage(name: string): string {
-  return `A(z) "${name}" kötelező env változó hiányzik vagy üres (missing_env_variable).`;
 }
 
 function invalidVariableMessage(name: string): string {
@@ -123,10 +118,11 @@ export function readServerConfig(environment: EnvironmentReader): Outcome<Server
     return streamKeepAliveIntervalMs;
   }
 
-  const skillLibraryDirectory = readStringOrDefault(environment, ENV_SKILL_LIBRARY_DIRECTORY, '');
-  if (skillLibraryDirectory.length === 0) {
-    return { kind: 'error', message: missingVariableMessage(ENV_SKILL_LIBRARY_DIRECTORY) };
-  }
+  const skillLibraryDirectory = readStringOrDefault(
+    environment,
+    ENV_SKILL_LIBRARY_DIRECTORY,
+    DEFAULT_SERVER_CONFIG.skillLibraryDirectory,
+  );
   // A plugin neve az abszolút útvonal utolsó tagja (a relatív érték az induló könyvtárhoz képest
   // oldódik fel, ugyanúgy, mint a `continueStartupWithDatabase`-ben), és a `query()` az érvénytelen
   // alakra dob (M-136 5b), ezért a szerver ilyenkor el sem indul (SPEC-009 5.1).

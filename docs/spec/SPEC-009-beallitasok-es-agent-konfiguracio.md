@@ -299,11 +299,11 @@ részletek, a táblák és a mérő eszközök: `docs/research/2026-10-28-spec-0
 ### 5.1 A döntött alak
 
 - **Tárolás:** a szerver egy kezelt könyvtárában, a fájlrendszeren (O-9), mert az SDK skillt csak
-  fájlrendszerről tölt (2.2). A könyvtár útvonala kötelező szerver konfiguráció, alapérték nélkül: az
-  `EASTER_SKILL_LIBRARY_DIRECTORY` env változó (T-012-8; az `EASTER_*` névminta, SPEC-006 4. szekció).
-  Hiányában vagy üres értékénél a szerver nem indul (`missing_env_variable`); ez a SPEC-012 4.2 "minden
-  értéknek van alapértéke" szabályának kimondott, egyetlen kivétele (a SPEC-012 szövege a kivételt nem
-  nevezi meg: nyitott kérdés, O-49, 14.9). Relatív érték a szerver induló
+  fájlrendszerről tölt (2.2). A könyvtár útvonala szerver konfiguráció, forrásolt alapértékkel
+  (`.data/skills`, az adatbázis és a napló `.data` könyvtára mellett), amit az
+  `EASTER_SKILL_LIBRARY_DIRECTORY` env változó felülír (T-012-8; az `EASTER_*` névminta, SPEC-006 4.
+  szekció; a SPEC-012 4.2 mintája: hiányában vagy üres értékénél az alapérték érvényes; user döntés
+  2026-10-28, O-49). Relatív érték a szerver induló
   könyvtárához képest abszolút útvonalra oldódik. A gyökér könyvtárneve a plugin neve (5.3), és a
   `query()` az érvénytelen alakú `<plugin>:<név>` skill elemre dob (M-136 5b), ezért a szerver induláskor
   ellenőrzi: a név nem üres, nem kezdődik szóközzel, és nem tartalmaz zárójelet, vesszőt vagy C0, C1
