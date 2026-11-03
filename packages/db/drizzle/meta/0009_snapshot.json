@@ -53,9 +53,7 @@
       "indexes": {
         "workflow_updated_at_idx": {
           "name": "workflow_updated_at_idx",
-          "columns": [
-            "updated_at_ms"
-          ],
+          "columns": ["updated_at_ms"],
           "isUnique": false
         }
       },
@@ -134,9 +132,7 @@
       "indexes": {
         "workflow_node_workflow_idx": {
           "name": "workflow_node_workflow_idx",
-          "columns": [
-            "workflow_id"
-          ],
+          "columns": ["workflow_id"],
           "isUnique": false
         }
       },
@@ -145,12 +141,8 @@
           "name": "workflow_node_workflow_id_workflow_id_fk",
           "tableFrom": "workflow_node",
           "tableTo": "workflow",
-          "columnsFrom": [
-            "workflow_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workflow_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -222,23 +214,17 @@
       "indexes": {
         "workflow_edge_workflow_idx": {
           "name": "workflow_edge_workflow_idx",
-          "columns": [
-            "workflow_id"
-          ],
+          "columns": ["workflow_id"],
           "isUnique": false
         },
         "workflow_edge_source_idx": {
           "name": "workflow_edge_source_idx",
-          "columns": [
-            "source_node_id"
-          ],
+          "columns": ["source_node_id"],
           "isUnique": false
         },
         "workflow_edge_target_idx": {
           "name": "workflow_edge_target_idx",
-          "columns": [
-            "target_node_id"
-          ],
+          "columns": ["target_node_id"],
           "isUnique": false
         }
       },
@@ -247,12 +233,8 @@
           "name": "workflow_edge_workflow_id_workflow_id_fk",
           "tableFrom": "workflow_edge",
           "tableTo": "workflow",
-          "columnsFrom": [
-            "workflow_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workflow_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -260,12 +242,8 @@
           "name": "workflow_edge_source_node_id_workflow_node_id_fk",
           "tableFrom": "workflow_edge",
           "tableTo": "workflow_node",
-          "columnsFrom": [
-            "source_node_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_node_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -273,12 +251,8 @@
           "name": "workflow_edge_target_node_id_workflow_node_id_fk",
           "tableFrom": "workflow_edge",
           "tableTo": "workflow_node",
-          "columnsFrom": [
-            "target_node_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["target_node_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -322,9 +296,7 @@
       "indexes": {
         "graph_snapshot_version_idx": {
           "name": "graph_snapshot_version_idx",
-          "columns": [
-            "document_version"
-          ],
+          "columns": ["document_version"],
           "isUnique": false
         }
       },
@@ -452,31 +424,22 @@
       "indexes": {
         "workflow_run_workflow_created_idx": {
           "name": "workflow_run_workflow_created_idx",
-          "columns": [
-            "workflow_id",
-            "created_at_ms"
-          ],
+          "columns": ["workflow_id", "created_at_ms"],
           "isUnique": false
         },
         "workflow_run_status_idx": {
           "name": "workflow_run_status_idx",
-          "columns": [
-            "status"
-          ],
+          "columns": ["status"],
           "isUnique": false
         },
         "workflow_run_root_idx": {
           "name": "workflow_run_root_idx",
-          "columns": [
-            "root_run_id"
-          ],
+          "columns": ["root_run_id"],
           "isUnique": false
         },
         "workflow_run_snapshot_idx": {
           "name": "workflow_run_snapshot_idx",
-          "columns": [
-            "graph_snapshot_hash"
-          ],
+          "columns": ["graph_snapshot_hash"],
           "isUnique": false
         }
       },
@@ -485,12 +448,8 @@
           "name": "workflow_run_workflow_id_workflow_id_fk",
           "tableFrom": "workflow_run",
           "tableTo": "workflow",
-          "columnsFrom": [
-            "workflow_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workflow_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -498,12 +457,8 @@
           "name": "workflow_run_root_run_id_workflow_run_id_fk",
           "tableFrom": "workflow_run",
           "tableTo": "workflow_run",
-          "columnsFrom": [
-            "root_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["root_run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -511,12 +466,8 @@
           "name": "workflow_run_graph_snapshot_hash_graph_snapshot_hash_fk",
           "tableFrom": "workflow_run",
           "tableTo": "graph_snapshot",
-          "columnsFrom": [
-            "graph_snapshot_hash"
-          ],
-          "columnsTo": [
-            "hash"
-          ],
+          "columnsFrom": ["graph_snapshot_hash"],
+          "columnsTo": ["hash"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -524,12 +475,8 @@
           "name": "workflow_run_restarted_from_run_id_workflow_run_id_fk",
           "tableFrom": "workflow_run",
           "tableTo": "workflow_run",
-          "columnsFrom": [
-            "restarted_from_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["restarted_from_run_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -744,32 +691,22 @@
       "indexes": {
         "step_run_run_created_idx": {
           "name": "step_run_run_created_idx",
-          "columns": [
-            "run_id",
-            "created_at_ms"
-          ],
+          "columns": ["run_id", "created_at_ms"],
           "isUnique": false
         },
         "step_run_run_node_idx": {
           "name": "step_run_run_node_idx",
-          "columns": [
-            "run_id",
-            "node_id"
-          ],
+          "columns": ["run_id", "node_id"],
           "isUnique": false
         },
         "step_run_parent_idx": {
           "name": "step_run_parent_idx",
-          "columns": [
-            "parent_step_run_id"
-          ],
+          "columns": ["parent_step_run_id"],
           "isUnique": false
         },
         "step_run_sub_run_idx": {
           "name": "step_run_sub_run_idx",
-          "columns": [
-            "sub_workflow_run_id"
-          ],
+          "columns": ["sub_workflow_run_id"],
           "isUnique": false
         }
       },
@@ -778,12 +715,8 @@
           "name": "step_run_run_id_workflow_run_id_fk",
           "tableFrom": "step_run",
           "tableTo": "workflow_run",
-          "columnsFrom": [
-            "run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -791,12 +724,8 @@
           "name": "step_run_parent_step_run_id_step_run_id_fk",
           "tableFrom": "step_run",
           "tableTo": "step_run",
-          "columnsFrom": [
-            "parent_step_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_step_run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -804,12 +733,8 @@
           "name": "step_run_sub_workflow_run_id_workflow_run_id_fk",
           "tableFrom": "step_run",
           "tableTo": "workflow_run",
-          "columnsFrom": [
-            "sub_workflow_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sub_workflow_run_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1046,26 +971,17 @@
       "indexes": {
         "run_event_run_id_idx": {
           "name": "run_event_run_id_idx",
-          "columns": [
-            "run_id",
-            "id"
-          ],
+          "columns": ["run_id", "id"],
           "isUnique": false
         },
         "run_event_step_run_id_idx": {
           "name": "run_event_step_run_id_idx",
-          "columns": [
-            "step_run_id",
-            "id"
-          ],
+          "columns": ["step_run_id", "id"],
           "isUnique": false
         },
         "run_event_run_uuid_uq": {
           "name": "run_event_run_uuid_uq",
-          "columns": [
-            "run_id",
-            "sdk_uuid"
-          ],
+          "columns": ["run_id", "sdk_uuid"],
           "isUnique": true
         }
       },
@@ -1074,12 +990,8 @@
           "name": "run_event_run_id_workflow_run_id_fk",
           "tableFrom": "run_event",
           "tableTo": "workflow_run",
-          "columnsFrom": [
-            "run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1087,12 +999,8 @@
           "name": "run_event_step_run_id_step_run_id_fk",
           "tableFrom": "run_event",
           "tableTo": "step_run",
-          "columnsFrom": [
-            "step_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["step_run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1171,17 +1079,12 @@
       "indexes": {
         "human_approval_step_uq": {
           "name": "human_approval_step_uq",
-          "columns": [
-            "step_run_id"
-          ],
+          "columns": ["step_run_id"],
           "isUnique": true
         },
         "human_approval_pending_idx": {
           "name": "human_approval_pending_idx",
-          "columns": [
-            "decision",
-            "requested_at_ms"
-          ],
+          "columns": ["decision", "requested_at_ms"],
           "isUnique": false
         }
       },
@@ -1190,12 +1093,8 @@
           "name": "human_approval_run_id_workflow_run_id_fk",
           "tableFrom": "human_approval",
           "tableTo": "workflow_run",
-          "columnsFrom": [
-            "run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1203,12 +1102,8 @@
           "name": "human_approval_step_run_id_step_run_id_fk",
           "tableFrom": "human_approval",
           "tableTo": "step_run",
-          "columnsFrom": [
-            "step_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["step_run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
