@@ -699,6 +699,43 @@ describe('runAgentStep', () => {
     database.close();
   });
 
+  it('a megszakítás hibája mellett is a megnevezett mcp_server_connection_failed ok marad (O-46)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'docs',
+        definition: { type: 'http', url: 'http://127.0.0.1:4100/mcp', authEnvName: null },
+      }),
+    );
+    const messages = [
+      {
+        type: 'system',
+        subtype: 'init',
+        session_id: 's',
+        uuid: 'u',
+        mcp_servers: [{ name: 'docs', status: 'needs-auth' }],
+      },
+    ];
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: {
+        run: () => ({
+          kind: 'ok',
+          value: { messages: messageIterable(messages), interrupt: () => Promise.reject(new Error('lezárt folyam')) },
+        }),
+      },
+    });
+    const config = agentStepConfig({ mcpServerReferences: { docs: { envBindings: {}, authEnvName: null } } });
+
+    const execution = okOrThrow(
+      await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry),
+    );
+
+    expect(execution.outcome).toMatchObject({ status: 'failed', errorKind: 'mcp_server_connection_failed' });
+    database.close();
+  });
+
   it('a csatlakozott MCP szerver mellett a lépés lefut (O-46)', async () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRun(database);

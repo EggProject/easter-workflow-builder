@@ -177,7 +177,12 @@ async function consumeStream(
       // megszakítás után a ciklus elhagyása lezárja a folyamot (az iterátor `return()` hívása).
       const failedServers = isSdkSystemInitMessage(message) ? findFailedMcpServers(message, mcpServerNames) : [];
       if (failedServers.length > 0) {
-        await query.interrupt();
+        // A megszakítás hibája nem írja felül a megnevezett okot: a ciklus elhagyása így is lezárja a folyamot.
+        try {
+          await query.interrupt();
+        } catch {
+          // a lezárt folyam megszakítási hibája nem változtat az okon
+        }
         return preStreamFailure(
           'mcp_server_connection_failed',
           formatEngineErrorMessage(
