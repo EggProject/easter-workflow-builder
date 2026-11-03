@@ -661,3 +661,32 @@ titkosítás, tömörítés, típus) és a kicsomagolt méret korlát nem vonatk
 a központi könyvtár deklarált méretének egyeztetése a csomag egészének szerkezeti ellenőrzése, a yauzl
 a kihagyott bejegyzés központi könyvtár rekordját is beolvassa, ezért abba beleszámít (biztonsági
 szempont: a korlát a beolvasott rekordok számát és méretét fogja meg).
+
+## 7. Merge kapu a T-012-30 után (2026-11-04)
+
+**A fej.** A friss `origin/main` (`66d4553`) az ág őse, tehát nincs mit bemergelni. A kilenc kapu a `2cfbe42`
+fejen futott; a teljes e2e a `15cf0ee` fejen, és a kettő között csak a `create-hardened-sdk-query.ts`
+kommentje, a küszöb (`apps/web/package.json`) és két research fájl változott (`git diff --stat 15cf0ee
+2cfbe42`), az e2e build bemenete nem. A riport a `2cfbe42` fejen, a végleges küszöbbel futott. Az e jelentést
+hordozó commit csak dokumentáció, utána a `format:check` és a `docs:check` újra zöld.
+
+| Parancs                                                                    | Kilépési kód | Összegzés                                                             |
+| -------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------- |
+| `bun run format:check`                                                     | 0            | minden fájl formázott                                                 |
+| `TURBO_CONCURRENCY=1 bun run typecheck`                                    | 0            | 19/19 sikeres                                                         |
+| `bun x turbo run lint --concurrency=1`                                     | 0            | 32/32 task sikeres                                                    |
+| `bun run test`                                                             | 0            | 7720 teszt, mind zöld; lefedettség 100 / 100 / 100 / 100              |
+| `bun run build`                                                            | 0            | 1/1 sikeres                                                           |
+| `bun run docs:check`                                                       | 0            | 20/20 kötelező helyen van `CLAUDE.md`                                 |
+| `bun run check:casing`                                                     | 0            | 0 eltérés                                                             |
+| `bun run check:graph`                                                      | 0            | 0 eltérés                                                             |
+| `bun run check:db-drift`                                                   | 0            | a séma és a migrációk szinkronban                                     |
+| `bun x playwright test --shard=<i>/8` (i = 1 ... 8, tiszta nyers könyvtár) | mind 0       | 94 + 94 + 94 + 94 + 94 + 94 + 93 + 93 = 750 teszt, mind zöld          |
+| `bun run coverage:e2e:report`                                              | 0            | 99.63 / 99.25 / 99.89 / 99.61, az új küszöbbel egyenlő (research 55.) |
+
+**E2e lefedettség és ratchet.** Fedetlen tételek: statements 10/2713, branches 10/1335, functions 1/948, lines
+10/2596, ugyanaz az öt fájl, mint az 5. szekcióban. Az első tiszta futás a `functions` metrikán elbukott
+(99.57 a 99.73 küszöb alatt), és a `branches` fedetlen darabja 12-re nőtt: az O-53 eltávolító függvénye, a
+nem támogatott mező mentési hibaága és a Beépített skillek mentési hibaága nem kapott e2e-t. Két új e2e
+pótolta (`8212dae`, `15cf0ee`), a küszöb ezután felfelé követte a mért értéket
+(`docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 55. szekció).
