@@ -20,3 +20,18 @@
 .skill-row .settings-screen__hint {
   overflow-wrap: anywhere;
 }
+
+/* SAJÁT KIEGÉSZÍTÉS (SPEC-009 O-56, koordinátor döntés 2026-10-28): a kártyában álló feltöltő
+   mező nem lehet kártya a kártyában (`.claude/CLAUDE.md` 11. szekció: szegély plusz lekerekítés
+   plusz saját háttér). A mező a design system kompakt (`dropzone--small`) alakjában áll, nyugalmi
+   állapotban saját háttér nélkül, tehát csak a szaggatott beviteli keret marad; a rámutatás és a
+   behúzás kiemelése a forrás szabálya szerint változatlan. A kiválasztott fájl sora szegély és
+   háttér nélküli, a kártya felületén álló sor. */
+.skill-upload-form .dropzone:not(:hover, .is-dragging) {
+  background: transparent;
+}
+.skill-upload-form .dropzone-file {
+  background: transparent;
+  border-color: transparent;
+  padding-inline: 0;
+}

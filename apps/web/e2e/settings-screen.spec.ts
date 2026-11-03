@@ -385,7 +385,7 @@ test('a topnav "Beállítások" linkje a /settings útvonalra visz, a morzsamen�
 // A Provider kártya (SPEC-009 3.1, O-4, O-5, O-8, AC1, AC2, AC3).
 const PROVIDER_LABEL = 'Globális alapértelmezett provider';
 
-test('a Provider kártya a Párhuzamossági korlát, a Futás napló, a Skill könyvtár, az MCP szerverek és a Gráf szerkesztő kártya fölött áll, alapértelmezés nélkül warning Alertet mutat, "nincs" opció nélkül', async ({
+test('a Provider kártya a Párhuzamossági korlát, a Futás napló, a Beépített skillek, a Skill könyvtár, az MCP szerverek és a Gráf szerkesztő kártya fölött áll, alapértelmezés nélkül warning Alertet mutat, "nincs" opció nélkül', async ({
   page,
 }) => {
   await page.goto('/settings');
@@ -395,6 +395,7 @@ test('a Provider kártya a Párhuzamossági korlát, a Futás napló, a Skill k�
     'Provider',
     'Párhuzamossági korlát',
     'Futás napló',
+    'Beépített skillek',
     'Skill könyvtár',
     'MCP szerverek',
     'Gráf szerkesztő',
@@ -677,6 +678,27 @@ test('nem pozitív egész értékre a hiba a mező alatt áll, a PUT nem megy ki
   await expect(row).toContainText('Beállított korlát: 5 egyszerre futó agent lépés.');
   expect(mockState.limitPuts).toEqual([{ providerId: 'minimax', body: { maxConcurrentSteps: 5 } }]);
 });
+
+for (const width of [320, 1440]) {
+  test(`${String(width)} pixelen a korlát mezőjének elhagyáskor megjelenő hibája nem mozdítja el a Mentés gombot (O-59)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/settings');
+    const row = limitRow(page, MINIMAX_NAME);
+    const field = limitField(row, MINIMAX_NAME);
+    const saveButton = row.getByRole('button', { name: 'Mentés', exact: true });
+    await saveButton.scrollIntoViewIfNeeded();
+
+    await field.fill('0');
+    const before = await saveButton.boundingBox();
+    await saveButton.click();
+
+    await expect(row.getByRole('alert')).toHaveText('Pozitív egész számot adj meg.');
+    expect(await saveButton.boundingBox()).toStrictEqual(before);
+    expect(mockState.limitPuts).toHaveLength(0);
+  });
+}
 
 test('a korlát mentése és törlése alatt mindkét gomb tiltott, a futó művelet gombja betöltés állapotú', async ({
   page,

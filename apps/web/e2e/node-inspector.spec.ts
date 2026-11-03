@@ -697,7 +697,8 @@ test.describe('agent_step node: provider felülírás Kapcsolat teszt gombja', (
     await expect(testButton).toBeEnabled();
     await testButton.click();
     const failure = panel.getByRole('alert').filter({ hasText: 'A kapcsolat teszt sikertelen' });
-    await expect(failure).toContainText('Hiányzik az ANTHROPIC_AUTH_TOKEN');
+    await expect(failure).toContainText('Ellenőrizd a provider env változóit a szerveren.');
+    await expect(failure).not.toContainText('ANTHROPIC_AUTH_TOKEN');
     await expect(failure).toHaveClass(/\balert--danger\b/);
 
     connectionResult.succeeded = true;

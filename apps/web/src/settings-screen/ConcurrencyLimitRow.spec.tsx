@@ -127,7 +127,7 @@ describe('ConcurrencyLimitRow', () => {
     await clickAsync(button('Mentés'));
 
     expect(saveLimit).not.toHaveBeenCalled();
-    const error = container.querySelector('.field__error');
+    const error = container.querySelector('.field__error[role="alert"]');
     expect(error?.textContent).toBe('Pozitív egész számot adj meg.');
     expect(error?.getAttribute('role')).toBe('alert');
     expect(field().getAttribute('aria-invalid')).toBe('true');
@@ -141,19 +141,19 @@ describe('ConcurrencyLimitRow', () => {
     await clickAsync(button('Mentés'));
 
     expect(saveLimit).not.toHaveBeenCalled();
-    expect(container.querySelector('.field__error')?.textContent).toBe('Pozitív egész számot adj meg.');
+    expect(container.querySelector('.field__error[role="alert"]')?.textContent).toBe('Pozitív egész számot adj meg.');
   });
 
   it('érintetlen mezőn gépelés közben nincs hibaüzenet, elhagyás után az érvénytelen értéknél van', () => {
     render();
     typeInto(field(), '0');
-    expect(container.querySelector('.field__error')).toBeNull();
+    expect(container.querySelector('.field__error[role="alert"]')).toBeNull();
 
     act(() => {
       field().dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
     });
 
-    expect(container.querySelector('.field__error')).not.toBeNull();
+    expect(container.querySelector('.field__error[role="alert"]')).not.toBeNull();
   });
 
   it('érvényes értékre a providerId-vel és a számmal hívja a mentést; futás alatt a gomb isLoading, mindkét gomb tiltott; siker után a mező üres és hibátlan', async () => {
@@ -178,7 +178,7 @@ describe('ConcurrencyLimitRow', () => {
     });
 
     expect(field().value).toBe('');
-    expect(container.querySelector('.field__error')).toBeNull();
+    expect(container.querySelector('.field__error[role="alert"]')).toBeNull();
     expect(button('Mentés').classList.contains('is-loading')).toBe(false);
   });
 

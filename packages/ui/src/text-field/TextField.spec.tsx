@@ -117,6 +117,30 @@ describe('TextField', () => {
     expect(errorElement?.getAttribute('role')).toBe('alert');
   });
 
+  it('reserveErrorSpace mellett a még nem látható hiba helye láthatatlanul, felolvasás nélkül foglalt (O-59)', () => {
+    act(() => {
+      root.render(<TextField id="nev" error="Kötelező mező" reserveErrorSpace />);
+    });
+    const reserved = container.querySelector<HTMLElement>('.field__error');
+    expect(reserved?.textContent).toBe('Kötelező mező');
+    expect(reserved?.style.visibility).toBe('hidden');
+    expect(reserved?.getAttribute('aria-hidden')).toBe('true');
+    expect(reserved?.getAttribute('role')).toBeNull();
+    expect(renderedInput().getAttribute('aria-describedby')).toBeNull();
+
+    blurInput();
+    const visible = container.querySelectorAll('.field__error');
+    expect(visible).toHaveLength(1);
+    expect(visible[0]?.getAttribute('role')).toBe('alert');
+  });
+
+  it('reserveErrorSpace mellett hiba nélkül nincs foglalt hely', () => {
+    act(() => {
+      root.render(<TextField id="nev" reserveErrorSpace />);
+    });
+    expect(container.querySelector('.field__error')).toBeNull();
+  });
+
   it('megkísérelt beküldés után érintetlen mezőn is látszik a hibaüzenet', () => {
     act(() => {
       root.render(

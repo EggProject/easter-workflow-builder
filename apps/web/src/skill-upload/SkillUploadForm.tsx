@@ -114,6 +114,7 @@ export function SkillUploadForm(properties: Readonly<SkillUploadFormProperties>)
             key={nameGeneration}
             size="sm"
             label="Skill neve"
+            reserveErrorSpace
             autoComplete="off"
             value={nameDraft}
             error={parsedName === undefined ? INVALID_NAME_MESSAGE : undefined}

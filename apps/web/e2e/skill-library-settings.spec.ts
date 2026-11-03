@@ -251,6 +251,27 @@ test('üres űrlapon a Feltöltés a név és a fájl hibáját a mező alatt je
   expect(mockState.uploads).toHaveLength(0);
 });
 
+for (const width of [320, 1440]) {
+  test(`${String(width)} pixelen a gépelés közbeni első kattintás a Feltöltés gombon nem vész el: a mező hibájának helye foglalt (O-59)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await openSettings(page);
+    const uploadButton = card(page).getByRole('button', { name: 'Feltöltés', exact: true });
+    await uploadButton.scrollIntoViewIfNeeded();
+
+    // A mező még nem érintett: a hibája a gomb lenyomásakor (a mező elhagyásakor) jelenik meg.
+    await fillName(page, 'Rossz Név');
+    await uploadButton.click();
+
+    // A hiányzó fájl hibája csak a beküldésből jön: ha a kattintás elveszne, nem jelenne meg.
+    await expect(card(page).getByRole('alert')).toHaveText([
+      /^A név 1-64 karakter lehet/u,
+      'Válassz ki egy ZIP csomagot.',
+    ]);
+  });
+}
+
 test('a kiválasztott fájl eltávolítható, utána a feltöltés a hiányzó fájlt jelzi', async ({ page }) => {
   await openSettings(page);
 
@@ -443,3 +464,55 @@ test('az utolsó skill törlése után az üres állapot áll, a feltöltő űrl
   await expect(card(page).getByText('Még nincs feltöltött skill.')).toBeVisible();
   await expect(card(page).getByRole('button', { name: 'Feltöltés', exact: true })).toBeVisible();
 });
+
+/**
+ * A WCAG 2.2 relatív fénysűrűség és kontrasztarány képlete
+ * (<https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html>, "contrast ratio"): a
+ * számított `rgb()` színekből, átlátszó háttérnél a kártya hátterével.
+ */
+function relativeLuminance(color: string): number {
+  const channels = (color.match(/\d+(\.\d+)?/gu) ?? [])
+    .slice(0, 3)
+    .map((channel) => Number(channel) / 255)
+    .map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
+  const [red = 0, green = 0, blue = 0] = channels;
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function contrastRatio(foreground: string, background: string): number {
+  const first = relativeLuminance(foreground);
+  const second = relativeLuminance(background);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+async function computedStyleOf(locator: Locator, property: 'color' | 'background-color'): Promise<string> {
+  return await locator.evaluate(
+    (element, name) => globalThis.getComputedStyle(element).getPropertyValue(name),
+    property,
+  );
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`${theme} témában a kártyabeli feltöltő mező saját háttér nélküli, olvasható, és a fájl sora sem doboz (O-54, O-56)`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((mode: string) => {
+      globalThis.localStorage.setItem('eggTheme', mode);
+    }, theme);
+    await openSettings(page);
+    const dropzone = card(page).locator('.dropzone');
+    const copy = card(page).locator('.dropzone__copy');
+    const cardBackground = await computedStyleOf(card(page), 'background-color');
+
+    expect(await computedStyleOf(dropzone, 'background-color')).toBe('rgba(0, 0, 0, 0)');
+    expect(contrastRatio(await computedStyleOf(copy, 'color'), cardBackground)).toBeGreaterThanOrEqual(4.5);
+
+    await chooseArchive(page);
+    const fileRow = card(page).locator('.dropzone-file');
+    expect(await computedStyleOf(fileRow, 'background-color')).toBe('rgba(0, 0, 0, 0)');
+    expect(await fileRow.evaluate((element) => globalThis.getComputedStyle(element).borderTopColor)).toBe(
+      'rgba(0, 0, 0, 0)',
+    );
+  });
+}

@@ -9,6 +9,7 @@ import {
 import { joinClassNames } from '../class-name-list/join-class-names.ts';
 import { formatBytes } from './format-bytes.ts';
 import './file-upload.css';
+import './file-upload-theme.css';
 
 export type FileUploadSize = 'md' | 'sm';
 

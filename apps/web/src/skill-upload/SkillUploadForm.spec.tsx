@@ -96,11 +96,11 @@ describe('SkillUploadForm', () => {
     const uploadSkill = vi.fn();
     render({ uploadSkill });
 
-    expect(container.querySelector('.field__error')).toBeNull();
+    expect(container.querySelector('.field__error[role="alert"]')).toBeNull();
     await submit();
 
     expect(uploadSkill).not.toHaveBeenCalled();
-    const errors = [...container.querySelectorAll('.field__error')].map((error) => error.textContent);
+    const errors = [...container.querySelectorAll('.field__error[role="alert"]')].map((error) => error.textContent);
     expect(errors).toHaveLength(2);
     expect(errors[0]).toContain('A név 1-64 karakter lehet');
     expect(errors[1]).toBe('Válassz ki egy ZIP csomagot.');
@@ -115,7 +115,7 @@ describe('SkillUploadForm', () => {
 
     await submit();
 
-    const error = container.querySelector('.field__error');
+    const error = container.querySelector('.field__error[role="alert"]');
     expect(error?.id).not.toBe('');
     expect(fileInput().getAttribute('aria-invalid')).toBe('true');
     expect(fileInput().getAttribute('aria-describedby')).toBe(error?.id);
@@ -135,7 +135,7 @@ describe('SkillUploadForm', () => {
     await submit();
 
     expect(uploadSkill).not.toHaveBeenCalled();
-    const errors = [...container.querySelectorAll('.field__error')].map((error) => error.textContent);
+    const errors = [...container.querySelectorAll('.field__error[role="alert"]')].map((error) => error.textContent);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('A név 1-64 karakter lehet');
   });
@@ -148,7 +148,7 @@ describe('SkillUploadForm', () => {
     await submit();
 
     expect(uploadSkill).not.toHaveBeenCalled();
-    const errors = [...container.querySelectorAll('.field__error')].map((error) => error.textContent);
+    const errors = [...container.querySelectorAll('.field__error[role="alert"]')].map((error) => error.textContent);
     expect(errors).toEqual(['Válassz ki egy ZIP csomagot.']);
   });
 
@@ -188,7 +188,7 @@ describe('SkillUploadForm', () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(nameField().value).toBe('');
     expect(container.querySelector('.dropzone-file')).toBeNull();
-    expect(container.querySelector('.field__error')).toBeNull();
+    expect(container.querySelector('.field__error[role="alert"]')).toBeNull();
     expect(container.querySelector('.alert--danger')).toBeNull();
   });
 

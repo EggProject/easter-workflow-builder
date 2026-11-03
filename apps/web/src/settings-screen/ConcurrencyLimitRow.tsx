@@ -110,6 +110,7 @@ export function ConcurrencyLimitRow(properties: Readonly<ConcurrencyLimitRowProp
             inputMode="numeric"
             min={1}
             step={1}
+            reserveErrorSpace
             aria-label={`Egyszerre futó agent lépések száma: ${providerName}`}
             value={draft}
             error={parsedDraft === undefined ? INVALID_DRAFT_MESSAGE : undefined}

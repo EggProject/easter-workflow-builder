@@ -1,0 +1,21 @@
+/* ============================================================
+   EggProject: File upload, témafüggő felület
+   Kiegészítő fájl a `file-upload.css` mellett. A `file-upload.css` a design
+   system forrásával bájtra azonos blokkot hordoz, ezért a javítás külön
+   fájlban áll (a `tooltip-hover-bridge.css` precedense).
+
+   SZÁNDÉKOS ELTÉRÉS A DESIGN SYSTEMTŐL (user döntés, 2026-10-28, SPEC-009
+   O-54). A forrás `.dropzone` szabálya a hátteret a `--ep-paper-100`, a
+   szegélyt a `--ep-paper-300` nyers tokenből veszi, amelyeknek nincs sötét
+   felülírása, ezért sötét témában a világos háttéren a világos szöveg
+   olvashatatlan. A pótlás a téma szerinti szerep tokeneket használja: a
+   `theme-light.css` szerint `--ep-bg-sunken: var(--ep-paper-100)` és
+   `--ep-border: var(--ep-paper-300)`, tehát világos témában a megjelenés
+   változatlan, sötét témában a sötét "well" felület és szegély érvényes. A
+   `file-upload-theme.spec.ts` mindkét állítást a token fájlokból olvassa.
+   ============================================================ */
+
+.dropzone {
+  border-color: var(--ep-border);
+  background: var(--ep-bg-sunken);
+}

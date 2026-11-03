@@ -236,7 +236,8 @@ test('a létrehozó modális Kapcsolat teszt gombja provider nélkül tiltott, s
   await testButton.click();
   const failure = dialog.getByRole('alert');
   await expect(failure).toContainText('A kapcsolat teszt sikertelen');
-  await expect(failure).toContainText('Hiányzik az ANTHROPIC_AUTH_TOKEN');
+  await expect(failure).toContainText('Ellenőrizd a provider env változóit a szerveren.');
+  await expect(failure).not.toContainText('ANTHROPIC_AUTH_TOKEN');
   await expect(failure).toHaveClass(/\balert--danger\b/);
   expect(testedProviders).toEqual(['/api/providers/minimax/connection-test', '/api/providers/minimax/connection-test']);
 });
