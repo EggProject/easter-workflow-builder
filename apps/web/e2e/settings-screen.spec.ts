@@ -857,6 +857,22 @@ test('a Beépített skillek kapcsolója bekapcsolt alapértékkel áll, és a v�
   await expect(page.getByRole('switch', { name: DELTA_SWITCH_LABEL })).not.toBeChecked();
 });
 
+test('a Beépített skillek mentésének hibája danger Alert a kártyán, a kapcsoló a régi értéken marad (SPEC-009 O-44)', async ({
+  page,
+}) => {
+  mockState.isUpdateFailing = true;
+  await page.goto('/settings');
+  const card = page.getByRole('region', { name: 'Beépített skillek', exact: true });
+  const builtinSwitch = card.getByRole('switch', { name: 'Beépített skillek elérhetők' });
+  await expect(builtinSwitch).toBeChecked();
+
+  await card.locator('.ctrl__switch').click();
+  const failure = card.getByRole('alert');
+  await expect(failure).toHaveText('Váratlan szerver hiba történt.');
+  await expect(failure).toHaveClass(/\balert--danger\b/);
+  await expect(builtinSwitch).toBeChecked();
+});
+
 test('a mentés alatt a kapcsoló tiltott és a régi értéket mutatja, "Mentés…" jelzéssel; a válasz után az új érték áll', async ({
   page,
 }) => {

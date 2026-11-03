@@ -929,6 +929,12 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
 
     await expect(kutatoTools.getByText('nem támogatott mező: a gép agent memória könyvtárát töltené be')).toBeVisible();
     await expect(kutatoTools.getByText('project', { exact: true })).toBeVisible();
+    // Beküldés előtt a mező alatt nincs hiba; a mentési kísérlet után a séma szabálya ott jelenik meg.
+    await expect(kutatoTools.getByRole('alert')).toBeAttached({ attached: false });
+    await page.getByRole('button', { name: 'Mentés', exact: true }).click();
+    await expect(kutatoTools.getByRole('alert')).toHaveText(
+      'Ez a mező nem támogatott: a futás nem adja ki, a mentéshez el kell távolítani.',
+    );
     await kutatoTools.getByRole('button', { name: 'Memória hatóköre eltávolítása' }).click();
 
     await expect(kutatoTools.getByRole('button', { name: 'Memória hatóköre eltávolítása' })).toBeAttached({
