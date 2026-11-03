@@ -416,4 +416,22 @@ describe('createCelExpressionEvaluator: evaluate egyetlen bemenetre sem dob kiv�
       unexpectedErrorType: 'Error',
     });
   });
+
+  // Regresszió: a körkörös adat korábban a verem kifutásán bukott, és a kivétel
+  // típusa a futtató állapotától függött; a normalizálás bemelegítése után
+  // `RangeError` jött `TypeError` helyett (research 2026-10-28 cel-korkoros-bemenet).
+  it('a körkörös kontextus a bemelegített normalizálás után is TypeError', () => {
+    const warmEvaluator = createCelExpressionEvaluator();
+    const nested = runContext();
+    for (let index = 0; index < 10_000; index += 1) {
+      warmEvaluator.evaluate('input', nested);
+    }
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
+    expect(warmEvaluator.evaluate('input', runContext({ input: circular }))).toStrictEqual({
+      kind: 'error',
+      message: 'a kifejezés nem dolgozható fel',
+      unexpectedErrorType: 'TypeError',
+    });
+  });
 });
