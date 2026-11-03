@@ -32,6 +32,14 @@ function ownEntry(record: Readonly<Record<string, string>>, key: string): string
   return Object.hasOwn(record, key) ? record[key] : undefined;
 }
 
+// Az üres érték hiányzónak számít (SPEC-009 6.4, O-58, a provider kulcs SPEC-013 4.7 szabályának
+// mintája): egy `NEV=` sor nem ad használható titkot vagy fejlécet.
+function readNonEmpty(processEnvironment: ProcessEnvironmentPort, name: string): string | null {
+  const value = processEnvironment.read(name);
+  // eslint-disable-next-line unicorn/no-null -- a port `string | null` szerződése szerint a hiány `null`
+  return value === '' ? null : value;
+}
+
 function missingEnvironment(
   subject: string,
   serverName: string,
@@ -68,7 +76,7 @@ function resolveServer(
     for (const declaredName of definition.envNames) {
       const environmentName =
         ownEntry(reference.envBindings, declaredName) ?? ownEntry(definition.envBindings, declaredName) ?? declaredName;
-      const value = processEnvironment.read(environmentName);
+      const value = readNonEmpty(processEnvironment, environmentName);
       if (value === null) {
         return missingEnvironment(subject, serverName, `"${declaredName}" változójához`, environmentName);
       }
@@ -89,7 +97,7 @@ function resolveServer(
   if (environmentName === null) {
     return { kind: 'ok', value: { type: definition.type, url: definition.url } };
   }
-  const value = processEnvironment.read(environmentName);
+  const value = readNonEmpty(processEnvironment, environmentName);
   if (value === null) {
     return missingEnvironment(subject, serverName, 'Authorization fejlécéhez', environmentName);
   }

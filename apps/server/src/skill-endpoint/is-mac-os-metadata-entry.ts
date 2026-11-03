@@ -5,5 +5,5 @@
  * O-57, user döntés 2026-10-28).
  */
 export function isMacOsMetadataEntry(entryPath: string): boolean {
-  return entryPath.split('/')[0] === '__MACOSX';
+  return entryPath.split('/', 1)[0] === '__MACOSX';
 }

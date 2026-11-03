@@ -176,6 +176,19 @@ describe('resolveMcpServers', () => {
     });
   });
 
+  it('az üres értékű változó hiányzónak számít, a stdio és a http ágon is (O-58)', () => {
+    const environment = environmentOf({ GITHUB_TOKEN_CEG: 'titkos-ertek', GH_HOST_KOZPONTI: '', DOCS_AUTH: '' });
+
+    expect(resolveMcpServers(STEP, { github: NO_OVERRIDE }, [GITHUB], environment)).toMatchObject({
+      kind: 'error',
+      errorKind: 'missing_mcp_server_env',
+    });
+    expect(resolveMcpServers(STEP, { docs: NO_OVERRIDE }, [DOCS], environment)).toMatchObject({
+      kind: 'error',
+      errorKind: 'missing_mcp_server_env',
+    });
+  });
+
   it('a központi listában nem álló névre mcp_server_not_found hibát ad, a csomópont és a szerver nevével', () => {
     expect(resolveMcpServers(STEP, { torolt: NO_OVERRIDE }, [DOCS], environmentOf({ DOCS_AUTH: 'x' }))).toStrictEqual({
       kind: 'error',
