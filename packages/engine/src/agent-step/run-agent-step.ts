@@ -182,7 +182,7 @@ async function consumeStream(
           'mcp_server_connection_failed',
           formatEngineErrorMessage(
             'mcp_server_connection_failed',
-            `A(z) ${request.instance.nodeId} csomópont MCP szervere nem csatlakozott: ${failedServers.map((name) => `"${name}"`).join(', ')}`,
+            `A(z) ${request.instance.nodeId} csomópont MCP szervere nem csatlakozott: ${failedServers.map((name) => JSON.stringify(name)).join(', ')}`,
           ),
         );
       }

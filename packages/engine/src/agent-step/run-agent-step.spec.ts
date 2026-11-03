@@ -633,6 +633,7 @@ describe('runAgentStep', () => {
     const interruptSpy = vi.fn(() => Promise.resolve());
     const consumed: unknown[] = [];
     async function* generate(): AsyncGenerator {
+      await Promise.resolve();
       yield {
         type: 'system',
         subtype: 'init',
