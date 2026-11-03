@@ -206,15 +206,15 @@ export function AgentDefinitionEntryFields(properties: Readonly<AgentDefinitionE
   // A nem támogatott mező nem beviteli elem, tehát nem lehet érintett: a hibája csak a mentés
   // kísérlete után látszik (`.claude/CLAUDE.md` 11. szekció, a mező alatti hiba szabálya).
   const isSaveAttempted = useContext(FieldErrorVisibilityContext);
-  const errorOf = (field: AgentDefinitionFieldDescriptor): string | undefined =>
-    field.control.kind === 'unsupported' && !isSaveAttempted
-      ? undefined
-      : fieldErrors.get(`${fieldPathPrefix}${field.key}`);
 
   if (!isRecord(value)) {
     return <p role="alert">Ez a bejegyzés nem objektum alakú, itt nem szerkeszthető.</p>;
   }
   const record = value;
+  const errorOf = (field: AgentDefinitionFieldDescriptor): string | undefined =>
+    !isSaveAttempted && field.control.kind === 'unsupported'
+      ? undefined
+      : fieldErrors.get(`${fieldPathPrefix}${field.key}`);
 
   function setField(key: string, fieldValue: unknown): void {
     onChange({ ...record, [key]: fieldValue });

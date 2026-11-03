@@ -272,11 +272,11 @@ describe('AgentDefinitionEntryFields', () => {
     });
     expect(container.textContent).toContain('project');
     expect(container.textContent).toContain('nem támogatott mező: a gép agent memória könyvtárát töltené be');
-    const removeButton = [...container.querySelectorAll('button')].find(
+    const memoryRemovalButton = [...container.querySelectorAll('button')].find(
       (button) => button.textContent === 'Memória hatóköre eltávolítása',
     );
     act(() => {
-      removeButton?.click();
+      memoryRemovalButton?.click();
     });
     const nextValue: unknown = onChange.mock.calls[0]?.[0];
     expect(isRecord(nextValue) && Object.hasOwn(nextValue, 'memory')).toBe(false);

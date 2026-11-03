@@ -822,11 +822,11 @@ describe('NodeConfigSaveSchema: az MCP hivatkozás szerver oldali nevei env vál
   });
 });
 
-describe('NodeConfigSaveSchema: az agent definíció memory mezője és közvetlen MCP objektuma nem menthető (SPEC-009 6.2, O-53)', () => {
-  function agentStepWithAgents(agents: unknown): unknown {
-    return { type: 'agent_step', ...VALID_AGENT_STEP_SETTINGS, agents, onUnhandledError: 'fail_run' };
-  }
+function agentStepWithAgents(agents: unknown): unknown {
+  return { type: 'agent_step', ...VALID_AGENT_STEP_SETTINGS, agents, onUnhandledError: 'fail_run' };
+}
 
+describe('NodeConfigSaveSchema: az agent definíció memory mezője és közvetlen MCP objektuma nem menthető (SPEC-009 6.2, O-53)', () => {
   it('a memory és a nem szöveg elemű mcpServers a mező útvonalán bukik, a szöveg elem átmegy', () => {
     const parsed = NodeConfigSaveSchema.safeParse(
       agentStepWithAgents({
