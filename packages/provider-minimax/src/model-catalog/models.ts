@@ -64,11 +64,12 @@ export const minimaxModels: readonly ModelDescriptor<MiniMaxModelId, MiniMaxFami
       ],
     },
     maxOutputTokensWireCeiling: notMeasuredOnFlash(['M-22']),
-    // A Flash a 256x256 pixeles piros kép színét megnevezte.
+    // Egyetlen mintában a Flash a 256x256 pixeles piros kép színét megnevezte, az előző modellre ellenkező mérés van.
     imageInput: {
-      state: 'known',
-      value: true,
-      evidence: [{ kind: 'measurement', id: 'M-23-flash' }],
+      state: 'unknown',
+      reason:
+        'Egyetlen futásban, egyetlen képpel a Flash megnevezte a kép színét, az előző modellre viszont ellenkező mérés van, ezért a képbemenet támogatása egy mintából nem állítható.',
+      blockedBy: ['M-23', 'M-16'],
     },
     videoInput: {
       state: 'unknown',

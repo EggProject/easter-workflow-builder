@@ -83,6 +83,9 @@ az előtagon belül a második kérés bemenete túlnyomórészt `cache_read_inp
   `StructuredOutput` eszközt hívta. A `result` `subtype: success`, `num_turns: 3`, kitöltött
   `structured_output` (`{"label":"teszt","count":4}`).
 - A harmadik kérés streamje a fő kérésben is `thinking` blokkot adott (`thinking_delta`, `signature_delta`).
+- **Mit jelent a 3.** A mérési prompt kifejezetten egy `echo` tool hívását kérte, majd az összefoglalót a séma szerint:
+  a 3 kör ennek a promptnak a körszáma (a `num_turns` az echo hívást is számolja), egy minta. Nem a strukturált
+  kimenet minimuma: tool hívás nélküli prompt körszámát egyik futás sem mérte (nem ellenőrzött).
 
 ### M-05-flash `thinking` bekapcsolva
 
@@ -130,7 +133,8 @@ az előtagon belül a második kérés bemenete túlnyomórészt `cache_read_inp
 ### M-23-flash Kép bemenet felismerhető tartalommal
 
 - A kimenő `messages[].content[]` egy `image` blokkot hordozott (`base64`, `image/png`). HTTP 200.
-- A válasz szövege `Piros.`: a modell a 256x256 pixeles, tiszta piros kép színét megnevezte. Egy futás, egy minta.
+- A válasz szövege `Piros.`: a modell a 256x256 pixeles, tiszta piros kép színét megnevezte. Egy futás, egy minta; az előző
+  modellre az M-16 és az eredeti M-23 ellenkezőt mért ("Nincs kép."), ezért a `models[0].imageInput` `unknown` marad (4. szekció).
 
 ### M-26-flash `Options.effort` nélkül és `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT`
 
@@ -161,24 +165,29 @@ az előtagon belül a második kérés bemenete túlnyomórészt `cache_read_inp
   | (d) `auto` (kontroll) | `end_turn`    | `thinking`, `text` ("Fény."), nincs `tool_use`                      | 177 / 147   |
 
 - **Értékelés.** Az `any` kérés ugyanazzal a törzzsel az első körben `tool_use` blokkot adott, a másodikban
-  szöveget: a kikényszerítés tehát nem determinisztikus, a második minta szerint nem betartott (a `tool` értékkel
-  együtt: a `rejectionBehaviour` `silently_dropped` állítást a (b) második mintája is erősíti). A `none` kérésben
+  szöveget: a kikényszerítés tehát nem determinisztikus, a második minta szerint nem betartott. A `tool` értékre két
+  mintában (az első és a második kör (b) kérése) jött `tool_use` nélküli szöveg, de a `tool` esethez nincs azonos
+  promptú `auto` kontroll, és az `any` ellentmondása miatt a viselkedés sem determinisztikus: a csendes eldobás a
+  modell saját döntésétől nem választható el, a `rejectionBehaviour` ezért `unknown` marad. A `none` kérésben
   nincs `tool_use`, de a prompt kifejezetten az eszközt kérte és a modell azt írta, hogy az eszköz nem elérhető; erre
   az ágra nincs `auto` kontroll (ugyanazzal a prompttal), tehát egy mintából a betartás nem választható el a modell
-  saját döntésétől. A `toolChoice.accepted` ezért `unknown` marad, a `reason` mező a fentieket rögzíti. További
+  saját döntésétől. A `toolChoice.accepted` ezért szintén `unknown` marad, a `reason` mezők a fentieket rögzítik. További
   futás nem volt (user korlát).
 
 ### M-35-flash `GET /v1/models` közvetlen HTTP hívással
 
 - HTTP 200, a törzs `data`, `first_id`, `last_id`, `has_more` mezőkkel; a `data` 9 elemű, elemenként
-  `created_at`, `display_name`, `id`, `type`. A `MiniMax-M3.1-Flash` szerepel benne.
+  `created_at`, `display_name`, `id`, `type`. A `MiniMax-M3.1-Flash` szerepel benne. A 9 a mérés napjára (2026-10-28) szóló érték: a lista a szolgáltatás
+  kínálatával változik, nem stabil tény.
 
 ### M-36-flash Header és végpont leltár (passzív)
 
 - A kör 42 rögzített tranzakciója (a két első kísérleten kívül): 27 `POST /v1/messages`, 13 `HEAD /api/hello`,
   1 `GET /v1/models`, 1 `GET /` (a proxy indulásának első, azóta kivett ellenőrzése). Státusz: 200 és 404.
 - A válasz headerek uniójában nincs `retry-after` és nincs `ratelimit` részszöveget tartalmazó header; 429 nem
-  érkezett. A `rateLimits` két header mezője ezért `unknown` marad.
+  érkezett. A `rateLimits` két header mezője ezért `unknown` marad. A passzív leltár tehát lefutott, de 429 nélkül nem dönt;
+  a mezők `blockedBy` listájában az M-36 azt jelenti, hogy a mezőt egy 429-et is rögzítő leltár zárná (az M-18
+  mellett), nem azt, hogy a leltár nem futott.
 - Az SDK egyik futásban sem hívta a `/v1/models` végpontot.
 
 ---
@@ -197,25 +206,24 @@ az előtagon belül a második kérés bemenete túlnyomórészt `cache_read_inp
 | `thinking.streamEventTypes`                         | `content_block_start`, `thinking_delta`, `signature_delta`, `content_block_stop` | M-01-flash, M-03-flash        |
 | `structuredOutput.strategies[0].usable`             | `true`                                                                           | M-03-flash                    |
 | `structuredOutput.strategies[0].blockingWireDetail` | `null`                                                                           | M-03-flash                    |
-| `structuredOutput.strategies[0].observedRoundTrips` | `[3]`                                                                            | M-03-flash                    |
+| `structuredOutput.strategies[0].observedRoundTrips` | `[3]` (az M-03 prompt körszáma, nem a kimenet minimuma)                          | M-03-flash                    |
 | `structuredOutput.outputConfigAlwaysSent`           | `true`                                                                           | M-01-flash, M-26-flash        |
 | `structuredOutput.outputConfigWireField`            | `output_config.effort`                                                           | M-01-flash, M-26-flash        |
-| `toolChoice.rejectionBehaviour`                     | `silently_dropped`                                                               | M-34-flash                    |
 | `toolChoice.sdkSendsForcedChoice`                   | `false`                                                                          | M-03-flash, M-17-flash        |
 | `serverTools` (`web_search_20250305`)               | `available: true`, `clientToolName: 'WebSearch'`                                 | M-17-flash                    |
-| `models[0].imageInput`                              | `true`                                                                           | M-23-flash                    |
 | `models[0].listedByModelsEndpoint`                  | `true`                                                                           | M-35-flash                    |
 | `models[0].clientModelIdentifier`                   | változatlan `MiniMax-M3.1-Flash[1m]`, plusz mérési bizonyíték                    | M-11-flash (a doksik mellett) |
 | `modelsEndpoint.directHttpReachable`                | `true`                                                                           | M-35-flash                    |
 | `modelsEndpoint.calledBySdk`                        | `false`                                                                          | M-12-flash, M-36-flash        |
-| `modelsEndpoint.listedModelCount`                   | `9`                                                                              | M-35-flash                    |
+| `modelsEndpoint.listedModelCount`                   | `9` (a mérés napjára szóló érték)                                                | M-35-flash                    |
 | `anthropicBetaHeaders`                              | az M-11-flash (a) listája (8 elem, `context-1m-2025-08-07`-tel)                  | M-01-flash, M-11-flash        |
 
 **A motor következménye.** A `streaming.sse` `known` `true`, tehát egy `minimax` lépés
 `includePartialMessages: true` mellett fut, és az élő nézet delta eseményeket kap (SPEC-013 O-7 lezárva). A
 `serverTools` `known`, a `web_search` elérhető, tehát a `WebSearch` nem kerül tiltólistára és a
 `serverToolAvailabilityUnproven` jelölés `false`. Egy strukturált kimenetű `minimax` lépés `maxTurns` alsó
-korlátja 3 (`insufficient_max_turns` alatta). Védelem: `apps/server/src/minimax-flash-capabilities/` és a
+korlátja 3 (`insufficient_max_turns` alatta); a 3 az M-03 mérési prompt körszáma (kikényszerített `echo`
+hívással), nem a strukturált kimenet minimuma, a motor a leíró megfigyelt körszámából számolja. Védelem: `apps/server/src/minimax-flash-capabilities/` és a
 `packages/provider-minimax` `descriptor.spec.ts`.
 
 **Lefuttatva, de el nem döntve (`unknown`, saját indoklással):**
@@ -224,6 +232,12 @@ korlátja 3 (`insufficient_max_turns` alatta). Védelem: `apps/server/src/minima
   signature-rel vissza kell-e küldeni, egyik futásból sem dönthető el (blokkoló: M-05, kiterjesztett alakban).
 - `toolChoice.accepted`: 3. szekció M-34-flash, két kör: az `any` két mintája ellentmond, a `none` egy mintája kontroll
   nélkül nem dönt (blokkoló: M-34).
+- `toolChoice.rejectionBehaviour`: a `tool` kényszerítésre két mintában jött `tool_use` nélküli szöveg, de a viselkedés
+  nem determinisztikus (az `any` ellentmondása), és a `tool` esethez nincs azonos promptú `auto` kontroll (blokkoló:
+  M-34). A motor viselkedése ettől nem változik: a kockázati ág `sdkSendsForcedChoice` `false` és `accepted`
+  `unknown` mellett eddig sem futott.
+- `models[0].imageInput`: a Flash egyetlen futásban, egyetlen képpel megnevezte a kép színét (M-23-flash), de az
+  előző modellre az M-16 és az eredeti M-23 ellenkezőt mért; egy mintából a támogatás nem állítható (blokkoló: M-23, M-16).
 
 **Nem futott, változatlanul `unknown`:** `effectiveContextWindowOnWire` (M-20), `maxOutputTokensWireCeiling`
 (M-22), `videoInput` (SDK típusfelület), `structuredOutput.defaultStrategy` (M-19), a `promptCaching` minden
