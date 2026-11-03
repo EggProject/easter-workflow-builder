@@ -90,6 +90,23 @@ describe('normalizeCelResult (SPEC-010 7.4)', () => {
     expect(first.kind === 'ok' && first.value).not.toBe(second.kind === 'ok' && second.value);
   });
 
+  it('a körkörös tömb és sima objektum TypeError kivételt dob, közvetve is, a verem kifutása nélkül', () => {
+    const circularObject: Record<string, unknown> = {};
+    circularObject['self'] = circularObject;
+    const circularArray: unknown[] = [];
+    circularArray.push({ back: circularArray });
+    const indirect = { a: { b: [circularObject] } };
+    for (const value of [circularObject, circularArray, indirect]) {
+      expect(() => normalizeCelResult(value)).toThrow(new TypeError('körkörös hivatkozás a kifejezés eredményében'));
+    }
+  });
+
+  it('a lezárt ág konténere testvér ágon újra előfordulhat, nem körkörös', () => {
+    const shared = [1];
+    const outcome = normalizeCelResult({ a: { b: shared }, c: [shared, { d: shared }] });
+    expect(outcome).toStrictEqual({ kind: 'ok', value: { a: { b: [1] }, c: [[1], { d: [1] }] } });
+  });
+
   it('a null prototípusú objektum sima objektum', () => {
     const value: unknown = Object.assign(Object.create(null), { a: 1n });
     expect(normalizeCelResult(value)).toStrictEqual({ kind: 'ok', value: { a: 1 } });

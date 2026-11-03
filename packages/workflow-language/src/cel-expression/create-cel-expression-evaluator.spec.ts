@@ -392,6 +392,8 @@ describe('createCelExpressionEvaluator: evaluate egyetlen bemenetre sem dob kiv�
   const evaluator = createCelExpressionEvaluator();
 
   it('furcsa kifejezésre és furcsa kontextusra sem', () => {
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
     const throwingGetter = {
       get input(): unknown {
         throw new Error('TITKOS');
@@ -403,6 +405,11 @@ describe('createCelExpressionEvaluator: evaluate egyetlen bemenetre sem dob kiv�
         expect(() => evaluator.evaluate(expression, context)).not.toThrow();
       }
     }
+    expect(evaluator.evaluate('input', runContext({ input: circular }))).toStrictEqual({
+      kind: 'error',
+      message: 'a kifejezés nem dolgozható fel',
+      unexpectedErrorType: 'TypeError',
+    });
     expect(evaluator.evaluate('input', throwingGetter)).toStrictEqual({
       kind: 'error',
       message: 'a kifejezés nem dolgozható fel',
@@ -410,26 +417,21 @@ describe('createCelExpressionEvaluator: evaluate egyetlen bemenetre sem dob kiv�
     });
   });
 
-  // REGRESSZIÓ (billegő teszt): a körkörös kontextus normalizálása veremtúlcsordulásig
-  // rekurzív (7.4, a gyorsítótárba csak a kész érték kerül), és a hívó a kivételt a közös
-  // mondatra viszi. A kivétel típusa viszont attól függ, a verem melyik keretben fogy el:
-  // V8 alatt `RangeError`, vagy a modul import elérésében elfogyó veremnél `TypeError`.
-  // A korábbi teszt a `TypeError` típust állította, ezért a teljes futásban, más
-  // veremmélységről indulva, időnként `RangeError` jött. A teszt a kiértékelést több,
-  // rögzített veremmélységről indítja: a mondat és a típusnév mező megléte (O-22)
-  // minden mélységen azonos, a típusnév értéke nem állítható.
-  it.each([0, 100, 1000, 5000])(
-    'a körkörös kontextus a közös mondat, a veremmélységtől függetlenül (%i keret)',
-    (depth) => {
-      const circular: Record<string, unknown> = {};
-      circular['self'] = circular;
-      const atDepth = (remaining: number): ReturnType<typeof evaluator.evaluate> =>
-        remaining === 0 ? evaluator.evaluate('input', runContext({ input: circular })) : atDepth(remaining - 1);
-      const outcome = atDepth(depth);
-      expect(outcome.kind === 'error' ? [outcome.message, typeof outcome.unexpectedErrorType] : outcome).toStrictEqual([
-        'a kifejezés nem dolgozható fel',
-        'string',
-      ]);
-    },
-  );
+  // Regresszió: a körkörös adat korábban a verem kifutásán bukott, és a kivétel
+  // típusa a futtató állapotától függött; a normalizálás bemelegítése után
+  // `RangeError` jött `TypeError` helyett (research 2026-10-28 cel-korkoros-bemenet).
+  it('a körkörös kontextus a bemelegített normalizálás után is TypeError', () => {
+    const warmEvaluator = createCelExpressionEvaluator();
+    const nested = runContext();
+    for (let index = 0; index < 10_000; index += 1) {
+      warmEvaluator.evaluate('input', nested);
+    }
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
+    expect(warmEvaluator.evaluate('input', runContext({ input: circular }))).toStrictEqual({
+      kind: 'error',
+      message: 'a kifejezés nem dolgozható fel',
+      unexpectedErrorType: 'TypeError',
+    });
+  });
 });

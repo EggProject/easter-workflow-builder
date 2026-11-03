@@ -8,6 +8,7 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { MeasurementCase } from '../harness/types.ts';
 import { buildBaseOptions, executeQuery } from '../harness/runner.ts';
+import { MINIMAX_CLIENT_MODEL } from '../harness/minimax-model.ts';
 
 const FILLER = 'Ez egy hosszú, ismétlődő mondat a kontextusablak feltöltéséhez a mérés során. '.repeat(200);
 const MAX_ROUNDS = 8;
@@ -40,7 +41,7 @@ export const M28: MeasurementCase = {
       prompt: fillerPrompts(),
       options: {
         ...base,
-        model: 'MiniMax-M3[1m]',
+        model: MINIMAX_CLIENT_MODEL,
         persistSession: true,
         maxTurns: MAX_ROUNDS + 2,
         env: {

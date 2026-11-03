@@ -14,6 +14,7 @@
  */
 import type { MeasurementCase } from '../harness/types.ts';
 import { buildBaseOptions, DEFAULT_PROMPT, executeQuery } from '../harness/runner.ts';
+import { MINIMAX_CLIENT_MODEL, MINIMAX_WIRE_MODEL } from '../harness/minimax-model.ts';
 
 export const M32: MeasurementCase = {
   id: 'M-32',
@@ -33,10 +34,10 @@ export const M32: MeasurementCase = {
           ...baseWithoutModel.env,
           API_TIMEOUT_MS: '3000000',
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
-          ANTHROPIC_MODEL: 'MiniMax-M3[1m]',
-          ANTHROPIC_DEFAULT_SONNET_MODEL: 'MiniMax-M3[1m]',
-          ANTHROPIC_DEFAULT_OPUS_MODEL: 'MiniMax-M3[1m]',
-          ANTHROPIC_DEFAULT_HAIKU_MODEL: 'MiniMax-M3',
+          ANTHROPIC_MODEL: MINIMAX_CLIENT_MODEL,
+          ANTHROPIC_DEFAULT_SONNET_MODEL: MINIMAX_CLIENT_MODEL,
+          ANTHROPIC_DEFAULT_OPUS_MODEL: MINIMAX_CLIENT_MODEL,
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: MINIMAX_WIRE_MODEL,
           CLAUDE_CODE_AUTO_COMPACT_WINDOW: '1000000',
           CLAUDE_CODE_ALWAYS_ENABLE_EFFORT: '1',
           CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '50',

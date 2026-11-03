@@ -6,7 +6,6 @@ import {
   DOC_WOKEY_MINIMAX_M31_FLASH,
   type ThinkingCapability,
 } from '@easter-workflow-builder/provider-capability';
-import { notMeasuredOnFlash } from '../measurement-gap/not-measured-on-flash.ts';
 import type { MiniMaxFamilyId } from '../model-catalog/family-id.ts';
 
 export const minimaxThinking: ThinkingCapability<MiniMaxFamilyId> = {
@@ -24,8 +23,35 @@ export const minimaxThinking: ThinkingCapability<MiniMaxFamilyId> = {
       ],
     },
   },
-  wireShape: notMeasuredOnFlash(['M-01', 'M-05']),
-  sendsBudgetTokens: notMeasuredOnFlash(['M-05', 'M-06']),
-  interleavedSignatureRequired: notMeasuredOnFlash(['M-05']),
-  streamEventTypes: notMeasuredOnFlash(['M-05']),
+  wireShape: {
+    state: 'known',
+    value: '{"type":"adaptive"}',
+    evidence: [
+      { kind: 'measurement', id: 'M-01-flash' },
+      { kind: 'measurement', id: 'M-05-flash' },
+    ],
+  },
+  // A kikapcsolt thinking mellett a kliens a mezőt elhagyja, budget_tokens kulcs egyik kérésben sincs.
+  sendsBudgetTokens: {
+    state: 'known',
+    value: false,
+    evidence: [
+      { kind: 'measurement', id: 'M-05-flash' },
+      { kind: 'measurement', id: 'M-06-flash' },
+    ],
+  },
+  interleavedSignatureRequired: {
+    state: 'unknown',
+    reason:
+      'A Flash streamje signature_delta eseményt ad, de hogy a thinking blokkot signature-rel vissza kell-e küldeni, a mért futásokból nem dönthető el.',
+    blockedBy: ['M-05'],
+  },
+  streamEventTypes: {
+    state: 'known',
+    value: ['content_block_start', 'thinking_delta', 'signature_delta', 'content_block_stop'],
+    evidence: [
+      { kind: 'measurement', id: 'M-01-flash' },
+      { kind: 'measurement', id: 'M-03-flash' },
+    ],
+  },
 };

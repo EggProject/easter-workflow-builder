@@ -96,6 +96,11 @@ gráf tagja, de más csomag nem importál innen semmit.
   terminálban. A `probe` a `WIRE_PROBE_PORT` env változóból olvassa, melyik proxy porton
   keresztül menjen (ugyanaz az érték, amit a proxynak is beállítottál).
 
+- **Mért modell és alapbeállítás.** Minden eset a `MiniMax-M3.1-Flash` modellt méri, az azonosítók a
+  `src/harness/minimax-model.ts` két konstansában állnak (SPEC-013 O-2, átállás 2026-10-28). A közös
+  alapbeállítás `effort: 'low'`, mert a user token korlátja szerint a mérés tárgya nem a kimenet hossza; az effort
+  hiányát mérő eset a `buildBaseOptionsWithoutEffort` függvényt használja
+  (`docs/research/2026-10-28-flash-meresek.md` 1. és 7. szekció).
 - **Útvonal-konvenció.** A proxy tisztán origin-cserét végez - a bejövő kérés útvonalát
   (path + query) változatlanul a beállított upstream origin-jéhez fűzi. Emiatt az
   `ANTHROPIC_BASE_URL`-nek, amit a harness a `Options.env`-en keresztül beállít, ugyanazt

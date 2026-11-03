@@ -2,9 +2,26 @@ import { RESEARCH_GATEWAY, type StreamingCapability } from '@easter-workflow-bui
 import { notMeasuredOnFlash } from '../measurement-gap/not-measured-on-flash.ts';
 
 export const minimaxStreaming: StreamingCapability = {
-  sse: notMeasuredOnFlash(['M-05', 'M-09']),
-  toolInputDelta: notMeasuredOnFlash(['M-09']),
-  sdkReassemblesToolInput: notMeasuredOnFlash(['M-09']),
+  // A Flash SSE választ ad, és az SDK a részleges üzeneteket stream_event alakban továbbadja.
+  sse: {
+    state: 'known',
+    value: true,
+    evidence: [
+      { kind: 'measurement', id: 'M-05-flash' },
+      { kind: 'measurement', id: 'M-09-flash' },
+    ],
+  },
+  toolInputDelta: {
+    state: 'known',
+    value: 'input_json_delta',
+    evidence: [{ kind: 'measurement', id: 'M-09-flash' }],
+  },
+  // Bájtszintű egyezés a tool callback inputja és az assistant tool_use blokk között.
+  sdkReassemblesToolInput: {
+    state: 'known',
+    value: true,
+    evidence: [{ kind: 'measurement', id: 'M-09-flash' }],
+  },
   // A Claude Code gateway dokumentációja szerint custom base URL mellett kerülendő, modelltől függetlenül.
   fineGrainedToolStreaming: {
     state: 'known',

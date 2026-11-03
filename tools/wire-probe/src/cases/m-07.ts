@@ -3,6 +3,7 @@ M-07: háttér modellhívások feltérképezése -- Q5.
 */
 import type { MeasurementCase } from '../harness/types.ts';
 import { buildBaseOptions, DEFAULT_PROMPT, executeQuery } from '../harness/runner.ts';
+import { MINIMAX_WIRE_MODEL } from '../harness/minimax-model.ts';
 
 export const M07: MeasurementCase = {
   id: 'M-07',
@@ -29,7 +30,7 @@ export const M07: MeasurementCase = {
       caseId: 'M-07',
       runId: 'c-default-haiku-model',
       prompt: DEFAULT_PROMPT,
-      options: { ...base, env: { ...base.env, ANTHROPIC_DEFAULT_HAIKU_MODEL: 'MiniMax-M3' } },
+      options: { ...base, env: { ...base.env, ANTHROPIC_DEFAULT_HAIKU_MODEL: MINIMAX_WIRE_MODEL } },
     });
     const d = await executeQuery({
       ctx: context,

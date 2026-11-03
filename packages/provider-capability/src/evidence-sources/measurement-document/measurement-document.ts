@@ -10,6 +10,8 @@ export interface MeasurementDocumentAnchor {
 
 const MEASUREMENT_JOURNAL = 'docs/research/2026-08-26-spec000-meresi-jegyzokonyv.md';
 const CONCURRENCY_MEASUREMENT = 'docs/research/2026-08-28-parhuzamossagi-korlat.md';
+// A `MiniMax-M3.1-Flash` modellre megismételt esetek: az azonosító az eredeti eset száma plusz `-flash`.
+const FLASH_MEASUREMENT = 'docs/research/2026-10-28-flash-meresek.md';
 
 /**
  * `MeasurementId` -> docs horgony leképezés. Csak a leírókban ténylegesen
@@ -79,4 +81,20 @@ export const measurementDocument: Readonly<Partial<Record<MeasurementId, Measure
     heading: 'M-36 Rate limit header leltár (M-26 - M-35 kör, passzív)',
   },
   'M-39': { file: CONCURRENCY_MEASUREMENT, heading: '2.2 Konkurrencia ramp (M-39)' },
+  'M-01-flash': { file: FLASH_MEASUREMENT, heading: 'M-01-flash Alap body és header leltár' },
+  'M-03-flash': { file: FLASH_MEASUREMENT, heading: 'M-03-flash `tool_choice` az `outputFormat` záró fázisában' },
+  'M-05-flash': { file: FLASH_MEASUREMENT, heading: 'M-05-flash `thinking` bekapcsolva' },
+  'M-06-flash': { file: FLASH_MEASUREMENT, heading: 'M-06-flash `thinking` kikapcsolva' },
+  'M-09-flash': { file: FLASH_MEASUREMENT, heading: 'M-09-flash Tool argumentum streaming' },
+  'M-11-flash': { file: FLASH_MEASUREMENT, heading: 'M-11-flash `[1m]` suffix kezelése' },
+  'M-12-flash': { file: FLASH_MEASUREMENT, heading: 'M-12-flash Nem-Messages végpontok' },
+  'M-17-flash': { file: FLASH_MEASUREMENT, heading: 'M-17-flash Szerver oldali tool' },
+  'M-23-flash': { file: FLASH_MEASUREMENT, heading: 'M-23-flash Kép bemenet felismerhető tartalommal' },
+  'M-26-flash': {
+    file: FLASH_MEASUREMENT,
+    heading: 'M-26-flash `Options.effort` nélkül és `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT`',
+  },
+  'M-34-flash': { file: FLASH_MEASUREMENT, heading: 'M-34-flash `tool_choice` közvetlen HTTP hívással' },
+  'M-35-flash': { file: FLASH_MEASUREMENT, heading: 'M-35-flash `GET /v1/models` közvetlen HTTP hívással' },
+  'M-36-flash': { file: FLASH_MEASUREMENT, heading: 'M-36-flash Header és végpont leltár (passzív)' },
 };
