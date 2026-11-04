@@ -148,6 +148,30 @@ test('a futás indításának graph_cycle_detected hibája a modálisban a sajá
   await expectNoInternalText(page, 'graph_cycle_detected');
 });
 
+test('a futás indításának invalid_input_type hibája a modálisban a saját mondatával áll', async ({ page }) => {
+  await mockEditor(
+    page,
+    START_WITH_FIELDS,
+    {
+      code: 'unprocessable',
+      message: internalMessage('invalid_input_type'),
+      errorClass: 'invalid_input_type',
+    } satisfies ProtocolErrorBody,
+    422,
+  );
+  await page.goto(EDITOR_URL);
+  await page.getByRole('button', { name: 'Futás indítása', exact: true }).click();
+
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('textbox', { name: 'Téma' }).fill('AI hírek');
+  await dialog.getByRole('button', { name: 'Indítás', exact: true }).click();
+
+  const alert = dialog.getByRole('alert');
+  await expect(alert).toHaveText('A futás bemenetének egy mezője nem a beállított típusú.');
+  await expect(alert).toHaveClass(/\balert--danger\b/);
+  await expectNoInternalText(page, 'invalid_input_type');
+});
+
 // A `malformed_node_config` hibaosztályt a szerver a futás indításakor adja (a
 // motor validációja); a `PUT .../graph` végponton a mentési séma előbb
 // utasít el `invalid_request` kóddal (SPEC-008 5.4, O-37), tehát a mentés

@@ -150,6 +150,12 @@ function edgeOf(id: string, sourceNodeId: string, targetNodeId: string): Workflo
 function seedFanOutWorkflow(
   database: DatabaseContext,
   fields: { readonly itemsExpression: string; readonly branchLabelTemplate: string },
+  startInputFields: readonly {
+    readonly name: string;
+    readonly label: string;
+    readonly valueKind: 'number';
+    readonly required: boolean;
+  }[] = [],
 ): string {
   const workflow = okOrThrow(
     database.workflows.createWorkflow({ name: 'forditas', description: null, providerId: 'claude-subscription' }),
@@ -163,7 +169,7 @@ function seedFanOutWorkflow(
           label: 'start',
           positionX: 0,
           positionY: 0,
-          config: { type: 'start', inputFields: [], onUnhandledError: 'fail_run' },
+          config: { type: 'start', inputFields: startInputFields, onUnhandledError: 'fail_run' },
         },
         {
           id: 'fo',
@@ -380,6 +386,37 @@ describe('createHttpServer', () => {
       expect(okOrThrow(database.runs.listRuns())).toStrictEqual([]);
     },
   );
+
+  it('REGRESSZIÓ: a valódi motor invalid_input_type elutasítása 422 unprocessable és errorClass mező, futás sor nélkül (SPEC-016 5.5)', async () => {
+    const database = okOrThrow(openDatabase(':memory:'));
+    const registry = createStreamRegistry(createRandomUuidIdGenerator());
+    const engine = createEngine(
+      buildEngineDependencies(
+        database,
+        registry,
+        createSystemClock(),
+        buildCapturingLogger().logger,
+        TEST_SKILL_LIBRARY.rootDirectory,
+      ),
+    );
+    const workflowId = seedFanOutWorkflow(database, { itemsExpression: '[1]', branchLabelTemplate: 'elem' }, [
+      { name: 'darab', label: 'Darab', valueKind: 'number', required: true },
+    ]);
+    const { baseUrl, close } = await startTestServer(
+      buildOptions({ startRun: createStartRunHandler(engine) }, undefined),
+    );
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/workflows/${workflowId}/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: { darab: '5' } }),
+    });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: 'unprocessable', errorClass: 'invalid_input_type' });
+    expect(okOrThrow(database.runs.listRuns())).toStrictEqual([]);
+  });
 
   it('a kezelő invalid_request hibaágát 400-ra képezi, nem 500-ra (regresszió, 2026-09-26)', async () => {
     const message = 'A kérés törzse érvénytelen, hibás mező(k): name (invalid_request).';

@@ -57,6 +57,7 @@ describe('mapOutcomeMessageToErrorCode', () => {
     'unhandled_error_policy_missing',
     'insufficient_backoff_list',
     'missing_required_input',
+    'invalid_input_type',
     'structured_output_strategy_unsupported',
     'insufficient_max_turns',
     'forced_tool_choice_silently_dropped',

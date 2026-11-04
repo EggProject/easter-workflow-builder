@@ -38,6 +38,8 @@ export const ProtocolErrorClassSchema = z.enum([
   'insufficient_backoff_list',
   // SPEC-004 4.8 4. lépés: a futás bemenete
   'missing_required_input',
+  // SPEC-016 5.5: egy jelen lévő bemeneti mező értéke nem a beállított típusú
+  'invalid_input_type',
   // SPEC-004 11.1: a provider feloldás
   'no_default_provider',
   // SPEC-010 9.2 és 9.3: a sablon és a kifejezés mezők fordítása (user döntés 2026-10-25)
