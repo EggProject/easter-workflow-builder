@@ -5,6 +5,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fetchForSandbox } from './fetch-for-sandbox.ts';
 
 // Helyi teszt szerver az operációs rendszer által kiosztott porton; valódi külső hívás nincs.
+// A tesztek törzs korlátja: bőven a teszt válaszok fölött.
+const MAX_BODY_BYTES = 2 ** 20;
+
 // A teszt szerver címe; a `beforeAll` tölti ki.
 const target = { origin: '' };
 const hangingRequests: IncomingMessage[] = [];
@@ -17,6 +20,11 @@ function handle(request: IncomingMessage, response: ServerResponse): void {
   if (request.url === '/hello') {
     response.writeHead(200, { 'content-type': 'text/plain', 'x-teszt': 'igen' });
     response.end('szia');
+    return;
+  }
+  if (request.url === '/empty') {
+    response.writeHead(204);
+    response.end();
     return;
   }
   if (request.url === '/echo') {
@@ -78,7 +86,9 @@ function resolvedValue(outcome: Awaited<ReturnType<typeof fetchForSandbox>>): un
 
 describe('fetchForSandbox', () => {
   it('GET kérésre a státuszt, a fejléceket és a törzset szövegként adja', async () => {
-    const value = resolvedValue(await fetchForSandbox(`${target.origin}/hello`, undefined, liveSignal()));
+    const value = resolvedValue(
+      await fetchForSandbox(`${target.origin}/hello`, undefined, liveSignal(), MAX_BODY_BYTES),
+    );
     expect(value).toMatchObject({
       status: 200,
       headers: { 'content-type': 'text/plain', 'x-teszt': 'igen' },
@@ -88,7 +98,7 @@ describe('fetchForSandbox', () => {
 
   it('a POST kérés a megadott metódussal, fejléccel és törzzsel megy, a gazda hitelesítő fejlécet és sütit nem tesz hozzá', async () => {
     const init = { method: 'POST', headers: { 'x-kliens': 'szkript' }, body: 'adat' };
-    const value = resolvedValue(await fetchForSandbox(`${target.origin}/echo`, init, liveSignal()));
+    const value = resolvedValue(await fetchForSandbox(`${target.origin}/echo`, init, liveSignal(), MAX_BODY_BYTES));
     expect(value).toMatchObject({ status: 201 });
     expect(value).toHaveProperty('body');
     const echoed: unknown = JSON.parse(
@@ -105,8 +115,25 @@ describe('fetchForSandbox', () => {
     });
   });
 
+  it('a törzs nélküli (204) válasz törzse üres szöveg', async () => {
+    const value = resolvedValue(
+      await fetchForSandbox(`${target.origin}/empty`, undefined, liveSignal(), MAX_BODY_BYTES),
+    );
+    expect(value).toMatchObject({ status: 204, body: '' });
+  });
+
+  it('a pontosan határnyi törzs átmegy, a hosszabb TypeError (T-015-12)', async () => {
+    const atLimit = resolvedValue(await fetchForSandbox(`${target.origin}/hello`, undefined, liveSignal(), 4));
+    expect(atLimit).toMatchObject({ body: 'szia' });
+    await expect(fetchForSandbox(`${target.origin}/hello`, undefined, liveSignal(), 3)).resolves.toStrictEqual({
+      kind: 'rejected',
+      name: 'TypeError',
+      message: 'a válasz törzse nagyobb, mint a lépés memória korlátja',
+    });
+  });
+
   it('az átirányítást nem követi: a 302 státusz és a location fejléc látszik', async () => {
-    const value = resolvedValue(await fetchForSandbox(`${target.origin}/redirect`, {}, liveSignal()));
+    const value = resolvedValue(await fetchForSandbox(`${target.origin}/redirect`, {}, liveSignal(), MAX_BODY_BYTES));
     expect(value).toMatchObject({ status: 302, headers: { location: '/hello' }, body: '' });
   });
 
@@ -115,7 +142,7 @@ describe('fetchForSandbox', () => {
     ['data:', 'data:text/plain,szia'],
     ['ftp:', 'ftp://127.0.0.1/a'],
   ])('a nem HTTP séma elutasított, kérés nélkül: %s', async (scheme, url) => {
-    await expect(fetchForSandbox(url, undefined, liveSignal())).resolves.toStrictEqual({
+    await expect(fetchForSandbox(url, undefined, liveSignal(), MAX_BODY_BYTES)).resolves.toStrictEqual({
       kind: 'rejected',
       name: 'TypeError',
       message: `a fetch csak http: és https: címet fogad, ez ${scheme} séma`,
@@ -123,12 +150,12 @@ describe('fetchForSandbox', () => {
   });
 
   it('az érvénytelen cím és a nem szöveg cím elutasított', async () => {
-    await expect(fetchForSandbox('nem cím', undefined, liveSignal())).resolves.toStrictEqual({
+    await expect(fetchForSandbox('nem cím', undefined, liveSignal(), MAX_BODY_BYTES)).resolves.toStrictEqual({
       kind: 'rejected',
       name: 'TypeError',
       message: 'a fetch címe nem érvényes URL: nem cím',
     });
-    await expect(fetchForSandbox(42, undefined, liveSignal())).resolves.toStrictEqual({
+    await expect(fetchForSandbox(42, undefined, liveSignal(), MAX_BODY_BYTES)).resolves.toStrictEqual({
       kind: 'rejected',
       name: 'TypeError',
       message: 'a fetch címe szöveg kell legyen',
@@ -140,7 +167,7 @@ describe('fetchForSandbox', () => {
     ['nem szöveg fejléc', { headers: { a: 1 } }],
     ['nem objektum', 'GET'],
   ])('a nem dokumentált beállítás elutasított: %s', async (_name, init) => {
-    await expect(fetchForSandbox(`${target.origin}/hello`, init, liveSignal())).resolves.toStrictEqual({
+    await expect(fetchForSandbox(`${target.origin}/hello`, init, liveSignal(), MAX_BODY_BYTES)).resolves.toStrictEqual({
       kind: 'rejected',
       name: 'TypeError',
       message: 'a fetch beállítása csak method, headers és body mezőt tartalmazhat, szöveg értékkel',
@@ -155,7 +182,9 @@ describe('fetchForSandbox', () => {
     closed.close();
     await once(closed, 'close');
     const port = address !== null && typeof address !== 'string' ? address.port : 0;
-    await expect(fetchForSandbox(`http://127.0.0.1:${String(port)}/`, undefined, liveSignal())).resolves.toStrictEqual({
+    await expect(
+      fetchForSandbox(`http://127.0.0.1:${String(port)}/`, undefined, liveSignal(), MAX_BODY_BYTES),
+    ).resolves.toStrictEqual({
       kind: 'rejected',
       name: 'TypeError',
       message: 'a hálózati kérés nem sikerült (TypeError)',
@@ -164,7 +193,7 @@ describe('fetchForSandbox', () => {
 
   it('a jel megszakítja a függő kérést, a szerver a kapcsolat bezárását látja', async () => {
     const controller = new AbortController();
-    const pending = fetchForSandbox(`${target.origin}/hang`, undefined, controller.signal);
+    const pending = fetchForSandbox(`${target.origin}/hang`, undefined, controller.signal, MAX_BODY_BYTES);
     await expect.poll(() => hangingRequests.length).toBe(1);
     const request = hangingRequests[0];
     if (request === undefined) {

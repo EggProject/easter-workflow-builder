@@ -37,6 +37,27 @@ function handle(request: IncomingMessage, response: ServerResponse): void {
     response.end('szia');
     return;
   }
+  if (request.url === '/big') {
+    // A lépés 16 MB-os memória korlátjánál 1 MB-tal hosszabb törzs, megabájtos darabokban.
+    response.writeHead(200);
+    const chunk = Buffer.alloc(2 ** 20, 'a');
+    const writeNext = (remaining: number): void => {
+      if (remaining === 0) {
+        response.end();
+        return;
+      }
+      if (response.write(chunk)) {
+        writeNext(remaining - 1);
+        return;
+      }
+      response.once('drain', () => {
+        writeNext(remaining - 1);
+      });
+    };
+    response.on('error', ignoreClientAbort);
+    writeNext(17);
+    return;
+  }
   if (request.url === '/redirect') {
     response.writeHead(302, { location: '/hello' });
     response.end();
@@ -153,6 +174,14 @@ describe('installHostFunctions', () => {
       });
     });
 
+    it('a lépés memória korlátjánál hosszabb válasz törzs elkapható TypeError, a gazda nem olvassa végig (T-015-12)', async () => {
+      const source = `try { await fetch("${target.origin}/big"); return "olvasva"; } catch (e) { return e.name + ": " + e.message; }`;
+      await expect(runScript(request(source, { memoryLimitMb: 16 }))).resolves.toStrictEqual({
+        kind: 'succeeded',
+        output: 'TypeError: a válasz törzse nagyobb, mint a lépés memória korlátja',
+      });
+    });
+
     it('a határidőn függő válasz script_timed_out, és a kérés megszakad', async () => {
       const running = runScript(request(`await fetch("${target.origin}/hang"); return 1;`, { timeoutMs: 300 }));
       const { closed } = await nextHangingRequest();
@@ -185,6 +214,16 @@ describe('installHostFunctions', () => {
         output: { text: 'árvíztűrő', names: ['a.txt'] },
       });
       await expect(readFile(path.join(fixtureDirectory.root, 'a.txt'), 'utf8')).resolves.toBe('árvíztűrő');
+    });
+
+    it('a lépés memória korlátjánál nagyobb fájl olvasása elkapható hiba (T-015-12)', async () => {
+      await writeFile(path.join(fixtureDirectory.root, 'nagy.txt'), Buffer.alloc(17 * 2 ** 20, 'a'));
+      const source =
+        'try { await files.readText("nagy.txt"); return "olvasva"; } catch (e) { return e.name + ": " + e.message; }';
+      await expect(runScript(request(source, { memoryLimitMb: 16 }))).resolves.toStrictEqual({
+        kind: 'succeeded',
+        output: 'Error: a fájl nagyobb, mint a lépés memória korlátja: nagy.txt',
+      });
     });
 
     it('a .. kivezetés és az abszolút útvonal elutasítva, a hibaüzenetben a gazda gyökere nincs', async () => {

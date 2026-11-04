@@ -2,6 +2,7 @@ import { describeErrorType } from '@easter-workflow-builder/core';
 import { isString } from '@easter-workflow-builder/typeguards';
 import type { HostCallOutcome } from './host-call-outcome.ts';
 import { isSandboxFetchInit } from './is-sandbox-fetch-init.ts';
+import { readCappedBytes } from './read-capped-bytes.ts';
 
 const ALLOWED_PROTOCOLS: ReadonlySet<string> = new Set(['http:', 'https:']);
 
@@ -17,10 +18,19 @@ const ALLOWED_PROTOCOLS: ReadonlySet<string> = new Set(['http:', 'https:']);
  * - A kérés a `signal`-on szakad meg (a lépés vége, határideje, külső
  *   megszakítása); a gazda csak a dokumentált mezőket adja tovább.
  * - A válasz `{ status, headers, body }`: a fejlécek a `Headers` bejárásából
- *   (kisbetűs név), a törzs szöveg.
+ *   (kisbetűs név), a törzs szöveg (UTF-8 dekódolás, mint a `Response.text()`).
+ * - A törzs legfeljebb `maxBodyBytes` bájt (a lépés memória korlátja): a
+ *   hosszabb törzs olvasása a határon megáll, és `TypeError` az eredmény. A
+ *   korlátnál hosszabb törzs a sandboxba amúgy sem férne be, a korlát nélküli
+ *   olvasás viszont a szerver folyamat memóriáját fogyasztotta (T-015-12).
  * - A hálózati hiba elutasított ígéret, az üzenetben a gazda hiba típusneve.
  */
-export async function fetchForSandbox(url: unknown, init: unknown, signal: AbortSignal): Promise<HostCallOutcome> {
+export async function fetchForSandbox(
+  url: unknown,
+  init: unknown,
+  signal: AbortSignal,
+  maxBodyBytes: number,
+): Promise<HostCallOutcome> {
   if (!isString(url)) {
     return typeError('a fetch címe szöveg kell legyen');
   }
@@ -36,7 +46,11 @@ export async function fetchForSandbox(url: unknown, init: unknown, signal: Abort
   }
   try {
     const response = await fetch(target, { ...init, redirect: 'manual', signal });
-    const body = await response.text();
+    const bytes = response.body === null ? Buffer.alloc(0) : await readCappedBytes(response.body, maxBodyBytes);
+    if (bytes === undefined) {
+      return typeError('a válasz törzse nagyobb, mint a lépés memória korlátja');
+    }
+    const body = new TextDecoder().decode(bytes);
     return {
       kind: 'resolved',
       json: JSON.stringify({ status: response.status, headers: Object.fromEntries(response.headers), body }),

@@ -13,8 +13,10 @@ import { writeTextInRoot } from './write-text-in-root.ts';
  * nevek"): `fetch(url, init)` és a `files` objektum `readText`, `writeText` és
  * `list` függvénye, mindegyik ígéretet ad. A `root` a fájl hozzáférés gyökere
  * (abszolút, a JavaScript ág `cwd` mezője, üresen a szerver munkakönyvtára, O-5
- * user döntés). Az argumentumokat a gazda `unknown`-ként olvassa
- * (`readJsonArgument`), az ellenőrzés a hívott függvényé. A visszaadott
+ * user döntés). A `maxReadBytes` a `fetch` válasz törzsének és a `readText`
+ * fájljának felső határa bájtban, a lépés memória korlátja. Az argumentumokat
+ * a gazda `unknown`-ként olvassa (`readJsonArgument`), az ellenőrzés a hívott
+ * függvényé. A visszaadott
  * handle-ök a hívó lebontási listájába kerülnek.
  *
  * A határidő utáni hívás elutasított, az argumentum olvasása nélkül. Az
@@ -27,7 +29,7 @@ import { writeTextInRoot } from './write-text-in-root.ts';
  * foglalta; vele a megszakítás a szkript saját kódjában, elkaphatatlanul
  * érkezik (PLAN-015 T-015-12).
  */
-export function installHostFunctions(scope: HostCallScope, root: string): QuickJSHandle[] {
+export function installHostFunctions(scope: HostCallScope, root: string, maxReadBytes: number): QuickJSHandle[] {
   const { context } = scope;
   const argument = (handles: readonly QuickJSHandle[], index: number): unknown =>
     readJsonArgument(scope, handles[index]);
@@ -42,9 +44,9 @@ export function installHostFunctions(scope: HostCallScope, root: string): QuickJ
       return startHostCall(scope, call(argumentHandles));
     });
   const fetchFunction = hostFunction('fetch', (handles) =>
-    fetchForSandbox(argument(handles, 0), argument(handles, 1), scope.signal),
+    fetchForSandbox(argument(handles, 0), argument(handles, 1), scope.signal, maxReadBytes),
   );
-  const readText = hostFunction('readText', (handles) => readTextInRoot(root, argument(handles, 0)));
+  const readText = hostFunction('readText', (handles) => readTextInRoot(root, argument(handles, 0), maxReadBytes));
   const writeText = hostFunction('writeText', (handles) =>
     writeTextInRoot(root, argument(handles, 0), argument(handles, 1)),
   );

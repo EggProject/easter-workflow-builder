@@ -14,6 +14,7 @@ import { disposeQuietly } from './dispose-quietly.ts';
 import type { HostCallScope } from './host-call-scope.ts';
 import { installHostFunctions } from './install-host-functions.ts';
 import { loadQuickJsModule } from './load-quickjs-module.ts';
+import { resolveMemoryLimitMb } from './resolve-memory-limit-mb.ts';
 import { SCRIPT_FILE_NAME } from './script-file-name.ts';
 import { SCRIPT_SANDBOX_LIMITS } from './script-sandbox-limits.ts';
 import { waitForSettlement } from './wait-for-settlement.ts';
@@ -42,7 +43,8 @@ const PARSE_SOURCE = 'JSON.parse';
 
 /**
  * A lépés futás közbeni állapota: a lebontandó handle-ök, a még nem rendezett
- * gazda hívások, a fájl hozzáférés gyökere, a gazda hívások jele (a kérés jele
+ * gazda hívások, a fájl hozzáférés gyökere, a gazda olvasás felső határa (a
+ * lépés memória korlátja bájtban), a gazda hívások jele (a kérés jele
  * és a lépés vége együtt) és az interrupt kezelő jelzése.
  */
 interface SandboxStep {
@@ -51,6 +53,7 @@ interface SandboxStep {
   readonly handles: QuickJSHandle[];
   readonly pendingCalls: Set<QuickJSDeferredPromise>;
   readonly root: string;
+  readonly maxReadBytes: number;
   readonly hostSignal: AbortSignal;
   readonly timeoutMs: number;
   readonly deadlineMs: number;
@@ -120,6 +123,7 @@ async function runInFreshModule(
     handles: [],
     pendingCalls: new Set(),
     root: path.resolve(request.cwd ?? process.cwd()),
+    maxReadBytes: resolveMemoryLimitMb(request.memoryLimitMb) * 2 ** 20,
     hostSignal: AbortSignal.any([request.signal, stepEnd.signal]),
     timeoutMs,
     deadlineMs,
@@ -159,7 +163,7 @@ async function evaluateInSandbox(step: SandboxStep, request: ScriptRunRequest): 
     },
     isInterrupted: () => step.state.interrupted,
   };
-  for (const handle of installHostFunctions(scope, step.root)) {
+  for (const handle of installHostFunctions(scope, step.root, step.maxReadBytes)) {
     keep(handle);
   }
 
