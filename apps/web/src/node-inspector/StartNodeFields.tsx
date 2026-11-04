@@ -1,8 +1,9 @@
 import type { StartInputField, StartInputValueKind, StartNodeConfig } from '@easter-workflow-builder/protocol';
 import { Button, Checkbox, SelectField, TextField } from '@easter-workflow-builder/ui';
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
-import { StartInputOptionsField } from './StartInputOptionsField.tsx';
+import { LineListTextAreaField } from './LineListTextAreaField.tsx';
 import { FieldErrorsContext } from './field-errors-context.ts';
+import { fromStringListFieldValue, toStringListFieldValue } from './string-list-field-value.ts';
 
 export interface StartNodeFieldsProperties {
   readonly config: StartNodeConfig;
@@ -89,8 +90,11 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
             }}
           />
           {field.valueKind === 'choice' && (
-            <StartInputOptionsField
-              options={field.options}
+            <LineListTextAreaField
+              label="Opciók (soronként egy)"
+              value={field.options}
+              toText={toStringListFieldValue}
+              fromText={fromStringListFieldValue}
               error={fieldErrors.get(`inputFields.${String(index)}.options`)}
               onChange={(options) => {
                 updateField(index, (current) => ({ ...current, options }));

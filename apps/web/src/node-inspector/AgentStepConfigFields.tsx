@@ -8,6 +8,7 @@ import { Accordion, AccordionItem, SelectField, TextAreaField, TextField } from 
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
 import { AgentsFieldEditor } from './AgentsFieldEditor.tsx';
 import { LEGACY_MCP_SERVERS_REASON } from './legacy-mcp-servers-reason.ts';
+import { LineListTextAreaField } from './LineListTextAreaField.tsx';
 import { McpServerReferencesField } from './McpServerReferencesField.tsx';
 import { BuiltinSkillsSelect } from '../builtin-skills-select/BuiltinSkillsSelect.tsx';
 import { ProviderSelect } from '../provider-select/ProviderSelect.tsx';
@@ -225,22 +226,24 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
 
         <AccordionItem title="Eszközök és környezet">
           <div className="node-inspector__group">
-            <TextAreaField
-              size="sm"
+            <LineListTextAreaField
               label="Engedélyezett eszközök"
-              value={toStringListFieldValue(config.allowedTools)}
+              value={config.allowedTools}
+              toText={toStringListFieldValue}
+              fromText={fromStringListFieldValue}
               error={allowedToolsError}
-              onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-                setField('allowedTools', fromStringListFieldValue(event.target.value));
+              onChange={(nextValue) => {
+                setField('allowedTools', nextValue);
               }}
             />
-            <TextAreaField
-              size="sm"
+            <LineListTextAreaField
               label="Tiltott eszközök"
-              value={toStringListFieldValue(config.disallowedTools)}
+              value={config.disallowedTools}
+              toText={toStringListFieldValue}
+              fromText={fromStringListFieldValue}
               error={disallowedToolsError}
-              onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-                setField('disallowedTools', fromStringListFieldValue(event.target.value));
+              onChange={(nextValue) => {
+                setField('disallowedTools', nextValue);
               }}
             />
             <TextField
@@ -252,13 +255,14 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
                 setField('cwd', fromTextFieldValue(event.target.value));
               }}
             />
-            <TextAreaField
-              size="sm"
+            <LineListTextAreaField
               label="További engedélyezett könyvtárak"
-              value={toStringListFieldValue(config.additionalDirectories)}
+              value={config.additionalDirectories}
+              toText={toStringListFieldValue}
+              fromText={fromStringListFieldValue}
               error={additionalDirectoriesError}
-              onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-                setField('additionalDirectories', fromStringListFieldValue(event.target.value));
+              onChange={(nextValue) => {
+                setField('additionalDirectories', nextValue);
               }}
             />
             <SandboxField
