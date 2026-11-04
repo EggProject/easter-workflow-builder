@@ -10,9 +10,9 @@ export interface ScriptNodeFieldsProperties {
 
 /**
  * A `script` node szerkesztett mezői: `source`, `runtime` (SPEC-008 5.1). A
- * `runtime` a séma szerint kizárólag `'expression'` literál lehet
- * (`ScriptConfigSchema`), tehát nem szerkeszthető - a mező csak megnevezi az
- * egyetlen érvényes értéket. A figyelmeztetés a kártyán (`graph-node-card`,
+ * `runtime` ma nem szerkeszthető, a mező csak megnevezi az értékét: a
+ * `ScriptConfigSchema` két ága közti választó a SPEC-014 5.9 szerinti felület
+ * munkája (T-015-10). A figyelmeztetés a kártyán (`graph-node-card`,
  * T-009-15) már megjelenik; ez a panel változata ugyanazt mondja ki
  * (SPEC-008 5.1 "a szerkesztő a `script` node kártyáján... is megnevezi
  * ezt", PLAN-009 T-009-18 sor).

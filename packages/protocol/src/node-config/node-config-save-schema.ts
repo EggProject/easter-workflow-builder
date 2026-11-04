@@ -2,9 +2,11 @@ import { isRecord, isString } from '@easter-workflow-builder/typeguards';
 import { BLANK_FIELD_MESSAGE } from './blank-field-message.ts';
 import { findBlankTextFields } from './find-blank-text-fields.ts';
 import { findInvalidChoiceOptions } from './find-invalid-choice-options.ts';
+import { findIntegerFieldsAbove } from './find-integer-fields-above.ts';
 import { findInvalidMcpServerReferenceEnvironmentNames } from './find-invalid-mcp-server-reference-environment-names.ts';
 import { findNonPositiveIntegerFields } from './find-non-positive-integer-fields.ts';
 import { findUnsupportedAgentDefinitionFields } from './find-unsupported-agent-definition-fields.ts';
+import { MAX_SCRIPT_TIMEOUT_MS } from './javascript-script-config.ts';
 import { NodeConfigSchema, type NodeConfig } from './node-config.ts';
 import { REQUIRED_TEXT_FIELD_PATHS } from './required-text-field-paths.ts';
 
@@ -14,6 +16,12 @@ import { REQUIRED_TEXT_FIELD_PATHS } from './required-text-field-paths.ts';
  * 6. szekció).
  */
 const NOT_POSITIVE_INTEGER_MESSAGE = 'A mező értéke nem pozitív egész szám.';
+
+/**
+ * A JavaScript szkript `timeoutMs` mezője felső határát meghaladó érték
+ * hibaüzenete (SPEC-014 5.3).
+ */
+const SCRIPT_TIMEOUT_TOO_LARGE_MESSAGE = `A mező értéke legfeljebb ${String(MAX_SCRIPT_TIMEOUT_MS)} lehet.`;
 
 /**
  * A szerver oldali env változó név hibaüzenete (SPEC-009 6.1, T-012-27), a
@@ -83,13 +91,45 @@ const POSITIVE_INTEGER_FIELD_PATHS = {
   agent_step: [],
   branch: [],
   fan_out: [],
-  join: [],
+  join: ['settings.timeoutMs'],
   loop: ['maxIterations'],
   human_approval: [],
   error_handler: ['maxAttempts', 'backoffMs.*'],
   sub_workflow: [],
-  script: [],
+  script: ['timeoutMs'],
 } as const satisfies Readonly<Record<NodeConfig['type'], readonly string[]>>;
+
+/**
+ * A JavaScript szkript `timeoutMs` mezőjének útvonala (SPEC-014 5.3): a `script`
+ * node-on és a `join` `settings` alobjektumán. Az `ai_synthesis` és a `merge`
+ * módnak, valamint a CEL ágnak nincs ilyen mezője, ott az útvonal nem a várt
+ * alakra mutat, tehát nincs találat. A felső határ a `db` `isNodeConfig`
+ * guardjának szabályát duplikálja (`MAX_SCRIPT_TIMEOUT_MS`).
+ */
+const SCRIPT_TIMEOUT_FIELD_PATHS = {
+  start: [],
+  agent_step: [],
+  branch: [],
+  fan_out: [],
+  join: ['settings.timeoutMs'],
+  loop: [],
+  human_approval: [],
+  error_handler: [],
+  sub_workflow: [],
+  script: ['timeoutMs'],
+} as const satisfies Readonly<Record<NodeConfig['type'], readonly string[]>>;
+
+/**
+ * A JavaScript szkript felső határ fölötti `timeoutMs` értékének felvétele a mező útvonalára (SPEC-014 5.3).
+ */
+function addScriptTimeoutTooLargeIssues(config: NodeConfig, context: CustomIssueSink): void {
+  const paths: readonly string[] = SCRIPT_TIMEOUT_FIELD_PATHS[config.type];
+  for (const path of paths) {
+    for (const fieldPath of findIntegerFieldsAbove(config, path, MAX_SCRIPT_TIMEOUT_MS)) {
+      context.addIssue({ code: 'custom', path: [...fieldPath], message: SCRIPT_TIMEOUT_TOO_LARGE_MESSAGE });
+    }
+  }
+}
 
 function requiredTextFieldPathsOf(config: NodeConfig): readonly string[] {
   if (config.type !== 'join') {
@@ -124,7 +164,9 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  * 2. az `onUnhandledError` mind a tíz típusnál nem `null` (O-29);
  * 3. a `join` `mode` mezője nem `null` (O-33);
  * 4. a `loop` `maxIterations`, az `error_handler` `maxAttempts` mezője és a
- *    `backoffMs` minden eleme pozitív egész (user döntés 2026-10-17, O-37);
+ *    `backoffMs` minden eleme pozitív egész (user döntés 2026-10-17, O-37); a
+ *    JavaScript szkript `timeoutMs` mezője is pozitív egész, és legfeljebb
+ *    `MAX_SCRIPT_TIMEOUT_MS` (SPEC-014 5.3);
  * 5. a lépés `mcpServerReferences` hivatkozásainak `envBindings` értéke és nem
  *    `null` `authEnvName` mezője env változó név alakú (SPEC-009 6.1,
  *    T-012-27); az agent definíciók azonos mezőjét a motor indításkori
@@ -196,6 +238,7 @@ export const NodeConfigSaveSchema = NodeConfigSchema.superRefine(
         context.addIssue({ code: 'custom', path: [...fieldPath], message: NOT_POSITIVE_INTEGER_MESSAGE });
       }
     }
+    addScriptTimeoutTooLargeIssues(config, context);
     addInvalidChoiceOptionIssues(config, context);
     const agentStep = agentStepPathOf(config);
     if (agentStep !== undefined) {

@@ -51,12 +51,21 @@ export type { NodeType } from './workflow-graph/node-type/node-type.ts';
 export type {
   NodeConfig,
   ScriptNodeConfig,
+  ExpressionScriptNodeConfig,
+  JavaScriptScriptNodeConfig,
   JoinScriptNodeConfig,
   JoinUnselectedNodeConfig,
   ErrorHandlerNodeConfig,
   UnhandledErrorPolicy,
 } from './workflow-graph/node-config/node-config.ts';
 export { isNodeConfig } from './workflow-graph/node-config/is-node-config.ts';
+// A szkript beállítás `runtime` szerinti uniója (SPEC-014 5.3): az `apps/server`
+// `node-config-drift-protection` témája a `protocol` párjával veti össze. A `timeoutMs`
+// felső határa futásidejű érték, ezért nem kerül ki: a határt a drift védelem mezőnkénti
+// futásidejű ága igazolja (a barrel futásidejű exportlistája rögzített, SPEC-003 9.3).
+export type { ScriptConfig } from './workflow-graph/node-config/script-config.ts';
+export type { ExpressionScriptConfig } from './workflow-graph/node-config/expression-script-config.ts';
+export type { JavaScriptScriptConfig } from './workflow-graph/node-config/javascript-script-config.ts';
 // A Start bemeneti mező értéktípusa (SPEC-016 5.1): az `apps/server` `enum-drift-protection`
 // témája a `protocol` párjával veti össze, a motor a futás indításakor ez alapján ellenőriz.
 export type { StartInputValueKind } from './workflow-graph/node-config/start-input-value-kind.ts';

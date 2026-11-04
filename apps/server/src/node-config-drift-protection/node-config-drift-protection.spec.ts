@@ -5,18 +5,25 @@ import {
   isNodeConfig,
   openDatabase,
   type DatabaseContext,
+  type ExpressionScriptConfig as DatabaseExpressionScriptConfig,
+  type JavaScriptScriptConfig as DatabaseJavaScriptScriptConfig,
   type JoinUnselectedNodeConfig as DatabaseJoinUnselectedNodeConfig,
   type McpServerReference as DatabaseMcpServerReference,
   type NodeConfig as DatabaseNodeConfig,
   type REQUIRED_TEXT_FIELD_PATHS as DATABASE_REQUIRED_TEXT_FIELD_PATHS,
+  type ScriptConfig as DatabaseScriptConfig,
 } from '@easter-workflow-builder/db';
 import {
+  MAX_SCRIPT_TIMEOUT_MS as PROTOCOL_MAX_SCRIPT_TIMEOUT_MS,
   NodeConfigSaveSchema,
   NodeConfigSchema,
   REQUIRED_TEXT_FIELD_PATHS as PROTOCOL_REQUIRED_TEXT_FIELD_PATHS,
+  type ExpressionScriptConfig as ProtocolExpressionScriptConfig,
+  type JavaScriptScriptConfig as ProtocolJavaScriptScriptConfig,
   type JoinUnselectedNodeConfig as ProtocolJoinUnselectedNodeConfig,
   type McpServerReference as ProtocolMcpServerReference,
   type NodeConfig as ProtocolNodeConfig,
+  type ScriptConfig as ProtocolScriptConfig,
 } from '@easter-workflow-builder/protocol';
 
 // A `JSON.parse` saját `__proto__` tulajdonságot hoz létre (egy objektum literál a prototípust állítaná).
@@ -71,6 +78,27 @@ describe('a protokoll és a db NodeConfig uniója kétirányban megegyezik', () 
       'merge' | 'script' | 'ai_synthesis' | null
     >();
     expectTypeOf<ProtocolJoinUnselectedNodeConfig>().toEqualTypeOf<DatabaseJoinUnselectedNodeConfig>();
+  });
+
+  /**
+   * A `ScriptConfig` mindkét oldalon a `runtime` szerinti két tagú unió
+   * (SPEC-014 5.3): az unió és mindkét ága, valamint a `script` node ága
+   * kétirányban egyezik.
+   */
+  it('a ScriptConfig runtime szerinti két ága (SPEC-014 5.3)', () => {
+    expectTypeOf<ProtocolScriptConfig>().toEqualTypeOf<DatabaseScriptConfig>();
+    expectTypeOf<ProtocolExpressionScriptConfig>().toEqualTypeOf<DatabaseExpressionScriptConfig>();
+    expectTypeOf<ProtocolJavaScriptScriptConfig>().toEqualTypeOf<DatabaseJavaScriptScriptConfig>();
+    expectTypeOf<Extract<ProtocolNodeConfig, { readonly type: 'script' }>>().toEqualTypeOf<
+      Extract<DatabaseNodeConfig, { readonly type: 'script' }>
+    >();
+    expectTypeOf<ProtocolScriptConfig['runtime']>().toEqualTypeOf<'expression' | 'javascript'>();
+  });
+
+  // A `db` konstansa nem exportált (a barrel futásidejű exportlistája rögzített, SPEC-003 9.3),
+  // ezért a `db` oldal határát a `timeoutMs` határérték tesztjei igazolják lejjebb.
+  it('a JavaScript szkript timeoutMs felső határa a protokoll oldalon 2147483647 (SPEC-014 5.3)', () => {
+    expect(PROTOCOL_MAX_SCRIPT_TIMEOUT_MS).toBe(2_147_483_647);
   });
 });
 
@@ -132,6 +160,12 @@ const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
   { type: 'fan_out', itemsExpression: 'items', branchLabelTemplate: '{{item}}', onUnhandledError: null },
   { type: 'join', mode: 'merge', onUnhandledError: null },
   { type: 'join', mode: 'script', settings: { source: 'x + 1', runtime: 'expression' }, onUnhandledError: null },
+  {
+    type: 'join',
+    mode: 'script',
+    settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: 120_000, cwd: 'munka/almappa' },
+    onUnhandledError: null,
+  },
   { type: 'join', mode: 'ai_synthesis', settings: VALID_AGENT_STEP_SETTINGS, onUnhandledError: null },
   { type: 'join', mode: null, onUnhandledError: null },
   { type: 'loop', maxIterations: 10, continueExpression: 'i < 10', onUnhandledError: null },
@@ -156,10 +190,14 @@ const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
     onUnhandledError: null,
   },
   { type: 'script', source: 'x + 1', runtime: 'expression', onUnhandledError: null },
+  { type: 'script', source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, onUnhandledError: null },
 ];
 
 function describeVariant(config: ProtocolNodeConfig): string {
-  return config.type === 'join' ? `join ${String(config.mode)}` : config.type;
+  if (config.type === 'join') {
+    return config.mode === 'script' ? `join script ${config.settings.runtime}` : `join ${String(config.mode)}`;
+  }
+  return config.type === 'script' ? `script ${config.runtime}` : config.type;
 }
 
 describe('a protokoll séma szerint érvényes érték a db isNodeConfig guardján is átmegy', () => {
@@ -384,6 +422,28 @@ const POSITIVE_INTEGER_FIELD_CASES: readonly NumberFieldCase[] = [
       onUnhandledError: 'fail_run',
     }),
   },
+  {
+    field: 'script (javascript): timeoutMs',
+    path: 'timeoutMs',
+    build: (value) => ({
+      type: 'script',
+      source: 'return 1;',
+      runtime: 'javascript',
+      timeoutMs: value,
+      cwd: null,
+      onUnhandledError: 'fail_run',
+    }),
+  },
+  {
+    field: 'join script (javascript): settings.timeoutMs',
+    path: 'settings.timeoutMs',
+    build: (value) => ({
+      type: 'join',
+      mode: 'script',
+      settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: value, cwd: null },
+      onUnhandledError: 'fail_run',
+    }),
+  },
   ...[0, 1, 2].map((index): NumberFieldCase => ({
     field: `error_handler: backoffMs.${String(index)}`,
     path: `backoffMs.${String(index)}`,
@@ -469,6 +529,68 @@ describe('a pozitív egész szám mezők mezőnként a protokoll mentési sémá
         expect(isNodeConfig(build(value))).toBe(true);
       });
     }
+  }
+});
+
+/**
+ * A JavaScript szkript `timeoutMs` felső határa (SPEC-014 5.3): a `protocol`
+ * mentési sémájának szabálya a `db` `isNodeConfig` guard szabályának szándékos
+ * duplikátuma. A határérték mindkét oldalon átmegy, az eggyel nagyobb mindkét
+ * oldalon elbukik; az olvasó séma a felső határ fölötti értéket is elfogadja
+ * (O-37 mintája), a `db` guard viszont mindkét irányban szigorú.
+ */
+describe('a JavaScript szkript timeoutMs felső határa a protokoll mentési sémáján és a db isNodeConfig guardján is ugyanúgy dönt', () => {
+  const builders: readonly {
+    readonly field: string;
+    readonly path: string;
+    readonly build: (value: unknown) => unknown;
+  }[] = [
+    {
+      field: 'script',
+      path: 'timeoutMs',
+      build: (value) => ({
+        type: 'script',
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: value,
+        cwd: null,
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    {
+      field: 'join script',
+      path: 'settings.timeoutMs',
+      build: (value) => ({
+        type: 'join',
+        mode: 'script',
+        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: value, cwd: null },
+        onUnhandledError: 'fail_run',
+      }),
+    },
+  ];
+
+  for (const { field, path, build } of builders) {
+    describe(field, () => {
+      for (const value of [1, 2_147_483_647, null]) {
+        it(`a(z) ${String(value)} mindkettőn átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse(build(value)).success).toBe(true);
+          expect(isNodeConfig(build(value))).toBe(true);
+        });
+      }
+
+      it('a 2147483648 mindkettőn elbukik, a protokoll a mező útvonalán', () => {
+        const parsed = NodeConfigSaveSchema.safeParse(build(2_147_483_648));
+
+        expect(parsed.success).toBe(false);
+        expect(parsed.error?.issues.map((issue) => issue.path.join('.'))).toEqual([path]);
+        expect(isNodeConfig(build(2_147_483_648))).toBe(false);
+      });
+
+      it('az olvasó séma a 2147483648 értéket elfogadja, a db guard nem', () => {
+        expect(NodeConfigSchema.safeParse(build(2_147_483_648)).success).toBe(true);
+        expect(isNodeConfig(build(2_147_483_648))).toBe(false);
+      });
+    });
   }
 });
 
@@ -590,6 +712,45 @@ const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
     accepted: false,
   },
   {
+    label: 'script javascript ág érvényes timeoutMs és cwd értékkel',
+    config: {
+      type: 'script',
+      source: 'return 1;',
+      runtime: 'javascript',
+      timeoutMs: 60_000,
+      cwd: 'munka/almappa',
+      onUnhandledError: 'fail_run',
+    },
+    accepted: true,
+  },
+  {
+    label: 'script javascript ág cwd nélkül',
+    config: { type: 'script', source: 'x', runtime: 'javascript', timeoutMs: null, onUnhandledError: 'fail_run' },
+    accepted: false,
+  },
+  {
+    label: 'script javascript ág timeoutMs nélkül',
+    config: { type: 'script', source: 'x', runtime: 'javascript', cwd: null, onUnhandledError: 'fail_run' },
+    accepted: false,
+  },
+  {
+    label: 'script javascript ág szám cwd értékkel',
+    config: {
+      type: 'script',
+      source: 'x',
+      runtime: 'javascript',
+      timeoutMs: null,
+      cwd: 7,
+      onUnhandledError: 'fail_run',
+    },
+    accepted: false,
+  },
+  {
+    label: 'script ismeretlen runtime',
+    config: { type: 'script', source: 'x', runtime: 'python', onUnhandledError: 'fail_run' },
+    accepted: false,
+  },
+  {
     label: 'human_approval timeoutMs nélkül',
     config: { type: 'human_approval', title: 't', bodyTemplate: 'b', onUnhandledError: 'fail_run' },
     accepted: false,
@@ -694,6 +855,28 @@ const UNKNOWN_KEY_CASES: readonly { readonly label: string; readonly config: unk
     },
   },
   {
+    label: 'join script javascript ágú settings alobjektuma',
+    config: {
+      type: 'join',
+      mode: 'script',
+      settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, [UNKNOWN_KEY]: true },
+      onUnhandledError: 'fail_run',
+    },
+  },
+  {
+    label: 'script expression ága a javascript ág timeoutMs kulcsával',
+    config: { type: 'script', source: 'x', runtime: 'expression', timeoutMs: null, onUnhandledError: 'fail_run' },
+  },
+  {
+    label: 'join script expression ágú settings alobjektuma a javascript ág cwd kulcsával',
+    config: {
+      type: 'join',
+      mode: 'script',
+      settings: { source: 'x', runtime: 'expression', cwd: null },
+      onUnhandledError: 'fail_run',
+    },
+  },
+  {
     label: 'join ai_synthesis settings alobjektuma',
     config: {
       type: 'join',
@@ -761,7 +944,7 @@ const UNKNOWN_KEY_CASES: readonly { readonly label: string; readonly config: unk
 
 describe('egy ismeretlen kulcs a protokoll sémáin és a db isNodeConfig guardján is elbukik (SPEC-011 5.2)', () => {
   it('az esetek a tíz típust, a join mind a négy ágát és a beágyazott objektumokat lefedik', () => {
-    expect(UNKNOWN_KEY_CASES).toHaveLength(REPRESENTATIVE_NODE_CONFIGS.length + 12);
+    expect(UNKNOWN_KEY_CASES).toHaveLength(REPRESENTATIVE_NODE_CONFIGS.length + 15);
   });
 
   for (const { label, config } of UNKNOWN_KEY_CASES) {

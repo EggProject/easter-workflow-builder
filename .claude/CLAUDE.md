@@ -202,6 +202,14 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   hibaleképezésen, user döntés 2026-10-17): a szám invariáns nincs típusszinten, tehát az ág nem
   halott, és típushelyesen, `as` nélkül tesztelhető valós `:memory:` adatbázison.
 
+- **A `ScriptConfig` a `runtime` szerinti diszkriminált unió mindkét oldalon, a JavaScript ág `timeoutMs`
+  mezője pedig felső határral bővíti a pozitív egész szabályt.** A `db` `ScriptConfig` és a `protocol`
+  `ScriptConfigSchema` két ága (`expression`, `javascript`) szándékos duplikátum; a `timeoutMs` `null` vagy
+  pozitív egész, legfeljebb 2147483647, mert a Node `setTimeout` ennél nagyobb késleltetést 1 ms-re állít. A
+  határ a mentési sémában és a `db` `isNodeConfig` guardjában áll, az olvasó séma csak a típust ellenőrzi. A
+  védelem az `apps/server` `node-config-drift-protection` témájában a két ág típusszintű egyenlősége és a
+  határérték mezőnkénti futásidejű ága (SPEC-014 5.3).
+
 - **A `db` `NodeConfig` guard minden ismeretlen kulcsot elutasít, és a `protocol` ugyanazt a szabályt
   duplikálja, ugyanezzel a védelemmel.** Az `isNodeConfig` és az `isAgentStepConfig` objektumonként zárt
   kulcslistával dolgozik: a tíz `NodeConfig` típus (a `join` mind a négy ága), az `AgentStepConfig`, a

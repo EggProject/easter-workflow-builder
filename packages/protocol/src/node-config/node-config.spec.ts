@@ -94,6 +94,16 @@ describe('NodeConfigSchema', () => {
     expect(NodeConfigSchema.safeParse(config).success).toBe(true);
   });
 
+  it('elfogadja a join node script módját JavaScript ággal (SPEC-014 5.3)', () => {
+    const config = {
+      type: 'join',
+      mode: 'script',
+      settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: 120_000, cwd: 'munka/almappa' },
+      onUnhandledError: null,
+    };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+  });
+
   it('elfogadja a join node ai_synthesis módját', () => {
     const config = {
       type: 'join',
@@ -169,6 +179,25 @@ describe('NodeConfigSchema', () => {
   it('elfogadja a script node teljes alakját', () => {
     const config = { type: 'script', source: 'x + 1', runtime: 'expression', onUnhandledError: null };
     expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+  });
+
+  it('elfogadja a script node JavaScript ágát (SPEC-014 5.3)', () => {
+    const config = {
+      type: 'script',
+      source: 'return 1;',
+      runtime: 'javascript',
+      timeoutMs: null,
+      cwd: null,
+      onUnhandledError: null,
+    };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+  });
+
+  it('elutasítja a script node ismeretlen runtime értékét és a másik ág kulcsát', () => {
+    const base = { type: 'script', source: 'x', onUnhandledError: null };
+    expect(NodeConfigSchema.safeParse({ ...base, runtime: 'python' }).success).toBe(false);
+    expect(NodeConfigSchema.safeParse({ ...base, runtime: 'expression', timeoutMs: null }).success).toBe(false);
+    expect(NodeConfigSchema.safeParse({ ...base, runtime: 'javascript' }).success).toBe(false);
   });
 
   it('ismeretlen type értékre elutasít', () => {

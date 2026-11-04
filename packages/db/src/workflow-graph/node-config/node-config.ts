@@ -1,4 +1,6 @@
 import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
+import type { ExpressionScriptConfig } from './expression-script-config.ts';
+import type { JavaScriptScriptConfig } from './javascript-script-config.ts';
 import type { ScriptConfig } from './script-config.ts';
 import type { StartInputValueKind } from './start-input-value-kind.ts';
 
@@ -170,12 +172,20 @@ export interface SubWorkflowNodeConfig {
 }
 
 /**
-Nem AI transzformáció. Tárolható, de a futás indítása elutasítja (4.3).
+Nem AI transzformáció (4.3). A `runtime` szerinti két ág interfészként bővíti a
+megfelelő `ScriptConfig` ágat (SPEC-014 5.3).
 */
-export interface ScriptNodeConfig extends ScriptConfig {
+export interface ExpressionScriptNodeConfig extends ExpressionScriptConfig {
   readonly type: 'script';
   readonly onUnhandledError: UnhandledErrorPolicy | null;
 }
+
+export interface JavaScriptScriptNodeConfig extends JavaScriptScriptConfig {
+  readonly type: 'script';
+  readonly onUnhandledError: UnhandledErrorPolicy | null;
+}
+
+export type ScriptNodeConfig = ExpressionScriptNodeConfig | JavaScriptScriptNodeConfig;
 
 export type NodeConfig =
   | StartNodeConfig

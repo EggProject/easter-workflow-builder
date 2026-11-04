@@ -57,6 +57,12 @@ const validConfigs: readonly NodeConfig[] = [
     settings: { source: 'a + b', runtime: 'expression' },
     onUnhandledError: null,
   },
+  {
+    type: 'join',
+    mode: 'script',
+    settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: 120_000, cwd: 'munka/almappa' },
+    onUnhandledError: 'fail_run',
+  },
   { type: 'join', mode: 'ai_synthesis', settings: agentStepConfig, onUnhandledError: 'fail_run' },
   { type: 'join', mode: null, onUnhandledError: null },
   { type: 'loop', maxIterations: 3, continueExpression: 'state.retry', onUnhandledError: 'fail_branch' },
@@ -81,14 +87,16 @@ const validConfigs: readonly NodeConfig[] = [
     onUnhandledError: 'fail_branch',
   },
   { type: 'script', source: 'a + b', runtime: 'expression', onUnhandledError: null },
+  { type: 'script', source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, onUnhandledError: null },
 ];
 
 describe('isNodeConfig', () => {
   it('igazat ad mind a tíz node típus érvényes configjára', () => {
     expect(validConfigs.every((config) => isNodeConfig(config))).toBe(true);
-    // Tíz típus, de tizenhárom példány: a `join` mindhárom módja és a
-    // választatlan (`mode: null`, SPEC-008 O-33) ága is szerepel.
-    expect(validConfigs).toHaveLength(13);
+    // Tíz típus, de tizenöt példány: a `join` mindhárom módja (a `script` mindkét
+    // `runtime` ággal, SPEC-014 5.3) és a választatlan (`mode: null`, SPEC-008
+    // O-33) ága is szerepel, a `script` node pedig mindkét `runtime` ággal.
+    expect(validConfigs).toHaveLength(15);
   });
 
   it('igazat ad a start bemeneti mező mind a hat valueKind értékére (SPEC-016 5.1)', () => {
@@ -286,6 +294,10 @@ describe('isNodeConfig', () => {
       { type: 'join', mode: null, onUnhandledError: 'unknown_policy' },
     ],
     ['join: script alobjektum hibás', { type: 'join', mode: 'script', settings: { source: 'a', runtime: 'js' } }],
+    [
+      'join: script source rossz típusú',
+      { type: 'join', mode: 'script', settings: { source: 7, runtime: 'expression' } },
+    ],
     ['join: ai_synthesis alobjektum hibás', { type: 'join', mode: 'ai_synthesis', settings: { promptTemplate: 7 } }],
     ['join: merge onUnhandledError érvénytelen', { type: 'join', mode: 'merge', onUnhandledError: 'unknown_policy' }],
     [
@@ -371,7 +383,51 @@ describe('isNodeConfig', () => {
       },
     ],
     ['script: source rossz típusú', { type: 'script', source: 7, runtime: 'expression' }],
-    ['script: ismeretlen runtime', { type: 'script', source: 'a + b', runtime: 'javascript' }],
+    ['script: ismeretlen runtime', { type: 'script', source: 'a + b', runtime: 'python' }],
+    ['script: javascript ág timeoutMs és cwd nélkül', { type: 'script', source: 'a', runtime: 'javascript' }],
+    [
+      'script: expression ág timeoutMs kulccsal',
+      { type: 'script', source: 'a', runtime: 'expression', timeoutMs: null },
+    ],
+    ['script: expression ág cwd kulccsal', { type: 'script', source: 'a', runtime: 'expression', cwd: null }],
+    ...[
+      ['nulla', 0],
+      ['negatív', -1],
+      ['nem egész', 1.5],
+      ['a felső határ fölötti', 2_147_483_648],
+      ['szöveg', '1000'],
+      ['hiányzó', undefined],
+    ].flatMap(([description, timeoutMs]): readonly (readonly [string, unknown])[] => [
+      [
+        `script: javascript ág ${String(description)} timeoutMs`,
+        { type: 'script', source: 'a', runtime: 'javascript', timeoutMs, cwd: null, onUnhandledError: null },
+      ],
+      [
+        `join script: javascript ág ${String(description)} timeoutMs`,
+        {
+          type: 'join',
+          mode: 'script',
+          settings: { source: 'a', runtime: 'javascript', timeoutMs, cwd: null },
+          onUnhandledError: null,
+        },
+      ],
+    ]),
+    [
+      'script: javascript ág szám cwd',
+      { type: 'script', source: 'a', runtime: 'javascript', timeoutMs: null, cwd: 7, onUnhandledError: null },
+    ],
+    [
+      'script: javascript ág hiányzó cwd',
+      { type: 'script', source: 'a', runtime: 'javascript', timeoutMs: null, onUnhandledError: null },
+    ],
+    [
+      'join script: javascript ág szám cwd',
+      { type: 'join', mode: 'script', settings: { source: 'a', runtime: 'javascript', timeoutMs: null, cwd: 7 } },
+    ],
+    [
+      'join script: ismeretlen runtime',
+      { type: 'join', mode: 'script', settings: { source: 'a', runtime: 'python' }, onUnhandledError: null },
+    ],
     [
       'script: onUnhandledError érvénytelen (isScriptConfig önmagában nem ellenőrzi)',
       { type: 'script', source: 'a + b', runtime: 'expression', onUnhandledError: 7 },
@@ -443,6 +499,24 @@ describe('isNodeConfig', () => {
       },
     ],
     [
+      'a join script módjának javascript ágú settings alobjektuma',
+      {
+        type: 'join',
+        mode: 'script',
+        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, [UNKNOWN_KEY]: true },
+        onUnhandledError: null,
+      },
+    ],
+    [
+      'a join script módjának expression ágú settings alobjektuma a javascript ág kulcsával',
+      {
+        type: 'join',
+        mode: 'script',
+        settings: { source: 'a + b', runtime: 'expression', timeoutMs: null },
+        onUnhandledError: null,
+      },
+    ],
+    [
       'a join ai_synthesis módjának settings alobjektuma',
       {
         type: 'join',
@@ -469,6 +543,21 @@ describe('isNodeConfig', () => {
       expect(isNodeConfig(config)).toBe(false);
     });
   }
+
+  it('igazat ad a javascript szkript timeoutMs határértékeire és a cwd szövegére (SPEC-014 5.3)', () => {
+    for (const timeoutMs of [1, 2_147_483_647, null]) {
+      expect(
+        isNodeConfig({
+          type: 'script',
+          source: 'a',
+          runtime: 'javascript',
+          timeoutMs,
+          cwd: 'munka',
+          onUnhandledError: null,
+        }),
+      ).toBe(true);
+    }
+  });
 
   it('a szabad mező kulcsai tetszőlegesek: a sub_workflow inputMapping', () => {
     expect(
