@@ -1,12 +1,12 @@
 # PLAN-016: A strukturált kimenet séma ellenőrzésének terve
 
-|         |                                                                                                                      |
-| ------- | -------------------------------------------------------------------------------------------------------------------- |
-| Státusz | indítható: a SPEC-015 O-1 ... O-3 lezárva (user döntés 2026-11-04)                                                   |
-| Dátum   | 2026-11-03, átvezetve 2026-11-04                                                                                     |
-| Spec    | [`../spec/SPEC-015-strukturalt-kimenet-sema-ellenorzes.md`](../spec/SPEC-015-strukturalt-kimenet-sema-ellenorzes.md) |
-| Forrás  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md)       |
-| Branch  | `feat/spec-015-strukturalt-kimenet`                                                                                  |
+|         |                                                                                                                             |
+| ------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Státusz | végrehajtva (T-016-1 ... T-016-10, PR #74, a `main`-en 2026-11-04): a SPEC-015 O-1 ... O-3 lezárva (user döntés 2026-11-04) |
+| Dátum   | 2026-11-03, átvezetve 2026-11-04                                                                                            |
+| Spec    | [`../spec/SPEC-015-strukturalt-kimenet-sema-ellenorzes.md`](../spec/SPEC-015-strukturalt-kimenet-sema-ellenorzes.md)        |
+| Forrás  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md)              |
+| Branch  | `feat/spec-015-strukturalt-kimenet`                                                                                         |
 
 A lépések a SPEC-015 8. szekciójának kritérium számára hivatkoznak (`ACn`). Végrehajtási sorrend a három
 terv között: PLAN-017, PLAN-016, PLAN-015 (a research 9. szekciója); ez a terv a második, a PLAN-017 merge után

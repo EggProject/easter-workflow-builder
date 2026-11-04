@@ -2,7 +2,7 @@
 
 |               |                                                                                                        |
 | ------------- | ------------------------------------------------------------------------------------------------------ |
-| Státusz       | tervezet                                                                                               |
+| Státusz       | végrehajtva (2026-08-28, T-003-28 zárás)                                                               |
 | Dátum         | 2026-08-27                                                                                             |
 | Spec          | [`../spec/SPEC-003-domain-perzisztencia.md`](../spec/SPEC-003-domain-perzisztencia.md)                 |
 | Konvenció     | [`../spec/SPEC-002-csomag-architektura.md`](../spec/SPEC-002-csomag-architektura.md), 6. szekció       |

@@ -1,12 +1,12 @@
 # PLAN-017: A Start bemenet értéktípusának terve
 
-|         |                                                                                                                                       |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz | végrehajtva (T-017-1 ... T-017-10; a T-017-11 és T-017-12 a PR előtti lépés): a SPEC-016 O-1 ... O-3 lezárva (user döntés 2026-11-04) |
-| Dátum   | 2026-11-03, átvezetve 2026-11-04                                                                                                      |
-| Spec    | [`../spec/SPEC-016-start-bemenet-ertektipus.md`](../spec/SPEC-016-start-bemenet-ertektipus.md)                                        |
-| Forrás  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md)                        |
-| Branch  | `feat/spec-016-bemenet-ertektipus`                                                                                                    |
+|         |                                                                                                                             |
+| ------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Státusz | végrehajtva (T-017-1 ... T-017-12, PR #72, a `main`-en 2026-11-04): a SPEC-016 O-1 ... O-3 lezárva (user döntés 2026-11-04) |
+| Dátum   | 2026-11-03, átvezetve 2026-11-04                                                                                            |
+| Spec    | [`../spec/SPEC-016-start-bemenet-ertektipus.md`](../spec/SPEC-016-start-bemenet-ertektipus.md)                              |
+| Forrás  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md)              |
+| Branch  | `feat/spec-016-bemenet-ertektipus`                                                                                          |
 
 A lépések a SPEC-016 8. szekciójának kritérium számára hivatkoznak (`ACn`). Végrehajtási sorrend a három
 terv között: PLAN-017, PLAN-016, PLAN-015 (a research 9. szekciója); ez a terv az első, mert a legkisebb, nincs új

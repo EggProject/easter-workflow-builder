@@ -2,6 +2,7 @@
 
 |              |                                                                                      |
 | ------------ | ------------------------------------------------------------------------------------ |
+| Státusz      | végrehajtva (2026-08-27, T-002-26)                                                   |
 | Specifikáció | [`../spec/SPEC-002-csomag-architektura.md`](../spec/SPEC-002-csomag-architektura.md) |
 | Előzmény     | [`../spec/SPEC-001-monorepo-toolchain.md`](../spec/SPEC-001-monorepo-toolchain.md)   |
 | Branch       | `feat/spec-002-csomag-architektura`, a `main` védett                                 |
@@ -9,7 +10,7 @@
 
 ---
 
-## A hét minőségi kapu
+## A hét minőségi kapu (történeti, a mai lista a `.claude/CLAUDE.md` 8. szekciója)
 
 Minden lépés végén, kivétel nélkül, mind a hét parancsnak nulla kilépési kóddal kell futnia:
 

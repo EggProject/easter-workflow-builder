@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                                                     |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | jóváhagyott: a 7.1 szekció O-1 ... O-3 termékkérdése lezárva (user döntés 2026-11-04); a technikai döntések forrásból lezárva (5. szekció)                                                          |
+| Státusz  | végrehajtva (PLAN-016, PR #74, a `main`-en 2026-11-04): a 7.1 szekció O-1 ... O-3 termékkérdése lezárva (user döntés 2026-11-04); a technikai döntések forrásból lezárva (5. szekció)               |
 | Dátum    | 2026-11-03, átvezetve 2026-11-04 (a `format` kulcsszó, a fordító naplózója és a lefordított ellenőrző átadása: 5.2, 5.3, 5.4)                                                                       |
 | Előzmény | [`SPEC-003`](SPEC-003-domain-perzisztencia.md) 4.6, [`SPEC-004`](SPEC-004-vegrehajto-motor.md) 5.2 és 17. szekció 21. kritérium, [`SPEC-013`](SPEC-013-flash-es-haiku.md) 3.2 (a Flash leíró mezői) |
 | Bemenet  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md) 2. és 4. szekció; a hiányleltár H-17 tétele                                          |

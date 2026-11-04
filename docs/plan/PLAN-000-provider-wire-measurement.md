@@ -2,7 +2,7 @@
 
 |         |                                                                                                  |
 | ------- | ------------------------------------------------------------------------------------------------ |
-| Státusz | tervezet                                                                                         |
+| Státusz | végrehajtva (2026-08-26)                                                                         |
 | Dátum   | 2026-08-26                                                                                       |
 | Spec    | [`../spec/SPEC-000-provider-wire-measurement.md`](../spec/SPEC-000-provider-wire-measurement.md) |
 | Branch  | `feat/spec-000-provider-wire-measurement`                                                        |

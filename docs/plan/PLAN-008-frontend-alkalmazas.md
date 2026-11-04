@@ -2,7 +2,7 @@
 
 |               |                                                                                                                                                                                                                |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz       | tervezet                                                                                                                                                                                                       |
+| Státusz       | végrehajtva (2026-09-05, PR #10)                                                                                                                                                                               |
 | Dátum         | 2026-08-30                                                                                                                                                                                                     |
 | Spec          | [`../spec/SPEC-007-frontend-alkalmazas.md`](../spec/SPEC-007-frontend-alkalmazas.md)                                                                                                                           |
 | Előzmény spec | [`../spec/SPEC-005-api-protokoll.md`](../spec/SPEC-005-api-protokoll.md), [`../spec/SPEC-006-szerver-alkalmazas.md`](../spec/SPEC-006-szerver-alkalmazas.md)                                                   |

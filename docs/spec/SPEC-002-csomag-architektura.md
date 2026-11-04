@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                                                                                                      |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | tervezet                                                                                                                                                                                                                                             |
+| Státusz  | végrehajtva (2026-08-27, PLAN-002); tervezet 2026-08-27                                                                                                                                                                                              |
 | Dátum    | 2026-08-27                                                                                                                                                                                                                                           |
 | Előzmény | [`SPEC-001-monorepo-toolchain.md`](SPEC-001-monorepo-toolchain.md), 3. szekció csomagtérkép és 13. szekció mappaszerkezet                                                                                                                            |
 | Bemenet  | a `packages/typeguards` bemásolt kód mappa konvenciója                                                                                                                                                                                               |
@@ -373,6 +373,8 @@ Mindkét barrel törlődik. A jelenleg belőlük exportált szimbólumok az alá
 ### 5.19 Megfigyelés, nem ennek a specnek a hatóköre
 
 A `packages/providers/package.json` `dependencies` mezője tartalmazza a `core` csomagot, de a `packages/providers/src` alatt egyetlen fájl sem importál a `core` csomagból (`grep -rn "from 'core'" packages/providers/src` nulla találat). Ez holt függőség. A csomag megszűnésével magától eltűnik, egyik utódcsomag sem veszi át.
+
+**Lezárva (2026-08-27, T-002-10):** a `packages/providers` csomag a PLAN-002 T-002-10 lépésével megszűnt, a holt függőség vele együtt eltűnt; a fenti két bekezdés a végrehajtás előtti állapotot írja le.
 
 ## 6. A belső mappa konvenció
 

@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                  |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | tervezet                                                                                                                                                         |
+| Státusz  | végrehajtva (2026-08-26, PLAN-001); tervezet 2026-08-26                                                                                                          |
 | Dátum    | 2026-08-26                                                                                                                                                       |
 | Bemenet  | [`../research/2026-08-26-toolchain.md`](../research/2026-08-26-toolchain.md) rögzített verziói                                                                   |
 | Előzmény | [`SPEC-000-provider-wire-measurement.md`](SPEC-000-provider-wire-measurement.md), lezárva                                                                        |
@@ -702,7 +702,7 @@ pillanatképe, szöveg), plusz a rejtett `.last-run.json`, amit az `actions/uplo
 A lépés tehát nem halott, de a neve és a `playwright-report` mintája igen; a `ci.yml` javítása külön
 lépés, mert workflow fájlt a munkamenet tokenje nem pusholhat.
 
-Retenciós napszámot **nem** rögzítünk, mert nincs rá projekt szintű forrásunk (V-17 nyitva). Az `actions/upload-artifact` v7.0.1 saját `action.yml` fájlja sem ad `default` értéket a `retention-days` bemenetre, tehát a repo beállítása érvényesül.
+Retenciós napszámot **nem** rögzítünk, mert nincs rá projekt szintű forrásunk (V-17, projekt döntéssel lezárva: nem állítunk explicit értéket, lásd a 15. szekció V-17 sorát). Az `actions/upload-artifact` v7.0.1 saját `action.yml` fájlja sem ad `default` értéket a `retention-days` bemenetre, tehát a repo beállítása érvényesül.
 
 Ugyanezen okból nem állítunk `timeout-minutes` értéket sem. A Turborepo hivatalos útmutatója mutat egy `timeout-minutes: 15` értéket, de az az ő **egyetlen, build+test** jobjára vonatkozik, nem erre a hat, eltérő terhelésű jobra - átvenni becslés lenne. Az `actions/checkout` `fetch-depth: 2` beállítását szintén nem vesszük át: az az útmutatóban a `--filter=[HEAD^1]` érintettség-szűréshez kell, amit nem használunk.
 
