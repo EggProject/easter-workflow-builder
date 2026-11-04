@@ -28,6 +28,13 @@ export type { SdkResultMessage } from './sdk-message-shape/sdk-result-message.ts
 export { isSdkResultMessage } from './sdk-message-shape/is-sdk-result-message.ts';
 export { hasStructuredOutput } from './sdk-message-shape/has-structured-output.ts';
 
+// A strukturált kimenet séma szerinti ellenőrzése (SPEC-015 5.2, 5.3): a séma
+// fordítója és a lefordított ellenőrző futtatása. A fordítót a futás indítása
+// és a gráf mentése is hívja, az ellenőrzőt a lépés zárása.
+export type { StructuredOutputValidator } from './sdk-message-shape/structured-output-validator.ts';
+export { compileStructuredOutputSchema } from './sdk-message-shape/compile-structured-output-schema.ts';
+export { checkStructuredOutput } from './sdk-message-shape/check-structured-output.ts';
+
 // A telepített Agent SDK verzió, amit az összeállítás a motornak átad
 // (SPEC-004 11.3 táblázat 17. sora, SPEC-003 5.1 `sdkVersionPin`).
 export { INSTALLED_AGENT_SDK_VERSION } from './sdk-version/installed-agent-sdk-version.ts';
