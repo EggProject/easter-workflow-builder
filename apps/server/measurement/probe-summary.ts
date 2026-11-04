@@ -10,4 +10,6 @@ export interface ProbeSummary {
   readonly numTurns: number | undefined;
   readonly outputTextLength: number | undefined;
   readonly errorClass: string | undefined;
+  readonly initPluginSkills: readonly string[] | undefined;
+  readonly initMcpServers: readonly string[] | undefined;
 }

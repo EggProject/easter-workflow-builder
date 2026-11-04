@@ -57,9 +57,15 @@ function step(overrides: Partial<StepRunRecord>): StepRunRecord {
 }
 /* eslint-enable unicorn/no-null */
 
+const NOTHING = { resultTextLength: undefined, initPluginSkills: undefined, initMcpServers: undefined };
+
 describe('summarizeRun', () => {
   it('a kapott szöveg hosszát adja tovább, a szöveget nem', () => {
-    const summary = summarizeRun('minimax', RUN, [step({})], 6);
+    const summary = summarizeRun('minimax', RUN, [step({})], {
+      resultTextLength: 6,
+      initPluginSkills: ['skills:proba-skill'],
+      initMcpServers: ['proba-mcp:connected'],
+    });
     expect(summary).toEqual({
       providerId: 'minimax',
       runStatus: 'succeeded',
@@ -68,11 +74,13 @@ describe('summarizeRun', () => {
       numTurns: 1,
       outputTextLength: 6,
       errorClass: undefined,
+      initPluginSkills: ['skills:proba-skill'],
+      initMcpServers: ['proba-mcp:connected'],
     });
   });
 
   it('lépés nélkül a lépés mezők üresek', () => {
-    const summary = summarizeRun('minimax', RUN, [], undefined);
+    const summary = summarizeRun('minimax', RUN, [], NOTHING);
     expect(summary.stepStatus).toBeUndefined();
     expect(summary.numTurns).toBeUndefined();
     expect(summary.outputTextLength).toBeUndefined();
@@ -80,9 +88,9 @@ describe('summarizeRun', () => {
 
   it('a hibaosztályt előbb a futásból, hiányában a lépésből olvassa', () => {
     expect(
-      summarizeRun('minimax', { ...RUN, errorKind: 'run_hiba' }, [step({ errorKind: 'lepes_hiba' })], undefined)
+      summarizeRun('minimax', { ...RUN, errorKind: 'run_hiba' }, [step({ errorKind: 'lepes_hiba' })], NOTHING)
         .errorClass,
     ).toBe('run_hiba');
-    expect(summarizeRun('minimax', RUN, [step({ errorKind: 'lepes_hiba' })], undefined).errorClass).toBe('lepes_hiba');
+    expect(summarizeRun('minimax', RUN, [step({ errorKind: 'lepes_hiba' })], NOTHING).errorClass).toBe('lepes_hiba');
   });
 });

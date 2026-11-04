@@ -53,10 +53,12 @@ describe('runProbe a hamis ágenses szerver ellen', () => {
     extraEnvironment: NodeJS.ProcessEnv = {},
     signal: AbortSignal = new AbortController().signal,
     modelId?: string,
+    isSkillAndMcpMode?: boolean,
   ): ReturnType<typeof runProbe> {
     return runProbe({
       providerId,
       ...(modelId !== undefined && { modelId }),
+      ...(isSkillAndMcpMode !== undefined && { isSkillAndMcpMode }),
       serverCommand: STUB_COMMAND,
       environment: {
         ...process.env,
@@ -85,6 +87,17 @@ describe('runProbe a hamis ágenses szerver ellen', () => {
     expect(request['effort']).toBe('low');
     expect(request['hasMaxBudgetUsd']).toBe(false);
     expect(JSON.stringify(summary)).not.toContain(FAKE_SECRET);
+  });
+
+  it('skill és MCP mód: a lépés a feltöltött skillt és a mentett MCP szervert hivatkozza (SPEC-009 T-012-12a)', async () => {
+    const summary = await probe('minimax', {}, new AbortController().signal, undefined, true);
+    expect(summary.runStatus).toBe('succeeded');
+    const request = readRequest();
+    expect(request['skills']).toStrictEqual(['skills:proba-skill']);
+    expect(request['hasPlugins']).toBe(true);
+    expect(request['mcpServerNames']).toStrictEqual(['proba-mcp']);
+    expect(request['maxTurns']).toBe(1);
+    expect(request['effort']).toBe('low');
   });
 
   it('claude-subscription: modell megadása nélkül az alapmodellel (claude-haiku-4-5) fut, effort nélkül', async () => {
