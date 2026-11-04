@@ -24,6 +24,30 @@ function startNodeConfig(): Record<string, unknown> {
   return { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
 }
 
+function agentSettings(structuredOutput: unknown): Record<string, unknown> {
+  return {
+    promptTemplate: 'p',
+    providerId: null,
+    modelId: null,
+    effort: null,
+    thinking: null,
+    allowedTools: [],
+    disallowedTools: [],
+    permissionMode: null,
+    maxTurns: null,
+    maxBudgetUsd: null,
+    systemPrompt: null,
+    agents: {},
+    skills: null,
+    mcpServers: {},
+    cwd: null,
+    additionalDirectories: [],
+    sandbox: null,
+    sessionMode: 'isolated',
+    structuredOutput,
+  };
+}
+
 describe('createReplaceWorkflowGraphHandler', () => {
   it('érvényes gráfot cserél, és a friss dokumentumot adja vissza', async () => {
     const database = openMemoryDatabase();
@@ -151,30 +175,6 @@ describe('createReplaceWorkflowGraphHandler', () => {
   });
 
   describe('a strukturált kimenet sémája (SPEC-015 5.7, AC3)', () => {
-    function agentSettings(structuredOutput: unknown): Record<string, unknown> {
-      return {
-        promptTemplate: 'p',
-        providerId: null,
-        modelId: null,
-        effort: null,
-        thinking: null,
-        allowedTools: [],
-        disallowedTools: [],
-        permissionMode: null,
-        maxTurns: null,
-        maxBudgetUsd: null,
-        systemPrompt: null,
-        agents: {},
-        skills: null,
-        mcpServers: {},
-        cwd: null,
-        additionalDirectories: [],
-        sandbox: null,
-        sessionMode: 'isolated',
-        structuredOutput,
-      };
-    }
-
     const newerDraftSchema = { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object' };
 
     it('az agent_step és a join ai_synthesis érvénytelen sémája invalid_request a két mezőúttal, írás nélkül', async () => {
