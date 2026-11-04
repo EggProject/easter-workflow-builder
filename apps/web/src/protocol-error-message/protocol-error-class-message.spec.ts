@@ -55,6 +55,7 @@ describe('protocolErrorClassMessage', () => {
     ['provider_descriptor_sdk_mismatch', 'A provider leírója nem a telepített Agent SDK verzióhoz készült.'],
     ['template_render_failed', 'A workflow egyik sablonja hibás, ezért a futás nem indítható.'],
     ['expression_evaluation_failed', 'A workflow egyik kifejezése hibás, ezért a futás nem indítható.'],
+    ['script_compile_failed', 'A workflow egyik szkriptje nem fordítható le, ezért a futás nem indítható.'],
     ['skill_not_found', 'Egy lépés olyan skillre hivatkozik, ami nincs a skill könyvtárban.'],
     [
       'mcp_server_not_found',

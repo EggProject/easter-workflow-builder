@@ -76,6 +76,7 @@ describe('mapOutcomeMessageToErrorCode', () => {
     'mcp_server_connection_failed',
     'agent_skill_not_in_step',
     'agent_mcp_server_override_conflict',
+    'script_compile_failed',
   ] as const)('a motor %s validációs hibaosztályát unprocessable kódra képezi', (kind) => {
     expect(mapOutcomeMessageToErrorCode(formatEngineErrorMessage(kind, 'A futás nem indítható'))).toBe('unprocessable');
   });

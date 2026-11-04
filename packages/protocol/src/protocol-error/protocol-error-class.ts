@@ -7,7 +7,8 @@ import { z } from 'zod';
  * a futás indításának minden validációs hibaosztálya (SPEC-004 4.2, 4.5,
  * 4.6, 4.7, 4.8, 8.2 és 11.3, a motor `validateRun` és `prepareRun` útja,
  * plusz a SPEC-010 9.2 sablon és kifejezés fordítási ellenőrzése és a
- * SPEC-009 5.1 skill hivatkozás ellenőrzése),
+ * SPEC-009 5.1 skill hivatkozás ellenőrzése, és a SPEC-014 5.7 JavaScript
+ * szkript fordítási ellenőrzése),
  * plusz a jóváhagyás `already_decided` ága (`packages/db`
  * `human-approval-repository.ts`), plusz a skill feltöltés tizenhat szerver
  * oldali elutasítási osztálya (SPEC-009 5.4, O-41, user döntés 2026-10-28;
@@ -73,6 +74,8 @@ export const ProtocolErrorClassSchema = z.enum([
   // nevű MCP felülírást ad; a futás indítása megnevezett hibával utasítja el
   'agent_skill_not_in_step',
   'agent_mcp_server_override_conflict',
+  // SPEC-014 5.7: a JavaScript szkript forrása nem fordítható, a futás indítása elutasítja
+  'script_compile_failed',
   // SPEC-005 4.2 18. végpont: a jóváhagyás már el van döntve
   'already_decided',
   // SPEC-009 5.4: a skill feltöltés elutasítási okai (O-41)

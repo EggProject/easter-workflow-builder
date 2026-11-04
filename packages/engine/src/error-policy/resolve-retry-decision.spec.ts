@@ -41,6 +41,24 @@ describe('resolveRetryDecision', () => {
     ).toStrictEqual({ kind: 'unhandled_error_kind' });
   });
 
+  // SPEC-014 5.7, AC4: a szkript lépés három futásidejű osztálya név szerint
+  // kezelhető, ugyanúgy, mint bármely más motor hibaosztály (SPEC-004 8.2).
+  it.each(['script_evaluation_failed', 'script_timed_out', 'script_output_not_json'] as const)(
+    'a(z) %s szkript hibaosztály név szerint kezelhető, a többi szkript osztály nem',
+    (failedErrorKind) => {
+      expect(
+        resolveRetryDecision({ config: configOf(2, [100], [failedErrorKind]), failedErrorKind, failedAttempt: 1 }),
+      ).toStrictEqual({ kind: 'retry', backoffMs: 100, nextAttempt: 2 });
+      expect(
+        resolveRetryDecision({
+          config: configOf(2, [100], ['script_compile_failed']),
+          failedErrorKind,
+          failedAttempt: 1,
+        }),
+      ).toStrictEqual({ kind: 'unhandled_error_kind' });
+    },
+  );
+
   it('attempt egyenlő maxAttempts esetén attempts_exhausted', () => {
     expect(
       resolveRetryDecision({

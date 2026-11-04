@@ -55,6 +55,7 @@ const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>
   agent_mcp_server_override_conflict:
     'Egy agent definíció olyan MCP szervert ír felül, amit a lépés is használ, ezért a felülírás nem érvényesülne.',
   missing_mcp_server_env: 'Egy lépés MCP szerveréhez rendelt szerver oldali env változó nincs beállítva.',
+  script_compile_failed: 'A workflow egyik szkriptje nem fordítható le, ezért a futás nem indítható.',
   already_decided: 'Ezt a jóváhagyást már eldöntötték.',
   // SPEC-009 5.4 tábla: a skill feltöltés elutasítási okai (O-41, user döntés 2026-10-28).
   skill_archive_unreadable: 'A feltöltött fájl nem érvényes ZIP csomag.',

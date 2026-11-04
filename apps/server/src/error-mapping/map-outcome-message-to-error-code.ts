@@ -87,6 +87,8 @@ const ENGINE_VALIDATION_ERROR_CLASSES = [
   'mcp_server_connection_failed',
   'agent_skill_not_in_step',
   'agent_mcp_server_override_conflict',
+  // SPEC-014 5.7: a JavaScript szkript fordítási ellenőrzése a futás indításakor.
+  'script_compile_failed',
 ] satisfies readonly EngineErrorKind[];
 
 /**

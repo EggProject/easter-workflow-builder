@@ -137,4 +137,14 @@ export type EngineErrorKind =
   // (user döntés 2026-10-21). Csak a `run_finished` payloadban és a
   // `workflow_run.error_kind` oszlopban jelenik meg, REST hibatörzsben soha,
   // ezért nem tagja a `ProtocolErrorClass` szótárnak.
-  | 'run_stalled';
+  | 'run_stalled'
+  // SPEC-014 5.7: a szkript csomópont JavaScript útja (a CEL út a meglévő
+  // `expression_evaluation_failed` osztályon megy). A `script_compile_failed` a
+  // futás indításának elutasítása, REST hibatörzsben is megjelenik, ezért tagja a
+  // `ProtocolErrorClass` szótárnak. A másik három lépés szintű hiba, a futás
+  // eseményein megy ki, és az `error_handler` `handledErrorKinds` szűrője név
+  // szerint kezelheti (SPEC-004 8.2).
+  | 'script_compile_failed'
+  | 'script_evaluation_failed'
+  | 'script_timed_out'
+  | 'script_output_not_json';
