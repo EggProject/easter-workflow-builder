@@ -60,8 +60,7 @@ Teljes lista: research 5. szekció (E-1 ... E-6). Kivonat:
   az n8n és a Windmill tömb és objektum típussal egészíti ki (E-2, E-3), és a Windmill a bemenetet a típusra
   ellenőrzi (E-3).
 - A CEL szigorú típusú: szöveget számmal nem hasonlít, a JSON szám `double` (E-4). Ma tehát egy
-  `input.darab > 3` kifejezés hibát ad, mert a `darab` szövegként érkezik. A `cel-js` viselkedése mérendő
-  (E-5).
+  `input.darab > 3` kifejezés hibát ad, mert a `darab` szövegként érkezik. A `cel-js` 8.0.0-n mérve (E-5).
 - A böngésző beviteli mezője szöveget ad, a számot a `valueAsNumber` adja, üresen `NaN` (E-6).
 
 ## 4. Fogalmak
@@ -130,8 +129,9 @@ Teljes lista: research 5. szekció (E-1 ... E-6). Kivonat:
 - A JSON mező szövege, ha nem értelmezhető (`JSON.parse` kivétel), a mező alatti hibát ad, és a futás nem indul.
 - A szám a CEL-ben `double` (E-4, SPEC-010 M-122), tehát `input.darab > 3` működik, de `input.darab + 1` int
   literállal a CEL szabálya szerint nem (nincs automatikus aritmetikai konverzió, E-4); a helyes alak
-  `input.darab + 1.0`. A viselkedést a PLAN-017 T-017-2 lépése a `cel-js`-en méri (E-5), és a SPEC-010
-  dokumentációja mondja ki.
+  `input.darab + 1.0`. A `cel-js` 8.0.0-n mérve (E-5, research 10. szekció): az egész JSON szám (`5`) is `double`,
+  tehát `input.darab + 1` egész értékre is hiba; a szöveg és szám egyenlősége (`input.s == 5`) nem hiba, hanem
+  `false`. A SPEC-010 dokumentációja ezt mondja ki (PLAN-017 T-017-10).
 
 ### 5.5 A motor ellenőrzi a típust
 
@@ -169,7 +169,7 @@ garantáltan sosem bukna (a halott ág tilalma, `.claude/CLAUDE.md` 5. szekció)
   `choice` opción kívüli értéke hiba.
 - `apps/web`: a választó a szerkesztőben, az opciók mezője, a típusos mezők a futás indító ablakban, a küldött JSON
   alakja, az érvénytelen JSON mező alatti hibája; e2e a futás indításra `page.route()` mockkal.
-- Mérés: a `cel-js` 8.0.0 viselkedése szöveg, szám és logikai bemenetre (E-5).
+- Mérés: a `cel-js` 8.0.0 viselkedése szöveg, szám és logikai bemenetre (E-5); elvégezve, research 10. szekció.
 
 ## 7. Nyitott kérdések
 
@@ -183,9 +183,9 @@ garantáltan sosem bukna (a halott ág tilalma, `.claude/CLAUDE.md` 5. szekció)
 
 ### 7.2 Technikai, nyitva
 
-| #   | Kérdés                                   | Mi a viselkedés addig                      | Mi zárná le      |
-| --- | ---------------------------------------- | ------------------------------------------ | ---------------- |
-| T-1 | A `cel-js` 8.0.0 típus viselkedése (E-5) | a CEL szabálya (E-4) a dokumentált elvárás | a T-017-2 mérése |
+| #   | Kérdés                                   | Mi a viselkedés addig                                                                                               | Mi zárná le |
+| --- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------- |
+| T-1 | A `cel-js` 8.0.0 típus viselkedése (E-5) | **lezárva** 2026-11-04 (T-017-2): mérve, research 10. szekció; az 5.4 állítása igaz, az egész JSON szám is `double` |             |
 
 ## 8. Elfogadási kritériumok
 

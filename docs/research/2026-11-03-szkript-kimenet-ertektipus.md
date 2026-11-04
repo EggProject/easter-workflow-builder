@@ -8,7 +8,9 @@
 - Kapcsolódó user döntések: SPEC-009 14.6 O-23 (szkript: "saját spec, később"), O-24 (strukturált kimenet:
   "saját spec"), O-25 (valueKind: "saját kis spec"), mind 2026-10-26.
 - Nem futott: valódi API hívás, kód módosítás, teszt. Ahol egy állítás mérésen múlna, "nem ellenőrzött".
-- Frissítve 2026-11-04: a 8. szekció (JavaScript sandbox hálózattal és fájllal) és a 9. szekció (a user döntései).
+- Frissítve 2026-11-04: a 8. szekció (JavaScript sandbox hálózattal és fájllal), a 9. szekció (a user döntései) és
+  a 10. szekció (a `cel-js` típus viselkedésének mérése, PLAN-017 T-017-2; ez kódot futtatott, a fenti "Nem futott"
+  pont a 10. szekcióra nem vonatkozik).
 
 Jelölés: **ellenőrzött** = elsődleges forrás plusz legalább két független megerősítés; **részben** = egy
 elsődleges forrás, vagy csak azonos gyártó több oldala; **nem ellenőrzött** = nincs elég megerősítés, a spec
@@ -92,12 +94,12 @@ erre nem épít döntést.
 | E-2 | n8n "Execute Sub-workflow Trigger" mező típusai: string, number, boolean, array, object, any                                                                                                                                                                    | <https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executeworkflowtrigger>; a node forrása; <https://github.com/n8n-io/n8n/pull/11922>                                                                                                          | részben                                    |
 | E-3 | Windmill: "Arguments can specify a type `integer`, `number`, `string`, `boolean`, `object`, `array` or `any`. The user's input will be validated against that type."                                                                                            | <https://www.windmill.dev/docs/core_concepts/json_schema_and_parsing>; két további Windmill oldal                                                                                                                                                                | részben (egy gyártó)                       |
 | E-4 | A CEL szigorú típusú: a JSON szám `double`, a `string` és a szám között nincs rendezés ("Comparisons require strict type equality at type-check time"), futásidőben `no_matching_overload`; az `int` és `double` között nincs automatikus aritmetikai konverzió | <https://github.com/google/cel-spec/blob/master/doc/langdef.md>; <https://github.com/cel-expr/cel-spec/wiki/proposal-210>; SPEC-010 M-122                                                                                                                        | ellenőrzött                                |
-| E-5 | Ugyanez a `@marcbachmann/cel-js` 8.0.0-ban (szöveg kontra szám összehasonlítás, `double + 1` int literállal)                                                                                                                                                    | nincs mérés                                                                                                                                                                                                                                                      | nem ellenőrzött                            |
+| E-5 | Ugyanez a `@marcbachmann/cel-js` 8.0.0-ban: a JS `number` mindig `double` (az egész is), a szöveg és a szám rendezése és aritmetikája `no such overload` hiba, az egyenlőségük `false`; `double + 1` int literállal hiba, `+ 1.0`-val működik                   | saját mérés, 10. szekció; a telepített forrás `lib/operators.js` `debugType`                                                                                                                                                                                     | mérve (10. szekció)                        |
 | E-6 | A HTML `input.value` mindig szöveg, a `type="number"` számát a `valueAsNumber` adja (üresen `NaN`); a checkbox állapota a `checked` logikai érték                                                                                                               | <https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value>; <https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/valueAsNumber>; <https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/checkbox>              | részben (egy gyártó, plusz Stack Overflow) |
 
 **Következmény (E-4):** ma a futás bemenete szövegként érkezik (C-16), tehát egy `input.darab > 3` alakú
 `branch` kifejezés a CEL szabálya szerint futásidőben hibát ad, nem számként hasonlít. A `cel-js`
-viselkedése erre mérendő (E-5, PLAN-017 F0).
+8.0.0-ban ez mérve (E-5, 10. szekció).
 
 ## 6. A `fail_run` és az `error_handler` backoff ütközése
 
@@ -147,7 +149,8 @@ csoportjába (két ág, hosszú backoff, a futás a bukás után a backoff kivá
 2. K-2, K-3: az SDK újrapróbálásainak száma és belső validátora (melyik kulcsszót kényszeríti).
 3. K-6: a `MiniMax-M3.1-Flash` viselkedése a séma kulcsszavaira (mérés nélkül a leíró csak a használhatóságot
    tudja, C-12).
-4. E-5: a `cel-js` 8.0.0 típus viselkedése szöveg és szám bemenetre (mérés: PLAN-017 T-017-2).
+4. ~~E-5: a `cel-js` 8.0.0 típus viselkedése szöveg és szám bemenetre.~~ Lezárva 2026-11-04: mérve, 10. szekció
+   (PLAN-017 T-017-2).
 5. 6. szekció: a megszakítás végállapota egy már `fail_run` állapotú futáson.
 6. J-8: a bellard QuickJS 2025-09-13 érintettsége a quickjs-ng 2026-os hibáiban; a WebAssembly modul szintű
    memória plafon; hogy egy motor memóriahiba a WebAssembly lineáris memóriájában marad-e (PLAN-015 T-015-2).
@@ -205,3 +208,86 @@ lista mintája szerint; zárt felsorolás az olvasó úton is.
 `ProtocolErrorClass` szótárt és az `error-class-drift-protection` témát bővíti, tehát párhuzamosan ütköznének; a
 PLAN-017 a legkisebb és külső függőség nélküli; a PLAN-016 egy függőséget (Ajv) hoz; a PLAN-015 a legnagyobb, új
 futtatóval és a nyitott O-5, O-6 kérdéssel.
+
+## 10. A `cel-js` típus viselkedésének mérése (PLAN-017 T-017-2, 2026-11-04)
+
+**Módszer.** Eldobható próba a repón kívül (`/tmp/cel-probe/`), Node v26.7.0 alatt
+`node --experimental-strip-types`, a termék saját kiértékelőjén át: a
+`packages/workflow-language/src/cel-expression/create-cel-expression-evaluator.ts` `createCelExpressionEvaluator()`
+függvénye, abszolút útvonallal importálva. Ez ugyanazt a környezetet építi, amit a termék (`createCelEnvironment`:
+opció nélküli `Environment`, a hét `RunContext` név `dyn` típussal), a kontextust a `toCelContext` képezi le (az
+`input` értéke változatlanul megy át, `BigInt` átalakítás csak az `itemIndex` és az `iteration` egész értékén van),
+az eredményt a `normalizeCelResult` normalizálja, a hibát a `describeCelError` írja le. Esetenként előbb `compile`,
+utána `evaluate` a `{ input }` kontextuson. A könyvtár nyers hibaszövegéhez egy második próba ugyanígy épített
+`Environment`-et használt (`registerVariable('input', 'dyn')`), a termék leképező rétegei nélkül.
+
+**Verzió.** `@marcbachmann/cel-js` 8.0.0: a `packages/workflow-language/node_modules/@marcbachmann/cel-js` link célja
+`node_modules/.bun/@marcbachmann+cel-js@8.0.0/...`, a `package.json` `version` mezője `8.0.0`.
+
+**A bemenet:** `{ s: '5', n5: 5, n25: 2.5, n55: 5.5, b: true, lista: ['a', 'b'], obj: { k: 'v', n: 7 } }`.
+
+**Eredmények.** Mind a 44 kifejezés `compile` eredménye `ok` (a `dyn` változó miatt a típus ellenőrzés a fordításkor
+nem jelez, minden eltérés futásidőben jön). A "termék" oszlop az `evaluate` `Outcome` értéke, a "könyvtár" oszlop a
+nyers `EvaluationError` szövegének első sora, ahol hiba van.
+
+| Kifejezés                                                 | Termék (`evaluate`)                                                                | Könyvtár hibaszövege                     |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------- |
+| `input.s > 3`                                             | hiba: "a művelet ezekre az operandus típusokra nem értelmezett (pozíció: 0)"       | `no such overload: dyn<string> > int`    |
+| `input.s > 3.0`                                           | hiba, ugyanaz a mondat                                                             | `no such overload: dyn<string> > double` |
+| `input.s + 1`                                             | hiba, ugyanaz a mondat                                                             | `no such overload: dyn<string> + int`    |
+| `input.s == 5`                                            | `false`                                                                            | nincs hiba                               |
+| `input.s == '5'`                                          | `true`                                                                             |                                          |
+| `input.n5 > 3`, `input.n5 > 3.0`                          | `true`, `true`                                                                     |                                          |
+| `input.n5 + 1`                                            | hiba, ugyanaz a mondat                                                             | `no such overload: dyn<double> + int`    |
+| `input.n5 + 1.0`                                          | `6`                                                                                |                                          |
+| `input.n5 * 2`                                            | hiba, ugyanaz a mondat                                                             | `no such overload: dyn<double> * int`    |
+| `input.n5 * 2.0`                                          | `10`                                                                               |                                          |
+| `input.n5 == 5`, `input.n5 == 5.0`                        | `true`, `true`                                                                     |                                          |
+| `input.n5 == '5'`                                         | `false`                                                                            |                                          |
+| `int(input.n5) + 1`, `input.n5 + double(1)`               | `6`, `6`                                                                           |                                          |
+| `type(input.n5)`, `type(input.n25)`                       | hiba: "a kifejezés eredményében nem JSON érték áll" (a nyers érték `Type<double>`) |                                          |
+| `input.n25 > 3`, `input.n25 > 3.0`                        | `false`, `false`                                                                   |                                          |
+| `input.n25 + 1`                                           | hiba, ugyanaz a mondat                                                             | (azonos alak, `dyn<double> + int`)       |
+| `input.n25 + 1.0`, `input.n25 == 2.5`                     | `3.5`, `true`                                                                      |                                          |
+| `input.n55 > 3`, `input.n55 + 1`, `input.n55 + 1.0`       | `true`, hiba (ugyanaz a mondat), `6.5`                                             |                                          |
+| `input.b == true`, `!input.b`, `input.b && true`          | `true`, `false`, `true`                                                            |                                          |
+| `input.b == 1`                                            | `false`                                                                            |                                          |
+| `size(input.lista)`, `size(input.lista) > 1`              | `2`, `true`                                                                        |                                          |
+| `'a' in input.lista`, `'c' in input.lista`                | `true`, `false`                                                                    |                                          |
+| `input.lista[0]`, `input.lista == ["a", "b"]`             | `"a"`, `true`                                                                      |                                          |
+| `input.obj.k`, `input.obj.k == 'v'`                       | `"v"`, `true`                                                                      |                                          |
+| `input.obj.n + 1`, `input.obj.n + 1.0`                    | hiba (ugyanaz a mondat), `8`                                                       |                                          |
+| `input.obj.hianyzo`                                       | hiba: "a hivatkozott kulcs nem létezik (pozíció: 10)"                              | `No such key: hianyzo`                   |
+| `has(input.obj.k)`, `'k' in input.obj`, `size(input.obj)` | `true`, `true`, `2`                                                                |                                          |
+
+**Az egész JSON szám is `double`.** A nyers könyvtáron `type(x)` az `x = 5` és az `x = 2.5` értékre is
+`Type<double>`, és mindkettőre `x + 1` hiba (`no such overload: dyn<double> + int`), `x + 1.0` szám. A forrás
+ugyanezt mondja: a telepített `lib/operators.js` `debugType` függvénye a `typeof v` szerint dönt, a `'number'`
+ágon `doubleType`, a `'bigint'` ágon `intType`; a `lib/registry.js` `double` ellenőrzője `typeof v === 'number'`.
+Egy JS `number` tehát egész értékkel is `double`, `int` csak `BigInt` lehet. A termékben az `input` értéke
+`BigInt` átalakítás nélkül megy át (`toCelContext`), tehát a Start bemenet minden száma `double`.
+
+**Eltérés a csomag README-jétől.** A README "Integer values are `BigInt`" szakasza szerint "Pass integer context
+values as `BigInt` too, or use `unlistedVariablesAreDyn: true` to accept plain numbers via coercion", és a példája
+`evaluate('count + 1', { count: 5 })`. Mérve (8.0.0): a globális `evaluate('count + 1', { count: 5 })`, a
+`new Environment({ unlistedVariablesAreDyn: true })` `count + 1` és `input.x + 1` kifejezése is
+`no such overload: dyn<double> + int` hibát ad, a README `numbers.map(n, n * 2)` példája `[1, 2]` értékre
+`no such overload: dyn<double> * int`. A README állítása a telepített verzióra nem igaz; a termék ezt az opciót
+amúgy sem kapcsolja be (SPEC-010 7.1).
+
+**Következtetés.**
+
+1. A SPEC-016 5.4 állítása mérve igaz: `input.darab > 3` (int literállal is) működik, `input.darab + 1` hiba,
+   `input.darab + 1.0` működik, egész (`5`) és tört (`2.5`, `5.5`) JSON számra egyformán. A cel-js az egész JSON
+   számot NEM adja `int`-ként. Az összehasonlítás `double` és `int` literál között működik (a CEL vegyes numerikus
+   összehasonlítása, SPEC-010 M-122), az aritmetika nem; a kerülő út a `double` literál, a `double(1)` vagy az
+   `int(input.darab)`.
+2. A szöveg és a szám között a rendezés (`>`) és az aritmetika (`+`) futásidejű hiba, tehát a mai, szövegként érkező
+   bemenetre `input.darab > 3` hibát ad (SPEC-016 3. szekció, E-4 következménye igaz). Az egyenlőség viszont NEM
+   hiba: `input.s == 5` és `input.n5 == '5'` `false`, `input.b == 1` szintén `false`. Az E-4 sora a rendezésről
+   szól; a vegyes típusú egyenlőség a cel-js-ben csendben `false`, ami egy szövegként érkező számra írt `== 5`
+   feltételt hiba nélkül hamissá tesz. Ezt a típusos bemenet (SPEC-016 5.4) szünteti meg.
+3. A logikai érték, a szöveg tömb (`size`, `in`, index, lista egyenlőség) és a JSON objektum (mező elérés, `has`,
+   `in`, `size`) a várt módon működik; a hiányzó kulcs elérése hiba, a `has()` nem.
+4. A `type(...)` eredménye a termékben nem JSON érték, tehát kimenetként hibát ad; feltételben (`type(x) == double`)
+   nem mértük.
