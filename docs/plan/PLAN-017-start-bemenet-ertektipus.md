@@ -2,20 +2,21 @@
 
 |         |                                                                                                                |
 | ------- | -------------------------------------------------------------------------------------------------------------- |
-| Státusz | **blokkolt**: a SPEC-016 O-1 ... O-3 user döntése nélkül nem indítható (a T-017-2 mérés előtte is futhat)      |
-| Dátum   | 2026-11-03                                                                                                     |
+| Státusz | indítható: a SPEC-016 O-1 ... O-3 lezárva (user döntés 2026-11-04)                                             |
+| Dátum   | 2026-11-03, átvezetve 2026-11-04                                                                               |
 | Spec    | [`../spec/SPEC-016-start-bemenet-ertektipus.md`](../spec/SPEC-016-start-bemenet-ertektipus.md)                 |
 | Forrás  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md) |
 | Branch  | `feat/spec-016-start-bemenet-ertektipus`                                                                       |
 
-A lépések a SPEC-016 8. szekciójának kritérium számára hivatkoznak (`ACn`). A választólistához tartozó
-lépések `[L]` jelölést kapnak, és csak akkor futnak, ha az O-1 válasza (a) vagy (c).
+A lépések a SPEC-016 8. szekciójának kritérium számára hivatkoznak (`ACn`). Végrehajtási sorrend a három
+terv között: PLAN-017, PLAN-016, PLAN-015 (a research 9. szekciója); ez a terv az első, mert a legkisebb, nincs új
+külső függősége, és a típusos bemenet a szkript lépés (PLAN-015) bemenetét is adja.
 
 ## 1. Előfeltételek
 
 | Feltétel            | Elvárt érték                                                 | Ellenőrzés                        |
 | ------------------- | ------------------------------------------------------------ | --------------------------------- |
-| SPEC-016 döntései   | O-1 ... O-3 lezárva, átvezetve a specbe                      | a SPEC-016 7.1 szekciója          |
+| SPEC-016 döntései   | O-1 ... O-3 lezárva, átvezetve a specbe (megvan)             | a SPEC-016 7.1 szekciója          |
 | Feature branch      | `feat/spec-016-start-bemenet-ertektipus`, a friss `main`-ről | `git rev-parse --abbrev-ref HEAD` |
 | A kiinduló fej zöld | a kilenc kapu                                                | a T-017-1 kimenete                |
 
@@ -45,23 +46,26 @@ A `model` és az `effort` mező soha nem hagyható üresen (gyökér `CLAUDE.md`
 
 ## 4. Todo lépések
 
-| ID          | Leírás                                                                                                                                                                                                                                                    | Függőség         | Modell             | Elfogadási kritérium                                       |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------------ | ---------------------------------------------------------- |
-| T-017-1     | Kiindulás: kilenc kapu, a SPEC-016 döntéseinek átvezetése.                                                                                                                                                                                                | user döntés      | `sonnet`, `medium` | kilenc kapu zöld; spec "jóváhagyott"                       |
-| T-017-2     | Mérés (döntéstől független): a `cel-js` 8.0.0 viselkedése szöveg, szám (`double`) és logikai bemenetre: összehasonlítás int literállal, aritmetika int és double literállal, egyenlőség szöveg és szám között; eldobható próba, számok a research fájlba. | nincs            | `opus`, `medium`   | a research E-5 sora lezárva; AC5 mérési része              |
-| T-017-3     | `db`: `StartInputValueKind` unió, írás oldali ellenőrzés a `replaceGraph`-ban, a kötelező szöveg mező táblából a `valueKind` törlése; az olvasó guard változatlanul bármilyen szöveget elfogad.                                                           | T-017-1          | `sonnet`, `high`   | AC1 (db rész), AC2 (olvasás); valós `:memory:` adatbázison |
-| T-017-4     | `protocol`: `z.enum` a mentési sémában, az olvasó séma szöveg marad; az `apps/server` sodródás védelme kétirányú típusszintű és futásidejű ággal; a kötelező mező tábla egyenlőségének védelme frissítve.                                                 | T-017-3          | `sonnet`, `high`   | AC1                                                        |
-| T-017-5 [L] | Választólista opciók: `options` mező a `StartInputField`-en (csak ennél a típusnál), a zárt kulcslisták (`isRecordWithKnownKeys`) és a mentési szabály (nem üres lista) mindkét oldalon, sodródás védelemmel.                                             | T-017-4          | `opus`, `medium`   | a zárt kulcslista teszt mindkét oldalon zöld               |
-| T-017-6     | Motor: a futás indításának típus ellenőrzése a jelen lévő mezőkre, `invalid_input_type`, adat írás nélkül; a régi értékek az O-2 szerint; meglévő typeguardok, szükség esetén új guard a `typeguards` csomagban unit teszttel.                            | T-017-3          | `sonnet`, `high`   | AC2 (futás rész), AC4                                      |
-| T-017-7     | Hibaosztály: `invalid_input_type` a `ProtocolErrorClass` szótárban és a kliens magyar mondataiban, az `error-class-drift-protection` bővítésével.                                                                                                         | T-017-6          | `sonnet`, `high`   | AC4 (protokoll rész)                                       |
-| T-017-8     | Felület: a szerkesztő `SelectField` választója; a futás indító ablak típus szerinti mezői (`TextField` `type="number"` a `valueAsNumber` értékkel, `Checkbox`, `SelectField`), típusos JSON küldés, mező alatti hiba; unit és e2e (`page.route()`).       | T-017-4, T-017-7 | `sonnet`, `high`   | AC3                                                        |
-| T-017-9     | Átvezetés: SPEC-003 4.3, SPEC-008 5.1 és 6.5, `apps/web/CLAUDE.md:284-288`, `packages/db/CLAUDE.md:77`, a SPEC-010 felhasználói súgója a szám aritmetikáról, a hiányleltár H-12 sora.                                                                     | T-017-2, T-017-8 | `sonnet`, `medium` | AC5, AC6                                                   |
-| T-017-10    | Adverzariális átvizsgálás és kritérium tábla a research fájlba.                                                                                                                                                                                           | T-017-9          | `opus`, `medium`   | minden AC teszthez kötve                                   |
-| T-017-11    | Merge kapu a PR fején, PR leírás.                                                                                                                                                                                                                         | T-017-10         | `sonnet`, `medium` | AC7                                                        |
+| ID       | Leírás                                                                                                                                                                                                                                                                                                           | Függőség         | Modell             | Elfogadási kritérium                                            |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------------ | --------------------------------------------------------------- |
+| T-017-1  | Kiindulás: kilenc kapu a kiinduló fejen.                                                                                                                                                                                                                                                                         | nincs            | `sonnet`, `medium` | kilenc kapu zöld                                                |
+| T-017-2  | Mérés: a `cel-js` 8.0.0 viselkedése szöveg, szám (`double`), logikai, szöveg tömb és JSON objektum bemenetre: összehasonlítás int literállal, aritmetika int és double literállal, egyenlőség szöveg és szám között, `size()` és tagság a tömbön; eldobható próba, számok a research fájlba.                     | nincs            | `opus`, `medium`   | a research E-5 sora lezárva; AC6 mérési része                   |
+| T-017-3  | `db`: `StartInputValueKind` hat értékű unió, a `StartInputField` `valueKind` szerinti uniója (`choice` ágon `options`), zárt kulcslista ágonként, az `isNodeConfig` szigorú ellenőrzése írás és olvasás úton, a `choice` mentési szabálya, a kötelező szöveg mező táblából a `valueKind` törlése.                | T-017-1          | `sonnet`, `high`   | AC1 (db rész), AC2, AC3 (db rész); valós `:memory:` adatbázison |
+| T-017-4  | `protocol`: `z.enum` és `z.discriminatedUnion('valueKind', ...)` az olvasó és a mentési sémában, a `choice` mentési szabálya a `superRefine` `when` feltételével; az `apps/server` sodródás védelme (kétirányú típusszintű és futásidejű ág, a kötelező mező tábla egyenlősége, az `options` szabály mezőnként). | T-017-3          | `sonnet`, `high`   | AC1, AC3                                                        |
+| T-017-5  | Motor: a futás indításának típus ellenőrzése a jelen lévő mezőkre az SPEC-016 5.5 táblája szerint (`isString`, `isNumber`, `isBoolean`, `isStringArray`, tagság), `invalid_input_type`, adat írás nélkül.                                                                                                        | T-017-3          | `sonnet`, `high`   | AC5 (motor rész)                                                |
+| T-017-6  | Hibaosztály: `invalid_input_type` a `ProtocolErrorClass` szótárban és a kliens magyar mondataiban, az `error-class-drift-protection` bővítésével.                                                                                                                                                                | T-017-5          | `sonnet`, `high`   | AC5 (protokoll rész)                                            |
+| T-017-7  | Szerkesztő: `SelectField` a hat értékre, alapérték `text`; `choice` típusnál az opciók soronkénti `TextAreaField` mezője; mező alatti hiba; a bemutató fixtúra `'text'` értékre; unit.                                                                                                                           | T-017-4          | `sonnet`, `high`   | AC3 (felület rész)                                              |
+| T-017-8  | Futás indító ablak: az 5.1 táblázat mezői (`TextField`, `type="number"` a `valueAsNumber` értékkel, `Checkbox`, `SelectField`, soronkénti és JSON `TextAreaField`), típusos JSON küldés, üres mező hiányzó kulcs, érvénytelen JSON mező alatti hibája; unit és e2e (`page.route()`).                             | T-017-4, T-017-6 | `sonnet`, `high`   | AC4                                                             |
+| T-017-9  | Képernyőképek: a `bun run screenshots` újrafuttatása a megváltozott bemutató fixtúrával, a manifeszt frissítése (`.claude/CLAUDE.md` 12. szekció).                                                                                                                                                               | T-017-7, T-017-8 | `sonnet`, `medium` | a `screenshot-pipeline` invariánsai zöldek                      |
+| T-017-10 | Átvezetés: SPEC-003 4.3, SPEC-004 4.8, SPEC-008 5.1 és 6.5, a SPEC-010 dokumentációja a szám aritmetikáról, `apps/web/CLAUDE.md:284-288`, `packages/db/CLAUDE.md:77`, a szabálykönyv 5. szekciója (a szigorú olvasó út kivétele), a hiányleltár H-12 sora.                                                       | T-017-2, T-017-9 | `sonnet`, `medium` | AC6, AC7                                                        |
+| T-017-11 | Adverzariális átvizsgálás és kritérium tábla a research fájlba.                                                                                                                                                                                                                                                  | T-017-10         | `opus`, `medium`   | minden AC teszthez kötve                                        |
+| T-017-12 | Merge kapu a PR fején, PR leírás.                                                                                                                                                                                                                                                                                | T-017-11         | `sonnet`, `medium` | AC8                                                             |
+
+Becsült lépésszám: 12.
 
 ## 5. Kockázatok
 
-- A régi bemutató fixtúra (`'string'`) és a v1 pillanatkép fixtúra (`'text'`, `'number'`) eltérő szövegei:
-  a v1 fixtúra commitolt és változatlan marad (pillanatkép), a bemutató fixtúra a választott készletre áll át,
-  a képernyőkép lenyomata ettől elavul (`.claude/CLAUDE.md` 12. szekció), tehát a `bun run screenshots` újra
-  fut.
+- A v1 pillanatkép fixtúra (`'text'`, `'number'`) a választott nevekkel érvényes, tehát változatlan marad; ha egy
+  lépés mégis a fixtúra módosítására kényszerülne, a lenyomat literál nem írható felül (a fixtúra teszt fejléce),
+  és a lépés megáll.
+- A bemutató fixtúra változása a képernyőkép lenyomatot elavulttá teszi (T-017-9).

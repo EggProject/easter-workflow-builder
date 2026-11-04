@@ -2,8 +2,8 @@
 
 |          |                                                                                                                                                                                                     |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | tervezet, user döntésre vár: a 7. szekció O-1 ... O-3 termékkérdése nyitott; a technikai döntések forrásból lezárva (5. szekció)                                                                    |
-| Dátum    | 2026-11-03                                                                                                                                                                                          |
+| Státusz  | jóváhagyott: a 7.1 szekció O-1 ... O-3 termékkérdése lezárva (user döntés 2026-11-04); a technikai döntések forrásból lezárva (5. szekció)                                                          |
+| Dátum    | 2026-11-03, átvezetve 2026-11-04                                                                                                                                                                    |
 | Előzmény | [`SPEC-003`](SPEC-003-domain-perzisztencia.md) 4.6, [`SPEC-004`](SPEC-004-vegrehajto-motor.md) 5.2 és 17. szekció 21. kritérium, [`SPEC-013`](SPEC-013-flash-es-haiku.md) 3.2 (a Flash leíró mezői) |
 | Bemenet  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md) 2. és 4. szekció; a hiányleltár H-17 tétele                                          |
 | Kimenet  | a strukturált kimenetet váró lépés csak akkor `succeeded`, ha a kimenet a beállított sémára illeszkedik; a SPEC-004 21. kritériuma teljesül                                                         |
@@ -17,17 +17,21 @@ A user döntése (SPEC-009 14.6 O-24, 2026-10-26): a strukturált kimenet séma 
 specet kap. A `packages/engine/CLAUDE.md:432-437` a hiányt "megnevezett hiány, nem elfogadott végállapot"
 címkével vezeti.
 
+**A user döntései (2026-11-04), szó szerint:** rossz alakú kimenet: "Hibával megáll" (a lépés hibás, a
+hibakezelő csomóponttal újrapróbálható); hibás séma jelzése: "Mentéskor és indításkor"; séma korlát: "Nincs".
+
 ### Amit eldönt
 
 1. Hol és mivel ellenőriz a motor (5.1 ... 5.3).
 2. Mikor ellenőrzi a séma saját érvényességét (5.4).
 3. Az eltérés hibaosztályát és a lépés sorsát (5.5).
 4. Hogy a `join` `ai_synthesis` módja is ugyanígy jár el (5.6).
+5. A mentéskori ellenőrzés helyét (5.7) és a séma korlát hiányának következményét (5.8).
 
 ### Amit NEM dönt el
 
 - A szerkesztő séma író felületét (ma szabad JSON szöveg, `apps/web/src/node-inspector/StructuredOutputField.tsx`):
-  csak a hibajelzés helyét, ha a user a mentéskori ellenőrzést választja (O-2).
+  csak a mentéskori hibajelzés helyét (5.7).
 - A `MiniMax-M3.1-Flash` dekódolási viselkedését a séma kulcsszavaira: mérési kérdés (research K-6), a motor
   ellenőrzése éppen ettől függetleníti a helyességet.
 - Új stratégiát: a `StructuredOutputStrategyId` egyetlen értéke a `sdk_output_format` marad.
@@ -103,7 +107,7 @@ a réteg térkép nem változik, mert külső csomag.
   felvéve, a meglévő sodródás védelemmel. Ez megelőzi, hogy az SDK a lépés elején álljon le (K-3), miközben
   a futás többi lépése már lefutott.
 - Draft-07-nél újabb `$schema` deklaráció érvénytelen, ugyanúgy, mint az SDK-ban (K-3).
-- A mentéskori ellenőrzés termékdöntés (O-2).
+- A mentéskor is ellenőriz (O-2 user döntés), lásd 5.7.
 
 ### 5.5 Eltérés esetén
 
@@ -122,26 +126,51 @@ a réteg térkép nem változik, mert külső csomag.
 Az alobjektuma teljes `AgentStepConfig` (SPEC-003 4.3), ugyanazon a `runAgentStep` úton fut, tehát az 5.1
 ... 5.5 rá is érvényes, külön kód nélkül.
 
+### 5.7 Mentéskori ellenőrzés (O-2 user döntés)
+
+- A mentés a sémát ugyanazzal a fordítóval ellenőrzi, mint a futás indítása (5.4): érvénytelen vagy draft-07-nél
+  újabb séma a mentést elutasítja, a hiba a `structuredOutput.schema` mező alatt jelenik meg
+  (`.claude/CLAUDE.md` 11. szekció), az `agent_step` és a `join` `ai_synthesis` alobjektumán is.
+- A futás indításakori ellenőrzés megmarad: az API más úton is ír gráfot, és a mentési szabály nem a `db`
+  invariánsa.
+- Az ellenőrzés helye a szerver `PUT .../graph` kezelője, nem a `protocol` mentési sémája. A kezelő ugyanazt az
+  `agent` csomagbeli fordító függvényt hívja (5.3), mint a futás indítása, és érvénytelen sémára `invalid_request`
+  hibát ad a mező útvonalával (`nodes.<index>.config.structuredOutput.schema`, illetve a `join` `ai_synthesis`
+  alobjektumán a megfelelő út). Indok: (1) egyetlen validátor és egyetlen fordító függvény dönt mentéskor és
+  indításkor, tehát a két ellenőrzés nem tud elsodródni, és nem kell hozzá sodródás védelem; (2) a `protocol` ma
+  csak a `core` és a `typeguards` csomagtól függ (`packages/protocol/package.json`), az Ajv a webes csomagba nem
+  kerül; (3) az `apps/server` már függ az `agent` csomagtól (`apps/server/package.json`). Az ára: a hiba a mentés
+  válasza után jelenik meg, nem gépelés közben.
+- A kliens ma a szerver mentési hibájának mezőútját nem jeleníti meg mezőn ("a mentés mezőútja nem kap mondatot",
+  `.claude/CLAUDE.md` 11. szekció). Ehhez a mezőhöz a kliens a szerver válasz mezőútját a mező alatti hibára
+  képezi le; ez a szabály szűkített kiegészítése, egyetlen mezőútra, és a szabálykönyvbe átvezetendő.
+
+### 5.8 Séma korlát (O-3 user döntés)
+
+Nincs korlát a séma méretére, mélységére és mintáira. Az Ajv biztonsági oldala szerint a séma az alkalmazás
+kódjával azonos megbízhatóságú (K-8), és itt a sémát a workflow készítő írja, ugyanúgy, mint a CEL kifejezést
+(SPEC-010 O-2 precedens). Kimondott kockázat: egy `pattern` kulcsszó a Node regex motorján exponenciális
+idejű lehet (K-8), és az ellenőrzés a szerver eseményhurkán fut.
+
 ## 6. Tesztelés
 
 - `agent`: illeszkedő és nem illeszkedő kimenet, érvénytelen séma, draft-07-nél újabb `$schema`, típusszűkítés.
 - `engine`: a lépés `succeeded` illeszkedésnél, `failed` `structured_output_schema_mismatch` osztállyal
   eltérésnél, a futás indítás elutasítása `invalid_structured_output_schema` osztállyal; hamis agenttel.
-- `apps/server`: az `error-class-drift-protection` téma a két új osztállyal.
+- `apps/server`: az `error-class-drift-protection` téma a két új osztállyal; a mentési út érvénytelen sémára
+  mezőútvonalas hibát ad.
+- `apps/web`: a mentéskori hiba a `structuredOutput.schema` mező alatt; e2e `page.route()` mockkal.
 - Valódi API hívás nem kell.
 
 ## 7. Nyitott kérdések
 
 ### 7.1 Termékdöntések (user)
 
-| #   | Kérdés                                                  | Opciók                                                                                                                              | Mi a viselkedés addig                                    | Mi zárná le |
-| --- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----------- |
-| O-1 | Rossz alakú kimenetnél mi történjen                     | (a) a lépés hibával áll meg, a hibakezelő csomóponttal újrapróbálható (ajánlott); (b) csak figyelmeztetés, a lépés sikeres marad    | ma a rossz alakú kimenet is sikeres lépés                | user döntés |
-| O-2 | Mikor szóljon a program a hibás sémáról                 | (a) mentéskor a mező alatt és a futás indításakor is (ajánlott); (b) csak a futás indításakor                                       | a hibás séma csak a lépés futásakor, az SDK-ban derül ki | user döntés |
-| O-3 | Legyen-e korlát a séma méretére, mélységére és mintáira | (a) nincs korlát, ugyanúgy, mint a kifejezéseknél: a workflow készítő felel érte (ajánlott, SPEC-010 O-2 precedens); (b) van korlát | nincs korlát                                             | user döntés |
-
-Az O-2 (a) ára: az Ajv a webes felületbe is bekerül (a `protocol` mentési sémája a böngészőben fut), vagy a
-szerver végzi és mezőútvonalas hibát ad. A PLAN-016 T-016-6 dönti el a kettő közül a csomagméret mérésével.
+| #   | Kérdés                                                  | Döntés                                                                                                                           |
+| --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| O-1 | Rossz alakú kimenetnél mi történjen                     | **lezárva** (user döntés 2026-11-04): "Hibával megáll", a hibakezelő csomóponttal újrapróbálható (5.5)                           |
+| O-2 | Mikor szóljon a program a hibás sémáról                 | **lezárva** (user döntés 2026-11-04): "Mentéskor és indításkor" (5.4, 5.7); a mentési ellenőrzés helye technikai, a T-016-6 méri |
+| O-3 | Legyen-e korlát a séma méretére, mélységére és mintáira | **lezárva** (user döntés 2026-11-04): "Nincs" (5.8)                                                                              |
 
 ### 7.2 Technikai, nyitva
 
@@ -156,7 +185,7 @@ szerver végzi és mezőútvonalas hibát ad. A PLAN-016 T-016-6 dönti el a ket
    `structured_output_schema_mismatch` osztállyal, az üzenetben az útvonal és a kulcsszó.
 2. Hiányzó kimenet továbbra is `missing_structured_output`.
 3. Érvénytelen vagy draft-07-nél újabb séma a futás indítását `invalid_structured_output_schema` osztállyal
-   elutasítja, adat írás nélkül.
+   elutasítja, adat írás nélkül; a mentést is elutasítja, a hiba a `structuredOutput.schema` mező alatt.
 4. A `join` `ai_synthesis` mód ugyanígy jár el, teszttel igazolva.
 5. A két új osztály a motor uniójában, a `ProtocolErrorClass` szótárban (ahol REST hiba) és a kliens magyar
    mondatai között áll, a sodródás védelem mindkét irányban zöld.
