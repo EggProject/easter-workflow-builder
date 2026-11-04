@@ -4,11 +4,12 @@
 // `agentQueryRunner` port hamis: a commitolt fixture üzenetsorát adja. Valódi
 // provider hívás nincs. A `run-probe.spec.ts` ezt indítja a valódi
 // `src/main.ts` helyett; a környezet és a leállítás ugyanaz (`EASTER_SERVER_PORT`,
-// `EASTER_DB_FILE`, `SIGTERM`).
+// `EASTER_DB_FILE`, `SIGTERM`), de a próba itt `0` portot kér, és a szerver a
+// ténylegesen lekötött portot a stdout első sorában jelenti.
 //
 // A `STUB_AGENT_REQUEST_FILE` útvonalra a hamis ágens a kapott kérés
 // ellenőrizhető részét írja (prompt, `maxTurns`, `model`, `effort`,
-// `maxBudgetUsd` jelenléte, a `skills` lista, a `plugins` jelenléte, az MCP szerverek neve, az adatbázis és a napló útvonala): az env ÉRTÉKEI nem, mert titkot hordozhatnak. A `STUB_AGENT_BEHAVIOR=fail` esetén a hamis ágens hibaágat ad.
+// `maxBudgetUsd` jelenléte, a kapott `EASTER_SERVER_PORT`, a `skills` lista, a `plugins` jelenléte, az MCP szerverek neve, az adatbázis és a napló útvonala): az env többi értéke nem, mert titkot hordozhatnak. A `STUB_AGENT_BEHAVIOR=fail` esetén a hamis ágens hibaágat ad.
 import { readFileSync, writeFileSync } from 'node:fs';
 import process from 'node:process';
 import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
@@ -32,6 +33,7 @@ import { buildRouteHandlers } from '../src/route-registry/build-route-handlers.t
 import { TEST_SKILL_LIBRARY } from '../src/skill-endpoint/test-skill-library.ts';
 import { registerShutdownSignalHandlers } from '../src/shutdown-sequence/register-shutdown-signal-handlers.ts';
 import { createStreamRegistry } from '../src/stream-registry/create-stream-registry.ts';
+import { formatProbePortReport } from './probe-port-report.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -85,6 +87,7 @@ function describeRequest(prompt: string, options: Readonly<Record<string, unknow
     hasMaxBudgetUsd: Object.hasOwn(options, 'maxBudgetUsd'),
     skills: options['skills'],
     hasPlugins: Object.hasOwn(options, 'plugins'),
+    requestedServerPort: process.env['EASTER_SERVER_PORT'],
     mcpServerNames: isRecord(options['mcpServers']) ? Object.keys(options['mcpServers']) : [],
   });
 }
@@ -142,4 +145,11 @@ const server = createHttpServer({
   idGenerator,
 });
 registerShutdownSignalHandlers({ server, engine, database, logger, streamRegistry });
-server.listen(port, '127.0.0.1');
+// A próba `0` portot kér: a portot az operációs rendszer itt, a kötéskor osztja
+// ki, és a szerver a stdout első sorában jelenti (`probe-port-report.ts`).
+server.listen(port, '127.0.0.1', () => {
+  const address = server.address();
+  if (address !== null && typeof address !== 'string') {
+    process.stdout.write(formatProbePortReport(address.port));
+  }
+});
