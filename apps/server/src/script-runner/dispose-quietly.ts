@@ -1,7 +1,8 @@
-import type { QuickJSContext, QuickJSHandle, QuickJSRuntime } from 'quickjs-emscripten-core';
+import type { Disposable, QuickJSContext, QuickJSRuntime } from 'quickjs-emscripten-core';
 
 /**
- * A lépés lebontása: előbb minden, a lépés alatt létrehozott handle, utána a
+ * A lépés lebontása: előbb minden, a lépés alatt létrehozott handle (és a még
+ * függő gazda hívások ígérete, a `QuickJSDeferredPromise`), utána a
  * kontextus és a runtime (research `2026-11-04-szkript-csomopont.md` Q-2 B: a
  * tiszta lebontás feltétele, hogy a runtime `dispose` előtt minden handle
  * felszabaduljon). A lebontás hibája (a `JS_FreeRuntime` assertje, ami a gazdán
@@ -11,11 +12,7 @@ import type { QuickJSContext, QuickJSHandle, QuickJSRuntime } from 'quickjs-emsc
  * 5.4 "Életciklus"). A handle listát a hívó tölti, minden handle pontosan
  * egyszer kerül bele.
  */
-export function disposeQuietly(
-  handles: readonly QuickJSHandle[],
-  context: QuickJSContext,
-  runtime: QuickJSRuntime,
-): void {
+export function disposeQuietly(handles: readonly Disposable[], context: QuickJSContext, runtime: QuickJSRuntime): void {
   try {
     for (const handle of handles) {
       handle.dispose();

@@ -476,3 +476,98 @@ T-015-5. Forrás: a telepített `quickjs-emscripten-core` 0.32.0 `dist/index.d.t
 - **Időtartam (mérve, a T-015-6 kapu futásának teljes Vitest menetében, 8412 teszt).** A `run-script.spec.ts` 24
   tesztje együtt 526 ms; a leghosszabb egyedi teszt a gazdára kijutó `RangeError` esete, 114 ms, a három időkorlát
   teszt 51 ... 52 ms (50 ms-os határidővel). Az 5000 ms-os korláttól messze van, időzített bomba nincs.
+
+## 9. T-015-7: a `fetch` és a `files` gazda függvény
+
+Lépés: PLAN-015 T-015-7 (2026-11-04), a `530d6b9` fejen. Helye: `apps/server/src/script-runner/`. Forrás: a
+telepített `quickjs-emscripten-core` 0.32.0 forrása (a `dist/chunk-V2S4ZYJR.mjs.map` beágyazott `src/context.ts`,
+`src/deferred-promise.ts` és `src/lifetime.ts`), a Node `v26.7.0` beépített `fetch`-ének undici `8.9.0` forrása
+(`process.versions.undici`; <https://github.com/nodejs/undici/blob/v8.9.0/lib/web/fetch/index.js>), a Node `fs`
+dokumentációja (<https://nodejs.org/api/fs.html>), a POSIX `open` leírása
+(<https://pubs.opengroup.org/onlinepubs/9799919799/functions/open.html>), és a unit tesztek valódi QuickJS-sel, helyi
+`node:http` szerverrel és ideiglenes könyvtárral.
+
+### 9.1 Döntések
+
+1. **A sandbox ígéret.** A gazda függvény `context.newPromise()` handle-jét adja vissza; a könyvtár a visszaadott
+   handle-t maga szabadítja fel (`src/context.ts`: a visszatérési értéket a hívás `scope.manage` alá veszi), a
+   `resolve` és a `reject` a két feloldó handle-t (`src/deferred-promise.ts`). A még nem rendezett ígéret a lépés
+   `pendingCalls` halmazában áll, és a lebontás a handle-ök, a kontextus és a runtime előtt szabadítja fel (Q-2 B); a
+   `QuickJSDeferredPromise.dispose` idempotens.
+2. **A lépés jele.** `AbortSignal.any([kérés jele, lépés vége])`: a lépés vége a `finally` első utasítása, a
+   lebontás előtt. A hálózati kérés ezen a jelen szakad meg (a határidő után a lépés vége, a külső megszakításkor a
+   kérés jele), és a rendezés első lépése a jel ellenőrzése: a jel után érkező gazda eredmény semmit nem ír a
+   sandboxba, tehát felszabadított handle-be sem (Q-2 C), és szkript kód sem fut a külső megszakítás után.
+3. **Az argumentumok és az eredmény JSON alakban mennek át** (SPEC-014 5.5). Az argumentumot a szkript előtt
+   rögzített sandbox `JSON.stringify` olvassa szöveggé (a gazda oldalon `unknown`, utána typeguard); a `context.dump`
+   nem használható, mert ígéret argumentum esetén felszabadítja a handle-t (`src/context.ts` `dump`), amit a hívó
+   függvény nem tehet meg. A JSON alakkal nem bíró argumentum (függvény) `undefined`. Az eredmény JSON szövegét a
+   szkript előtt rögzített sandbox `JSON.parse` alakítja értékké, a sandbox memória korlátja alatt.
+4. **A rendezés után a függő feladatok futnak** (`executePendingJobs`): a szkript folytatása itt, az interrupt kezelő
+   alatt fut. Az itt a gazdára kijutó hiba (a mély `JSON.stringify` `RangeError`-ja, Q-6) a lépés
+   `script_evaluation_failed` hibája: a futtató a szkript ígéretét és ezt a jelzést versenyezteti.
+5. **`fetch`.** Kizárólag `http:` és `https:` (`URL.parse`, a séma halmazban). A `redirect: 'manual'` a Node-ban a
+   tényleges 3xx választ adja: az undici forrása szerint "On the web this would return an `opaqueredirect` response,
+   but that doesn't make sense server side" (`lib/web/fetch/index.js` 1228 ... 1234. sor), és a teszt a `302`
+   státuszt és a `location` fejlécet látja. A második argumentum csak `method`, `headers` (szöveg értékek) és `body`
+   (szöveg) mezőt tartalmazhat, az ismeretlen kulcs `TypeError` (`isSandboxFetchInit`, zárt kulcslista). A gazda
+   ezen kívül csak a `redirect` és a `signal` mezőt adja; a teszt szerint a kérésben nincs `authorization` és
+   `cookie` fejléc. A válasz `{ status, headers, body }`, a fejlécek a `Headers` bejárásából (kisbetűs név), a törzs
+   `response.text()`. A hálózati hiba `TypeError: a hálózati kérés nem sikerült (<gazda hiba típusneve>)`.
+6. **`files`.** A gyökér `path.resolve(cwd ?? process.cwd())`. Az útvonal szöveg, nem abszolút (az abszolút útvonal a
+   gyökér alatt is elutasított), és a `path.resolve(gyökér, útvonal)` a gyökér plusz elválasztó előtag alatt áll
+   (`/` gyökérnél az előtag maga a gyökér); a gyökér maga csak a `list` számára elfogadott. Utána az útvonal és a
+   gyökér `fs.realpath` alakja is összevetve (Node doksi: "Determines the actual location of path"), és a művelet a
+   feloldott útvonalon fut. **Írás:** létező célnál a cél feloldott alakja, nem létezőnél a szülő könyvtáré
+   ellenőrzött, és az új fájl a `wx` jelzővel jön létre. A Node doksi szerint "On POSIX, if the path is a symbolic
+   link, using O_EXCL returns an error even if the link is to a path that does not exist", a POSIX szerint "If
+   O_EXCL and O_CREAT are set, and path names a symbolic link, open() shall fail and set errno to [EEXIST]": a
+   gyökéren kívüli, nem létező célra mutató (függő) link ezért `EEXIST`, a teszt szerint a gyökéren kívül nem jön
+   létre fájl. A `list` a `readdir` neveit adja a `readdir` sorrendjében.
+7. **Hibaüzenetek** (a sandboxban, a lépés üzenetében `a szkript hibát dobott: <név>: <üzenet>` alakban, ha a szkript
+   nem kapja el): `TypeError: az útvonal szöveg kell legyen`; `Error: az útvonal nem lehet abszolút: <útvonal>`;
+   `Error: az útvonal a hozzáférés gyökerén kívülre mutat: <útvonal>`; `Error: a fájl művelet nem sikerült (<kód>):
+<útvonal>`; `TypeError: a beírandó tartalom szöveg kell legyen`; `TypeError: a fetch címe szöveg kell legyen`;
+   `TypeError: a fetch címe nem érvényes URL: <cím>`; `TypeError: a fetch csak http: és https: címet fogad, ez <séma>
+séma`; `TypeError: a fetch beállítása csak method, headers és body mezőt tartalmazhat, szöveg értékkel`. Az
+   `<útvonal>` mindig a szkript saját bemenete: a Node fájl hiba `message` mezője (ami a gazda abszolút útvonalát
+   tartalmazza) nem kerül át, csak a `code`. Az argumentum olvasásának sandbox hibája (például dobó getter a második
+   argumentumban) a hívás helyén, a saját nevével és üzenetével dobódik.
+8. **A TOCTOU** (az ellenőrzés és a használat közötti linkcsere) kimondott, nem javított (SPEC-014 5.4, 5.10 3.).
+
+### 9.2 Tesztek
+
+`fetch-for-sandbox.spec.ts` (helyi szerver: GET, POST törzzsel és fejléccel, hitelesítő fejléc és süti nélkül, 302,
+`file:`, `data:`, `ftp:`, érvénytelen és nem szöveg cím, nem dokumentált beállítás, hálózati hiba, megszakítás a
+szerver oldali bontással), `read-text-in-root.spec.ts`, `write-text-in-root.spec.ts`, `list-in-root.spec.ts`
+(ideiglenes könyvtár: `..`, abszolút út, kifelé mutató fájl és könyvtár link, függő link, gyökérre mutató link,
+`ENOENT`, `ENOTDIR`), `start-host-call.spec.ts` (teljesülés, elutasítás, a jel utáni késői eredmény a lebontás után,
+a gazdára kijutó hiba), és az `install-host-functions.spec.ts` a valódi futtatón át: a határidőn függő válasz
+`script_timed_out` és a szerver a kapcsolat bontását látja; a külső megszakítás `aborted`, ugyanígy; a `cwd: null`
+gyökere a `process.cwd()` (csak listázás); a várt gazda hívás utáni mély `JSON.stringify` `script_evaluation_failed`;
+a nem várt gazda hívás késői eredménye a lebontás után nem dob. A globális kulcslista tesztje a `fetch` és a `files`
+névvel bővült.
+
+### 9.3 A CPU kötött szkript és a külső megszakítás (a T-015-5 jelzése)
+
+A kért javítás: az interrupt kezelő a kérés jelére is szakítson meg. **Mérve: ez a gazda egy szálán nem hat.** A
+QuickJS a gazda szálán, szinkron fut (SPEC-014 5.4 "Párhuzamosság"), tehát a szinkron ciklus alatt az eseményhurok
+áll: a kérés jelét megszakító kód (egy HTTP kérés kezelője, egy időzítő, a motor `fail_run` ága) a ciklus alatt el sem
+indulhat. Próba: a kezelő feltétele kiegészítve `|| request.signal.aborted`-dal, `while (true) {}` 1500 ms-os
+határidővel, a jel abortja egy 20 ms-os időzítőn: az eredmény `script_timed_out` 1503 ms után, és az időzítő a
+lépés végéig nem sült el. A javítás tehát a megszakítás előtt bukó, utána zöld tesztet nem kaphat, és a kezelő ága
+a 100 százalékos lefedettség mellett sosem futó ág volna (szabálykönyv 5. szekció). A kódba nem került. A jelenlegi
+viselkedést a `run-script.spec.ts` "a CPU kötött szkript alatt a kérés jele nem ér célba" tesztje rögzíti.
+
+Ami a gazda egy szálán megoldható, a 9.1 2. pontja: a külső megszakítás után a lépés jele azonnal lejár, és a később
+érkező gazda eredmény már nem indít szkript kódot (különben egy `await fetch(...); while (true) {}` szkript a
+megszakítás után a határidőig futna). **Nyitva:** a CPU kötött szakasz külső megszakítása csak más szálon futó
+QuickJS-sel (például `worker_threads`) volna lehetséges; ez architektúra és termék döntés, nem ennek a lépésnek a köre.
+
+### 9.4 Nyitva marad
+
+- A válasz törzsének mérete nincs korlátozva a gazda oldalon (`response.text()`); a sandboxba a `JSON.parse` a modul
+  memória korlátja alatt hozza át. A spec nem ad rá szabályt.
+- A `Headers` bejárása a több `set-cookie` fejlécet külön elemként adja, az `Object.fromEntries` ezek közül az
+  utolsót tartja meg (nem ellenőrzött forrással, a teszt nem fedi).
+- A 8.2 szekció "a `cwd` mezőt a futtató még nem olvassa" pontja ezzel lezárult.

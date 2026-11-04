@@ -179,11 +179,11 @@ describe('runScript', () => {
       expect(runContext.input).toStrictEqual({ name: 'teszt' });
     });
 
-    it('a globális objektum kulcslistája pontosan a QuickJS 61 neve plusz a jelen lévő kontextus nevek', async () => {
+    it('a globális objektum kulcslistája pontosan a QuickJS 61 neve, a fetch, a files és a jelen lévő kontextus nevek', async () => {
       // A kulcslista egyezését halmazként vizsgáljuk: minden várt név benne van, és a darabszám azonos.
       const namesSource = 'return Object.getOwnPropertyNames(globalThis);';
       const countSource = 'return Object.getOwnPropertyNames(globalThis).length;';
-      const minimalNames = [...QUICKJS_GLOBAL_NAMES, 'input', 'steps'];
+      const minimalNames = [...QUICKJS_GLOBAL_NAMES, 'fetch', 'files', 'input', 'steps'];
       const minimalOutput = outputOf(await runScript(request(namesSource)));
       expect(minimalOutput).toStrictEqual(expect.arrayContaining(minimalNames));
       await expect(runScript(request(countSource))).resolves.toStrictEqual({
@@ -282,6 +282,24 @@ describe('runScript', () => {
         controller.abort();
       }, 20);
       await expect(running).resolves.toStrictEqual({ kind: 'aborted' });
+    });
+
+    it('a CPU kötött szkript alatt a kérés jele nem ér célba, mert a gazda szála foglalt: a határidő állítja meg', async () => {
+      // A megszakítás ugyanazon a szálon fut, mint a QuickJS, tehát a szinkron ciklus alatt el sem indulhat
+      // (research `2026-11-04-szkript-csomopont.md` 9.3): az időzítő a lépés vége után sül el.
+      const controller = new AbortController();
+      const timer = setTimeout(() => {
+        controller.abort();
+      }, 20);
+      const result = await runScript(request('while (true) {}', { timeoutMs: 300, signal: controller.signal }));
+      const wasAbortedBeforeResult = controller.signal.aborted;
+      clearTimeout(timer);
+      expect(result).toStrictEqual({
+        kind: 'failed',
+        errorKind: 'script_timed_out',
+        message: 'a szkript nem fejeződött be 300 ms alatt',
+      });
+      expect(wasAbortedBeforeResult).toBe(false);
     });
 
     it('a már megszakított jel mellett a szkript el sem indul', async () => {

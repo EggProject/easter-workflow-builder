@@ -1,13 +1,18 @@
+import path from 'node:path';
 import { describeErrorType } from '@easter-workflow-builder/core';
 import type { ScriptRunRequest, ScriptRunResult } from '@easter-workflow-builder/engine';
 import {
   shouldInterruptAfterDeadline,
   type QuickJSContext,
+  type QuickJSDeferredPromise,
   type QuickJSHandle,
   type QuickJSRuntime,
+  type VmCallResult,
 } from 'quickjs-emscripten-core';
 import { describeSandboxError } from './describe-sandbox-error.ts';
 import { disposeQuietly } from './dispose-quietly.ts';
+import type { HostCallScope } from './host-call-scope.ts';
+import { installHostFunctions } from './install-host-functions.ts';
 import { loadQuickJsModule } from './load-quickjs-module.ts';
 import { SCRIPT_FILE_NAME } from './script-file-name.ts';
 import { SCRIPT_SANDBOX_LIMITS } from './script-sandbox-limits.ts';
@@ -30,17 +35,35 @@ const PRELUDE_SOURCE =
   ' })(JSON.stringify, JSON.parse, Object.keys, globalThis)';
 
 /**
- * A lépés futás közbeni állapota: a lebontandó handle-ök és az interrupt
- * kezelő jelzése.
+ * A sandbox `JSON.parse`-a, a szkript előtt rögzítve: a gazda függvények
+ * eredménye ezzel lesz sandbox érték (`start-host-call.ts`).
+ */
+const PARSE_SOURCE = 'JSON.parse';
+
+/**
+ * A lépés futás közbeni állapota: a lebontandó handle-ök, a még nem rendezett
+ * gazda hívások, a fájl hozzáférés gyökere, a gazda hívások jele (a kérés jele
+ * és a lépés vége együtt) és az interrupt kezelő jelzése.
  */
 interface SandboxStep {
   readonly context: QuickJSContext;
   readonly runtime: QuickJSRuntime;
   readonly handles: QuickJSHandle[];
+  readonly pendingCalls: Set<QuickJSDeferredPromise>;
+  readonly root: string;
+  readonly hostSignal: AbortSignal;
   readonly timeoutMs: number;
   readonly deadlineMs: number;
   readonly state: { interrupted: boolean };
 }
+
+/**
+ * A kiértékelés vége: a szkript ígéretének rendeződése, vagy egy gazda hívás
+ * rendezésekor a gazdára kijutó hiba.
+ */
+type SandboxCompletion =
+  | { readonly kind: 'evaluated'; readonly result: VmCallResult<QuickJSHandle> }
+  | { readonly kind: 'host_crashed'; readonly error: unknown };
 
 /**
  * Egy JavaScript szkript lépés lefuttatása friss QuickJS modulon (SPEC-014 5.4
@@ -53,6 +76,8 @@ interface SandboxStep {
  * 3. A futás kontextus jelen lévő nevei JSON-ként a globális objektumra; a
  *    `undefined` értékű nevet a `JSON.stringify` kihagyja, tehát a hiányzó név a
  *    sandboxban sem létezik (SPEC-010 7.3 táblázata, a port leírása szerint).
+ *    Mellettük a `fetch` és a `files` gazda függvény (5.4 "Hálózat", "Fájl"), a
+ *    fájl gyökér a `cwd`, üresen a szerver munkakönyvtára (O-5).
  * 4. A csomagolt törzs kiértékelése, az ígéret a `resolvePromise` úton, a függő
  *    feladatok az `executePendingJobs` hívással; a várakozás a gazda oldali
  *    határidővel és a kérés jelével versenyez (`waitForSettlement`).
@@ -62,18 +87,17 @@ interface SandboxStep {
  * dobott kivétel, az el nem kapott `InternalError: out of memory` (Q-5) és a
  * gazdára kijutó hiba (a mély `JSON.stringify` `RangeError`-ja, Q-6)
  * `script_evaluation_failed`; a nem JSON eredmény `script_output_not_json`; a
- * kérés jele `aborted`. A lebontás minden ágon fut, a hibája elkapott (Q-2, Q-3).
+ * kérés jele `aborted`. A lebontás minden ágon fut: előbb a lépés jele lejár (a
+ * folyamatban lévő hálózati kérés megszakad, a késői gazda eredmény eldobva),
+ * utána a függő gazda ígéretek, a handle-ök, a kontextus és a runtime
+ * szabadul fel (Q-2 B); a hibája elkapott (Q-2, Q-3).
  */
 export async function runScript(request: ScriptRunRequest): Promise<ScriptRunResult> {
   const timeoutMs = request.timeoutMs ?? SCRIPT_SANDBOX_LIMITS.defaultTimeoutMs;
   try {
     return await runInFreshModule(request, timeoutMs, Date.now() + timeoutMs);
   } catch (error) {
-    return {
-      kind: 'failed',
-      errorKind: 'script_evaluation_failed',
-      message: `a szkript futása a gazda oldalon megszakadt (${describeErrorType(error)})`,
-    };
+    return hostFailure(error);
   }
 }
 
@@ -95,11 +119,23 @@ async function runInFreshModule(
     return state.interrupted;
   });
   const context = runtime.newContext();
-  const step: SandboxStep = { context, runtime, handles: [], timeoutMs, deadlineMs, state };
+  const stepEnd = new AbortController();
+  const step: SandboxStep = {
+    context,
+    runtime,
+    handles: [],
+    pendingCalls: new Set(),
+    root: path.resolve(request.cwd ?? process.cwd()),
+    hostSignal: AbortSignal.any([request.signal, stepEnd.signal]),
+    timeoutMs,
+    deadlineMs,
+    state,
+  };
   try {
     return await evaluateInSandbox(step, request);
   } finally {
-    disposeQuietly(step.handles, context, runtime);
+    stepEnd.abort();
+    disposeQuietly([...step.pendingCalls, ...step.handles], context, runtime);
   }
 }
 
@@ -115,14 +151,34 @@ async function evaluateInSandbox(step: SandboxStep, request: ScriptRunRequest): 
     context.newString(JSON.stringify({ input, steps, item, itemIndex, iteration, joinInputs, error })),
   );
   const stringify = keep(context.unwrapResult(context.callFunction(installer, context.undefined, contextText)));
+  const parse = keep(context.unwrapResult(context.evalCode(PARSE_SOURCE, 'host.js')));
+  const hostCrash = Promise.withResolvers<SandboxCompletion>();
+  const scope: HostCallScope = {
+    context,
+    runtime,
+    stringify,
+    parse,
+    signal: step.hostSignal,
+    pendingCalls: step.pendingCalls,
+    reportHostCrash: (crash) => {
+      hostCrash.resolve({ kind: 'host_crashed', error: crash });
+    },
+  };
+  for (const handle of installHostFunctions(scope, step.root)) {
+    keep(handle);
+  }
 
   const evaluated = context.evalCode(wrapScriptSource(request.source), SCRIPT_FILE_NAME);
   if (evaluated.error !== undefined) {
     return thrownFailure(step, keep(evaluated.error), 'script_evaluation_failed', 'a szkript hibát dobott');
   }
-  const settledPromise = context.resolvePromise(keep(evaluated.value));
+  const evaluation = evaluatedCompletion(context.resolvePromise(keep(evaluated.value)));
   runtime.executePendingJobs().dispose();
-  const settlement = await waitForSettlement(settledPromise, step.deadlineMs, request.signal);
+  const settlement = await waitForSettlement(
+    Promise.race([evaluation, hostCrash.promise]),
+    step.deadlineMs,
+    request.signal,
+  );
   switch (settlement.kind) {
     case 'aborted': {
       return { kind: 'aborted' };
@@ -131,7 +187,10 @@ async function evaluateInSandbox(step: SandboxStep, request: ScriptRunRequest): 
       return timedOut(step);
     }
     case 'settled': {
-      const result = settlement.value;
+      if (settlement.value.kind === 'host_crashed') {
+        return hostFailure(settlement.value.error);
+      }
+      const { result } = settlement.value;
       if (result.error !== undefined) {
         return thrownFailure(step, keep(result.error), 'script_evaluation_failed', 'a szkript hibát dobott');
       }
@@ -181,5 +240,17 @@ function timedOut(step: SandboxStep): ScriptRunResult {
     kind: 'failed',
     errorKind: 'script_timed_out',
     message: `a szkript nem fejeződött be ${String(step.timeoutMs)} ms alatt`,
+  };
+}
+
+async function evaluatedCompletion(promise: Promise<VmCallResult<QuickJSHandle>>): Promise<SandboxCompletion> {
+  return { kind: 'evaluated', result: await promise };
+}
+
+function hostFailure(error: unknown): ScriptRunResult {
+  return {
+    kind: 'failed',
+    errorKind: 'script_evaluation_failed',
+    message: `a szkript futása a gazda oldalon megszakadt (${describeErrorType(error)})`,
   };
 }

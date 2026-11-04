@@ -167,7 +167,11 @@ törzset `async` függvénybe csomagolja, az ígéretet a `resolvePromise` úton
 ahol a `body` szöveg. A gazda a Node beépített `fetch`-ét hívja, a lépés határidejéhez kötött `AbortSignal`-lal.
 Kizárólag `http:` és `https:` séma (az OWASP SSRF lap szerint a nem HTTP sémák külön kockázatot hordoznak,
 J-15). Átirányítás követése nincs (`redirect: 'manual'`, J-15); a szkript a `status` és a `location` fejléc
-alapján maga dönt. Címszűrés nincs (O-6 user döntés): a szkript bármely címet elérhet, a helyi gépet is.
+alapján maga dönt. Címszűrés nincs (O-6 user döntés): a szkript bármely címet elérhet, a helyi gépet is. A második
+argumentum csak a `method`, a `headers` (szöveg értékek) és a `body` (szöveg) mezőt tartalmazhatja, más kulcs
+`TypeError`; a válasz `headers` mezője a `Headers` bejárása kisbetűs névvel. A kérés a kérés jelén és a lépés végén
+(határidő, lebontás) szakad meg, a jel után érkező eredmény a sandboxot nem érinti (research
+`2026-11-04-szkript-csomopont.md` 9.1).
 
 **Fájl.** `files.readText(path)`, `files.writeText(path, text)`, `files.list(path)`, mindegyik ígéretet ad. A
 `path` relatív a hozzáférés gyökeréhez, ami a JavaScript ág `cwd` mezője, üresen a szerver folyamat
@@ -175,7 +179,10 @@ munkakönyvtára (O-5 user döntés). A gazda a feloldott útvonalat `path.resol
 előtagjára ellenőrzi (a gyökér végén útvonal elválasztóval), majd `fs.realpath` után újra, hogy egy szimbolikus
 link ne vezessen ki (J-15); a gyökéren kívüli út `script_evaluation_failed` hibát ad a sandboxban. Ez a
 szintaktikai ellenőrzés nem véd az ellenőrzés és a használat közötti linkcsere ellen (TOCTOU, nem ellenőrzött
-forrással, 5.10).
+forrással, 5.10). Az abszolút `path` a gyökér alatt is elutasított; az írás létező célnál a cél, nem létezőnél a
+szülő könyvtár `fs.realpath` alakját ellenőrzi, és az új fájlt `wx` jelzővel hozza létre, ami a függő szimbolikus
+linkre is hibát ad. A `list` a bejegyzések nevét adja. A hibaüzenet a szkript saját útvonalát és a Node hibakódot
+mondja (`a fájl művelet nem sikerült (ENOENT): a.txt`), a gazda abszolút gyökerét nem (research 9.1 7. pont).
 
 **Időkorlát.** A határidő a lépés indulásától számít, `timeoutMs` vagy 60 000 ms. Két ága van, mert az
 interrupt kezelő a gazda ígéretre várakozás alatt nem fut (J-6): (1) CPU kötött kódra
