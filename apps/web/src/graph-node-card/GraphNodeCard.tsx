@@ -7,7 +7,6 @@ import { GRAPH_NODE_CATALOG } from '../graph-node-catalog/graph-node-catalog.ts'
 import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { describeWaitingApprovalSince } from './describe-waiting-approval-since.ts';
 import type { GraphNodeCardFlowNode, GraphNodeRunDecoration } from './graph-node-card-data.ts';
-import { SCRIPT_UNIMPLEMENTED_ERROR_CLASS } from './script-unimplemented-error-class.ts';
 import { describeStepRunStatusBadge } from './step-run-status-badge.ts';
 import './graph-node-card.css';
 
@@ -167,9 +166,6 @@ export function GraphNodeCard(properties: Readonly<NodeProps<GraphNodeCardFlowNo
       </div>
       <p className="graph-node-card__label">{workflowNode.label}</p>
       {runDecoration !== undefined && renderRunSummary(runDecoration)}
-      {workflowNode.type === 'script' && (
-        <p className="graph-node-card__warning">{`Nem futtatható: \`${SCRIPT_UNIMPLEMENTED_ERROR_CLASS}\``}</p>
-      )}
       {outputHandles.map((handle, index) =>
         renderOutputHandle(handle, computeHandleTopPercent(index, outputHandles.length)),
       )}

@@ -1268,12 +1268,12 @@ test.describe('soronkénti lista mezők billentyűzetes gépelése', () => {
 });
 
 test.describe('script node', () => {
-  test('a motor elutasítás figyelmeztetés látszik, a forrás szerkeszthető, a runtime csak olvasható', async ({
+  test('nincs figyelmeztetés, a forrás szerkeszthető, a runtime választó CEL kifejezést mutat (SPEC-014 5.9)', async ({
     page,
   }) => {
     const panel = await openNode(page, 'n-script');
-    await expect(panel.getByRole('alert')).toContainText('unimplemented_node_type');
-    await expect(panel.getByText('expression', { exact: true })).toBeVisible();
+    await expect(panel.getByRole('alert')).toHaveCount(0);
+    await expectSelectedLabel(panel.getByRole('combobox', { name: 'Futásidő (runtime)' }), 'CEL kifejezés');
     await expect(panel.getByLabel('Forrás (source)')).toHaveValue('return 1;');
     await panel.getByLabel('Forrás (source)').fill('return input.value * 2;');
 

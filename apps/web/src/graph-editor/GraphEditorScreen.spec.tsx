@@ -5,7 +5,6 @@ import type { useStoreApi } from '@xyflow/react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
-import { SCRIPT_UNIMPLEMENTED_ERROR_CLASS } from '../graph-node-card/script-unimplemented-error-class.ts';
 import type { NavigationGuard } from '../history-navigation/use-client-route.ts';
 import type { GraphEditorCanvasProperties } from './GraphEditorCanvas.tsx';
 import { GraphEditorScreen, type GraphEditorScreenProperties } from './GraphEditorScreen.tsx';
@@ -1450,7 +1449,7 @@ describe('GraphEditorScreen', () => {
     });
   });
 
-  describe('script lépés a gráfban (SPEC-008 14. kritérium, user döntés 2026-10-21: letiltás okkal)', () => {
+  describe('script lépés a gráfban (SPEC-014 5.9: a letiltás megszűnt)', () => {
     const SCRIPT_NODE = {
       id: 'n-script',
       type: 'script',
@@ -1462,7 +1461,7 @@ describe('GraphEditorScreen', () => {
       updatedAtMs: 0,
     };
 
-    it('a "Futás indítása" gomb tiltott, és az `aria-describedby` hivatkozás az okot nevező szövegre mutat', async () => {
+    it('a "Futás indítása" gomb aktív, és nem hordoz `aria-describedby` hivatkozást', async () => {
       const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
       await renderScreen(
         '?workflowId=wf-1',
@@ -1472,22 +1471,8 @@ describe('GraphEditorScreen', () => {
         }),
       );
 
-      const button = startButton();
-      expect(button.disabled).toBe(true);
-      const reasonId = button.getAttribute('aria-describedby');
-      const reason = [...container.querySelectorAll('[id]')].find((element) => element.id === reasonId);
-      expect(reasonId).not.toBeNull();
-      expect(reason?.textContent).toContain('Szkript');
-      expect(reason?.textContent).toContain(SCRIPT_UNIMPLEMENTED_ERROR_CLASS);
-    });
-
-    it('script nélküli gráfnál a gomb aktív, és sem `aria-describedby`, sem tiltási ok szöveg nincs', async () => {
-      const log: StartRunLog = { postBodies: [] };
-      await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, []));
-
       expect(startButton().disabled).toBe(false);
       expect(startButton().hasAttribute('aria-describedby')).toBe(false);
-      expect(container.textContent).not.toContain(SCRIPT_UNIMPLEMENTED_ERROR_CLASS);
     });
   });
 

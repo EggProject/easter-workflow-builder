@@ -14,7 +14,22 @@ function typeInto(textarea: HTMLTextAreaElement, value: string): void {
   textarea.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-const CONFIG: ScriptNodeConfig = { type: 'script', source: 'return 1;', runtime: 'expression', onUnhandledError: null };
+/**
+ * A `detail: 1` kötelező: a `SelectField` a `detail === 0` kattintást
+ * billentyűzetből származónak tekinti, és szándékosan nem nyit rá.
+ */
+function clickOn(target: Element): void {
+  act(() => {
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  });
+}
+
+const CONFIG: ScriptNodeConfig = {
+  type: 'script',
+  source: 'return 1;',
+  runtime: 'expression',
+  onUnhandledError: 'fail_run',
+};
 
 describe('ScriptNodeFields', () => {
   let container: HTMLDivElement;
@@ -33,13 +48,12 @@ describe('ScriptNodeFields', () => {
     container.remove();
   });
 
-  it('megjeleníti a figyelmeztetést és a futásidőt, a forrás szerkeszthető', () => {
+  it('nincs figyelmeztetés, a forrás szerkeszthető, a `type` és az `onUnhandledError` megmarad', () => {
     const onChange = vi.fn();
     act(() => {
       root.render(<ScriptNodeFields config={CONFIG} onChange={onChange} />);
     });
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('unimplemented_node_type');
-    expect(container.textContent).toContain('expression');
+    expect(container.querySelector('[role="alert"]')).toBeNull();
     const textarea = container.querySelector('textarea');
     if (textarea === null) {
       throw new Error('a teszt nem találta a forrás textarea-t');
@@ -47,7 +61,40 @@ describe('ScriptNodeFields', () => {
     act(() => {
       typeInto(textarea, 'return 2;');
     });
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ source: 'return 2;' }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      type: 'script',
+      source: 'return 2;',
+      runtime: 'expression',
+      onUnhandledError: 'fail_run',
+    });
+  });
+
+  it('a runtime váltása a node-ra teljes alakot ad: `type` és `onUnhandledError` a JavaScript ág mezői mellett', () => {
+    const onChange = vi.fn();
+    act(() => {
+      root.render(<ScriptNodeFields config={CONFIG} onChange={onChange} />);
+    });
+    const trigger = container.querySelector<HTMLButtonElement>('button.select');
+    if (trigger === null) {
+      throw new Error('a teszt nem találta a runtime select triggert');
+    }
+    clickOn(trigger);
+    const option = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (candidate) => candidate.querySelector('.menu__text')?.textContent === 'JavaScript',
+    );
+    if (option === undefined) {
+      throw new Error('a teszt nem találta a JavaScript opciót');
+    }
+    clickOn(option);
+    expect(onChange).toHaveBeenLastCalledWith({
+      type: 'script',
+      source: 'return 1;',
+      runtime: 'javascript',
+      timeoutMs: null,
+      cwd: null,
+      memoryLimitMb: null,
+      onUnhandledError: 'fail_run',
+    });
   });
 
   it('a `source` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {

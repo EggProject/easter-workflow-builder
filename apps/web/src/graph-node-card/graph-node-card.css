@@ -160,13 +160,3 @@
   font: var(--ep-text-small);
   color: var(--ep-fg-muted);
 }
-
-/* A 12px a `--ep-text-meta` mérete, de a token teljes `font` értéke (500-as
-   súly, 1.4 sormagasság) a számított értéket változtatná; a legközelebbi
-   design system recept a `.field__error` (`font: var(--ep-text-meta)`).
-   Nyitott kérdés: SPEC-008 O-35. */
-.graph-node-card__warning {
-  margin: 0;
-  font-size: 12px;
-  color: var(--ep-danger);
-}

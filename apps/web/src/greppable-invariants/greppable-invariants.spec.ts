@@ -499,10 +499,9 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       [path.join('run-view', 'RunViewScreen.tsx')]: 2,
       // a futás saját hibája (a `RunDetail` mezői, nem hibaág)
       [path.join('run-control', 'RunControlBar.tsx')]: 1,
-      // a szerkesztő panel két statikus figyelmeztetése
+      // a szerkesztő panel statikus figyelmeztetése (a nem objektum alakú agent bejegyzés)
       // A második a nem támogatott agent definíció mező mentési hibája a mező alatt (SPEC-009 O-53), nem REST eredetű.
       [path.join('node-inspector', 'AgentDefinitionEntryFields.tsx')]: 2,
-      [path.join('node-inspector', 'ScriptNodeFields.tsx')]: 1,
       // a skill feltöltés hiányzó ZIP csomagjának mező alatti hibája (helyi ellenőrzés, a `TextField` hibájával azonos alak)
       [path.join('skill-upload', 'SkillUploadForm.tsx')]: 1,
       // az MCP szerver deklarált változó neveinek mező alatti hibája (helyi ellenőrzés, a `TagInput`-nak nincs saját hibaága)

@@ -3,8 +3,8 @@
 // (`graph-editor.spec.ts`) - ez a fájl a fennmaradó nyolc típust, a hosszú
 // címke kezelését és a kiválasztott állapotot fedi le, VALÓS böngészőben,
 // hogy a `resolveOutputHandles` `branch` ága (`GraphNodeCard.tsx` 29-36. sor)
-// és a `script` figyelmeztető ág (85. sor) e2e szinten is lefusson, nem csak
-// happy-dom unit teszttel (`GraphNodeCard.spec.tsx`).
+// e2e szinten is lefusson, nem csak happy-dom unit teszttel
+// (`GraphNodeCard.spec.tsx`).
 //
 // A node konfigurációk a `GraphNodeCard.spec.tsx` már bizonyítottan érvényes
 // (`NodeConfigSchema` ellen validált) fixture-jeinek mintáját követik - nem
@@ -20,7 +20,6 @@ import type {
   WorkflowNode,
 } from '@easter-workflow-builder/protocol';
 import type { Locator, Page } from '@playwright/test';
-import { GRAPH_NODE_CARD_WIDTH } from '../src/graph-node-catalog/graph-node-catalog.ts';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { mockIdleStream } from './sse-mock.ts';
@@ -351,42 +350,6 @@ test('ha a szerver a node.type-tól eltérő config.type-ot ad vissza, a kártya
   // sem a `config.type === 'branch'` ágat nem találja, tehát az utolsó,
   // üres lista ágra esik vissza - összeomlás helyett.
   await expect(outputHandles(page, 'mismatched')).toHaveCount(0);
-});
-
-test('a script figyelmeztető szövege KIZÁRÓLAG a script típusú kártyán jelenik meg', async ({ page }) => {
-  await page.setViewportSize({ width: 1600, height: 1000 });
-  await mockGraph(page, buildTenTypeNodes());
-  await page.goto(EDITOR_URL);
-  await expect(nodeLocator(page, 't-script')).toBeVisible();
-
-  const warningText = 'Nem futtatható: `unimplemented_node_type`';
-  await expect(nodeLocator(page, 't-script').getByText(warningText)).toBeVisible();
-  // A másik kilenc kártya egyikén sem jelenik meg - pontosan egy előfordulás
-  // a teljes vásznon.
-  await expect(page.getByText(warningText)).toHaveCount(1);
-});
-
-test('a script kártyájának szélessége a GRAPH_NODE_CARD_WIDTH, és a figyelmeztetés nincs levágva', async ({ page }) => {
-  await page.setViewportSize({ width: 1600, height: 1000 });
-  await mockGraph(page, buildTenTypeNodes());
-  await page.goto(EDITOR_URL);
-  const scriptNode = nodeLocator(page, 't-script');
-  await expect(scriptNode).toBeVisible();
-
-  // A kártya `min-width` értéke a dagre elrendezés bemenete: ha a figyelmeztetés
-  // hosszabb, mint a kártya belső szélessége, a flex konténer a tartalomhoz
-  // nő, és a kártya ráfut a szomszédjára. Az `offsetWidth` elrendezési
-  // (nem a nagyítással átszámolt) szélesség, ezért a nagyítás nem torzítja.
-  const measured = await scriptNode.locator('.graph-node-card').evaluate((card) => {
-    const warning = card.querySelector('.graph-node-card__warning');
-    return {
-      cardWidth: card instanceof HTMLElement ? card.offsetWidth : -1,
-      warningOverflow: warning === null ? -1 : warning.scrollWidth - warning.clientWidth,
-    };
-  });
-  expect(measured.cardWidth).toBe(GRAPH_NODE_CARD_WIDTH);
-  // A figyelmeztetés teljes szövege a saját dobozán belül marad (nincs vágás).
-  expect(measured.warningOverflow).toBeLessThanOrEqual(0);
 });
 
 test('a hosszú node címke teljes tartalommal jelenik meg, és a kártya szélessége ehhez igazodik', async ({ page }) => {
