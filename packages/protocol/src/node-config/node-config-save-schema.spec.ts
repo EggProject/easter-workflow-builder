@@ -1150,3 +1150,60 @@ describe('NodeConfigSaveSchema: a JavaScript szkript memoryLimitMb mezője null 
     });
   }
 });
+
+const SCRIPT_CWD_FORBIDDEN_MESSAGE = 'A munkakönyvtár nem lehet a /proc vagy a /dev könyvtárban.';
+
+describe('NodeConfigSaveSchema: a JavaScript szkript cwd mezője nem mutathat a /proc vagy a /dev alá (SPEC-014 5.9)', () => {
+  const SCRIPT_CWD_CASES: readonly {
+    readonly field: string;
+    readonly path: readonly string[];
+    readonly build: (cwd: string | null) => unknown;
+  }[] = [
+    {
+      field: 'script',
+      path: ['cwd'],
+      build: (cwd) => ({
+        type: 'script',
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd,
+        memoryLimitMb: null,
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    {
+      field: 'join script',
+      path: ['settings', 'cwd'],
+      build: (cwd) => ({
+        type: 'join',
+        mode: 'script',
+        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd, memoryLimitMb: null },
+        onUnhandledError: 'fail_run',
+      }),
+    },
+  ];
+
+  for (const { field, path, build } of SCRIPT_CWD_CASES) {
+    describe(field, () => {
+      for (const cwd of ['/srv/adat', '/', 'relativ/ut', '/procs', null]) {
+        it(`a(z) ${String(cwd)} átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse(build(cwd)).success).toBe(true);
+        });
+      }
+
+      for (const cwd of ['/proc', '/proc/self', '/dev', '/dev/shm', '/srv/../proc/1']) {
+        it(`a(z) ${cwd} elbukik, a hiba a mező útvonalán áll`, () => {
+          const parsed = NodeConfigSaveSchema.safeParse(build(cwd));
+
+          expect(parsed.success).toBe(false);
+          if (parsed.success) {
+            return;
+          }
+          expect(issuePaths(parsed.error)).toEqual([path]);
+          expect(parsed.error.issues[0]?.message).toBe(SCRIPT_CWD_FORBIDDEN_MESSAGE);
+        });
+      }
+    });
+  }
+});

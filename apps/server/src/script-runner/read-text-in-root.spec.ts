@@ -85,4 +85,24 @@ describe('readTextInRoot', () => {
       message: 'a fájl művelet nem sikerült (ENOENT): nincs.txt',
     });
   });
+
+  describe('a /proc és a /dev tiltása (user döntés 2026-11-04)', () => {
+    it('a / gyökér alatt a dev/zero lexikálisan elutasított, olvasás nélkül', async () => {
+      await expect(readTextInRoot('/', 'dev/zero', MAX_BYTES)).resolves.toStrictEqual({
+        kind: 'rejected',
+        name: 'Error',
+        message: 'az útvonal a tiltott /proc vagy /dev könyvtárba mutat: dev/zero',
+      });
+    });
+
+    it('a /dev könyvtárba feloldódó szimbolikus link útvonala is elutasított', async () => {
+      await symlink('/dev', path.join(fixtureDirectory.base, 'eszkozok'));
+      const requested = `${path.relative('/', fixtureDirectory.base)}/eszkozok/null`;
+      await expect(readTextInRoot('/', requested, MAX_BYTES)).resolves.toStrictEqual({
+        kind: 'rejected',
+        name: 'Error',
+        message: `az útvonal a tiltott /proc vagy /dev könyvtárba mutat: ${requested}`,
+      });
+    });
+  });
 });

@@ -198,6 +198,27 @@ linkre is hibát ad. A `list` a bejegyzések nevét adja. A `readText` legfeljeb
 fájl hiba (research 10.1 F4). A hibaüzenet a szkript saját útvonalát és a Node hibakódot
 mondja (`a fájl művelet nem sikerült (ENOENT): a.txt`), a gazda abszolút gyökerét nem (research 9.1 7. pont).
 
+**A `/proc` és a `/dev` tiltása.** A user döntése (2026-11-04), szó szerint: "/proc és /dev tiltva". A gyökér és a
+szkript minden fájl útvonala nem lehet a `/proc` vagy a `/dev` könyvtár, és nem állhat alattuk; ide feloldódó útvonal
+(`..`, szimbolikus link) sem fogadható el. A lista (`FORBIDDEN_SCRIPT_PATH_PREFIXES`) a `protocol` csomagban áll, a
+mentési séma és a futtató ugyanazt olvassa.
+
+- Mentéskor: a `cwd` lexikálisan normalizált abszolút alakja (a `..` és a `.` feloldva) nem tiltott, különben a
+  "Munkakönyvtár (cwd)" mező alatt jelzés (5.9). A relatív `cwd` és a szimbolikus link a mentéskor nem dönthető el (a
+  séma a böngészőben is fut, a szerver munkakönyvtárát és a fájlrendszert nem látja), ezekre a futtató dönt.
+- Futáskor, a szkript indítása előtt: a gyökér (`path.resolve` alakja és, ha feloldható, az `fs.realpath` alakja)
+  nem tiltott, különben a lépés `script_evaluation_failed`, a megnevező üzenettel ("a szkript fájl hozzáférésének
+  gyökere (cwd) a tiltott /proc vagy /dev könyvtárba mutat"). A nem feloldható gyökér (nem létezik, nem könyvtár) a
+  korábbi viselkedést tartja: a fájl művelet adja a hibát.
+- Futáskor, fájl műveletenként: a `readText`, a `writeText` és a `list` a feloldott útvonal lexikális alakját és az
+  `fs.realpath` alakját (íráskor a létező célét, új fájlnál a szülő könyvtárét) is ellenőrzi; a tiltott út a
+  sandboxban elkapható `Error` ("az útvonal a tiltott /proc vagy /dev könyvtárba mutat: <a szkript útvonala>"). Ez a
+  `/` és más, a két könyvtár fölötti gyökér esetét fedi.
+- TOCTOU: a meglévő minta szerint az ellenőrzés a feloldott (link nélküli) útvonalon történik, és a művelet ugyanazon
+  a feloldott útvonalon fut. Ami marad: az ellenőrzés és a megnyitás között egy KÜLSŐ folyamat a feloldott útvonal
+  egy könyvtár elemét linkre cserélheti, és a megnyitás azt követi (5.10 3.). A szkript maga linket nem tud
+  létrehozni (a `files` felületén nincs ilyen művelet).
+
 **Időkorlát.** A határidő a lépés indulásától számít (a modul betöltése is beleszámít), `timeoutMs` vagy 60 000 ms. Két ága van, mert az
 interrupt kezelő a gazda ígéretre várakozás alatt nem fut (J-6): (1) CPU kötött kódra
 `setInterruptHandler(shouldInterruptAfterDeadline(...))`; (2) a gazda oldalon egy saját, a lépés
@@ -297,7 +318,10 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
   (PLAN-015 T-015-10). JavaScript esetén a "Munkakönyvtár (cwd)" `TextField` is
   megjelenik (az agent lépés mintájára), üresen `null`. JavaScript esetén a "Memória korlát (MB)" `TextField`
   `type="number"` is megjelenik, üresen `null` (alapérték: a rendszermemória, legfeljebb 2048 MB); a 16 ... 2048
-  tartományon kívüli érték a mentéskor a mező alatti hibát ad.
+  tartományon kívüli érték a mentéskor a mező alatti hibát ad. A `/proc` vagy `/dev` alá mutató munkakönyvtár (5.4
+  "A `/proc` és a `/dev` tiltása") a mentéskor a "Munkakönyvtár (cwd)" mező alatt jelez ("A munkakönyvtár nem lehet a
+  /proc vagy a /dev könyvtárban."), PUT nélkül; a szabály a `protocol` mentési sémájában áll, `db` oldali párja
+  nincs (az `onUnhandledError` mintájára), a második védvonal a futtató.
 - A mentési séma a `source` mezőt a kötelező szöveg mezők közé veszi fel (a meglévő `required-text-field-paths`
   tábla mindkét oldalon, a sodródás védelemmel), mert üres szkript nem futtatható. A hiba a mező alatt.
 - A futás nézet a szkript lépést a meglévő csomópont állapot jelvényekkel mutatja; új transcript sor típus
@@ -316,11 +340,13 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
    ezt kihasználhatja. A címszűrés hiánya az O-6 user döntése, a kockázat kimondott és elfogadott.
 3. **A fájl hozzáférés írni is tud.** A gyökér alatt a szkript felülírhat bármit, és a szintaktikai ellenőrzés
    nem véd a TOCTOU linkcsere ellen (5.4). A gyökér az O-5 user döntése szerint csomópontonként megadott
-   (`cwd`), üresen a szerver munkakönyvtára; a kockázat kimondott és elfogadott.
+   (`cwd`), üresen a szerver munkakönyvtára; a kockázat kimondott és elfogadott. A `/proc` és a `/dev` elzárva
+   (O-8); egy külső folyamat linkcseréje az ellenőrzés és a megnyitás között oda is vezethet (5.4).
 4. **Titok.** A gazda `fetch` nem ad hozzá hitelesítő fejlécet és sütit, és nincs `process`. A fájl hozzáférésen át
-   viszont a gyökér alatti minden fájl olvasható: ha a `cwd` a `/proc/self` vagy a `/` könyvtár, a
-   `/proc/self/environ` a szerver indulási környezeti változóit adja (mérve, research 10.3), és az üres `cwd` a szerver
-   munkakönyvtára, az ott álló fájlokkal. A szerző saját figyelmeztetése szerint egy hitelesített gazda `fetch`
+   viszont a gyökér alatti minden fájl olvasható. A `/proc/self/environ` (a szerver indulási környezeti változói,
+   mérve, research 10.3) az O-8 döntése óta nem olvasható: a `/proc` és a `/dev` gyökérként és útvonalként is tiltott
+   (5.4). Ami marad: az üres `cwd` a szerver munkakönyvtára, az ott álló fájlokkal (például egy `.env` fájl), és a `/`
+   gyökér alatt minden más, a szerver folyamat által olvasható fájl. A szerző saját figyelmeztetése szerint egy hitelesített gazda `fetch`
    kiadása a sandbox értelmét veszi el (J-4).
 5. **Szolgáltatás kiesés.** A CPU kötött szkript a határidőig az eseményhurkot foglalja (5.4), a nagyobb
    `timeoutMs` ezt arányosan növeli, és a külső megszakítás sem állítja meg (5.8). A memória alapértéke a rendszermemória (legfeljebb 2048 MB) lépésenként: több
@@ -345,14 +371,17 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
 
 ### 7.1 Termékdöntések (user)
 
-| #   | Kérdés                                        | Döntés vagy opciók                                                                                                                               | Mi a viselkedés addig | Mi zárná le |
-| --- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------- | ----------- |
-| O-1 | Milyen nyelven írja a felhasználó a szkriptet | **lezárva** (user döntés 2026-11-04): "CEL + JavaScript", mindkettő választható                                                                  |                       |             |
-| O-2 | Mit érhet el a szkript                        | **lezárva** (user döntés 2026-11-04): "Hálózatot vagy fájlt is", csak a JavaScript úton                                                          |                       |             |
-| O-3 | Kell-e a `join` `script` módja                | **lezárva** (user döntés 2026-11-04): "Igen, ugyanazzal a nyelvvel"                                                                              |                       |             |
-| O-4 | JavaScript időkorlát                          | **lezárva** (user döntés 2026-11-04): 60 másodperc alapérték, csomópontonként nagyobb megadható ("de meg lehessen adni nagyobb idokorlatot ...") |                       |             |
-| O-5 | Melyik könyvtárat érheti el a fájl hozzáférés | **lezárva** (user döntés 2026-11-04): (a) csomópontonként megadott könyvtár, üresen a szerver munkakönyvtára ("Csópontonként megadott")          |                       |             |
-| O-6 | Milyen címeket érhet el a hálózat             | **lezárva** (user döntés 2026-11-04): (a) bármely cím, a helyi gépet is ("Bármit, a helyi gépet is")                                             |                       |             |
+| #   | Kérdés                                                       | Döntés vagy opciók                                                                                                                                    | Mi a viselkedés addig | Mi zárná le |
+| --- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ----------- |
+| O-1 | Milyen nyelven írja a felhasználó a szkriptet                | **lezárva** (user döntés 2026-11-04): "CEL + JavaScript", mindkettő választható                                                                       |                       |             |
+| O-2 | Mit érhet el a szkript                                       | **lezárva** (user döntés 2026-11-04): "Hálózatot vagy fájlt is", csak a JavaScript úton                                                               |                       |             |
+| O-3 | Kell-e a `join` `script` módja                               | **lezárva** (user döntés 2026-11-04): "Igen, ugyanazzal a nyelvvel"                                                                                   |                       |             |
+| O-4 | JavaScript időkorlát                                         | **lezárva** (user döntés 2026-11-04): 60 másodperc alapérték, csomópontonként nagyobb megadható ("de meg lehessen adni nagyobb idokorlatot ...")      |                       |             |
+| O-5 | Melyik könyvtárat érheti el a fájl hozzáférés                | **lezárva** (user döntés 2026-11-04): (a) csomópontonként megadott könyvtár, üresen a szerver munkakönyvtára ("Csópontonként megadott")               |                       |             |
+| O-6 | Milyen címeket érhet el a hálózat                            | **lezárva** (user döntés 2026-11-04): (a) bármely cím, a helyi gépet is ("Bármit, a helyi gépet is")                                                  |                       |             |
+| O-7 | A pinelt QuickJS ismert hibáit hordozó nevek (T-4)           | **lezárva** (user döntés 2026-11-04): "A hat név törlése" (5.4 "Eltávolított nevek")                                                                  |                       |             |
+| O-8 | A fájl hozzáférés és a `/proc`, `/dev`                       | **lezárva** (user döntés 2026-11-04): "/proc és /dev tiltva", mentéskor a mező alatt, futáskor megnevezett hiba (5.4 "A `/proc` és a `/dev` tiltása") |                       |             |
+| O-9 | Gazda oldali olvasási plafon a hálózati válaszra és a fájlra | **lezárva** (user döntés 2026-11-04): "Igen, iparági alapértékkel", csomópontonként állítható (5.3, 5.4 "Olvasási plafon")                            |                       |             |
 
 ### 7.2 Technikai, nyitva
 
@@ -385,7 +414,8 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
    2048 MB, 16 ... 2048 mindkét oldalon a sodródás védelemmel); a túllépés és a gazdára kijutó `RangeError` a lépés
    hibája, a szerver folyamat fut tovább (unit teszt); a `setMaxStackSize` 131072.
 8. A fájl és a hálózat gazda függvénye az O-5 és az O-6 user döntése szerint működik (a gyökér a `cwd`, címszűrés nincs); a gyökéren kívüli út és a
-   szimbolikus link kivezetése elutasítva, átirányítás nincs követve, csak `http:` és `https:`.
+   szimbolikus link kivezetése elutasítva, átirányítás nincs követve, csak `http:` és `https:`; a `/proc` és a `/dev`
+   gyökérként és útvonalként (lexikálisan és `fs.realpath` után) tiltott, mentéskor a `cwd` mező alatt jelez (O-8).
 9. A szerkesztő tiltása és figyelmeztetése megszűnt; `runtime` választó, időkorlát mező; a `source` kötelező
    mező a mentéskor, a hiba a mező alatt; a sodródás védelem mindkét oldalon.
 10. A `quickjs-emscripten` verziója pinelve, a toolchain research fájlban két forrással.

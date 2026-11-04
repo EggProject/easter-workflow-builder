@@ -13,6 +13,7 @@ import { describeSandboxError } from './describe-sandbox-error.ts';
 import { disposeQuietly } from './dispose-quietly.ts';
 import type { HostCallScope } from './host-call-scope.ts';
 import { installHostFunctions } from './install-host-functions.ts';
+import { isForbiddenScriptRoot } from './is-forbidden-script-root.ts';
 import { loadQuickJsModule } from './load-quickjs-module.ts';
 import { resolveMemoryLimitMb } from './resolve-memory-limit-mb.ts';
 import { SCRIPT_FILE_NAME } from './script-file-name.ts';
@@ -85,7 +86,9 @@ type SandboxCompletion =
  * Egy JavaScript szkript lépés lefuttatása friss QuickJS modulon (SPEC-014 5.4
  * ... 5.8). A menet:
  *
- * 1. A határidő a lépés indulásától számít (`timeoutMs` vagy 60 000 ms).
+ * 1. A határidő a lépés indulásától számít (`timeoutMs` vagy 60 000 ms). A
+ *    `/proc` vagy `/dev` alá mutató fájl gyökér (lexikálisan vagy
+ *    `fs.realpath` után) a modul betöltése előtt `script_evaluation_failed`.
  * 2. Friss modul saját memória korláttal, új runtime `setMaxStackSize`-zal, új
  *    kontextus; az interrupt kezelő (a CPU kötött kód ága, research
  *    `2026-11-04-szkript-csomopont.md` Q-1, Q-3) közvetlenül a szkript előtt.
@@ -110,8 +113,19 @@ type SandboxCompletion =
  */
 export async function runScript(request: ScriptRunRequest): Promise<ScriptRunResult> {
   const timeoutMs = request.timeoutMs ?? SCRIPT_SANDBOX_LIMITS.defaultTimeoutMs;
+  const deadlineMs = Date.now() + timeoutMs;
+  const root = path.resolve(request.cwd ?? process.cwd());
+  // A `/proc` vagy `/dev` alá mutató gyökér a szkript indítása előtt a lépés
+  // megnevezett hibája (user döntés 2026-11-04, SPEC-014 5.4 "Fájl").
+  if (await isForbiddenScriptRoot(root)) {
+    return {
+      kind: 'failed',
+      errorKind: 'script_evaluation_failed',
+      message: 'a szkript fájl hozzáférésének gyökere (cwd) a tiltott /proc vagy /dev könyvtárba mutat',
+    };
+  }
   try {
-    return await runInFreshModule(request, timeoutMs, Date.now() + timeoutMs);
+    return await runInFreshModule(request, root, timeoutMs, deadlineMs);
   } catch (error) {
     return hostFailure(error);
   }
@@ -119,6 +133,7 @@ export async function runScript(request: ScriptRunRequest): Promise<ScriptRunRes
 
 async function runInFreshModule(
   request: ScriptRunRequest,
+  root: string,
   timeoutMs: number,
   deadlineMs: number,
 ): Promise<ScriptRunResult> {
@@ -135,7 +150,7 @@ async function runInFreshModule(
     runtime,
     handles: [],
     pendingCalls: new Set(),
-    root: path.resolve(request.cwd ?? process.cwd()),
+    root,
     maxReadBytes: resolveMemoryLimitMb(request.memoryLimitMb) * 2 ** 20,
     hostSignal: AbortSignal.any([request.signal, stepEnd.signal]),
     timeoutMs,

@@ -265,6 +265,38 @@ describe('runScript', () => {
     });
   });
 
+  describe('a /proc és a /dev gyökér tiltása (user döntés 2026-11-04)', () => {
+    it.each(['/dev', '/dev/../dev/shm', '/proc/self'])(
+      'a(z) %s cwd a szkript indítása előtt megnevezett script_evaluation_failed',
+      async (cwd) => {
+        await expect(runScript(request('return 1;', { cwd }))).resolves.toStrictEqual({
+          kind: 'failed',
+          errorKind: 'script_evaluation_failed',
+          message: 'a szkript fájl hozzáférésének gyökere (cwd) a tiltott /proc vagy /dev könyvtárba mutat',
+        });
+      },
+    );
+
+    it('a / gyökér alatt a szkript a dev/zero olvasásakor elkapható hibát kap, a szerver folyamat környezete nem olvasható', async () => {
+      const result = await runScript(
+        request(
+          'const out = []; for (const p of ["dev/zero", "proc/self/environ", "dev"]) {' +
+            ' try { await (p === "dev" ? files.list(p) : files.readText(p)); out.push("olvasva"); }' +
+            ' catch (e) { out.push(e.message); } } return out;',
+          { cwd: '/' },
+        ),
+      );
+      expect(result).toStrictEqual({
+        kind: 'succeeded',
+        output: [
+          'az útvonal a tiltott /proc vagy /dev könyvtárba mutat: dev/zero',
+          'az útvonal a tiltott /proc vagy /dev könyvtárba mutat: proc/self/environ',
+          'az útvonal a tiltott /proc vagy /dev könyvtárba mutat: dev',
+        ],
+      });
+    });
+  });
+
   describe('hibák', () => {
     it('a szintaktikai hiba script_evaluation_failed', async () => {
       const result = await runScript(request('return {'));

@@ -60,4 +60,29 @@ describe('listInRoot', () => {
       message: 'a fájl művelet nem sikerült (ENOTDIR): a.txt',
     });
   });
+
+  describe('a /proc és a /dev tiltása (user döntés 2026-11-04)', () => {
+    it('a / gyökér alatt a dev lexikálisan elutasított', async () => {
+      await expect(listInRoot('/', 'dev')).resolves.toStrictEqual({
+        kind: 'rejected',
+        name: 'Error',
+        message: 'az útvonal a tiltott /proc vagy /dev könyvtárba mutat: dev',
+      });
+    });
+
+    it('a /dev könyvtárba feloldódó szimbolikus link is elutasított', async () => {
+      const base = await mkdtemp(path.join(os.tmpdir(), 'list-in-root-tiltott-'));
+      try {
+        await symlink('/dev', path.join(base, 'eszkozok'));
+        const requested = `${path.relative('/', base)}/eszkozok`;
+        await expect(listInRoot('/', requested)).resolves.toStrictEqual({
+          kind: 'rejected',
+          name: 'Error',
+          message: `az útvonal a tiltott /proc vagy /dev könyvtárba mutat: ${requested}`,
+        });
+      } finally {
+        await rm(base, { recursive: true, force: true });
+      }
+    });
+  });
 });

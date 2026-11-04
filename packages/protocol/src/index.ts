@@ -177,6 +177,7 @@ export {
   MAX_SCRIPT_TIMEOUT_MS,
   MIN_SCRIPT_MEMORY_LIMIT_MB,
 } from './node-config/javascript-script-config.ts';
+export { FORBIDDEN_SCRIPT_PATH_PREFIXES } from './node-config/forbidden-script-path-prefixes.ts';
 export type { McpServerReference } from './node-config/mcp-server-reference.ts';
 export { McpServerReferenceSchema } from './node-config/mcp-server-reference.ts';
 export type { AgentStepConfig, PresetSystemPrompt, StructuredOutputConfig } from './node-config/agent-step-config.ts';

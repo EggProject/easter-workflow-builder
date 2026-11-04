@@ -64,6 +64,8 @@ const TIMEOUT_SECONDS_MESSAGE =
   'Az időkorlát pozitív szám legyen másodpercben, legfeljebb három tizedesjeggyel, és legfeljebb 2 147 483,647 másodperc.';
 const MEMORY_OUT_OF_RANGE_MESSAGE = 'A mező értéke 16 és 2048 közötti egész szám lehet.';
 
+const CWD_FORBIDDEN_MESSAGE = 'A munkakönyvtár nem lehet a /proc vagy a /dev könyvtárban.';
+
 /**
  * A mező alatti hiba: `aria-invalid`, és a hozzáférhető leírás a mező
  * `role="alert"` hibaüzenete (`aria-describedby`, `.claude/CLAUDE.md` 11.).
@@ -275,6 +277,27 @@ for (const invalid of ['8', '4096', '16.5', '0']) {
 
     await memory.fill('2048');
     await expectNoFieldError(memory);
+    await saveButton(page).click();
+    await expect(page.getByText('Gráf mentve')).toBeVisible();
+    expect(putBodies).toHaveLength(1);
+  });
+}
+
+for (const forbidden of ['/proc/self', '/dev', '/srv/../dev/shm']) {
+  test(`a /proc vagy /dev alá mutató munkakönyvtár (${forbidden}) a mező alatt jelez, PUT nélkül; más könyvtárral a mentés lefut`, async ({
+    page,
+  }) => {
+    const putBodies: unknown[] = [];
+    const panel = await openScriptPanel(page, putBodies);
+    await switchToJavaScript(page, panel);
+    const cwd = panel.getByLabel('Munkakönyvtár (cwd)');
+    await cwd.fill(forbidden);
+    await saveButton(page).click();
+    await expectFieldError(cwd, CWD_FORBIDDEN_MESSAGE);
+    expect(putBodies).toHaveLength(0);
+
+    await cwd.fill('/srv/munka');
+    await expectNoFieldError(cwd);
     await saveButton(page).click();
     await expect(page.getByText('Gráf mentve')).toBeVisible();
     expect(putBodies).toHaveLength(1);

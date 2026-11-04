@@ -2,7 +2,9 @@ import { realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { isString } from '@easter-workflow-builder/typeguards';
 import { describeFileError } from './describe-file-error.ts';
+import { forbiddenPathRejection } from './forbidden-path-rejection.ts';
 import type { HostCallOutcome } from './host-call-outcome.ts';
+import { isForbiddenHostPath } from './is-forbidden-host-path.ts';
 import { isWithinRoot } from './is-within-root.ts';
 import { outsideRootRejection } from './outside-root-rejection.ts';
 import { realpathIfExists } from './realpath-if-exists.ts';
@@ -19,7 +21,10 @@ import { resolvePathInRoot } from './resolve-path-in-root.ts';
  *   "File system flags"; POSIX `open` `O_CREAT | O_EXCL`), tehát egy függő link
  *   sem vezet ki.
  *
- * Az ellenőrzés és az írás közötti linkcsere ellen nem véd (TOCTOU, 5.10 3.).
+ * A `/proc` és a `/dev` alá mutató cél (lexikálisan, a létező cél és az új
+ * fájl szülő könyvtárának `fs.realpath` alakján) elutasított (user döntés
+ * 2026-11-04). Az ellenőrzés és az írás közötti linkcsere ellen nem véd
+ * (TOCTOU, 5.10 3.).
  */
 export async function writeTextInRoot(root: string, requested: unknown, text: unknown): Promise<HostCallOutcome> {
   const target = resolvePathInRoot(root, requested, false);
@@ -29,6 +34,9 @@ export async function writeTextInRoot(root: string, requested: unknown, text: un
   if (!isString(text)) {
     return { kind: 'rejected', name: 'TypeError', message: 'a beírandó tartalom szöveg kell legyen' };
   }
+  if (isForbiddenHostPath(target.path)) {
+    return forbiddenPathRejection(target.requested);
+  }
   try {
     const realRoot = await realpath(root);
     const existing = await realpathIfExists(target.path);
@@ -36,12 +44,18 @@ export async function writeTextInRoot(root: string, requested: unknown, text: un
       if (!isWithinRoot(realRoot, existing, false)) {
         return outsideRootRejection(target.requested);
       }
+      if (isForbiddenHostPath(existing)) {
+        return forbiddenPathRejection(target.requested);
+      }
       await writeFile(existing, text, 'utf8');
       return { kind: 'resolved', json: undefined };
     }
     const parent = await realpath(path.dirname(target.path));
     if (!isWithinRoot(realRoot, parent, true)) {
       return outsideRootRejection(target.requested);
+    }
+    if (isForbiddenHostPath(parent)) {
+      return forbiddenPathRejection(target.requested);
     }
     await writeFile(path.join(parent, path.basename(target.path)), text, { encoding: 'utf8', flag: 'wx' });
     return { kind: 'resolved', json: undefined };

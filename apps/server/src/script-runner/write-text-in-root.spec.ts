@@ -100,4 +100,35 @@ describe('writeTextInRoot', () => {
       name: 'TypeError',
     });
   });
+
+  describe('a /proc és a /dev tiltása (user döntés 2026-11-04)', () => {
+    it('a / gyökér alatt a dev/null lexikálisan elutasított, írás nélkül', async () => {
+      await expect(writeTextInRoot('/', 'dev/null', 'x')).resolves.toStrictEqual({
+        kind: 'rejected',
+        name: 'Error',
+        message: 'az útvonal a tiltott /proc vagy /dev könyvtárba mutat: dev/null',
+      });
+    });
+
+    it('a /dev alatti létező célra és a /dev alatti új fájlra feloldódó link is elutasított', async () => {
+      const base = await mkdtemp(path.join(os.tmpdir(), 'write-text-in-root-tiltott-'));
+      try {
+        await symlink('/dev', path.join(base, 'eszkozok'));
+        const existing = `${path.relative('/', base)}/eszkozok/null`;
+        const created = `${path.relative('/', base)}/eszkozok/nem-letezo-uj-fajl`;
+        await expect(writeTextInRoot('/', existing, 'x')).resolves.toStrictEqual({
+          kind: 'rejected',
+          name: 'Error',
+          message: `az útvonal a tiltott /proc vagy /dev könyvtárba mutat: ${existing}`,
+        });
+        await expect(writeTextInRoot('/', created, 'x')).resolves.toStrictEqual({
+          kind: 'rejected',
+          name: 'Error',
+          message: `az útvonal a tiltott /proc vagy /dev könyvtárba mutat: ${created}`,
+        });
+      } finally {
+        await rm(base, { recursive: true, force: true });
+      }
+    });
+  });
 });

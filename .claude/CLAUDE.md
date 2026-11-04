@@ -192,6 +192,10 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   `malformed_node_config` (user döntés 2026-10-14). Sodródás védelmi ág e két mentési szabályhoz nem
   tartozik (a `join` unió negyedik, `mode: null` ága viszont a meglévő sodródás védelem bővítése; a
   szabály helye technikai döntés a user 2026-09-28-i O-29 és O-33 döntése nyomán, SPEC-008 5.4).
+  **Ugyanígy nem duplikátum a JavaScript szkript `cwd` mezőjének `/proc` és `/dev` tilalma**: kizárólag a
+  `NodeConfigSaveSchema` lexikális szabálya (a mező alatt jelez), a második védvonal az `apps/server` futtatója
+  (`fs.realpath` alapú ellenőrzés a gyökérre és minden fájl útvonalra), a lista a `protocol`
+  `FORBIDDEN_SCRIPT_PATH_PREFIXES` konstansa (user döntés 2026-11-04, SPEC-014 5.4, 5.9).
 - **A `protocol` a `db` pozitív egész szám szabályát is duplikálhatja, ugyanezzel a védelemmel.** A
   `loop.maxIterations`, az `error_handler.maxAttempts` és a `backoffMs` minden eleme a mentési sémában
   is pozitív egész (user döntés 2026-10-17, O-37), a `db` `isNodeConfig` guard `isPositiveInteger`

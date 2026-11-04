@@ -1,6 +1,7 @@
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
 import { BLANK_FIELD_MESSAGE } from './blank-field-message.ts';
 import { findBlankTextFields } from './find-blank-text-fields.ts';
+import { findForbiddenScriptCwdFields } from './find-forbidden-script-cwd-fields.ts';
 import { findInvalidChoiceOptions } from './find-invalid-choice-options.ts';
 import { findIntegerFieldsAbove } from './find-integer-fields-above.ts';
 import { findIntegerFieldsOutsideRange } from './find-integer-fields-outside-range.ts';
@@ -33,6 +34,12 @@ const SCRIPT_TIMEOUT_TOO_LARGE_MESSAGE = `A mező értéke legfeljebb ${String(M
  * hibaüzenete (SPEC-014 5.3): a tört is ide tartozik, a mező egész MB.
  */
 const SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE = `A mező értéke ${String(MIN_SCRIPT_MEMORY_LIMIT_MB)} és ${String(MAX_SCRIPT_MEMORY_LIMIT_MB)} közötti egész szám lehet.`;
+
+/**
+ * A JavaScript szkript `/proc` vagy `/dev` alá mutató `cwd` mezőjének
+ * hibaüzenete (user döntés 2026-11-04, "/proc és /dev tiltva", SPEC-014 5.9).
+ */
+const SCRIPT_CWD_FORBIDDEN_MESSAGE = 'A munkakönyvtár nem lehet a /proc vagy a /dev könyvtárban.';
 
 /**
  * A szerver oldali env változó név hibaüzenete (SPEC-009 6.1, T-012-27), a
@@ -177,6 +184,36 @@ function addScriptMemoryLimitOutOfRangeIssues(config: NodeConfig, context: Custo
   }
 }
 
+/**
+ * A JavaScript szkript `cwd` mezőjének útvonala (SPEC-014 5.9), a
+ * `SCRIPT_TIMEOUT_FIELD_PATHS` mintájára: a `script` node-on és a `join`
+ * `settings` alobjektumán.
+ */
+const SCRIPT_CWD_FIELD_PATHS = {
+  start: [],
+  agent_step: [],
+  branch: [],
+  fan_out: [],
+  join: ['settings.cwd'],
+  loop: [],
+  human_approval: [],
+  error_handler: [],
+  sub_workflow: [],
+  script: ['cwd'],
+} as const satisfies Readonly<Record<NodeConfig['type'], readonly string[]>>;
+
+/**
+ * A `/proc` vagy `/dev` alá mutató `cwd` felvétele a mező útvonalára (SPEC-014 5.9).
+ */
+function addScriptForbiddenCwdIssues(config: NodeConfig, context: CustomIssueSink): void {
+  const paths: readonly string[] = SCRIPT_CWD_FIELD_PATHS[config.type];
+  for (const path of paths) {
+    for (const fieldPath of findForbiddenScriptCwdFields(config, path)) {
+      context.addIssue({ code: 'custom', path: [...fieldPath], message: SCRIPT_CWD_FORBIDDEN_MESSAGE });
+    }
+  }
+}
+
 function requiredTextFieldPathsOf(config: NodeConfig): readonly string[] {
   if (config.type !== 'join') {
     return REQUIRED_TEXT_FIELD_PATHS[config.type];
@@ -203,7 +240,7 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
 }
 
 /**
- * A mentési séma (SPEC-008 5.4): a `NodeConfigSchema` olvasó séma plusz hét
+ * A mentési séma (SPEC-008 5.4): a `NodeConfigSchema` olvasó séma plusz nyolc
  * írás oldali szabály, egyetlen `superRefine` hívásban:
  *
  * 1. a kötelező szöveg mezők nem üresek (user döntés 2026-09-28, O-21);
@@ -226,7 +263,12 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  * 7. a `start` bemeneti mező `choice` típusának `options` listája nem üres,
  *    minden eleme nem üres, és az elemek egyediek (SPEC-016 5.3): a `db`
  *    `isNodeConfig` guard szabályának szándékos duplikátuma, a mezőnkénti
- *    egyezését az `apps/server` `node-config-drift-protection` tesztje őrzi.
+ *    egyezését az `apps/server` `node-config-drift-protection` tesztje őrzi;
+ * 8. a JavaScript szkript `cwd` mezője lexikálisan nem mutat a `/proc` vagy a
+ *    `/dev` alá (user döntés 2026-11-04, SPEC-014 5.9). A szabálynak nincs `db`
+ *    oldali párja, az `onUnhandledError` szabályának mintájára: a második
+ *    védvonal a futtató, ami a gyökeret és minden útvonalat az `fs.realpath`
+ *    alakján is ellenőrzi (relatív út, szimbolikus link).
  *
  * **A szabályok a konfig típushibája mellett is lefutnak** (user döntés
  * 2026-10-16, "Egyszerre látsszon mind", SPEC-008 81. kritérium): a zod
@@ -288,6 +330,7 @@ export const NodeConfigSaveSchema = NodeConfigSchema.superRefine(
     }
     addScriptTimeoutTooLargeIssues(config, context);
     addScriptMemoryLimitOutOfRangeIssues(config, context);
+    addScriptForbiddenCwdIssues(config, context);
     addInvalidChoiceOptionIssues(config, context);
     const agentStep = agentStepPathOf(config);
     if (agentStep !== undefined) {
