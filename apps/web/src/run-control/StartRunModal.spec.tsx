@@ -135,7 +135,7 @@ describe('StartRunModal', () => {
     });
   }
 
-  it('minden bemeneti mezőre rajzol egy szöveges mezőt, a kötelezőt megjelölve', () => {
+  it('a szöveg típusú bemeneti mezőkre szöveges mezőt rajzol, a kötelezőt megjelölve', () => {
     renderModal();
 
     expect(fieldInput('Téma').required).toBe(true);

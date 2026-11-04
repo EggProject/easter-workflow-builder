@@ -40,6 +40,16 @@ function describeInputTypeMismatch(field: StartInputField, value: unknown): stri
 }
 
 /**
+ * A mező értéke a bemenetből, csak SAJÁT kulcsról: a `Record<string, unknown>`
+ * bemenet (például a `JSON.parse` vagy a szerver `z.record` kimenete) az
+ * `Object.prototype` örököse, tehát egy `toString`, `constructor` vagy
+ * `valueOf` nevű mező kitöltetlenül is örökölt függvényt adna.
+ */
+function readOwnInputValue(input: Readonly<Record<string, unknown>>, name: string): unknown {
+  return Object.hasOwn(input, name) ? input[name] : undefined;
+}
+
+/**
  * A futás bemenetének ellenőrzése a `start` node `inputFields` listája ellen
  * (SPEC-004 4.8 4. lépés): "minden `required: true` mezőnek szerepelnie kell,
  * különben `missing_required_input`". A kötelező mezők után minden **jelen
@@ -81,7 +91,7 @@ export function validateRunInput(
   }
 
   for (const field of config.inputFields) {
-    if (field.required && input[field.name] === undefined) {
+    if (field.required && readOwnInputValue(input, field.name) === undefined) {
       return {
         kind: 'error',
         message: formatEngineErrorMessage(
@@ -93,7 +103,7 @@ export function validateRunInput(
   }
 
   for (const field of config.inputFields) {
-    const value = input[field.name];
+    const value = readOwnInputValue(input, field.name);
     if (value === undefined) {
       continue;
     }
