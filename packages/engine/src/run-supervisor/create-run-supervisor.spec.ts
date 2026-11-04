@@ -360,6 +360,9 @@ function openHarness(options: HarnessOptions = {}): Harness {
       },
     },
     processEnvironment: { read: () => null, readAll: () => ({}) },
+    skillLibrary: {
+      readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
+    },
   };
   const concurrencyGate = createConcurrencyGate(() => null);
   const supervisor = createRunSupervisor({

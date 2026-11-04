@@ -35,6 +35,13 @@ export interface TextFieldProperties extends Omit<InputHTMLAttributes<HTMLInputE
    * `<label>` elemre kerül.
    */
   readonly inputClassName?: string;
+  /**
+   * A még nem látható hibaüzenet helyét láthatatlanul lefoglalja (SPEC-009 O-59, koordinátor döntés
+   * 2026-10-28): a mező elhagyásakor megjelenő hiba így nem tolja el az alatta álló gombot, és a
+   * gomb lenyomásával kezdődő kattintás nem vész el. A lefoglalt elem `visibility: hidden` és
+   * `aria-hidden`, tehát se nem látszik, se nem olvasódik fel.
+   */
+  readonly reserveErrorSpace?: boolean;
 }
 
 /**
@@ -60,6 +67,7 @@ export function TextField(properties: Readonly<TextFieldProperties>): ReactEleme
     error,
     icon,
     inputClassName,
+    reserveErrorSpace = false,
     className,
     id,
     onBlur,
@@ -107,6 +115,11 @@ export function TextField(properties: Readonly<TextFieldProperties>): ReactEleme
       )}
       {isErrorVisible && (
         <span className="field__error" id={errorId} role="alert">
+          {error}
+        </span>
+      )}
+      {!isErrorVisible && reserveErrorSpace && error !== undefined && (
+        <span className="field__error" aria-hidden="true" style={{ visibility: 'hidden' }}>
           {error}
         </span>
       )}

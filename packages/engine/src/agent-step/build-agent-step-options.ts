@@ -3,21 +3,43 @@ import type { AgentStepCapabilityDecisions } from './agent-step-capability-decis
 import type { ThinkingMode } from '@easter-workflow-builder/provider-capability';
 import type { AgentStepOptions } from './agent-step-options.ts';
 import type { SessionBinding } from './session-binding.ts';
+import type { SkillLibrarySnapshot } from '../engine-port/skill-library-snapshot.ts';
+import type { OutgoingMcpServer } from '../mcp-server-resolution/outgoing-mcp-server.ts';
+import type { OutgoingAgents } from '../agent-definition/outgoing-agents.ts';
+import { qualifySkillNames } from '../agent-definition/qualify-skill-names.ts';
 
 /**
- * A `buildAgentStepOptions` bemenete. A négy mező négy, egymástól független
- * forrásból jön, és mind a négy **készen** érkezik: a lépés tárolt configja,
+ * A `buildAgentStepOptions` bemenete. A hét mező egymástól független
+ * forrásból jön, és mind **készen** érkezik: a lépés tárolt configja,
  * a leírótól függő döntések (`validateAgentStepCapabilities`), a kimenő env
- * blokk (`buildOutgoingEnvironment`, a `processEnvironment` porton át) és
- * a session kötés (`resolveSessionBinding`). Így az összeállítás maga tiszta
- * függvény marad: sem portot, sem adatbázist nem érint.
+ * blokk (`buildOutgoingEnvironment`, a `processEnvironment` porton át), a
+ * feloldott MCP szerverek (`resolveMcpServers`, a `database` és a
+ * `processEnvironment` porton át), az agent definíciók kimenő alakja
+ * (`resolveOutgoingAgents`), a session kötés (`resolveSessionBinding`)
+ * és a skill könyvtár állapota (a `skillLibrary` porton át), valamint a
+ * beépített skillek globális kapcsolója (a `database` port beállításaiból). Így az
+ * összeállítás maga tiszta függvény marad: sem portot, sem adatbázist nem
+ * érint.
  */
 export interface BuildAgentStepOptionsInput {
   readonly config: AgentStepConfig;
   readonly decisions: AgentStepCapabilityDecisions;
   readonly environmentBlock: Readonly<Record<string, string>>;
+  readonly mcpServers: Readonly<Record<string, OutgoingMcpServer>>;
+  readonly agents: OutgoingAgents;
   readonly sessionBinding: SessionBinding;
+  readonly skillLibrary: SkillLibrarySnapshot;
+  readonly builtinSkillsEnabled: boolean;
 }
+
+/**
+ * A CLI beépített skilljeit kikapcsoló env változó (SPEC-009 O-44, user döntés 2026-10-28): a
+ * telepített `sdk.d.ts` `Settings.disableBundledSkills` leírása szerint "Equivalent to
+ * CLAUDE_CODE_DISABLE_BUNDLED_SKILLS=1"; mérve a beágyazott CLI `init` üzenetén (M-149, research
+ * `2026-10-28-plan-012-vegrehajtas.md`): a változóval a beépített skillek eltűnnek, a feltöltött
+ * (`plugins`) skilleket nem érinti a leírás szerint.
+ */
+const DISABLE_BUNDLED_SKILLS_VARIABLE = 'CLAUDE_CODE_DISABLE_BUNDLED_SKILLS';
 
 /**
  * A session mezők (SPEC-004 6.3 táblázat): `isolated` módban egyáltalán nem
@@ -28,6 +50,32 @@ function sessionFields(
   binding: SessionBinding,
 ): Record<string, never> | { readonly resume: string; readonly forkSession: boolean } {
   return binding.mode === 'isolated' ? {} : { resume: binding.resume, forkSession: binding.forkSession };
+}
+
+/**
+ * A skill mezők (SPEC-009 5.1, 5.3, O-47): a `skills: null` lépésen sem a
+ * `skills`, sem a `plugins` opció nem megy ki (O-40 (a)), tehát a feltöltött
+ * skillek a fő szálnak és az al-agentnek sem érhetők el; az agent definíció
+ * skill hivatkozása `null` lépés mellett a futás indításakor
+ * `agent_skill_not_in_step` (`resolveOutgoingAgents`). Nem `null` lépésen a
+ * `plugins` a skill könyvtár gyökerére mutat, a `skills` pedig `<plugin>:<név>`
+ * alakú lista (`qualifySkillNames`; research
+ * `2026-10-28-spec-009-blokkolo-meresek.md` 2. és 5. szekció); a gyökeret a
+ * szerver a kimenő lista másolatára szűkíti (`sdk-query-hardening`, M-150).
+ */
+function skillFields(
+  skills: AgentStepConfig['skills'],
+  library: SkillLibrarySnapshot,
+):
+  | Record<string, never>
+  | {
+      readonly plugins: NonNullable<AgentStepOptions['plugins']>;
+      readonly skills: NonNullable<AgentStepOptions['skills']>;
+    } {
+  if (skills === null) {
+    return {};
+  }
+  return { plugins: [{ type: 'local', path: library.rootDirectory }], skills: qualifySkillNames(skills, library) };
 }
 
 /**
@@ -80,18 +128,32 @@ function thinkingFields(
  *    a `disallowedTools` a lépés saját listája **plusz** a leíró szerint nem
  *    működő szerver oldali toolok kliens neve (12. sor), az
  *    `includePartialMessages` a 13. sor, az `env` a
- *    `provider-environment` téma blokkja (10. és 11. sor), a
+ *    `provider-environment` téma blokkja (10. és 11. sor), kikapcsolt beépített
+ *    skilleknél a `CLAUDE_CODE_DISABLE_BUNDLED_SKILLS=1` taggal (O-44), a
  *    `persistSession` pedig minden lépésnél `true` (6.3, 32. elfogadási
- *    kritérium).
+ *    kritérium). A `settingSources: []` és a `strictMcpConfig: true` az
+ *    izoláció (SPEC-009 7.1, O-20 (a)): a lépés nem olvassa a szerver gép
+ *    user, project és local beállítás forrását (`~/.claude/settings.json`, a
+ *    `cwd` alatti `.claude/` és `CLAUDE.md`, az ott felfedezett skillek), és
+ *    csak a kimenő `mcpServers` MCP szervereit látja. Az auto memory
+ *    kikapcsolása nem itt, hanem a kimenő `env` blokkban áll
+ *    (`buildOutgoingEnvironment`, O-39).
  * 2. **A lépés configjából átemelt, elhagyható mezők.** Mindegyik tárolt alakja
  *    `null`-lal jelzi a hiányt (SPEC-003 4.4), és a `null` érték itt nem
  *    kiküldött `null`-t, hanem **hiányzó mezőt** jelent.
- * 3. **A session és a strukturált kimenet mezői**, a két segédfüggvény szerint.
- *
- * **Ami szándékosan kimarad: az `mcpServers`.** A tárolt `StorableMcpServer`
- * alak titok helyett env változó **nevet** hordoz; a mező bekötése a SPEC-009
- * hatóköre (SPEC-011 3.2), a motorban kitalált alakot nem építünk
- * (`.claude/CLAUDE.md` 4.).
+ * 3. **A session, a skill és a strukturált kimenet mezői**, a segédfüggvények
+ *    szerint.
+ * 4. **Az `mcpServers` mező** (SPEC-009 6.3, 6.4): a lépés
+ *    `mcpServerReferences` hivatkozásaiból a motor `mcp-server-resolution`
+ *    témája oldja fel, a központi definíciókból és a `processEnvironment`
+ *    portból; üres eredménynél a mező nem megy ki, tehát a hivatkozás nélküli
+ *    lépés `Options` objektuma változatlan. A lépés régi `mcpServers` mezőjét
+ *    (`StorableMcpServer`) a motor nem képezi le (SPEC-009 6.2, O-42 (b)). A
+ *    mező az env és fejléc **értékeket** hordozza, ezért az `Options`
+ *    objektumot a motor nem naplózza és nem írja eseménybe (AC19).
+ * 5. **Az `agents` mező** (SPEC-009 5.2, 6.2): a `resolveOutgoingAgents`
+ *    kimenete, a definíciók minősített `skills` listájával és feloldott MCP
+ *    hivatkozásaival; ugyanúgy értéket hordoz, mint az `mcpServers`.
  */
 export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentStepOptions {
   const config = input.config;
@@ -102,17 +164,22 @@ export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentS
     allowedTools: config.allowedTools,
     disallowedTools: [...config.disallowedTools, ...decisions.disallowedServerTools.disallowedTools],
     additionalDirectories: config.additionalDirectories,
-    agents: config.agents,
-    env: input.environmentBlock,
+    agents: input.agents.definitions,
+    env: input.builtinSkillsEnabled
+      ? input.environmentBlock
+      : { ...input.environmentBlock, [DISABLE_BUNDLED_SKILLS_VARIABLE]: '1' },
     includePartialMessages: decisions.includePartialMessages,
     persistSession: true,
+    settingSources: [],
+    strictMcpConfig: true,
     ...thinkingFields(decisions.thinking),
     ...(decisions.effort !== undefined && { effort: decisions.effort }),
     ...(config.permissionMode !== null && { permissionMode: config.permissionMode }),
     ...(config.maxTurns !== null && { maxTurns: config.maxTurns }),
     ...(config.maxBudgetUsd !== null && { maxBudgetUsd: config.maxBudgetUsd }),
     ...(config.systemPrompt !== null && { systemPrompt: config.systemPrompt }),
-    ...(config.skills !== null && { skills: config.skills }),
+    ...skillFields(config.skills, input.skillLibrary),
+    ...(Object.keys(input.mcpServers).length > 0 && { mcpServers: input.mcpServers }),
     ...(config.cwd !== null && { cwd: config.cwd }),
     ...(config.sandbox !== null && { sandbox: config.sandbox }),
     ...sessionFields(input.sessionBinding),

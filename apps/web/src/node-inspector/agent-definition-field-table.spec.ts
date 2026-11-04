@@ -14,14 +14,15 @@ describe('AGENT_DEFINITION_FIELD_TABLE', () => {
     expect(required).toStrictEqual(['description', 'prompt']);
   });
 
-  it('a `skills` és az `mcpServers` sor olvasható, nem szerkeszthető, és megnevezi az okot', () => {
+  it('a `skills` sor a `skillek` csoport szerkeszthető vezérlője, az `mcpServers` és a `memory` sor nem támogatott (O-53)', () => {
     const skills = AGENT_DEFINITION_FIELD_TABLE.find((field) => field.key === 'skills');
     const mcpServers = AGENT_DEFINITION_FIELD_TABLE.find((field) => field.key === 'mcpServers');
-    expect(skills?.control.kind).toBe('readonly');
-    expect(mcpServers?.control.kind).toBe('readonly');
-    if (skills?.control.kind === 'readonly') {
-      expect(skills.control.reason).toContain('SPEC-009');
-    }
+    const memory = AGENT_DEFINITION_FIELD_TABLE.find((field) => field.key === 'memory');
+    expect(skills?.group).toBe('skillek');
+    expect(skills?.control.kind).toBe('skills');
+    expect(mcpServers?.control.kind).toBe('unsupported');
+    expect(mcpServers?.group).toBe('MCP szerverek');
+    expect(memory?.control.kind).toBe('unsupported');
   });
 
   it('a mezőkulcsok egyediek', () => {

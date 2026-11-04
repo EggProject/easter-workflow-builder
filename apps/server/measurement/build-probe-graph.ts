@@ -27,6 +27,15 @@ Rövid, eszközt nem kérő prompt: a pontos szöveg a próba kódjában áll, n
 */
 const PROBE_PROMPT = 'Válaszolj egyetlen rövid mondattal: mire jó egy "hello world" program? Eszközt ne használj.';
 
+/**
+A skill és MCP mód (SPEC-009 T-012-12a): a lépés egy feltöltött skillt választ ki, és egy központi MCP
+szervert hivatkozik.
+*/
+export interface ProbeSkillAndMcp {
+  readonly skillName: string;
+  readonly mcpServerName: string;
+}
+
 export interface ProbeGraph {
   readonly nodes: readonly WorkflowNodeInput[];
   readonly edges: readonly WorkflowEdgeInput[];
@@ -38,9 +47,14 @@ export interface ProbeGraph {
  * `maxBudgetUsd`, nincs eszköz tiltás, nincs időkorlát. A modell és az effort
  * a SPEC-013 6. szekciója szerint: `minimax` esetén `MiniMax-M3.1-Flash` és
  * `low`, `claude-subscription` esetén `claude-haiku-4-5` és effort nélkül; a
- * hívó a `modelIdOverride` paraméterrel más modellt adhat.
+ * hívó a `modelIdOverride` paraméterrel más modellt adhat. A `skillAndMcp` megadásakor a lépés a
+ * skill könyvtár egy skilljét és egy központi MCP szervert hivatkozik (SPEC-009 T-012-12a).
  */
-export function buildProbeGraph(providerId: ProviderId, modelIdOverride?: string): ProbeGraph {
+export function buildProbeGraph(
+  providerId: ProviderId,
+  modelIdOverride?: string,
+  skillAndMcp?: ProbeSkillAndMcp,
+): ProbeGraph {
   return {
     nodes: [
       {
@@ -72,8 +86,11 @@ export function buildProbeGraph(providerId: ProviderId, modelIdOverride?: string
           maxBudgetUsd: null,
           systemPrompt: null,
           agents: {},
-          skills: null,
+          skills: skillAndMcp === undefined ? null : [skillAndMcp.skillName],
           mcpServers: {},
+          ...(skillAndMcp !== undefined && {
+            mcpServerReferences: { [skillAndMcp.mcpServerName]: { envBindings: {}, authEnvName: null } },
+          }),
           cwd: null,
           additionalDirectories: [],
           sandbox: null,

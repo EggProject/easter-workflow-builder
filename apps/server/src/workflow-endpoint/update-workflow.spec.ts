@@ -37,6 +37,28 @@ describe('createUpdateWorkflowHandler', () => {
     });
   });
 
+  it('a builtinSkillsEnabled elhagyva a tárolt értéken marad, megadva (null is) érvényesül (SPEC-009 O-44)', async () => {
+    const database = openMemoryDatabase();
+    const created = okOrThrow(
+      database.workflows.createWorkflow({
+        name: 'Eredeti',
+        description: null,
+        providerId: null,
+        builtinSkillsEnabled: false,
+      }),
+    );
+    const handler = createUpdateWorkflowHandler(database);
+    const update = async (body: Readonly<Record<string, unknown>>): Promise<unknown> => {
+      const result = await handler({ parameters: { workflowId: created.id }, query: new URLSearchParams(), body });
+      return result.kind === 'ok' ? result.value.body : result.message;
+    };
+
+    expect(await update({ name: 'Új név' })).toMatchObject({ builtinSkillsEnabled: false });
+    expect(await update({ builtinSkillsEnabled: true })).toMatchObject({ builtinSkillsEnabled: true });
+    expect(await update({ builtinSkillsEnabled: null })).toMatchObject({ builtinSkillsEnabled: null });
+    expect(okOrThrow(database.workflows.getWorkflow(created.id)).builtinSkillsEnabled).toBeNull();
+  });
+
   it('a description mező explicit null-ra állítását érvényesíti', async () => {
     const database = openMemoryDatabase();
     const created = okOrThrow(

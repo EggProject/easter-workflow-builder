@@ -349,13 +349,18 @@ const SHOWCASE_WORKFLOW: WorkflowDetail = {
   name: 'Bemutató workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };
 
 const SHOWCASE_PROVIDER_ID = 'minimax';
 
-const SHOWCASE_SETTINGS: SettingsRecord = { defaultProviderId: SHOWCASE_PROVIDER_ID, persistStreamDeltas: false };
+const SHOWCASE_SETTINGS: SettingsRecord = {
+  defaultProviderId: SHOWCASE_PROVIDER_ID,
+  persistStreamDeltas: false,
+  builtinSkillsEnabled: true,
+};
 
 /**
  * Az Agent SDK pinelt verziója, szó szerint az az érték, ami a csomagok

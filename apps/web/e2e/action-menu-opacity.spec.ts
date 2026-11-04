@@ -30,6 +30,8 @@ const ALFA: WorkflowSummary = {
   name: 'Alfa workflow',
   description: 'Az első teszt workflow',
   providerId: 'claude-subscription',
+  // eslint-disable-next-line unicorn/no-null -- a `null` az öröklés (SPEC-009 O-44)
+  builtinSkillsEnabled: null,
   createdAtMs: 1_735_689_600_000,
   updatedAtMs: 1_735_689_600_000,
 };

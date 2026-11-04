@@ -33,6 +33,8 @@ function handleUpdateWorkflow(
     name: patch.name ?? existing.name,
     description: patch.description === undefined ? existing.description : patch.description,
     providerId,
+    builtinSkillsEnabled:
+      patch.builtinSkillsEnabled === undefined ? existing.builtinSkillsEnabled : patch.builtinSkillsEnabled,
   });
   if (updated.kind === 'error') {
     return updated;
@@ -48,7 +50,7 @@ function handleUpdateWorkflow(
  * szintjén), ezért a kezelő először beolvassa a meglévő workflow-t, és a
  * kérésben megadott mezőket rá fésüli - az elhagyott mező (`undefined`) a
  * meglévő értéken marad, a kifejezetten `null`-ra állított mező (leírás,
- * providerId) érvényesül.
+ * providerId, builtinSkillsEnabled) érvényesül.
  */
 export function createUpdateWorkflowHandler(database: DatabaseContext): RouteHandler {
   return (context) => {

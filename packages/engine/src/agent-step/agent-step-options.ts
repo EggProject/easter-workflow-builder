@@ -1,5 +1,6 @@
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
 import type { SdkThinkingConfig } from './sdk-thinking-config.ts';
+import type { OutgoingMcpServer } from '../mcp-server-resolution/outgoing-mcp-server.ts';
 
 /**
  * A kimenő Agent SDK `Options` objektum **típusos** alakja, amit a motor
@@ -15,8 +16,14 @@ import type { SdkThinkingConfig } from './sdk-thinking-config.ts';
  * **Minden mező forrása az F-2 tény**, tehát a research 1. szekciójában
  * névvel felsorolt `Options` mező; kitalált mező nincs. A típusok több
  * helyen indexelt hozzáféréssel jönnek a tárolt `AgentStepConfig` alakból
- * (`systemPrompt`, `skills`, `sandbox`, `agents`), mert a motor ezeket
- * változatlanul adja tovább, tehát a két alaknak együtt kell mozognia.
+ * (`systemPrompt`, `sandbox`, `agents`), mert a motor az első kettőt
+ * változatlanul adja tovább, tehát a két alaknak együtt kell mozognia; az
+ * `agents` rekord a `resolveOutgoingAgents` kimenete (minősített `skills`,
+ * feloldott MCP hivatkozások, SPEC-009 5.2, 6.2), a szűkítetlen tárolt
+ * rekordtípussal. A
+ * `skills` kimenő alakja a tárolttól eltér (`<plugin>:<név>` lista, SPEC-009
+ * 5.3), a `plugins` az SDK `SdkPluginConfig` `local` ága (SPEC-009 5.1), az
+ * `mcpServers` a lépés hivatkozás mezőjéből feloldott alak (SPEC-009 6.4).
  *
  * **Az opcionális mezők a "nincs kiküldve" esetet jelentik**, nem az
  * `undefined` értéket: az `exactOptionalPropertyTypes` mellett a hiányzó mező
@@ -27,6 +34,10 @@ import type { SdkThinkingConfig } from './sdk-thinking-config.ts';
  * lépésnél explicit `true` értéket ad (SPEC-004 6.3, 32. elfogadási
  * kritérium), tehát a hamis érték típusszinten sem állítható be. A
  * `sessionStore` opciót a motor nem használja (F-14).
+ *
+ * **A `settingSources` üres tuple, a `strictMcpConfig` `true` literál típusú**
+ * (SPEC-009 7.1, O-20 (a)): minden lépés a gép saját Claude beállításai és
+ * MCP konfigurációja nélkül fut, tehát más érték típusszinten sem állítható be.
  */
 /* eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- itt szándékosan objektum literál típusalias áll, nem `interface`: az `AgentQueryRequest.options` mező típusa `Readonly<Record<string, unknown>>`, amire egy `interface` alakú objektum nem hozzárendelhető (nincs implicit index szignatúrája, mert az interfész később kiterjeszthető), egy típusalias viszont igen. Interfésszel az adapter felé `as` kényszerítés kellene, ami tiltott (`.claude/CLAUDE.md` 5.) */
 export type AgentStepOptions = {
@@ -38,13 +49,17 @@ export type AgentStepOptions = {
   readonly env: Readonly<Record<string, string>>;
   readonly includePartialMessages: boolean;
   readonly persistSession: true;
+  readonly settingSources: readonly [];
+  readonly strictMcpConfig: true;
   readonly thinking?: SdkThinkingConfig;
   readonly effort?: string;
   readonly permissionMode?: string;
   readonly maxTurns?: number;
   readonly maxBudgetUsd?: number;
   readonly systemPrompt?: NonNullable<AgentStepConfig['systemPrompt']>;
-  readonly skills?: NonNullable<AgentStepConfig['skills']>;
+  readonly plugins?: readonly { readonly type: 'local'; readonly path: string }[];
+  readonly skills?: readonly string[];
+  readonly mcpServers?: Readonly<Record<string, OutgoingMcpServer>>;
   readonly cwd?: string;
   readonly sandbox?: NonNullable<AgentStepConfig['sandbox']>;
   readonly resume?: string;

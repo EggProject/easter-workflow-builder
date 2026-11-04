@@ -19,6 +19,12 @@ import { buildProviderEnvironmentBlock } from './build-provider-environment-bloc
  * 3. **Ráírás:** a `requiredEnv[]` blokkja (`buildProviderEnvironmentBlock`)
  *    felülírja az alapot. A tiltott név a ráírásban sem jelenhet meg, azt a
  *    blokk összeállítása már kizárja.
+ * 4. **Az auto memory kikapcsolása** (SPEC-009 7.1, O-39): a
+ *    `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` a ráírás UTÁN kerül a blokkba, tehát
+ *    a szerver környezetében álló más érték nem nyer. A `settingSources: []`
+ *    az auto memoryt nem kapcsolja ki, a hivatalos izolációs recept a kettőt
+ *    együtt írja elő (`docs/research/2026-10-26-spec-009-forrasok.md` 8.
+ *    szekció). A lépés és a kapcsolat teszt is ezen az úton kapja.
  *
  * Az eredmény értékei titkot is hordozhatnak: eseménybe, naplóba és
  * hibaüzenetbe nem kerülhetnek (a hibaág kizárólag a változó nevét adja).
@@ -41,5 +47,8 @@ export function buildOutgoingEnvironment(
   const disallowedNames = new Set(disallowedEnvironment.map((requirement) => requirement.name));
   const filteredBase = Object.entries(processEnvironment.readAll()).filter(([name]) => !disallowedNames.has(name));
 
-  return { kind: 'ok', value: { ...Object.fromEntries(filteredBase), ...environmentBlock.value } };
+  return {
+    kind: 'ok',
+    value: { ...Object.fromEntries(filteredBase), ...environmentBlock.value, CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
+  };
 }

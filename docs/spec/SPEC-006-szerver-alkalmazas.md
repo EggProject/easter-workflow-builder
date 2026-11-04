@@ -132,7 +132,7 @@ Az `apps/server` az L6 réteg, a függőségi gráf csúcsa: az egyetlen csomag,
 2. **Az indulás és a leállás menetét**, kötött sorrendben, lépésenként kimondott hibaviselkedéssel.
 3. **A motor kilenc portjának valós megvalósítását**, beleértve az órát, az azonosító generátort, a környezet olvasót és az esemény kiadót.
 4. **A HTTP kiszolgálót** `node:http` felett, a `ROUTE_TABLE` alapján működő saját illesztővel.
-5. **A 26 REST végpont kezelőjét**, mindegyiket a `protocol` sémájával validálva és a `db` vagy az `engine` felé továbbítva.
+5. **A 33 REST végpont kezelőjét** (a SPEC-005 4.2 26 végpontja, a SPEC-009 skill, MCP szerver és env név végpontjai), mindegyiket a `protocol` sémájával validálva és a `db` vagy az `engine` felé továbbítva.
 6. **Az SSE végpontot**, a feliratkozás nyilvántartással, a pótlással és az élő szórással.
 7. **A hibaosztály leképezést** (SPEC-005 8.3 táblázat).
 
@@ -217,6 +217,8 @@ flowchart TD
 
 **Az adatbázis fájl útvonalát nem a szerver találja ki**: a `db` csomag `resolveDatabaseFilePath` függvénye adja, ami az `EASTER_DB_FILE` env változót olvassa, és annak hiányában a dokumentált fejlesztői alapértéket adja (SPEC-003). A szerver ezt a függvényt hívja, nem másolja le a szabályt.
 
+**A skill könyvtár és a feltöltés korlátai (SPEC-009 5.1, 5.4 6. pont, O-34, PLAN-012 T-012-8).** A `server-config` téma négy további env változót olvas. Az `EASTER_SKILL_LIBRARY_DIRECTORY` **kötelező, alapérték nélkül**: hiányában vagy üres értékénél a szerver nem indul (`missing_env_variable`), a SPEC-012 4.2 "minden értéknek van alapértéke" szabályának a SPEC-009 5.1 szerinti kivétele (a szabály ütközése nyitott kérdés: SPEC-009 O-49). Relatív érték a szerver induló könyvtárához képest abszolút útvonalra oldódik, a könyvtár nevének pedig érvényes skill plugin névnek kell lennie, különben `invalid_env_variable`. A három korlát opcionális, a kódban álló, forrásolt alapértékkel (`default-server-config.ts`), pozitív egész env értékkel felülírható, érvénytelen értékre `invalid_env_variable`: `EASTER_SKILL_MAX_ARCHIVE_BYTES` (alapérték `30000000`, a feltöltött törzs mérete), `EASTER_SKILL_MAX_UNPACKED_BYTES` (alapérték `30000000`, a kicsomagolt összméret) és `EASTER_SKILL_MAX_ENTRY_COUNT` (alapérték `1024`, a bejegyzések száma). A források az alapértékekre: SPEC-009 5.4 6. pont. A minta fájl a gyökér `.env.example`.
+
 **A `createEngine` nem `Outcome` alakú**, tehát ez a lépés nem tud "hibázni" a többi értelmében. Ez a motor szerződése, és a szerver nem burkolja be mesterségesen egy olyan hibaágba, ami logikailag sosem fut: a kizárás nélküli 100 százalékos lefedettségi küszöb ezt tiltja.
 
 ### 4.3 Mi történik, ha egy lépés hibázik
@@ -249,7 +251,7 @@ flowchart TD
 
 **Keretrendszert nem veszünk fel.** Négy, egymástól független érv, mindegyik forrással:
 
-1. **Az útvonal tábla már létezik, és egy forrásból jön.** A `packages/protocol` `ROUTE_TABLE` konstansa mind a 26 végpont metódusát és `:paramNév` alakú sablonját tartalmazza, `as const satisfies` alakban, és a `RouteId` unió a kulcsaiból következik. Egy keretrendszer routere a végpontokat **másodszor** deklarálná, a saját `app.get('/api/workflows/:workflowId', ...)` hívásaiban, és a két lista elcsúszhatna. Pontosan ezt a szétcsúszást tiltja a SPEC-005 3.1.
+1. **Az útvonal tábla már létezik, és egy forrásból jön.** A `packages/protocol` `ROUTE_TABLE` konstansa mind a 33 végpont metódusát és `:paramNév` alakú sablonját tartalmazza, `as const satisfies` alakban, és a `RouteId` unió a kulcsaiból következik. Egy keretrendszer routere a végpontokat **másodszor** deklarálná, a saját `app.get('/api/workflows/:workflowId', ...)` hívásaiban, és a két lista elcsúszhatna. Pontosan ezt a szétcsúszást tiltja a SPEC-005 3.1.
 2. **Amit a keretrendszer adna, arra nincs szükségünk.** Middleware lánc, tömörítés, sablon motor, sütikezelés, statikus fájl kiszolgálás, hitelesítés: a tömörítés a stream útvonalon **tiltott** (SPEC-005 F-11), hitelesítés nincs (3.5), sablon és süti nincs, statikus kiszolgálás nincs (3.3).
 3. **A `node:http` valóban nem ad routert** (M-9), tehát az illesztést meg kell írni. A tényleges munka viszont pontosan annyi, amennyit a 5.3 leír: egy tiszta függvény, ami metódus és útvonal szegmens lista alapján illeszt a `ROUTE_TABLE` bejegyzéseire. Ez kimerítően tesztelhető, és nincs benne kitalálható viselkedés.
 4. **A `URLPattern` alternatíva sem kell.** Globálisan elérhető és `:param` szintaxist tud (M-10), de kísérleti stabilitási szinten áll, tehát egy jövőbeli verzióban változhat. Egy huszonhat soros saját illesztő ennél olcsóbb.
@@ -654,7 +656,7 @@ packages/logger/
 
 | Amit a teszt igazol                   | Hogyan                                                                                                                                         |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| az illesztő mind a 26 végpontra talál | a `ROUTE_TABLE` bejárása, végpontonként egy behelyettesített útvonallal; a darabszám a táblából jön, nem kézzel írt listából                   |
+| az illesztő mind a 33 végpontra talál | a `ROUTE_TABLE` bejárása, végpontonként egy behelyettesített útvonallal; a darabszám a táblából jön, nem kézzel írt listából                   |
 | a `405` és a `404` ág                 | ismert útvonal rossz metódussal, és ismeretlen útvonal; az `Allow` fejléc tartalmának összehasonlítása                                         |
 | a séma validáció hibaága              | ismeretlen kulcs, hiányzó kötelező mező, rossz típus; a válasz `400`, és a törzs nem tartalmazza a küldött értéket                             |
 | a hibaosztály leképezés               | a SPEC-005 8.3 táblázat minden sorára egy `Outcome` hibaág, a hibaosztály nevével zárójelben; és egy be nem sorolt üzenet, ami `internal` lesz |

@@ -22,12 +22,15 @@ describe('createUpdateSettingsHandler', () => {
     const result = await handler({
       parameters: {},
       query: new URLSearchParams(),
-      body: { defaultProviderId: 'minimax', persistStreamDeltas: true },
+      body: { defaultProviderId: 'minimax', persistStreamDeltas: true, builtinSkillsEnabled: true },
     });
 
     expect(result).toStrictEqual({
       kind: 'ok',
-      value: { status: 200, body: { defaultProviderId: 'minimax', persistStreamDeltas: true } },
+      value: {
+        status: 200,
+        body: { defaultProviderId: 'minimax', persistStreamDeltas: true, builtinSkillsEnabled: true },
+      },
     });
   });
 
@@ -42,6 +45,25 @@ describe('createUpdateSettingsHandler', () => {
     expect(result.kind === 'ok' && result.value.body).toStrictEqual({
       defaultProviderId: 'claude-subscription',
       persistStreamDeltas: true,
+      builtinSkillsEnabled: true,
+    });
+  });
+
+  it('a builtinSkillsEnabled mezőt menti, a többi mező érintetlen (SPEC-009 O-44)', async () => {
+    const database = openMemoryDatabase();
+    const handler = createUpdateSettingsHandler(database);
+
+    const result = await handler({
+      parameters: {},
+      query: new URLSearchParams(),
+      body: { builtinSkillsEnabled: false },
+    });
+
+    expect(result.kind === 'ok' && result.value.body).toStrictEqual({
+      // eslint-disable-next-line unicorn/no-null -- a tárolt alapértelmezett provider hiánya a dróton `null`
+      defaultProviderId: null,
+      persistStreamDeltas: false,
+      builtinSkillsEnabled: false,
     });
   });
 
@@ -90,6 +112,20 @@ describe('createUpdateSettingsHandler', () => {
       parameters: {},
       query: new URLSearchParams(),
       body: { persistStreamDeltas: true },
+    });
+
+    expect(result.kind).toBe('error');
+  });
+
+  it('a setBuiltinSkillsEnabled hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+    const database = openMemoryDatabase();
+    database.close();
+    const handler = createUpdateSettingsHandler(database);
+
+    const result = await handler({
+      parameters: {},
+      query: new URLSearchParams(),
+      body: { builtinSkillsEnabled: false },
     });
 
     expect(result.kind).toBe('error');

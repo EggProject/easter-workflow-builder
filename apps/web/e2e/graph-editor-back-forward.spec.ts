@@ -38,11 +38,12 @@ const WORKFLOW: WorkflowDetail = {
   name: 'Alfa workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };
 
-const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false };
+const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true };
 
 /**
  * Egy al-workflow futás: a futás nézet morzsasorának "w-alfa" őse az

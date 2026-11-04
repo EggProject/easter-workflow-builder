@@ -10,6 +10,7 @@ describe('toWorkflowDetail', () => {
       name: 'Teszt workflow',
       description: 'leírás',
       providerId: 'minimax',
+      builtinSkillsEnabled: false,
       createdAtMs: new Date(1000),
       updatedAtMs: new Date(2000),
     };
@@ -18,6 +19,7 @@ describe('toWorkflowDetail', () => {
       name: 'Teszt workflow',
       description: 'leírás',
       providerId: 'minimax',
+      builtinSkillsEnabled: false,
       createdAtMs: 1000,
       updatedAtMs: 2000,
     });
@@ -29,6 +31,7 @@ describe('toWorkflowDetail', () => {
       name: 'Másik',
       description: null,
       providerId: null,
+      builtinSkillsEnabled: null,
       createdAtMs: new Date(0),
       updatedAtMs: new Date(0),
     };
@@ -37,6 +40,7 @@ describe('toWorkflowDetail', () => {
       name: 'Másik',
       description: null,
       providerId: null,
+      builtinSkillsEnabled: null,
       createdAtMs: 0,
       updatedAtMs: 0,
     });

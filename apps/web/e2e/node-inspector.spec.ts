@@ -45,7 +45,14 @@ const AGENT_STEP_CONFIG: NodeConfig = {
   maxBudgetUsd: null,
   systemPrompt: null,
   agents: {
-    kutato: { description: 'Kutat a weben.', prompt: 'Kutass alaposan.', skills: 'all' },
+    kutato: {
+      description: 'Kutat a weben.',
+      prompt: 'Kutass alaposan.',
+      skills: 'all',
+      observer: 'megfigyelo-ertek',
+      // A régi, ma már nem támogatott mező (SPEC-009 O-53): a panel mutatja és eltávolítható.
+      memory: 'project',
+    },
     legacy: 'régi, nem objektum alakú bejegyzés',
   },
   skills: null,
@@ -223,11 +230,16 @@ const WORKFLOW: WorkflowDetail = {
   name: 'Alfa workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };
 
-const SETTINGS: SettingsRecord = { defaultProviderId: 'minimax', persistStreamDeltas: false };
+const SETTINGS: SettingsRecord = {
+  defaultProviderId: 'minimax',
+  persistStreamDeltas: false,
+  builtinSkillsEnabled: true,
+};
 
 /* eslint-enable unicorn/no-null */
 
@@ -240,6 +252,9 @@ test.beforeEach(async ({ page }) => {
     mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(GRAPH))),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
+    mockRoute('listSkills', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listMcpServerDefinitions', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listServerEnvironmentNames', async (route) => route.fulfill(jsonBody([]))),
   ]);
   await page.goto(EDITOR_URL);
   await expect(nodeLocator(page, 'n-start')).toBeVisible();
@@ -360,7 +375,8 @@ test.describe('a panel dokkolt sáv alakja és a mezőnkénti hibajelzés', () =
       'Modell és futási korlátok',
       'Eszközök és környezet',
       'Al-agentek (agents)',
-      'Skillek és MCP szerverek (csak olvasható)',
+      'Skillek',
+      'MCP szerverek',
     ]) {
       await expect(panel.getByRole('button', { name: title, exact: true })).toHaveAttribute('aria-expanded', 'false');
     }
@@ -654,6 +670,52 @@ test.describe('agent_step node: prompt, provider öröklés, rendszer prompt', (
   });
 });
 
+test.describe('agent_step node: provider felülírás Kapcsolat teszt gombja', () => {
+  test('örökölt választásnál tiltott és megindokolt, felülírásnál a provider tesztjét futtatja, a váltás elrejti az eredményt', async ({
+    page,
+  }) => {
+    const testedPaths: string[] = [];
+    const connectionResult = { succeeded: false };
+    await installApiMocks(page, [
+      mockRoute('testProviderConnection', async (route, url) => {
+        testedPaths.push(url.pathname);
+        await route.fulfill(
+          jsonBody({
+            succeeded: connectionResult.succeeded,
+            // eslint-disable-next-line unicorn/no-null -- a ConnectionTestResponse.errorMessage a dróton `null`, ha a teszt sikeres (packages/protocol).
+            errorMessage: connectionResult.succeeded ? null : 'Hiányzik az ANTHROPIC_AUTH_TOKEN',
+          }),
+        );
+      }),
+    ]);
+    const panel = await openNode(page, 'n-agent');
+    const providerSelect = panel.getByRole('combobox', { name: 'Provider felülírás' });
+    const testButton = panel.getByRole('button', { name: 'Kapcsolat teszt' });
+
+    await expectSelectedLabel(providerSelect, 'nincs felülírás (öröklés)');
+    await expect(testButton).toBeDisabled();
+    await expect(panel.getByText('A kapcsolat teszthez válassz ki egy providert.')).toBeVisible();
+
+    await chooseSelectOption(page, providerSelect, 'minimax');
+    await expect(testButton).toBeEnabled();
+    await testButton.click();
+    const failure = panel.getByRole('alert').filter({ hasText: 'A kapcsolat teszt sikertelen' });
+    await expect(failure).toContainText('Ellenőrizd a provider env változóit a szerveren.');
+    await expect(failure).not.toContainText('ANTHROPIC_AUTH_TOKEN');
+    await expect(failure).toHaveClass(/\balert--danger\b/);
+
+    connectionResult.succeeded = true;
+    await testButton.click();
+    const success = panel.getByRole('status').filter({ hasText: 'A kapcsolat teszt sikeres.' });
+    await expect(success).toHaveClass(/\balert--success\b/);
+    expect(testedPaths).toEqual(['/api/providers/minimax/connection-test', '/api/providers/minimax/connection-test']);
+
+    await chooseSelectOption(page, providerSelect, 'nincs felülírás (öröklés)');
+    await expect(success).toBeHidden();
+    await expect(testButton).toBeDisabled();
+  });
+});
+
 test.describe('agent_step node: futási korlátok', () => {
   test('a modell, a session mód és a számláló mezők szerkeszthetők és megmaradnak, motor hook csoport nincs', async ({
     page,
@@ -781,17 +843,12 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
   });
 });
 
-test.describe('agent_step node: SPEC-009 hatókörű, csak olvasható mezők', () => {
-  test('a skillek és az MCP szerverek mező olvashatóan, ok megnevezéssel jelenik meg', async ({ page }) => {
+test.describe('agent_step node: a régi `mcpServers` mező csak olvasható', () => {
+  test('a régi mező olvashatóan, a régi alakot megnevező szöveggel jelenik meg (SPEC-009 AC26)', async ({ page }) => {
     const panel = await openNode(page, 'n-agent');
-    const group = await openAccordion(panel, 'Skillek és MCP szerverek (csak olvasható)');
-    // A `skills` mező `null`, a `describeUnknownValue` a JSON.stringify ágon
-    // fut le (nem a `(nincs megadva)` ágon, mert `null !== undefined`).
-    await expect(group.getByText('null', { exact: true })).toBeVisible();
+    const group = await openAccordion(panel, 'MCP szerverek');
     await expect(group.getByText('{}', { exact: true })).toBeVisible();
-    await expect(
-      group.getByText('a SPEC-009 hatóköre (skill feltöltés / MCP konfiguráció), itt csak olvasható'),
-    ).toHaveCount(2);
+    await expect(group.getByText('a régi, lépésenkénti alak', { exact: false })).toHaveCount(1);
   });
 });
 
@@ -832,18 +889,22 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     const kutatoTools = await openAccordion(kutatoGroup, 'Eszközök és környezet');
     await kutatoTools.getByLabel('Engedélyezett eszközök').fill('Read');
     await kutatoTools.getByLabel('Tiltott eszközök').fill('Bash');
-    await chooseSelectOption(page, kutatoTools.getByRole('combobox', { name: 'Memória hatóköre' }), 'project');
     await kutatoTools.getByLabel('Kezdő üzenet').fill('Szia!');
 
-    const kutatoReadOnly = await openAccordion(kutatoGroup, 'Skillek és MCP szerverek (csak olvasható)');
-    // A `skills` mező sztring (`'all'`) -> a `describeUnknownValue` sztring ága.
-    await expect(kutatoReadOnly.getByText('all', { exact: true })).toBeVisible();
+    // A `skills` mező `'all'` értéke a módválasztón "minden feltöltött skill".
+    const kutatoSkills = await openAccordion(kutatoGroup, 'Skillek');
+    await expect(kutatoSkills.getByRole('combobox', { name: 'Skillek használata' })).toHaveText(
+      'minden feltöltött skill',
+    );
+    const kutatoReadOnly = await openAccordion(kutatoGroup, 'MCP szerverek');
     await expect(
       kutatoReadOnly.getByText(
         'nem megerősített mező: csak a telepített .d.ts fájlban szerepel, hivatalos dokumentáció nem fedi (M-90)',
       ),
     ).toBeVisible();
     await expect(kutatoReadOnly.getByText('criticalSystemReminder_EXPERIMENTAL')).toBeVisible();
+    // A szöveg értékű nem megerősített mező a sztringet változatlanul mutatja.
+    await expect(kutatoReadOnly.getByText('megfigyelo-ertek')).toBeVisible();
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-agent');
@@ -855,8 +916,34 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     await expect(reopenedLimits.getByLabel('Max. körök száma')).toHaveValue('4');
     await expect(reopenedLimits.getByRole('checkbox', { name: 'Háttérben fut' })).toBeChecked();
     const reopenedTools = await openAccordion(reopenedKutato, 'Eszközök és környezet');
-    await expectSelectedLabel(reopenedTools.getByRole('combobox', { name: 'Memória hatóköre' }), 'project');
     await expect(reopenedTools.getByLabel('Kezdő üzenet')).toHaveValue('Szia!');
+  });
+
+  test('a nem támogatott memory mező a tárolt értékkel és az okkal áll, és eltávolítható (SPEC-009 O-53)', async ({
+    page,
+  }) => {
+    const panel = await openNode(page, 'n-agent');
+    const agentsGroup = await openAccordion(panel, 'Al-agentek (agents)');
+    const kutatoGroup = agentsGroup.getByRole('group', { name: 'kutato', exact: true });
+    await kutatoGroup.getByRole('button', { name: 'Kibontás' }).click();
+    const kutatoTools = await openAccordion(kutatoGroup, 'Eszközök és környezet');
+
+    await expect(kutatoTools.getByText('nem támogatott mező: a gép agent memória könyvtárát töltené be')).toBeVisible();
+    await expect(kutatoTools.getByText('project', { exact: true })).toBeVisible();
+    // Beküldés előtt a mező alatt nincs hiba; a mentési kísérlet után a séma szabálya ott jelenik meg.
+    await expect(kutatoTools.getByRole('alert')).toBeAttached({ attached: false });
+    await page.getByRole('button', { name: 'Mentés', exact: true }).click();
+    await expect(kutatoTools.getByRole('alert')).toHaveText(
+      'Ez a mező nem támogatott: a futás nem adja ki, a mentéshez el kell távolítani.',
+    );
+    await kutatoTools.getByRole('button', { name: 'Memória hatóköre eltávolítása' }).click();
+
+    await expect(kutatoTools.getByRole('button', { name: 'Memória hatóköre eltávolítása' })).toBeAttached({
+      attached: false,
+    });
+    await expect(kutatoTools.getByText('nem támogatott mező: a gép agent memória könyvtárát töltené be')).toBeAttached({
+      attached: false,
+    });
   });
 
   test('agent hozzáadása üres vagy ütköző névvel tiltott, érvényes névvel felvehető; átnevezés és törlés', async ({

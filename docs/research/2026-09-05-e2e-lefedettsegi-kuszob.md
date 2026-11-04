@@ -2176,3 +2176,39 @@ fedetlen tételek darabszáma előtte és utána azonos. A küszöb ezért a `li
 **Igazolás.** Ugyanazon a nyers adaton a beállított küszöbökkel a `nyc report --check-coverage` exit 0;
 egy századdal magasabb küszöbökkel (99.36 / 98.95 / 99.74 / 99.33) mind a négy metrika `ERROR` sorral
 bukik (négy `ERROR`).
+
+## 55. A SPEC-009 2026-10-28-i döntéseinek végrehajtása utáni újramérés (2026-11-04, PR #67): mind a négy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `feat/spec-009-skill-mcp` ág a SPEC-009 14.10 döntéseit valósítja meg (O-44 beépített
+skillek kapcsoló, O-53 nem támogatott agent mezők eltávolítása, O-55, O-59 és társaik). Az első tiszta
+mérés a `functions` metrikán elbukott (`ERROR: Coverage for functions (99.57%) does not meet global threshold
+(99.73%)`): az `AgentDefinitionEntryFields.tsx` eltávolító függvényét és a `BuiltinSkillsSettingsCard.tsx`
+mentési hibaágát e2e nem érte el, a `branches` fedetlen darabja 11 fölé nőtt. A szabálykönyv 8. szekciója
+szerint ez valódi romlás, tehát teszt kellett, nem küszöbcsökkentés: a `node-inspector.spec.ts` "a nem
+támogatott memory mező" tesztje (a mező alatti mentési hiba és az eltávolítás) és a `settings-screen.spec.ts`
+"a Beépített skillek mentésének hibája" tesztje pótolta.
+
+**A mérés** a 29. szekció tiszta eljárásával, a 47. szekció sandbox módja szerint, a `15cf0ee` fejen:
+`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, az `apps/web` alatt `bun x playwright test
+--shard=<i>/8` nyolc egymás utáni futásban, `flock /tmp/playwright-gep.lock` alatt, 3 workerrel, majd
+`nyc report --reporter=json-summary`. Mind a nyolc shard zöld (94 + 94 + 94 + 94 + 94 + 94 + 93 + 93 = 750 teszt).
+
+| Metrika    | 54. szekció: fedetlen | Most: fedett / összes | Most: fedetlen | Új küszöb |
+| ---------- | --------------------- | --------------------- | -------------- | --------- |
+| statements | 14                    | 2703 / 2713           | 10             | 99.63     |
+| branches   | 11                    | 1325 / 1335           | 10             | 99.25     |
+| functions  | 2                     | 947 / 948             | 1              | 99.89     |
+| lines      | 14                    | 2586 / 2596           | 10             | 99.61     |
+
+A fedetlen tételek fájlonként (statements / branches / functions / lines): `app-mount/mount-app.tsx`
+(3/2/0/3), `frontend-config/read-frontend-config.ts` (4/6/0/4), `graph-editor/is-valid-connection.ts`
+(1/1/0/1), `rest-client/perform-route-request.ts` (1/1/0/1), `stream-client/use-stream-connection.ts`
+(1/0/1/1); mind az 53. szekció óta ismert, unit teszttel fedett tétel. Új fájl nem került a listára.
+
+**Levezetés.** A fedetlen darab egyik metrikán sem nőtt, a mért százalék mind a négyen a korábbi küszöb
+felett van, tehát a ratchet szerint a küszöb felfelé követi a mért értéket, felfelé kerekítés nélkül
+(`apps/web/package.json`).
+
+**Igazolás.** Ugyanazon a nyers adaton a beállított küszöbökkel a `bun run coverage:e2e:report` exit 0;
+egy századdal magasabb küszöbökkel (99.64 / 99.26 / 99.90 / 99.62) mind a négy metrika `ERROR` sorral
+bukik (négy `ERROR`).

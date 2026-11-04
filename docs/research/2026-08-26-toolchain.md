@@ -35,6 +35,9 @@ verzió-döntéseinek forrása. Ha frissítesz egy csomagot, ide is vezesd át.
 | `mustache`                       | 4.2.0                      | **pinelve**, sablon nyelv, SPEC-010, lásd lent        |
 | `@types/mustache`                | 4.2.6                      | **pinelve**, dev függőség, SPEC-010, lásd lent        |
 | `@marcbachmann/cel-js`           | 8.0.0                      | **pinelve**, kifejezés nyelv, SPEC-010, lásd lent     |
+| `yauzl`                          | 3.4.0                      | **pinelve**, ZIP kicsomagolás, SPEC-009, lásd lent    |
+| `@types/yauzl`                   | 3.4.0                      | **pinelve**, dev függőség, SPEC-009, lásd lent        |
+| `yaml`                           | 2.9.1                      | **pinelve**, `SKILL.md` frontmatter, SPEC-009, lent   |
 
 ## `drizzle-kit` és `@types/better-sqlite3` verzió, 2026-08-27 (T-003-2, SPEC-003)
 
@@ -245,6 +248,29 @@ lépéssel; a frissítése külön, forrásolt lépés, a PLAN-010 F0 mérésén
 megismétlésével. A `mustache` utolsó kiadása 2021-03-28-i; a kockázat kezelése a SPEC-010 4.1
 szekciójában áll. A csomagok a PLAN-010 T-010-7 lépésében települtek: a `bun.lock` és a
 `packages/workflow-language/package.json` ugyanezt a három pontos verziót rögzíti.
+
+## Skill könyvtár csomagok, 2026-10-28 (SPEC-009, PLAN-012 T-012-8)
+
+Élő npm registry lekérdezés `curl`-lel, két független forrással (a `yauzl` választása a user
+2026-10-26-i O-33 döntése, a jelölt adatai: `docs/research/2026-10-26-spec-009-forrasok.md` 7.5).
+
+| Csomag         | Verzió  | Forrás 1                                                                | Forrás 2                                                                 |
+| -------------- | ------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `yauzl`        | `3.4.0` | `https://registry.npmjs.org/yauzl` (`dist-tags.latest`, 2026-06-07)     | `https://data.jsdelivr.com/v1/packages/npm/yauzl` (`tags.latest`)        |
+| `@types/yauzl` | `3.4.0` | `https://registry.npmjs.org/@types/yauzl` (`dist-tags.latest`, `ts6.0`) | `https://data.jsdelivr.com/v1/packages/npm/@types/yauzl` (`tags.latest`) |
+| `yaml`         | `2.9.1` | `https://registry.npmjs.org/yaml` (`dist-tags.latest`, 2026-09-11)      | `https://data.jsdelivr.com/v1/packages/npm/yaml` (`tags.latest`)         |
+
+Mindhárom **pontos verzióval** az `apps/server` `package.json` fájljában áll (a `@types/yauzl` a
+`devDependencies` alatt). A `yauzl` egyetlen függősége a `pend` `~1.2.0`, `engines.node` `>=12`;
+a `yaml` függőség nélküli, saját típusdeklarációval szállít (ISC licenc).
+
+**Miért kell a `yaml`.** A SPEC-009 5.4 4. pontja az "olvashatatlan YAML frontmatter" esetet
+elutasítja, és a `description` mezőt a YAML leképezésből olvassa; ehhez YAML elemző kell. A `yaml`
+csomag (eemeli/yaml) a repóban már tranzitívan jelen volt (az `eslint-plugin-sonarjs` és az
+`eslint-plugin-unicorn` függősége, `2.9.0`), a közvetlen függőség a registry `latest` értéke. A
+használt felület a telepített `dist/public-api.d.ts` `parseDocument` függvénye és a
+`Document.errors` tömbje (`dist/doc/Document.d.ts`): hibás YAML-ra a függvény nem dob, a hibát a
+tömb hordozza. A választás technikai döntés, a SPEC-009 9. szekciójában rögzítve.
 
 ## GitHub Actions verziók
 

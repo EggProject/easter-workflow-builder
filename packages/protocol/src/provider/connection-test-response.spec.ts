@@ -6,7 +6,6 @@ describe('ConnectionTestResponseSchema', () => {
   it('elfogadja a sikeres tesztet, errorMessage: null mellett', () => {
     const outcome = ConnectionTestResponseSchema.safeParse({
       succeeded: true,
-      mode: 'minimal_query',
       errorMessage: null,
     });
     expect(outcome.success).toBe(true);
@@ -15,9 +14,17 @@ describe('ConnectionTestResponseSchema', () => {
   it('elfogadja a sikertelen tesztet, hibaüzenettel', () => {
     const outcome = ConnectionTestResponseSchema.safeParse({
       succeeded: false,
-      mode: 'sdk_model_list',
       errorMessage: 'hiányzó API kulcs',
     });
     expect(outcome.success).toBe(true);
+  });
+
+  it('visszautasítja a megszűnt mode mezőt (strictObject, SPEC-009 O-1)', () => {
+    const outcome = ConnectionTestResponseSchema.safeParse({
+      succeeded: true,
+      mode: 'minimal_query',
+      errorMessage: null,
+    });
+    expect(outcome.success).toBe(false);
   });
 });

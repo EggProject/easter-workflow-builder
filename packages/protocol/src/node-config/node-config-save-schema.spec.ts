@@ -10,6 +10,10 @@ import {
   WorkflowNodeSchema,
 } from '../workflow/workflow-graph-document.ts';
 
+// A `JSON.parse` saját `__proto__` tulajdonságot hoz létre (egy objektum literál a prototípust állítaná).
+const OWN_PROTO_KEY_1: unknown = JSON.parse('{"__proto__":{"envBindings":{},"authEnvName":null}}');
+const OWN_PROTO_KEY_2: unknown = JSON.parse('{"github":{"envBindings":{"__proto__":"X"},"authEnvName":null}}');
+
 const VALID_AGENT_STEP_SETTINGS = {
   promptTemplate: 'Foglald össze: {{input}}',
   providerId: null,
@@ -760,5 +764,87 @@ describe('NodeConfigSaveSchema: a szám mezők pozitív egészek (SPEC-008 5.4, 
     };
 
     expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
+  });
+});
+
+function agentStepWithReferences(mcpServerReferences: unknown): unknown {
+  return { type: 'agent_step', ...VALID_AGENT_STEP_SETTINGS, mcpServerReferences, onUnhandledError: 'fail_run' };
+}
+
+function aiSynthesisWithReferences(mcpServerReferences: unknown): unknown {
+  return {
+    type: 'join',
+    mode: 'ai_synthesis',
+    settings: { ...VALID_AGENT_STEP_SETTINGS, mcpServerReferences },
+    onUnhandledError: 'fail_run',
+  };
+}
+
+describe('NodeConfigSaveSchema: az MCP hivatkozás szerver oldali nevei env változó nevek (SPEC-009 6.1, T-012-27)', () => {
+  const INVALID = { github: { envBindings: { GITHUB_TOKEN: 'ghp-titok' }, authEnvName: '' } };
+
+  it('az érvényes nevek átmennek', () => {
+    const valid = { github: { envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_CEG' }, authEnvName: 'AUTH' } };
+
+    expect(NodeConfigSaveSchema.safeParse(agentStepWithReferences(valid)).success).toBe(true);
+    expect(NodeConfigSaveSchema.safeParse(aiSynthesisWithReferences(valid)).success).toBe(true);
+  });
+
+  it('a név alakon kívüli envBindings érték és authEnvName elbukik, a mező útvonalán, az érték nélkül', () => {
+    const parsed = NodeConfigSaveSchema.safeParse(agentStepWithReferences(INVALID));
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map((issue) => issue.path)).toStrictEqual([
+      ['mcpServerReferences', 'github', 'envBindings', 'GITHUB_TOKEN'],
+      ['mcpServerReferences', 'github', 'authEnvName'],
+    ]);
+    expect(parsed.error?.issues.map((issue) => issue.message).join(' ')).not.toContain('ghp-titok');
+  });
+
+  it('a join ai_synthesis settings mezőjében is, a settings útvonalán', () => {
+    const parsed = NodeConfigSaveSchema.safeParse(aiSynthesisWithReferences(INVALID));
+
+    expect(parsed.error?.issues.map((issue) => issue.path)).toStrictEqual([
+      ['settings', 'mcpServerReferences', 'github', 'envBindings', 'GITHUB_TOKEN'],
+      ['settings', 'mcpServerReferences', 'github', 'authEnvName'],
+    ]);
+  });
+
+  it('az olvasó NodeConfigSchema a név alakon kívüli értéket elfogadja (a pillanatkép olvasható marad)', () => {
+    expect(NodeConfigSchema.safeParse(agentStepWithReferences(INVALID)).success).toBe(true);
+  });
+
+  it('a saját __proto__ kulcs a hivatkozás rekordban és az envBindings rekordban mindkét sémán elbukik', () => {
+    for (const references of [OWN_PROTO_KEY_1, OWN_PROTO_KEY_2]) {
+      expect(NodeConfigSchema.safeParse(agentStepWithReferences(references)).success).toBe(false);
+      expect(NodeConfigSaveSchema.safeParse(agentStepWithReferences(references)).success).toBe(false);
+    }
+  });
+});
+
+function agentStepWithAgents(agents: unknown): unknown {
+  return { type: 'agent_step', ...VALID_AGENT_STEP_SETTINGS, agents, onUnhandledError: 'fail_run' };
+}
+
+describe('NodeConfigSaveSchema: az agent definíció memory mezője és közvetlen MCP objektuma nem menthető (SPEC-009 6.2, O-53)', () => {
+  it('a memory és a nem szöveg elemű mcpServers a mező útvonalán bukik, a szöveg elem átmegy', () => {
+    const parsed = NodeConfigSaveSchema.safeParse(
+      agentStepWithAgents({
+        a: { description: 'd', prompt: 'p', memory: 'user' },
+        b: { description: 'd', prompt: 'p', mcpServers: [{ sajat: { command: 'x' } }] },
+        c: { description: 'd', prompt: 'p', mcpServers: ['lepes'] },
+      }),
+    );
+
+    expect(parsed.error?.issues.map((issue) => issue.path)).toStrictEqual([
+      ['agents', 'a', 'memory'],
+      ['agents', 'b', 'mcpServers'],
+    ]);
+  });
+
+  it('az olvasó NodeConfigSchema a tárolt memory mezőt elfogadja (a régi gráf olvasható marad)', () => {
+    expect(
+      NodeConfigSchema.safeParse(agentStepWithAgents({ a: { description: 'd', prompt: 'p', memory: 'user' } })).success,
+    ).toBe(true);
   });
 });

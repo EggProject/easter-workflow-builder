@@ -1,4 +1,14 @@
 /**
+ * A két nem támogatott agent definíció mező indoka (SPEC-009 6.2, O-53, user döntés 2026-10-28): a
+ * futás egyiket sem adja ki, a mentési séma elutasítja, a panel a tárolt értéket mutatja és
+ * eltávolítható.
+ */
+const UNSUPPORTED_MEMORY_REASON =
+  'nem támogatott mező: a gép agent memória könyvtárát töltené be, a futás nem adja ki; a mentéshez távolítsd el';
+const UNSUPPORTED_AGENT_MCP_SERVERS_REASON =
+  'a régi, közvetlen alak: a futás csak a név elemeit adja ki, a szerver objektumot nem, és az objektum elemmel a gráf nem menthető; az MCP szervert a fenti listából válaszd';
+
+/**
  * Az `agents` mező egy bejegyzésének (`AgentDefinition`-szerű `unknown`
  * érték) szerkesztett mezőlistája - a `docs/research/
  * 2026-09-05-grafszerkeszto-es-transcript.md` 5. szekciójában mért,
@@ -8,12 +18,14 @@
  * tehát ehhez a tábla ad felületi típusbiztonságot, nem egy második
  * séma forrás.
  *
- * A `skills` és az `mcpServers` sor a lépés szintű beállítással azonos
- * határvonalat követi: olvasható, de nem szerkeszthető, mert a SPEC-009
- * hatóköre (skill feltöltés, MCP konfiguráció).
+ * A `skills` sor a `SkillsField` vezérlőn szerkeszthető, a lépés szintű
+ * mezővel azonos tárolt alakkal (SPEC-009 5.2). Az `mcpServers` sor olvasható,
+ * a régi alakot megnevező szöveggel (SPEC-009 6.2, AC26); az MCP hivatkozás
+ * (`mcpServerReferences`) NEM sora a táblának, mert nem SDK mező, a bejegyzés
+ * panelje külön rajzolja a `McpServerReferencesField` vezérlőjével.
  */
 export type AgentDefinitionFieldGroup =
-  'kötelező' | 'modell és korlátok' | 'eszközök' | 'környezet' | 'SPEC-009 hatókör';
+  'kötelező' | 'modell és korlátok' | 'eszközök' | 'környezet' | 'skillek' | 'MCP szerverek';
 
 export type AgentDefinitionFieldControl =
   | { readonly kind: 'text' }
@@ -21,8 +33,8 @@ export type AgentDefinitionFieldControl =
   | { readonly kind: 'number' }
   | { readonly kind: 'boolean' }
   | { readonly kind: 'string-list' }
-  | { readonly kind: 'select'; readonly options: readonly string[] }
-  | { readonly kind: 'readonly'; readonly reason: string };
+  | { readonly kind: 'skills' }
+  | { readonly kind: 'unsupported'; readonly reason: string };
 
 export interface AgentDefinitionFieldDescriptor {
   readonly key: string;
@@ -31,8 +43,6 @@ export interface AgentDefinitionFieldDescriptor {
   readonly control: AgentDefinitionFieldControl;
   readonly required: boolean;
 }
-
-const SPEC_009_SCOPE_REASON = 'a SPEC-009 hatóköre (skill feltöltés / MCP konfiguráció), itt csak olvasható';
 
 export const AGENT_DEFINITION_FIELD_TABLE = [
   { key: 'description', label: 'Leírás', group: 'kötelező', control: { kind: 'textarea' }, required: true },
@@ -84,22 +94,22 @@ export const AGENT_DEFINITION_FIELD_TABLE = [
     key: 'memory',
     label: 'Memória hatóköre',
     group: 'környezet',
-    control: { kind: 'select', options: ['user', 'project', 'local'] },
+    control: { kind: 'unsupported', reason: UNSUPPORTED_MEMORY_REASON },
     required: false,
   },
   { key: 'initialPrompt', label: 'Kezdő üzenet', group: 'környezet', control: { kind: 'textarea' }, required: false },
   {
     key: 'skills',
     label: 'Skillek',
-    group: 'SPEC-009 hatókör',
-    control: { kind: 'readonly', reason: SPEC_009_SCOPE_REASON },
+    group: 'skillek',
+    control: { kind: 'skills' },
     required: false,
   },
   {
     key: 'mcpServers',
     label: 'MCP szerverek',
-    group: 'SPEC-009 hatókör',
-    control: { kind: 'readonly', reason: SPEC_009_SCOPE_REASON },
+    group: 'MCP szerverek',
+    control: { kind: 'unsupported', reason: UNSUPPORTED_AGENT_MCP_SERVERS_REASON },
     required: false,
   },
 ] as const satisfies readonly AgentDefinitionFieldDescriptor[];

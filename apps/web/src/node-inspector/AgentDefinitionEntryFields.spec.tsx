@@ -1,10 +1,13 @@
+/* eslint-disable unicorn/no-null -- a teszt a hivatkozás `authEnvName` mezőjének `null` értékét (nincs felülírás) vizsgálja (SPEC-009 6.2). */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import { AgentDefinitionEntryFields } from './AgentDefinitionEntryFields.tsx';
 import { UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS } from './agent-definition-field-table.ts';
 import { FieldErrorsContext } from './field-errors-context.ts';
+import { McpServerLibraryContext } from './mcp-server-library-context.ts';
 
 function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
@@ -260,35 +263,117 @@ describe('AgentDefinitionEntryFields', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ tools: ['WebSearch', 'WebFetch'] }));
   });
 
-  it('a zárt lista (memory) kiválasztása frissíti a mezőt', () => {
+  it('a nem támogatott memory mező a tárolt értéket és az okot mutatja, és eltávolítható (O-53)', () => {
     const onChange = vi.fn();
     act(() => {
       root.render(
         <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={onChange} />,
       );
     });
-    chooseOption(container, 'Memória hatóköre', 'local');
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ memory: 'local' }));
+    expect(container.textContent).toContain('project');
+    expect(container.textContent).toContain('nem támogatott mező: a gép agent memória könyvtárát töltené be');
+    const memoryRemovalButton = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Memória hatóköre eltávolítása',
+    );
+    act(() => {
+      memoryRemovalButton?.click();
+    });
+    const nextValue: unknown = onChange.mock.calls[0]?.[0];
+    expect(isRecord(nextValue) && Object.hasOwn(nextValue, 'memory')).toBe(false);
+    expect(isRecord(nextValue) && nextValue['initialPrompt']).toBe('szia');
   });
 
-  it('a zárt lista üres értékű opciója üríti a mezőt', () => {
+  it('a hiányzó memory kulcsnál nincs nem támogatott sor és eltávolító gomb', () => {
+    const withoutMemory = Object.fromEntries(Object.entries(FULL_ENTRY).filter(([key]) => key !== 'memory'));
+    act(() => {
+      root.render(
+        <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={withoutMemory} onChange={vi.fn()} />,
+      );
+    });
+    expect(container.textContent).not.toContain('Memória hatóköre');
+  });
+
+  it('a régi `mcpServers` mező a közvetlen alakot nevezi meg, és a mentési hiba a mező alatt jelenik meg (O-53)', () => {
+    const errors = new Map([['agents.kutato.mcpServers', 'Ez a mező nem támogatott.']]);
+    const entry = { ...FULL_ENTRY, mcpServers: [{ sajat: { command: 'x' } }] };
+    for (const isSaveAttempted of [false, true]) {
+      act(() => {
+        root.render(
+          <FieldErrorVisibilityContext.Provider value={isSaveAttempted}>
+            <FieldErrorsContext.Provider value={errors}>
+              <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={entry} onChange={vi.fn()} />
+            </FieldErrorsContext.Provider>
+          </FieldErrorVisibilityContext.Provider>,
+        );
+      });
+      expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+        isSaveAttempted ? 'Ez a mező nem támogatott.' : undefined,
+      );
+    }
+    expect(container.textContent).toContain('a régi, közvetlen alak');
+    expect(container.textContent).not.toContain('SPEC-009');
+  });
+
+  it('az MCP hivatkozás a központi listából választ, és a bejegyzés többi kulcsa változatlanul megmarad', () => {
+    const onChange = vi.fn();
+    act(() => {
+      root.render(
+        <McpServerLibraryContext.Provider
+          value={{
+            servers: {
+              status: 'success',
+              value: [
+                {
+                  name: 'github',
+                  definition: { type: 'stdio', command: 'npx', args: [], envNames: [], envBindings: {} },
+                },
+              ],
+            },
+            environmentNames: { status: 'success', value: [] },
+          }}
+        >
+          <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={onChange} />
+        </McpServerLibraryContext.Provider>,
+      );
+    });
+    const checkbox = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+      (candidate) => candidate.parentElement?.textContent === 'github',
+    );
+    if (checkbox === undefined) {
+      throw new Error('a teszt nem talált github jelölőnégyzetet');
+    }
+    act(() => {
+      checkbox.click();
+    });
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...FULL_ENTRY,
+      mcpServerReferences: { github: { envBindings: {}, authEnvName: null } },
+    });
+  });
+
+  it('a `skills` mező a módválasztón szerkeszthető, a többi kulcs változatlanul megmarad', () => {
     const onChange = vi.fn();
     act(() => {
       root.render(
         <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={onChange} />,
       );
     });
-    chooseOption(container, 'Memória hatóköre', 'nincs megadva');
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ memory: '' }));
+    expect(selectTrigger(container, 'Skillek használata').textContent).toBe('kiválasztott skillek');
+    chooseOption(container, 'Skillek használata', 'minden feltöltött skill');
+    expect(onChange).toHaveBeenLastCalledWith({ ...FULL_ENTRY, skills: 'all' });
   });
 
-  it('a `skills` és az `mcpServers` mező olvasható, és megnevezi a SPEC-009 okot', () => {
+  it('a hiányzó `skills` kulcs "nincs beállítva", és a listás módra váltás üres listát ír a kulcsba', () => {
+    const onChange = vi.fn();
+    const withoutSkills = Object.fromEntries(Object.entries(FULL_ENTRY).filter(([key]) => key !== 'skills'));
     act(() => {
       root.render(
-        <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={vi.fn()} />,
+        <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={withoutSkills} onChange={onChange} />,
       );
     });
-    expect(container.textContent).toContain('SPEC-009');
+    expect(selectTrigger(container, 'Skillek használata').textContent).toBe('nincs beállítva');
+    chooseOption(container, 'Skillek használata', 'kiválasztott skillek');
+    expect(onChange).toHaveBeenLastCalledWith({ ...withoutSkills, skills: [] });
   });
 
   it('a három nem megerősített mező (M-90) értékkel is csak olvasható szöveg, vezérlő nélkül', () => {

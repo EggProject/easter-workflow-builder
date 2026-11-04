@@ -3,8 +3,40 @@ import { API_BASE_PATH } from './api-base-path.ts';
 import { ROUTE_TABLE } from './route-table.ts';
 
 describe('ROUTE_TABLE', () => {
-  it('a SPEC-005 4.2 táblázatának mind a 26 végpontját tartalmazza (11. kritérium)', () => {
-    expect(Object.keys(ROUTE_TABLE)).toHaveLength(26);
+  it('a SPEC-005 4.2 táblázatának 26, a SPEC-009 5.1 három skill, a 6.2 három MCP szerver és az egy env név végpontját tartalmazza (11. kritérium, AC10)', () => {
+    expect(Object.keys(ROUTE_TABLE)).toHaveLength(33);
+  });
+
+  it('a skill könyvtár három útvonala a SPEC-009 5.1 szerint áll, a feltöltés nyers ZIP törzzsel (O-36)', () => {
+    expect(ROUTE_TABLE.listSkills).toStrictEqual({ method: 'GET', template: `${API_BASE_PATH}/skills` });
+    expect(ROUTE_TABLE.uploadSkill).toStrictEqual({
+      method: 'PUT',
+      template: `${API_BASE_PATH}/skills/:name`,
+      requestBody: 'application/zip',
+    });
+    expect(ROUTE_TABLE.deleteSkill).toStrictEqual({ method: 'DELETE', template: `${API_BASE_PATH}/skills/:name` });
+  });
+
+  it('a központi MCP szerver lista három útvonala a SPEC-009 6.2 szerint áll, JSON törzzsel', () => {
+    expect(ROUTE_TABLE.listMcpServerDefinitions).toStrictEqual({
+      method: 'GET',
+      template: `${API_BASE_PATH}/mcp-servers`,
+    });
+    expect(ROUTE_TABLE.saveMcpServerDefinition).toStrictEqual({
+      method: 'PUT',
+      template: `${API_BASE_PATH}/mcp-servers/:name`,
+    });
+    expect(ROUTE_TABLE.deleteMcpServerDefinition).toStrictEqual({
+      method: 'DELETE',
+      template: `${API_BASE_PATH}/mcp-servers/:name`,
+    });
+  });
+
+  it('a szerver környezet változó neveit adó útvonal a SPEC-009 6.2 szerint áll (O-32)', () => {
+    expect(ROUTE_TABLE.listServerEnvironmentNames).toStrictEqual({
+      method: 'GET',
+      template: `${API_BASE_PATH}/server-environment-names`,
+    });
   });
 
   it('minden útvonal sablon az API_BASE_PATH alatt áll', () => {

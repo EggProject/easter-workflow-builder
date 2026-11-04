@@ -74,6 +74,27 @@ export type EngineErrorKind =
   | 'provider_descriptor_sdk_mismatch'
   // PLAN-005 T-005-14: a `provider-environment` téma, hiányzó kötelező env változó
   | 'missing_provider_env'
+  // SPEC-009 5.1 (O-13): a lépés a skill könyvtárban nem álló skillre
+  // hivatkozik (például törölték). A futás indításakor fut, mert az SDK a nem
+  // létező nevre nem ad indítási hibát (M-136 5a).
+  | 'skill_not_found'
+  // SPEC-009 6.4 (O-43, O-18): a lépés a központi MCP szerver listában nem
+  // álló szerverre hivatkozik (például törölték), illetve egy hivatkozott
+  // szerver feloldott szerver oldali env változója nincs beállítva. A futás
+  // indításakor és a lépés futtatásakor is ellenőrzött.
+  | 'mcp_server_not_found'
+  | 'missing_mcp_server_env'
+  // SPEC-009 6.4 (O-46, user döntés 2026-10-28): egy kiadott MCP szerver nem
+  // csatlakozott (az `init` üzenet `failed` vagy `needs-auth` állapota); a lépés
+  // futtatás közben, megnevezett hibával áll meg.
+  | 'mcp_server_connection_failed'
+  // SPEC-009 O-47 (2026-11-04): egy agent definíció a lépés kiválasztott skilljein
+  // kívüli skillre hivatkozik; a lépés skill listája az al-agentre is mérvadó.
+  | 'agent_skill_not_in_step'
+  // SPEC-009 O-48 (user döntés 2026-11-04, "Indításkor hiba"): egy agent definíció
+  // ugyanazzal a szervernévvel ad MCP felülírást, mint a lépés (M-147 B6: a
+  // lépés konfigurációja nyerne, a felülírás hatástalan volna).
+  | 'agent_mcp_server_override_conflict'
   // 7.: a párhuzamossági szabályozó, ismeretlen azonosító felszabadítása
   | 'unknown_concurrency_slot'
   // 9. szekció zárómondat, PLAN-005 T-005-27: a `restartRun` művelet - az

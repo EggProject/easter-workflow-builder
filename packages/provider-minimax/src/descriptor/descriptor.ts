@@ -62,7 +62,7 @@ export const minimaxProvider = {
       value: true,
       evidence: [{ kind: 'measurement', id: 'M-35-flash' }],
     },
-    // Az SDK egyik mért kérés sorozatban sem hívta meg ezt a végpontot; a kapcsolat teszt módja minimal_query.
+    // Az SDK egyik mért kérés sorozatban sem hívta meg ezt a végpontot; a kapcsolat teszt ettől nem függ: egyetlen útja van (SPEC-009 O-1).
     calledBySdk: {
       state: 'known',
       value: false,

@@ -45,7 +45,7 @@ ugyanerre a gondolatra épül: egy in-process `emit_output` eszközt és egy `St
 
 ### Amit NEM dönt el
 
-- Az `mcpServers` konfigurálását és bekötését (SPEC-009 hatóköre).
+- Az `mcpServers` konfigurálását és bekötését (a SPEC-009 tárgya, megvalósult).
 
 ---
 

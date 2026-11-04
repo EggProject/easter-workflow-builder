@@ -12,9 +12,11 @@
 //
 //   bun run probe:real-provider -- minimax
 //   bun run probe:real-provider -- claude-subscription [modelId]
+//   bun run probe:real-provider -- minimax --skill-mcp
 //
 // A `modelId` opcionális: alapból `minimax` mellett `MiniMax-M3.1-Flash`,
-// `claude-subscription` mellett `claude-haiku-4-5` (SPEC-013 6.).
+// `claude-subscription` mellett `claude-haiku-4-5` (SPEC-013 6.). A `--skill-mcp` kapcsolóval a lépés
+// egy feltöltött skillt és egy stdio MCP szervert is hivatkozik (SPEC-009 T-012-12a).
 //
 // A kimenet csak összegzés; a titkok értéke `REDACTED`. A megszakítás
 // (`Ctrl-C`) a gyermek szervert is leállítja és az ideiglenes könyvtárat
@@ -26,7 +28,10 @@ import { collectSecretEnvironmentValues } from '../src/startup-sequence/collect-
 import { maskSecrets } from './mask-secrets.ts';
 import { runProbe } from './run-probe.ts';
 
+const SKILL_MCP_FLAG = '--skill-mcp';
 const providerArgument = process.argv[2];
+const restArguments = process.argv.slice(3);
+const modelArgument = restArguments.find((argument) => argument !== SKILL_MCP_FLAG);
 if (isProviderId(providerArgument)) {
   const secretValues = collectSecretEnvironmentValues(process.env);
   const controller = new AbortController();
@@ -39,7 +44,8 @@ if (isProviderId(providerArgument)) {
   try {
     const summary = await runProbe({
       providerId: providerArgument,
-      ...(process.argv[3] !== undefined && { modelId: process.argv[3] }),
+      ...(modelArgument !== undefined && { modelId: modelArgument }),
+      isSkillAndMcpMode: restArguments.includes(SKILL_MCP_FLAG),
       serverCommand: {
         executable: process.execPath,
         args: [fileURLToPath(new URL('../src/main.ts', import.meta.url))],
@@ -55,6 +61,8 @@ if (isProviderId(providerArgument)) {
     process.exitCode = 1;
   }
 } else {
-  process.stderr.write('Használat: bun run probe:real-provider -- <minimax|claude-subscription> [modelId]\n');
+  process.stderr.write(
+    'Használat: bun run probe:real-provider -- <minimax|claude-subscription> [modelId] [--skill-mcp]\n',
+  );
   process.exitCode = 2;
 }

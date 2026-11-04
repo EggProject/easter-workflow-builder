@@ -70,7 +70,10 @@ describe('a claude-subscription kimenő env szabálya', () => {
       processEnvironmentOf({ [name]: 'nem-jut-ki', PATH: '/usr/bin', HOME: '/home/teszt' }),
     );
 
-    expect(result).toStrictEqual({ kind: 'ok', value: { PATH: '/usr/bin', HOME: '/home/teszt' } });
+    expect(result).toStrictEqual({
+      kind: 'ok',
+      value: { PATH: '/usr/bin', HOME: '/home/teszt', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
+    });
   });
 
   it('a CLAUDE_CODE_OAUTH_TOKEN előfizetéses hitelesítő: átmegy (O-3)', () => {
@@ -80,7 +83,10 @@ describe('a claude-subscription kimenő env szabálya', () => {
       processEnvironmentOf({ CLAUDE_CODE_OAUTH_TOKEN: 'atmegy', PATH: '/usr/bin' }),
     );
 
-    expect(result).toStrictEqual({ kind: 'ok', value: { CLAUDE_CODE_OAUTH_TOKEN: 'atmegy', PATH: '/usr/bin' } });
+    expect(result).toStrictEqual({
+      kind: 'ok',
+      value: { CLAUDE_CODE_OAUTH_TOKEN: 'atmegy', PATH: '/usr/bin', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
+    });
   });
 });
 
@@ -122,6 +128,7 @@ describe('a minimax kimenő env szabálya', () => {
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
         PATH: '/usr/bin',
         HOME: '/home/teszt',
+        CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
       },
     });
   });
@@ -140,6 +147,7 @@ describe('a minimax kimenő env szabálya', () => {
         ANTHROPIC_AUTH_TOKEN: 'masik-nev-kulcs',
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
         PATH: '/usr/bin',
+        CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
       },
     });
   });

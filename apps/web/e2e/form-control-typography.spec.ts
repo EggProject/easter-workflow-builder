@@ -94,11 +94,16 @@ const WORKFLOW: WorkflowDetail = {
   name: 'Alfa workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };
 
-const SETTINGS: SettingsRecord = { defaultProviderId: 'minimax', persistStreamDeltas: false };
+const SETTINGS: SettingsRecord = {
+  defaultProviderId: 'minimax',
+  persistStreamDeltas: false,
+  builtinSkillsEnabled: true,
+};
 
 /* eslint-enable unicorn/no-null */
 

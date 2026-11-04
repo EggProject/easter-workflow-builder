@@ -14,12 +14,14 @@ type TransactionFunction = <TValue>(work: () => Outcome<TValue>) => Outcome<TVal
 export interface AppSettingsRecord {
   readonly defaultProviderId: ProviderId | null;
   readonly persistStreamDeltas: boolean;
+  readonly builtinSkillsEnabled: boolean;
 }
 
 export interface AppSettingRepository {
   readSettings(): Outcome<AppSettingsRecord>;
   setDefaultProvider(providerId: ProviderId): Outcome<void>;
   setPersistStreamDeltas(isEnabled: boolean): Outcome<void>;
+  setBuiltinSkillsEnabled(isEnabled: boolean): Outcome<void>;
 }
 
 /**
@@ -42,8 +44,11 @@ export function createAppSettingRepository(
     return transaction(() => {
       const row = database.select().from(appSettingTable).where(eq(appSettingTable.id, APP_SETTING_ROW_ID)).get();
       if (row === undefined) {
-        // eslint-disable-next-line unicorn/no-null -- a séma szintű DEFAULT-tal egyező alapértelmezés, nincs még sor
-        return { kind: 'ok', value: { defaultProviderId: null, persistStreamDeltas: false } };
+        return {
+          kind: 'ok',
+          // eslint-disable-next-line unicorn/no-null -- a séma szintű DEFAULT-tal egyező alapértelmezés, nincs még sor
+          value: { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true },
+        };
       }
       const defaultProviderId = row.defaultProviderId;
       if (defaultProviderId !== null && !isProviderId(defaultProviderId)) {
@@ -52,7 +57,14 @@ export function createAppSettingRepository(
           message: `Az app_setting default_provider_id mezője érvénytelen: "${defaultProviderId}" (invalid_provider_id).`,
         };
       }
-      return { kind: 'ok', value: { defaultProviderId, persistStreamDeltas: row.persistStreamDeltas } };
+      return {
+        kind: 'ok',
+        value: {
+          defaultProviderId,
+          persistStreamDeltas: row.persistStreamDeltas,
+          builtinSkillsEnabled: row.builtinSkillsEnabled,
+        },
+      };
     });
   }
 
@@ -99,5 +111,24 @@ export function createAppSettingRepository(
     });
   }
 
-  return { readSettings, setDefaultProvider, setPersistStreamDeltas };
+  /**
+   * A beépített skillek kapcsolója (SPEC-009 O-44), ugyanazzal az upsert mintával: az első íráskor a
+   * többi mező a séma szintű alapértékét kapja.
+   */
+  function setBuiltinSkillsEnabled(isEnabled: boolean): Outcome<void> {
+    return transaction(() => {
+      const now = new Date();
+      database
+        .insert(appSettingTable)
+        .values({ id: APP_SETTING_ROW_ID, builtinSkillsEnabled: isEnabled, updatedAtMs: now })
+        .onConflictDoUpdate({
+          target: appSettingTable.id,
+          set: { builtinSkillsEnabled: isEnabled, updatedAtMs: now },
+        })
+        .run();
+      return { kind: 'ok', value: undefined };
+    });
+  }
+
+  return { readSettings, setDefaultProvider, setPersistStreamDeltas, setBuiltinSkillsEnabled };
 }

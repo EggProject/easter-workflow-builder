@@ -2,15 +2,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
-import {
-  ReplaceGraphRequestSchema,
-  zodErrorToProtocolErrorBody,
-  type RouteId,
-} from '@easter-workflow-builder/protocol';
+import { ReplaceGraphRequestSchema, zodErrorToProtocolErrorBody } from '@easter-workflow-builder/protocol';
 import { createServerLogger, type DestinationStream, type ServerLogger } from '@easter-workflow-builder/logger';
 import { isRecord } from '@easter-workflow-builder/typeguards';
 import { createHttpServer, type HttpServerOptions } from '../http-server/create-http-server.ts';
+import type { BinaryRouteHandler } from '../route-dispatch/binary-route-handler.ts';
 import type { RouteHandler } from '../route-dispatch/route-handler.ts';
+import type { RouteHandlers } from '../route-dispatch/route-handlers.ts';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
 import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
@@ -33,6 +31,13 @@ import { createReplaceWorkflowGraphHandler } from './replace-workflow-graph.ts';
  */
 
 const DEFAULT_HANDLER: RouteHandler = () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } });
+const DEFAULT_BINARY_HANDLER: BinaryRouteHandler = {
+  maxBodyBytes: 0,
+  accept: () => ({
+    kind: 'ok',
+    value: () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } }),
+  }),
+};
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -67,8 +72,8 @@ function createMemorySink(): MemorySink {
   };
 }
 
-function buildHandlers(database: DatabaseContext): Record<RouteId, RouteHandler> {
-  const base: Record<RouteId, RouteHandler> = {
+function buildHandlers(database: DatabaseContext): RouteHandlers {
+  const base: RouteHandlers = {
     listWorkflows: DEFAULT_HANDLER,
     createWorkflow: DEFAULT_HANDLER,
     getWorkflow: DEFAULT_HANDLER,
@@ -95,6 +100,13 @@ function buildHandlers(database: DatabaseContext): Record<RouteId, RouteHandler>
     setConcurrencyLimit: DEFAULT_HANDLER,
     clearConcurrencyLimit: DEFAULT_HANDLER,
     replaceStreamSubscriptions: DEFAULT_HANDLER,
+    listSkills: DEFAULT_HANDLER,
+    uploadSkill: DEFAULT_BINARY_HANDLER,
+    deleteSkill: DEFAULT_HANDLER,
+    listMcpServerDefinitions: DEFAULT_HANDLER,
+    saveMcpServerDefinition: DEFAULT_HANDLER,
+    deleteMcpServerDefinition: DEFAULT_HANDLER,
+    listServerEnvironmentNames: DEFAULT_HANDLER,
   };
   return {
     ...base,

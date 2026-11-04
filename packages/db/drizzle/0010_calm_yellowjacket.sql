@@ -1,0 +1,1 @@
+ALTER TABLE `workflow` ADD `builtin_skills_enabled` integer;

@@ -1,7 +1,7 @@
 // Barrel: csak nevesített újraexport. A csomag téma mappánként bővül, ahogy a
 // PLAN-005 végrehajtási lépései elkészülnek.
 
-// engine-port: a kilenc befecskendezett port típusa és az összefogó
+// engine-port: a tíz befecskendezett port típusa és az összefogó
 // `EngineDependencies` (SPEC-004 3.2, 3.3).
 export type { DatabaseContext } from './engine-port/database-port.ts';
 export type { AgentQueryRunner } from './engine-port/agent-query-runner-port.ts';
@@ -12,6 +12,8 @@ export type { EventPublisherPort } from './engine-port/event-publisher-port.ts';
 export type { ClockPort } from './engine-port/clock-port.ts';
 export type { IdGeneratorPort } from './engine-port/id-generator-port.ts';
 export type { ProcessEnvironmentPort } from './engine-port/process-environment-port.ts';
+export type { SkillLibraryPort } from './engine-port/skill-library-port.ts';
+export type { SkillLibrarySnapshot } from './engine-port/skill-library-snapshot.ts';
 export type { EngineDependencies } from './engine-port/engine-dependencies.ts';
 // A motor teljes felülete és a `createEngine` összeállítás (SPEC-004 3.1
 // szekció, PLAN-005 T-005-28): az `Engine` interfész, a négy eredmény típus
@@ -116,7 +118,6 @@ export { resolveNodeProviders } from './run-validation/resolve-node-providers.ts
 // stratégia választás következménye, ezért az `Options` összeállításához
 // tartozik (`agent-step` téma, T-005-19).
 export type { CapabilityFieldInclusion } from './capability-policy/capability-field-inclusion.ts';
-export type { ConnectionTestMode } from './capability-policy/connection-test-mode.ts';
 export type { StructuredOutputStrategyDecision } from './capability-policy/structured-output-strategy-decision.ts';
 export type { ModelIdentifierDecision } from './capability-policy/model-identifier-decision.ts';
 export type { DisallowedServerToolsDecision } from './capability-policy/disallowed-server-tools-decision.ts';
@@ -132,7 +133,6 @@ export { resolveDisallowedServerTools } from './capability-policy/resolve-disall
 export { shouldIncludePartialMessages } from './capability-policy/should-include-partial-messages.ts';
 export { resolveConcurrencySuggestion } from './capability-policy/resolve-concurrency-suggestion.ts';
 export { RATE_LIMIT_RETRY_POLICY } from './capability-policy/rate-limit-retry-policy.ts';
-export { resolveConnectionTestMode } from './capability-policy/resolve-connection-test-mode.ts';
 export { validateSdkVersionMatch } from './capability-policy/validate-sdk-version-match.ts';
 
 // provider-environment: a SPEC-004 11.3 táblázat 10. és 11. sora, a
@@ -218,6 +218,7 @@ export type {
 } from './agent-step/validate-agent-step-capabilities.ts';
 export { validateAgentStepCapabilities } from './agent-step/validate-agent-step-capabilities.ts';
 export type { BuildAgentStepOptionsInput } from './agent-step/build-agent-step-options.ts';
+export type { OutgoingAgents } from './agent-definition/outgoing-agents.ts';
 export { buildAgentStepOptions } from './agent-step/build-agent-step-options.ts';
 export { readResultTelemetry } from './agent-step/read-result-telemetry.ts';
 export { runAgentStep } from './agent-step/run-agent-step.ts';

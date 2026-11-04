@@ -19,6 +19,20 @@ describe('createProcessEnvironmentReader', () => {
     expect(reader.read(TEST_VARIABLE_NAME)).toBeNull();
   });
 
+  it.each(['constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf'])(
+    'a prototípus lánc %s neve hiányzó változó: null (PLAN-012 T-012-27)',
+    (name) => {
+      const reader = createProcessEnvironmentReader();
+      expect(reader.read(name)).toBeNull();
+    },
+  );
+
+  it('az üres érték nem hiányzó: üres szöveget ad (SPEC-009 6.4)', () => {
+    process.env[TEST_VARIABLE_NAME] = '';
+    const reader = createProcessEnvironmentReader();
+    expect(reader.read(TEST_VARIABLE_NAME)).toBe('');
+  });
+
   it('a readAll a teljes környezet pillanatképe, a beállított változóval együtt', () => {
     process.env[TEST_VARIABLE_NAME] = 'érték';
     const snapshot = createProcessEnvironmentReader().readAll();

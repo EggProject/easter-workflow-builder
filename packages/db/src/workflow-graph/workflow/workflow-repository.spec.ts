@@ -350,6 +350,7 @@ describe('createWorkflowRepository', () => {
       expect(created.name).toBe('Első workflow');
       expect(created.description).toBe('Leírás');
       expect(created.providerId).toBe('minimax');
+      expect(created.builtinSkillsEnabled).toBeNull();
       expect(created.createdAtMs).toStrictEqual(created.updatedAtMs);
 
       const fetched = okOrThrow(repository.getWorkflow(created.id));
@@ -357,6 +358,26 @@ describe('createWorkflowRepository', () => {
 
       sqlite.close();
     });
+
+    it.each([true, false, null])(
+      'a beépített skill felülírás (%s) tárolódik és visszaolvasható (SPEC-009 O-44)',
+      (value) => {
+        const { sqlite, repository } = openRepository();
+
+        const created = okOrThrow(
+          repository.createWorkflow({
+            name: 'Skillek',
+            description: null,
+            providerId: null,
+            builtinSkillsEnabled: value,
+          }),
+        );
+        expect(created.builtinSkillsEnabled).toBe(value);
+        expect(okOrThrow(repository.getWorkflow(created.id)).builtinSkillsEnabled).toBe(value);
+
+        sqlite.close();
+      },
+    );
 
     it('a description és a providerId null maradhat', () => {
       const { sqlite, repository } = openRepository();
@@ -414,9 +435,11 @@ describe('createWorkflowRepository', () => {
           name: 'Új név',
           description: 'Új leírás',
           providerId: 'claude-subscription',
+          builtinSkillsEnabled: false,
         }),
       );
       expect(updated.id).toBe(created.id);
+      expect(updated.builtinSkillsEnabled).toBe(false);
       expect(updated.name).toBe('Új név');
       expect(updated.description).toBe('Új leírás');
       expect(updated.providerId).toBe('claude-subscription');
@@ -433,7 +456,12 @@ describe('createWorkflowRepository', () => {
       const { sqlite, repository } = openRepository();
 
       const message = errorOrThrow(
-        repository.updateWorkflow('nincs-ilyen', { name: 'X', description: null, providerId: null }),
+        repository.updateWorkflow('nincs-ilyen', {
+          name: 'X',
+          description: null,
+          providerId: null,
+          builtinSkillsEnabled: null,
+        }),
       );
       expect(message).toContain('not_found');
 
@@ -704,6 +732,37 @@ describe('createWorkflowRepository', () => {
 
       const message = errorOrThrow(repository.readGraph(workflow.id));
       expect(message).toContain('corrupt_node_config');
+
+      sqlite.close();
+    });
+
+    /**
+     * Régi gráf (SPEC-009 AC20, O-42; research 9.5 2. pont): a hivatkozás mező
+     * előtti, nem üres régi `mcpServers` értékű agent lépés nyers SQL
+     * beszúrással áll a táblában, és a `readGraph` változatlanul visszaadja.
+     */
+    it('a hivatkozás mező nélküli, nem üres régi mcpServers értékű agent lépés olvasható (O-42)', () => {
+      const { sqlite, repository } = openRepository();
+      const workflow = okOrThrow(repository.createWorkflow({ name: 'Régi', description: null, providerId: null }));
+      const legacyConfig = {
+        ...agentStepSettings,
+        mcpServers: {
+          local: { type: 'stdio', command: 'node', args: ['server.js'], envNames: ['MCP_TOKEN'] },
+          remote: { type: 'sse', url: 'https://example.test/sse', authEnvName: 'MCP_AUTH' },
+          web: { type: 'http', url: 'https://example.test/mcp', authEnvName: null },
+        },
+        type: 'agent_step',
+        onUnhandledError: 'fail_run',
+      };
+      sqlite
+        .prepare(
+          'INSERT INTO workflow_node (id, workflow_id, type, label, position_x, position_y, config, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run('regi-node', workflow.id, 'agent_step', 'Régi', 0, 0, JSON.stringify(legacyConfig), 0, 0);
+
+      const graph = okOrThrow(repository.readGraph(workflow.id));
+      expect(graph.nodes.map((node) => node.config)).toStrictEqual([legacyConfig]);
+      expect(Object.hasOwn(legacyConfig, 'mcpServerReferences')).toBe(false);
 
       sqlite.close();
     });
@@ -1020,6 +1079,7 @@ describe('createWorkflowRepository', () => {
           name: 'Átírt',
           description: 'másik leírás',
           providerId: 'claude-subscription',
+          builtinSkillsEnabled: true,
         }),
       );
       okOrThrow(repository.replaceGraph(workflow.id, [], []));

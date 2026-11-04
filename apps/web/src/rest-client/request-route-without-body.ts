@@ -1,11 +1,15 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
-import type { RouteId } from '@easter-workflow-builder/protocol';
+import type { RouteId, ZipBodyRouteId } from '@easter-workflow-builder/protocol';
 import { performRouteRequest } from './perform-route-request.ts';
 import type { RouteOutcome } from './route-outcome.ts';
 import type { SafeParsableSchema } from './safe-parsable-schema.ts';
 
 export interface RequestRouteWithoutBodyInput<TValue> {
-  readonly routeId: RouteId;
+  /**
+   * A nyers ZIP törzsű végpont a `requestRouteWithZipBody` dolga: törzs
+   * nélkül hívva a szerver nem tudná feldolgozni.
+   */
+  readonly routeId: Exclude<RouteId, ZipBodyRouteId>;
   readonly parameters?: Readonly<Record<string, string>>;
   readonly query?: Readonly<Record<string, string>>;
   readonly responseSchema: SafeParsableSchema<TValue>;

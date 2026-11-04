@@ -1,0 +1,20 @@
+/* A provider választó és a "Kapcsolat teszt" gombja (SPEC-009 3.2): SAJÁT
+   KIEGÉSZÍTÉS, a design systemben nincs ilyen összetett komponens, a
+   választó, a gomb és az Alert a `packages/ui` meglévő elemei. A tiltás
+   oka a gomb mellett áll, szűk szélességen alá törik. */
+.provider-select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-2);
+  min-width: 0;
+}
+.provider-select__test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ep-space-2);
+}
+.provider-select__reason {
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}

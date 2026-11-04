@@ -68,6 +68,12 @@ export { REQUIRED_TEXT_FIELD_PATHS } from './workflow-graph/node-config/required
 // segédalakját (`PresetSystemPrompt`, `SandboxConfig`, ...) a motor indexelt
 // hozzáféréssel éri el, tehát azok nem duplikálódnak a barrelben.
 export type { AgentStepConfig } from './workflow-graph/agent-step-config/agent-step-config.ts';
+// A lépés hivatkozása a központi MCP definícióra (SPEC-009 6.2, O-42 (b)): az
+// `apps/server` `node-config-drift-protection` témája veti össze a `protocol` párjával.
+export type { McpServerReference } from './workflow-graph/agent-step-config/mcp-server-reference.ts';
+// A hivatkozás guardja: az `engine` az agent definíciók (`agents`, szűkítetlen rekord) azonos
+// nevű mezőjét ezzel olvassa (SPEC-009 6.2, M-147).
+export { isMcpServerReference } from './workflow-graph/agent-step-config/is-mcp-server-reference.ts';
 
 // graph-snapshot: a pillanatkép dokumentum alakja. A `readGraphSnapshot`-ot és
 // a lenyomat számítót szándékosan nem exportáljuk, csak a dokumentum típusait:
@@ -143,6 +149,25 @@ export type { AppSettingRepository, AppSettingsRecord } from './app-setting/app-
 // szándékosan nem exportáljuk, csak a típust, ugyanaz a minta, mint a
 // `WorkflowRepository`-nél (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció).
 export type { ProviderConcurrencyRepository } from './provider-concurrency/provider-concurrency-repository.ts';
+
+// mcp-server-definition: a központi MCP szerver lista (SPEC-009 6.2, PLAN-012
+// T-012-10). A factory függvényt nem exportáljuk, ugyanaz a minta, mint fent; az
+// `isMcpServerDefinition` guardot az `apps/server`
+// `mcp-server-definition-drift-protection` témája futtatja.
+export type {
+  McpServerDefinitionRepository,
+  McpServerDefinitionRecord,
+} from './mcp-server-definition/mcp-server-definition-repository.ts';
+export type {
+  McpServerDefinition,
+  StdioMcpServerDefinition,
+  SseMcpServerDefinition,
+  HttpMcpServerDefinition,
+} from './mcp-server-definition/mcp-server-definition.ts';
+export { isMcpServerDefinition } from './mcp-server-definition/is-mcp-server-definition.ts';
+// A kötelező szöveg mezők táblája (SPEC-009 6.1): a `saveDefinition` ebből dolgozik, az `apps/server`
+// `mcp-server-definition-drift-protection` témája a `protocol` mentési sémájának táblájával veti össze.
+export { MCP_SERVER_DEFINITION_REQUIRED_TEXT_FIELDS } from './mcp-server-definition/mcp-server-definition-required-text-fields.ts';
 
 // human-approval: a HumanApprovalRepository publikus felülete (T-003-22). A
 // factory függvényt (`createHumanApprovalRepository`) szándékosan nem

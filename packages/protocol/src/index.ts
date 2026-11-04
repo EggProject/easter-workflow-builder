@@ -1,14 +1,16 @@
 // Barrel: csak nevesített újraexport (SPEC-002 6.6 6. szabálya). A csomag téma mappánként
 // bővül, ahogy a SPEC-005 végrehajtási lépései elkészülnek.
 
-// http-route: az API_BASE_PATH és a STREAM_PATH konstans, a 26 végpont útvonal sablonja,
-// és a paraméter behelyettesítő tiszta függvény.
+// http-route: az API_BASE_PATH és a STREAM_PATH konstans, a 33 végpont útvonal sablonja,
+// a paraméter behelyettesítő tiszta függvény, és a nyers ZIP törzsű végpontok guardja.
 export { API_BASE_PATH } from './http-route/api-base-path.ts';
 export { STREAM_PATH } from './http-route/stream-path.ts';
 export type { HttpMethod, RouteDefinition, RouteId } from './http-route/route-table.ts';
 export { ROUTE_TABLE } from './http-route/route-table.ts';
 export { buildRoutePath } from './http-route/build-route-path.ts';
 export { isRouteId } from './http-route/is-route-id.ts';
+export type { ZipBodyRouteId } from './http-route/is-zip-body-route-id.ts';
+export { isZipBodyRouteId } from './http-route/is-zip-body-route-id.ts';
 
 // protocol-error: a ProtocolErrorCode szótár, a ProtocolErrorClass szótár, a
 // ProtocolErrorBody séma, a HTTP státusz leképezés, és a Zod hiba lista fordítása a boríték
@@ -96,8 +98,8 @@ export { ApprovalDecisionRequestSchema, PendingApprovalSchema } from './approval
 // provider: a provider összefoglaló alakja és a kapcsolat teszt válasza.
 export type { ProviderSummary } from './provider/provider-summary.ts';
 export { ProviderSummarySchema } from './provider/provider-summary.ts';
-export type { ConnectionTestMode, ConnectionTestResponse } from './provider/connection-test-response.ts';
-export { ConnectionTestModeSchema, ConnectionTestResponseSchema } from './provider/connection-test-response.ts';
+export type { ConnectionTestResponse } from './provider/connection-test-response.ts';
+export { ConnectionTestResponseSchema } from './provider/connection-test-response.ts';
 
 // settings: a beállítás rekord, a részleges frissítés kérése, a párhuzamossági korlát
 // nézete a beállított értékkel és a mért javaslattal.
@@ -165,6 +167,8 @@ export type { SandboxConfig } from './node-config/sandbox-config.ts';
 export { SandboxConfigSchema } from './node-config/sandbox-config.ts';
 export type { ScriptConfig } from './node-config/script-config.ts';
 export { ScriptConfigSchema } from './node-config/script-config.ts';
+export type { McpServerReference } from './node-config/mcp-server-reference.ts';
+export { McpServerReferenceSchema } from './node-config/mcp-server-reference.ts';
 export type { AgentStepConfig, PresetSystemPrompt, StructuredOutputConfig } from './node-config/agent-step-config.ts';
 export {
   AgentStepConfigSchema,
@@ -218,3 +222,39 @@ export { REQUIRED_TEXT_FIELD_PATHS } from './node-config/required-text-field-pat
 // Az üres kötelező mező mondata: az apps/web az agents bejegyzés kötelező mezőire ugyanezt adja
 // (SPEC-008 5.4, O-38), a mentési sémán kívül.
 export { BLANK_FIELD_MESSAGE } from './node-config/blank-field-message.ts';
+
+// skill: a skill név szabálya és a skill könyvtár egy elemének alakja (SPEC-009 5.1, 5.3, 5.4 5. pont).
+export type { SkillName } from './skill/skill-name.ts';
+export { SkillNameSchema } from './skill/skill-name.ts';
+export type { SkillSummary } from './skill/skill-summary.ts';
+export { SkillSummarySchema } from './skill/skill-summary.ts';
+
+// mcp-server-definition: a központi MCP szerver lista sémái (SPEC-009 6.1, 6.2, PLAN-012 T-012-10), a
+// `packages/db` `mcp-server-definition` témájának szándékos mirror sémái; a sodródás védelmét az
+// `apps/server` `mcp-server-definition-drift-protection` tesztje adja.
+export type { EnvironmentVariableName } from './mcp-server-definition/environment-variable-name.ts';
+export { EnvironmentVariableNameSchema } from './mcp-server-definition/environment-variable-name.ts';
+export type { McpServerName } from './mcp-server-definition/mcp-server-name.ts';
+export { McpServerNameSchema } from './mcp-server-definition/mcp-server-name.ts';
+export { McpServerNameSaveSchema } from './mcp-server-definition/mcp-server-name-save-schema.ts';
+export type {
+  HttpMcpServerDefinition,
+  McpServerDefinition,
+  SseMcpServerDefinition,
+  StdioMcpServerDefinition,
+} from './mcp-server-definition/mcp-server-definition.ts';
+export {
+  HttpMcpServerDefinitionSchema,
+  McpServerDefinitionSchema,
+  SseMcpServerDefinitionSchema,
+  StdioMcpServerDefinitionSchema,
+} from './mcp-server-definition/mcp-server-definition.ts';
+export { McpServerDefinitionSaveSchema } from './mcp-server-definition/mcp-server-definition-save-schema.ts';
+export { MCP_SERVER_DEFINITION_REQUIRED_TEXT_FIELDS } from './mcp-server-definition/mcp-server-definition-required-text-fields.ts';
+export type { McpServerDefinitionRecord } from './mcp-server-definition/mcp-server-definition-record.ts';
+export { McpServerDefinitionRecordSchema } from './mcp-server-definition/mcp-server-definition-record.ts';
+
+// server-environment: a szerver környezet változó NEVEINEK listája (SPEC-009 6.2, O-32 (a), PLAN-012
+// T-012-11), értéket soha nem hordoz.
+export type { ServerEnvironmentNameList } from './server-environment/server-environment-name-list.ts';
+export { ServerEnvironmentNameListSchema } from './server-environment/server-environment-name-list.ts';

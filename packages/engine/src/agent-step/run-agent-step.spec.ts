@@ -11,11 +11,13 @@ import type {
   SnapshotNode,
 } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import { buildExecutableGraph } from '../run-graph/build-executable-graph.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import type { ProcessEnvironmentPort } from '../engine-port/process-environment-port.ts';
+import type { SkillLibraryPort } from '../engine-port/skill-library-port.ts';
 import type { TemplateRendererPort } from '../engine-port/template-renderer-port.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { AgentStepCapabilityDecisions } from './agent-step-capability-decisions.ts';
@@ -113,9 +115,17 @@ function openMemoryDatabase(): DatabaseContext {
 // Valós `workflow`, `workflow_run` és `step_run` sor: a `run_event` idegen
 // kulcsai miatt kell, és a teszt így a commitolt migrációkkal felépült
 // adatbázis ellen fut (SPEC-004 14.4).
-function seedRun(database: DatabaseContext): { readonly runId: string; readonly stepRunId: string } {
+function seedRun(
+  database: DatabaseContext,
+  workflowBuiltinSkillsEnabled: boolean | null = null,
+): { readonly runId: string; readonly stepRunId: string } {
   const workflow = okOrThrow(
-    database.workflows.createWorkflow({ name: 'agent-step teszt', description: null, providerId: null }),
+    database.workflows.createWorkflow({
+      name: 'agent-step teszt',
+      description: null,
+      providerId: null,
+      builtinSkillsEnabled: workflowBuiltinSkillsEnabled,
+    }),
   );
   const snapshot = {
     version: 1,
@@ -233,6 +243,7 @@ interface DependencyParts {
   readonly templateRenderer?: TemplateRendererPort;
   readonly processEnvironment?: ProcessEnvironmentPort;
   readonly eventPublisher?: EventPublisherPort;
+  readonly skillLibrary?: SkillLibraryPort;
 }
 
 function dependenciesOf(parts: DependencyParts): EngineDependencies {
@@ -255,6 +266,9 @@ function dependenciesOf(parts: DependencyParts): EngineDependencies {
     clock: { nowMs: () => 0, sleep: notCalled },
     idGenerator: { nextId: notCalled },
     processEnvironment: parts.processEnvironment ?? { read: () => null, readAll: () => ({}) },
+    skillLibrary: parts.skillLibrary ?? {
+      readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
+    },
   };
 }
 
@@ -286,6 +300,16 @@ function failedOutcomeOf(execution: AgentStepExecution): { readonly kind: string
   return execution.outcome.status === 'failed'
     ? { kind: execution.outcome.errorKind, message: execution.outcome.errorMessage }
     : { kind: 'succeeded', message: '' };
+}
+
+function failingListDatabase(database: DatabaseContext): DatabaseContext {
+  return {
+    ...database,
+    mcpServerDefinitions: {
+      ...database.mcpServerDefinitions,
+      listDefinitions: () => ({ kind: 'error', message: 'olvasási hiba (corrupt_mcp_server_definition).' }),
+    },
+  };
 }
 
 describe('runAgentStep', () => {
@@ -552,6 +576,476 @@ describe('runAgentStep', () => {
     database.close();
   });
 
+  it('a lépés MCP hivatkozásai a központi definíciókból és a szerver környezetéből oldódnak fel, az érték eseménybe nem kerül (SPEC-009 6.4)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'github',
+        definition: {
+          type: 'stdio',
+          command: 'github-mcp',
+          args: ['--stdio'],
+          envNames: ['GITHUB_TOKEN'],
+          envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_CEG' },
+        },
+      }),
+    );
+    okOrThrow(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'docs',
+        definition: { type: 'http', url: 'http://127.0.0.1:4100/mcp', authEnvName: 'DOCS_AUTH' },
+      }),
+    );
+    const environment = new Map([
+      ['GITHUB_TOKEN_SAJAT', 'mcp-titok-sajat'],
+      ['DOCS_AUTH', 'Bearer mcp-titok-docs'],
+    ]);
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+      processEnvironment: { read: (name) => environment.get(name) ?? null, readAll: () => ({}) },
+    });
+    const config = agentStepConfig({
+      mcpServerReferences: {
+        github: { envBindings: { GITHUB_TOKEN: 'GITHUB_TOKEN_SAJAT' }, authEnvName: null },
+        docs: { envBindings: {}, authEnvName: null },
+      },
+    });
+
+    const execution = okOrThrow(
+      await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry),
+    );
+
+    expect(execution.outcome.status).toBe('succeeded');
+    expect(captured.request?.options['mcpServers']).toStrictEqual({
+      github: { type: 'stdio', command: 'github-mcp', args: ['--stdio'], env: { GITHUB_TOKEN: 'mcp-titok-sajat' } },
+      docs: { type: 'http', url: 'http://127.0.0.1:4100/mcp', headers: { Authorization: 'Bearer mcp-titok-docs' } },
+    });
+    const events = okOrThrow(database.events.readEventsForStep(stepRunId, 100));
+    expect(JSON.stringify(events)).not.toContain('mcp-titok');
+
+    database.close();
+  });
+
+  it('a kikapcsolt beépített skillek a kimenő env blokkba a kikapcsoló változót teszik (SPEC-009 O-44)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(database.settings.setBuiltinSkillsEnabled(false));
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+    });
+
+    okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry));
+
+    const outgoingEnvironment = captured.request?.options['env'];
+    expect(isRecord(outgoingEnvironment) && outgoingEnvironment['CLAUDE_CODE_DISABLE_BUNDLED_SKILLS']).toBe('1');
+    database.close();
+  });
+
+  // A háromszintű feloldás (SPEC-009 O-44, user döntés 2026-11-04): lépés ?? workflow ?? globális.
+  it.each([
+    ['a lépés hamis értéke felülírja a globális igazat', false, null, true, '1'],
+    ['null lépés mellett a workflow hamis értéke kikapcsol', null, false, true, '1'],
+    ['a lépés igaz értéke felülírja a hamis workflow és globális értéket', true, false, false, undefined],
+  ] as const)(
+    'a beépített skillek háromszintű kapcsolója: %s',
+    async (_label, stepValue, workflowValue, globalValue, expected) => {
+      const database = openMemoryDatabase();
+      const { runId, stepRunId } = seedRun(database, workflowValue);
+      okOrThrow(database.settings.setBuiltinSkillsEnabled(globalValue));
+      const captured = newCapture();
+      const dependencies = dependenciesOf({
+        database,
+        agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+      });
+      const config = agentStepConfig({ builtinSkillsEnabled: stepValue });
+
+      okOrThrow(await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry));
+
+      const outgoingEnvironment = captured.request?.options['env'];
+      expect(isRecord(outgoingEnvironment)).toBe(true);
+      expect(isRecord(outgoingEnvironment) ? outgoingEnvironment['CLAUDE_CODE_DISABLE_BUNDLED_SKILLS'] : 'nincs').toBe(
+        expected,
+      );
+      database.close();
+    },
+  );
+
+  it('a futás sorának olvasási hibája az Outcome hibaágán megy tovább, futtatás nélkül (SPEC-009 O-44)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const dependencies = dependenciesOf({
+      database: { ...database, runs: { ...database.runs, getRun: () => ({ kind: 'error', message: 'nincs futás' }) } },
+      agentQueryRunner: { run: notCalled },
+    });
+
+    expect(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry)).toStrictEqual({
+      kind: 'error',
+      message: 'nincs futás',
+    });
+    database.close();
+  });
+
+  it('a workflow sorának olvasási hibája az Outcome hibaágán megy tovább, futtatás nélkül (SPEC-009 O-44)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const dependencies = dependenciesOf({
+      database: {
+        ...database,
+        workflows: { ...database.workflows, getWorkflow: () => ({ kind: 'error', message: 'nincs workflow' }) },
+      },
+      agentQueryRunner: { run: notCalled },
+    });
+
+    expect(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry)).toStrictEqual({
+      kind: 'error',
+      message: 'nincs workflow',
+    });
+    database.close();
+  });
+
+  it('a beállítás olvasásának adatbázis hibája az Outcome hibaágán megy tovább, futtatás nélkül', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const dependencies = dependenciesOf({
+      database: {
+        ...database,
+        settings: { ...database.settings, readSettings: () => ({ kind: 'error', message: 'zárva' }) },
+      },
+      agentQueryRunner: { run: notCalled },
+    });
+
+    expect(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry)).toStrictEqual({
+      kind: 'error',
+      message: 'zárva',
+    });
+    database.close();
+  });
+
+  it('a nem csatlakozott MCP szerver a lépést megnevezett hibával megállítja, a folyam tovább nem olvasódik (O-46)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'docs',
+        definition: { type: 'http', url: 'http://127.0.0.1:4100/mcp', authEnvName: null },
+      }),
+    );
+    const interruptSpy = vi.fn(() => Promise.resolve());
+    const consumed: unknown[] = [];
+    async function* generate(): AsyncGenerator {
+      await Promise.resolve();
+      yield {
+        type: 'system',
+        subtype: 'init',
+        session_id: 'session-mcp',
+        uuid: 'mcp-1',
+        mcp_servers: [{ name: 'docs', status: 'failed' }],
+      };
+      consumed.push('tovabb');
+      yield* fixtureMessages('sikeres');
+    }
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: { run: () => ({ kind: 'ok', value: { messages: generate(), interrupt: interruptSpy } }) },
+    });
+    const config = agentStepConfig({ mcpServerReferences: { docs: { envBindings: {}, authEnvName: null } } });
+
+    const execution = okOrThrow(
+      await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry),
+    );
+
+    expect(execution.outcome).toStrictEqual({
+      status: 'failed',
+      errorKind: 'mcp_server_connection_failed',
+      errorMessage: 'A(z) a csomópont MCP szervere nem csatlakozott: "docs" (mcp_server_connection_failed).',
+    });
+    expect(interruptSpy).toHaveBeenCalledTimes(1);
+    expect(consumed).toStrictEqual([]);
+    database.close();
+  });
+
+  it('a megszakítás hibája mellett is a megnevezett mcp_server_connection_failed ok marad (O-46)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'docs',
+        definition: { type: 'http', url: 'http://127.0.0.1:4100/mcp', authEnvName: null },
+      }),
+    );
+    const messages = [
+      {
+        type: 'system',
+        subtype: 'init',
+        session_id: 's',
+        uuid: 'u',
+        mcp_servers: [{ name: 'docs', status: 'needs-auth' }],
+      },
+    ];
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: {
+        run: () => ({
+          kind: 'ok',
+          value: { messages: messageIterable(messages), interrupt: () => Promise.reject(new Error('lezárt folyam')) },
+        }),
+      },
+    });
+    const config = agentStepConfig({ mcpServerReferences: { docs: { envBindings: {}, authEnvName: null } } });
+
+    const execution = okOrThrow(
+      await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry),
+    );
+
+    expect(execution.outcome).toMatchObject({ status: 'failed', errorKind: 'mcp_server_connection_failed' });
+    database.close();
+  });
+
+  it('a csatlakozott MCP szerver mellett a lépés lefut (O-46)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'docs',
+        definition: { type: 'http', url: 'http://127.0.0.1:4100/mcp', authEnvName: null },
+      }),
+    );
+    const messages = fixtureMessages('sikeres').map((message: unknown) =>
+      isRecord(message) && message['subtype'] === 'init'
+        ? { ...message, mcp_servers: [{ name: 'docs', status: 'connected' }] }
+        : message,
+    );
+    const dependencies = dependenciesOf({ database, agentQueryRunner: fakeRunner(messages, newCapture()) });
+    const config = agentStepConfig({ mcpServerReferences: { docs: { envBindings: {}, authEnvName: null } } });
+
+    const execution = okOrThrow(
+      await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry),
+    );
+
+    expect(execution.outcome.status).toBe('succeeded');
+    database.close();
+  });
+
+  it('az agent definíciók skill és MCP hivatkozásai a kimenő agents mezőben oldódnak fel, a lépés kiválasztott skilljével (M-147, O-47)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'docs',
+        definition: { type: 'http', url: 'http://127.0.0.1:4100/mcp', authEnvName: 'DOCS_AUTH' },
+      }),
+    );
+    const environment = new Map([['DOCS_AUTH_SEGITO', 'Bearer agent-titok-docs']]);
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+      processEnvironment: { read: (name) => environment.get(name) ?? null, readAll: () => ({}) },
+      skillLibrary: {
+        readSkillLibrary: () => ({
+          rootDirectory: '/skill-konyvtar',
+          pluginName: 'skill-konyvtar',
+          skillNames: ['alfa'],
+        }),
+      },
+    });
+    const config = agentStepConfig({
+      skills: ['alfa'],
+      agents: {
+        segito: {
+          description: 'Segítő',
+          prompt: 'Segíts.',
+          skills: ['alfa'],
+          mcpServerReferences: { docs: { envBindings: {}, authEnvName: 'DOCS_AUTH_SEGITO' } },
+        },
+      },
+    });
+
+    const execution = okOrThrow(
+      await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry),
+    );
+
+    expect(execution.outcome.status).toBe('succeeded');
+    expect(captured.request?.options['agents']).toStrictEqual({
+      segito: {
+        description: 'Segítő',
+        prompt: 'Segíts.',
+        skills: ['skill-konyvtar:alfa'],
+        mcpServers: [
+          {
+            docs: {
+              type: 'http',
+              url: 'http://127.0.0.1:4100/mcp',
+              headers: { Authorization: 'Bearer agent-titok-docs' },
+            },
+          },
+        ],
+      },
+    });
+    expect(captured.request?.options['plugins']).toStrictEqual([{ type: 'local', path: '/skill-konyvtar' }]);
+    expect(captured.request?.options['skills']).toStrictEqual(['skill-konyvtar:alfa']);
+    const events = okOrThrow(database.events.readEventsForStep(stepRunId, 100));
+    expect(JSON.stringify(events)).not.toContain('agent-titok');
+
+    database.close();
+  });
+
+  it('az érvénytelen alakú agent definíció malformed_node_config, futtatás nélkül', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+    });
+    const config = agentStepConfig({ agents: { segito: { description: 'd', prompt: 'p', skills: 7 } } });
+
+    const request = requestOf({ runId, stepRunId, config });
+    const failure = failedOutcomeOf(okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry)));
+
+    expect(failure).toStrictEqual({
+      kind: 'malformed_node_config',
+      message: 'A(z) a csomópont "segito" agent definíciója érvénytelen alakú (malformed_node_config).',
+    });
+    expect(captured.request).toBeUndefined();
+
+    database.close();
+  });
+
+  it('a null skills lépésen az agent definíció skillje agent_skill_not_in_step, futtatás nélkül (O-47)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+      skillLibrary: {
+        readSkillLibrary: () => ({
+          rootDirectory: '/skill-konyvtar',
+          pluginName: 'skill-konyvtar',
+          skillNames: ['alfa'],
+        }),
+      },
+    });
+    const config = agentStepConfig({
+      skills: null,
+      agents: { segito: { description: 'Segítő', prompt: 'Segíts.', skills: ['alfa'] } },
+    });
+
+    const request = requestOf({ runId, stepRunId, config });
+    const failure = failedOutcomeOf(okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry)));
+
+    expect(failure).toStrictEqual({
+      kind: 'agent_skill_not_in_step',
+      message:
+        'A(z) a csomópont "segito" agent definíciója a(z) "alfa" skillre hivatkozik, ami nincs a lépés kiválasztott skilljei között (agent_skill_not_in_step).',
+    });
+    expect(captured.request).toBeUndefined();
+
+    database.close();
+  });
+
+  it('a futás indítása után törölt központi definícióra mcp_server_not_found, futtatás nélkül (O-43)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+    });
+    const config = agentStepConfig({ mcpServerReferences: { torolt: { envBindings: {}, authEnvName: null } } });
+
+    const request = requestOf({ runId, stepRunId, config });
+    const failure = failedOutcomeOf(okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry)));
+
+    expect(failure).toStrictEqual({
+      kind: 'mcp_server_not_found',
+      message:
+        'A(z) a csomópont a(z) "torolt" MCP szerverre hivatkozik, ami nincs a központi MCP szerver listában (mcp_server_not_found).',
+    });
+    expect(captured.request).toBeUndefined();
+
+    database.close();
+  });
+
+  it('a hiányzó szerver oldali MCP változó missing_mcp_server_env, futtatás nélkül (O-18)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    okOrThrow(
+      database.mcpServerDefinitions.saveDefinition({
+        name: 'docs',
+        definition: { type: 'sse', url: 'http://127.0.0.1:4200/sse', authEnvName: 'DOCS_AUTH' },
+      }),
+    );
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+    });
+    const config = agentStepConfig({ mcpServerReferences: { docs: { envBindings: {}, authEnvName: null } } });
+
+    const request = requestOf({ runId, stepRunId, config });
+    const failure = failedOutcomeOf(okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry)));
+
+    expect(failure.kind).toBe('missing_mcp_server_env');
+    expect(failure.message).toContain('"DOCS_AUTH"');
+    expect(captured.request).toBeUndefined();
+
+    database.close();
+  });
+
+  it('a központi MCP lista olvasásának adatbázis hibája a hivatkozó lépés Outcome hibaágán jelenik meg', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const dependencies = dependenciesOf({
+      database: failingListDatabase(database),
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), newCapture()),
+    });
+    const stepReference = agentStepConfig({ mcpServerReferences: { docs: { envBindings: {}, authEnvName: null } } });
+    const agentReference = agentStepConfig({
+      agents: {
+        kutato: {
+          description: 'd',
+          prompt: 'p',
+          mcpServerReferences: { docs: { envBindings: {}, authEnvName: null } },
+        },
+      },
+    });
+
+    for (const config of [stepReference, agentReference]) {
+      expect(
+        await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry),
+      ).toStrictEqual({
+        kind: 'error',
+        message: 'olvasási hiba (corrupt_mcp_server_definition).',
+      });
+    }
+
+    database.close();
+  });
+
+  it('MCP hivatkozás nélkül a központi lista hibája nem állítja meg a lépést (T-012-27)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database: failingListDatabase(database),
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+    });
+
+    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry));
+
+    expect(execution.outcome.status).toBe('succeeded');
+    expect(captured.request).toBeDefined();
+
+    database.close();
+  });
+
   it('a kimenő env a folyamat környezetéből épül: a PATH és a HOME átmegy, a tiltott név nem (SPEC-012 2.1 hiba)', async () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRun(database);
@@ -578,7 +1072,11 @@ describe('runAgentStep', () => {
 
     okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry));
 
-    expect(captured.request?.options['env']).toStrictEqual({ PATH: '/usr/bin', HOME: '/home/teszt' });
+    expect(captured.request?.options['env']).toStrictEqual({
+      PATH: '/usr/bin',
+      HOME: '/home/teszt',
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
+    });
 
     database.close();
   });
@@ -603,17 +1101,21 @@ describe('runAgentStep', () => {
 
   it('az esemény hozzáfűzés adatbázis hibája az Outcome hibaágán jelenik meg', async () => {
     const database = openMemoryDatabase();
-    const { stepRunId } = seedRun(database);
+    const { runId, stepRunId } = seedRun(database);
+    // A futás sora létezik (a lépés indulásakor a beépített skillek feloldása olvassa, SPEC-009
+    // O-44), ezért a hozzáfűzés hibáját a port adja.
     const dependencies = dependenciesOf({
-      database,
+      database: {
+        ...database,
+        events: {
+          ...database.events,
+          appendSdkEvent: () => ({ kind: 'error', message: 'a hozzáfűzés elbukott (not_found)' }),
+        },
+      },
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), newCapture()),
     });
 
-    const outcome = await runAgentStep(
-      requestOf({ runId: 'nincs-ilyen-futas', stepRunId }),
-      dependencies,
-      agentQueryRegistry,
-    );
+    const outcome = await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry);
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('not_found');

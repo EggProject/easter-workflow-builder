@@ -90,11 +90,12 @@ const WORKFLOW: WorkflowDetail = {
   name: 'Alfa workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };
 
-const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false };
+const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true };
 
 const SNAPSHOT: RunSnapshotResponse = {
   version: 1,

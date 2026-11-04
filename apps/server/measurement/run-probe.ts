@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
@@ -10,7 +11,9 @@ import {
 } from '@easter-workflow-builder/protocol';
 import { isUnknownArray } from '@easter-workflow-builder/typeguards';
 import type { ProviderId } from '@easter-workflow-builder/provider-capability';
-import { buildProbeGraph } from './build-probe-graph.ts';
+import { buildTestZipArchive } from '../src/skill-endpoint/build-test-zip-archive.ts';
+import { testZipFileEntry } from '../src/skill-endpoint/test-zip-file-entry.ts';
+import { buildProbeGraph, type ProbeSkillAndMcp } from './build-probe-graph.ts';
 import { findFreePort } from './find-free-port.ts';
 import { openEventStream } from './open-event-stream.ts';
 import { parseOrThrow } from './parse-or-throw.ts';
@@ -26,6 +29,11 @@ export interface ProbeOptions {
   Opcionális modell azonosító a lépéshez (alapértelmezés: `build-probe-graph.ts`).
   */
   readonly modelId?: string;
+  /**
+  Skill és MCP mód (SPEC-009 T-012-12a): a próba egy skillt tölt fel és egy stdio MCP szervert ment, és a
+  lépés mindkettőt hivatkozza.
+  */
+  readonly isSkillAndMcpMode?: boolean;
   /**
   A gyermek szerver indítása (`node apps/server/src/main.ts`), a tesztben a hamis ágenses szerver.
   */
@@ -46,6 +54,32 @@ function expectOk(response: JsonResponse, what: string): unknown {
     throw new Error(`A(z) ${what} nem 200 választ adott (${String(response.status)}) ${JSON.stringify(response.body)}`);
   }
   return response.body;
+}
+
+const SKILL_AND_MCP: ProbeSkillAndMcp = { skillName: 'proba-skill', mcpServerName: 'proba-mcp' };
+
+/**
+A skill feltöltése (nyers ZIP törzs) és a stdio MCP szerver mentése a REST úton (SPEC-009 5., 6.).
+*/
+async function prepareSkillAndMcp(baseUrl: string, signal: AbortSignal): Promise<void> {
+  const archive = buildTestZipArchive([
+    testZipFileEntry('SKILL.md', `---\nname: ${SKILL_AND_MCP.skillName}\ndescription: Próba skill.\n---\n# Próba\n`),
+  ]);
+  const uploaded = await fetch(`${baseUrl}/api/skills/${SKILL_AND_MCP.skillName}`, {
+    method: 'PUT',
+    signal,
+    headers: { 'Content-Type': 'application/zip' },
+    body: new Uint8Array(archive),
+  });
+  expectOk({ status: uploaded.status, body: await uploaded.json() }, 'skill feltöltés');
+  const saved = await requestJson(baseUrl, 'PUT', `/api/mcp-servers/${SKILL_AND_MCP.mcpServerName}`, signal, {
+    type: 'stdio',
+    command: process.execPath,
+    args: [fileURLToPath(new URL('probe-mcp-stdio-server.ts', import.meta.url))],
+    envNames: [],
+    envBindings: {},
+  });
+  expectOk(saved, 'MCP szerver mentés');
 }
 
 function parseStepRuns(body: unknown): readonly StepRunRecord[] {
@@ -76,6 +110,7 @@ export async function runProbe(options: ProbeOptions): Promise<ProbeSummary> {
         EASTER_SERVER_PORT: String(port),
         EASTER_DB_FILE: path.join(workDirectory, 'proba.sqlite'),
         EASTER_LOG_DIRECTORY: path.join(workDirectory, 'logs', 'server'),
+        EASTER_SKILL_LIBRARY_DIRECTORY: path.join(workDirectory, 'skills'),
       },
       port,
       options.secretValues,
@@ -93,7 +128,11 @@ export async function runProbe(options: ProbeOptions): Promise<ProbeSummary> {
     const workflowCreation = { name: 'valodi-provider-proba', description: null, providerId: null };
     const created = await call('POST', '/api/workflows', workflowCreation);
     const workflowId = parseOrThrow(WorkflowDetailSchema.safeParse(created), 'workflow válasz').id;
-    await call('PUT', `/api/workflows/${workflowId}/graph`, buildProbeGraph(providerId, options.modelId));
+    const skillAndMcp = options.isSkillAndMcpMode === true ? SKILL_AND_MCP : undefined;
+    if (skillAndMcp !== undefined) {
+      await prepareSkillAndMcp(baseUrl, signal);
+    }
+    await call('PUT', `/api/workflows/${workflowId}/graph`, buildProbeGraph(providerId, options.modelId, skillAndMcp));
 
     const stream = await openEventStream(baseUrl, signal);
     try {
@@ -107,7 +146,7 @@ export async function runProbe(options: ProbeOptions): Promise<ProbeSummary> {
       const runBody = await call('GET', `/api/runs/${runId}`);
       const run = parseOrThrow(RunDetailSchema.safeParse(runBody), 'futás válasz');
       const stepRuns = parseStepRuns(await call('GET', `/api/runs/${runId}/steps`));
-      return summarizeRun(providerId, run, stepRuns, finished.resultTextLength);
+      return summarizeRun(providerId, run, stepRuns, finished);
     } finally {
       await stream.close();
     }

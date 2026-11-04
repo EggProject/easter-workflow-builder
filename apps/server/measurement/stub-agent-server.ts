@@ -8,7 +8,7 @@
 //
 // A `STUB_AGENT_REQUEST_FILE` útvonalra a hamis ágens a kapott kérés
 // ellenőrizhető részét írja (prompt, `maxTurns`, `model`, `effort`,
-// `maxBudgetUsd` jelenléte, az adatbázis és a napló útvonala): az env ÉRTÉKEI nem, mert titkot hordozhatnak. A `STUB_AGENT_BEHAVIOR=fail` esetén a hamis ágens hibaágat ad.
+// `maxBudgetUsd` jelenléte, a `skills` lista, a `plugins` jelenléte, az MCP szerverek neve, az adatbázis és a napló útvonala): az env ÉRTÉKEI nem, mert titkot hordozhatnak. A `STUB_AGENT_BEHAVIOR=fail` esetén a hamis ágens hibaágat ad.
 import { readFileSync, writeFileSync } from 'node:fs';
 import process from 'node:process';
 import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
@@ -23,11 +23,13 @@ import {
 } from '@easter-workflow-builder/workflow-language';
 import { buildProviderDescriptorLookup } from '../src/engine-assembly/build-provider-descriptor-lookup.ts';
 import { createProcessEnvironmentReader } from '../src/engine-assembly/create-process-environment-reader.ts';
+import { createSkillLibraryReader } from '../src/engine-assembly/create-skill-library-reader.ts';
 import { createRandomUuidIdGenerator } from '../src/engine-assembly/create-random-uuid-id-generator.ts';
 import { createRealEventPublisher } from '../src/engine-assembly/create-real-event-publisher.ts';
 import { createSystemClock } from '../src/engine-assembly/create-system-clock.ts';
 import { createHttpServer } from '../src/http-server/create-http-server.ts';
 import { buildRouteHandlers } from '../src/route-registry/build-route-handlers.ts';
+import { TEST_SKILL_LIBRARY } from '../src/skill-endpoint/test-skill-library.ts';
 import { registerShutdownSignalHandlers } from '../src/shutdown-sequence/register-shutdown-signal-handlers.ts';
 import { createStreamRegistry } from '../src/stream-registry/create-stream-registry.ts';
 
@@ -81,6 +83,9 @@ function describeRequest(prompt: string, options: Readonly<Record<string, unknow
     model: options['model'],
     effort: options['effort'],
     hasMaxBudgetUsd: Object.hasOwn(options, 'maxBudgetUsd'),
+    skills: options['skills'],
+    hasPlugins: Object.hasOwn(options, 'plugins'),
+    mcpServerNames: isRecord(options['mcpServers']) ? Object.keys(options['mcpServers']) : [],
   });
 }
 
@@ -104,6 +109,11 @@ function writeToStandardError(message: string): void {
 }
 
 const port = Number(process.env['EASTER_SERVER_PORT']);
+// A skill és MCP mód (SPEC-009 T-012-12a) a próba ideiglenes skill könyvtárába tölt fel.
+const skillLibrary = {
+  ...TEST_SKILL_LIBRARY,
+  rootDirectory: process.env['EASTER_SKILL_LIBRARY_DIRECTORY'] ?? TEST_SKILL_LIBRARY.rootDirectory,
+};
 const database = okOrThrow(openDatabase(process.env['EASTER_DB_FILE'] ?? ':memory:'));
 const clock = createSystemClock();
 const idGenerator = createRandomUuidIdGenerator();
@@ -122,9 +132,10 @@ const engine = createEngine({
   clock,
   idGenerator,
   processEnvironment: createProcessEnvironmentReader(),
+  skillLibrary: createSkillLibraryReader(skillLibrary.rootDirectory),
 });
 const server = createHttpServer({
-  handlers: buildRouteHandlers(database, engine, streamRegistry),
+  handlers: buildRouteHandlers(database, engine, streamRegistry, skillLibrary),
   devOrigin: undefined,
   streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
   logger,

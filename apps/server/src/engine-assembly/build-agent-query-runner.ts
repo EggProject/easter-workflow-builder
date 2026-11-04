@@ -1,5 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createAgentQueryRunner, type AgentQueryRunner } from '@easter-workflow-builder/agent';
+import { createHardenedSdkQuery } from '../sdk-query-hardening/create-hardened-sdk-query.ts';
 
 /**
  * A valódi Agent SDK `query()` függvényének bekötése (SPEC-004 1. és 3.1
@@ -8,5 +9,5 @@ import { createAgentQueryRunner, type AgentQueryRunner } from '@easter-workflow-
  * portra port-kompatibilis alakú, `as` kényszerítés nélkül (lásd ott).
  */
 export function buildAgentQueryRunner(): AgentQueryRunner {
-  return createAgentQueryRunner(query);
+  return createAgentQueryRunner(createHardenedSdkQuery(query));
 }

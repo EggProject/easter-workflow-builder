@@ -1,0 +1,35 @@
+/* SAJÁT KIEGÉSZÍTÉS, a forrásban nem létező szabályok (SPEC-009 3.1 5. pont,
+   6.2): a szerkesztő modális űrlapja mezői egymás alatt `--ep-space-3`
+   térközzel; a halk magyarázó sor a design system `--ep-text-small`
+   tokenjével. */
+.mcp-server-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-3);
+}
+.mcp-server-form__hint {
+  margin: 0;
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}
+
+/* SAJÁT KIEGÉSZÍTÉS (SPEC-009 3.1 5. pont): a lista sorának adatai (név,
+   parancs, URL, változó nevek) hosszúak lehetnek; keskeny kijelzőn bárhol
+   törhetnek, hogy a sor ne lógjon ki a kártyából. A két gomb egy
+   csoportban áll, szűk kijelzőn tördelve. */
+.mcp-server-row .preference-row__title,
+.mcp-server-row .settings-screen__hint {
+  overflow-wrap: anywhere;
+}
+.mcp-server-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ep-space-2);
+}
+
+/* SAJÁT KIEGÉSZÍTÉS (SPEC-009 6.2): a "Hozzáadás" gomb a lista alatt a
+   saját szélességén marad. */
+.mcp-server-card__add {
+  align-self: flex-start;
+  margin-top: var(--ep-space-3);
+}

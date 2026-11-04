@@ -10,10 +10,11 @@ import { buildProviderDescriptorLookup } from './build-provider-descriptor-looku
 import { createRealEventPublisher } from './create-real-event-publisher.ts';
 import { createRandomUuidIdGenerator } from './create-random-uuid-id-generator.ts';
 import { createProcessEnvironmentReader } from './create-process-environment-reader.ts';
+import { createSkillLibraryReader } from './create-skill-library-reader.ts';
 import { reportUnexpectedLanguageError } from './report-unexpected-language-error.ts';
 
 /**
- * A motor kilenc kötelező portjának összeállítása a szerver indulásakor
+ * A motor tíz kötelező portjának összeállítása a szerver indulásakor
  * (SPEC-004 3.1, 3.2, `EngineDependencies`). A `database` és a `clock` a
  * hívó (`continue-startup-with-database.ts`) által átadott, MÁR LÉTEZŐ
  * példány - a `clock`-ot azért kapja kívülről, nem itt építi fel, mert
@@ -28,12 +29,16 @@ import { reportUnexpectedLanguageError } from './report-unexpected-language-erro
  * tehát egy eltérést a `typecheck` kapu jelez. Mindkét port a
  * `reportUnexpectedLanguageError` burkolón át jut a motorhoz: a csomag tartalék
  * ágának kivétel típusát a `logger` naplózza (SPEC-010 O-22).
+ *
+ * A `skillLibrary` port a skill könyvtár abszolút gyökerét kapja (SPEC-009
+ * 5.1), ugyanazt, amit a skill végpontok kezelnek.
  */
 export function buildEngineDependencies(
   database: DatabaseContext,
   registry: StreamRegistry,
   clock: ClockPort,
   logger: ServerLogger,
+  skillLibraryRootDirectory: string,
 ): EngineDependencies {
   const celEvaluator = createCelExpressionEvaluator();
   const mustacheRenderer = createMustacheTemplateRenderer();
@@ -57,5 +62,6 @@ export function buildEngineDependencies(
     clock,
     idGenerator: createRandomUuidIdGenerator(),
     processEnvironment: createProcessEnvironmentReader(),
+    skillLibrary: createSkillLibraryReader(skillLibraryRootDirectory),
   };
 }

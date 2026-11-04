@@ -37,6 +37,8 @@ const ALFA: WorkflowSummary = {
   name: 'Alfa workflow',
   description: 'leírás',
   providerId: 'claude-subscription',
+  // eslint-disable-next-line unicorn/no-null -- a `null` az öröklés (SPEC-009 O-44)
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };
@@ -80,11 +82,16 @@ const EDITOR_WORKFLOW: WorkflowDetail = {
   name: 'Alfa workflow',
   description: 'leírás',
   providerId: 'claude-subscription',
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };
 
-const EDITOR_SETTINGS: SettingsRecord = { defaultProviderId: 'claude-subscription', persistStreamDeltas: false };
+const EDITOR_SETTINGS: SettingsRecord = {
+  defaultProviderId: 'claude-subscription',
+  persistStreamDeltas: false,
+  builtinSkillsEnabled: true,
+};
 
 // A futás nézet fixture-jei (2026-09-15, T-009-22): a rajz és a transcript
 // panel a --ep-screen-lg fölött egy nem törő flex sor, a --ep-screen-md alatt
@@ -176,6 +183,9 @@ test.beforeEach(async ({ page }) => {
     mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(EDITOR_GRAPH))),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(EDITOR_WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(EDITOR_SETTINGS))),
+    mockRoute('listSkills', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listMcpServerDefinitions', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listServerEnvironmentNames', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(RUN_STEP_RUNS))),
@@ -483,7 +493,7 @@ test('a téma váltó és a workflow sor műveletek menüje minden szélességen
       const trigger = page.getByRole('button', { name: /^Műveletek/ });
       await expect(trigger).toBeInViewport({ ratio: 1 });
       await trigger.click();
-      for (const label of ['Átnevezés', 'Törlés', 'Indítás']) {
+      for (const label of ['Szerkesztés', 'Törlés', 'Indítás']) {
         await expect(page.getByRole('menuitem', { name: label })).toBeInViewport({ ratio: 1 });
       }
       // Zárás billentyűzettel, hogy a következő iteráció (`page.goto`)
@@ -555,6 +565,10 @@ test('a Beállítások sorának felirata és választója minden támogatott sz�
       await page.goto('/settings');
       const title = page.getByText('Visszavonás/újra billentyű módosítója', { exact: true });
       const select = page.getByLabel('Visszavonás/újra billentyű módosítója');
+      // A sor a kártyák sorában az utolsó (Gráf szerkesztő), keskeny kijelzőn a
+      // nézetablak alatt áll: a mért állítás vízszintes, ezért előbb látótérbe
+      // görgetjük (SPEC-009 3.1: a kártyák egymás alatt állnak).
+      await page.getByRole('region', { name: 'Gráf szerkesztő' }).scrollIntoViewIfNeeded();
       await expect(title).toBeInViewport({ ratio: 1 });
       await expect(select).toBeInViewport({ ratio: 1 });
 

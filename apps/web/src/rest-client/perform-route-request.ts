@@ -18,6 +18,12 @@ export interface PerformRouteRequestInput<TValue> {
   readonly query: Readonly<Record<string, string>> | undefined;
   readonly hasBody: boolean;
   readonly body: unknown;
+  /**
+   * Nyers ZIP törzs (`application/zip`, SPEC-009 5.1, O-36): megadva a kérés
+   * törzse ez a `Blob`, a `Content-Type` `application/zip`, és a `hasBody`
+   * és a `body` mezőt nem olvassa. Csak a `ZipBodyRouteId` végpontok hívják.
+   */
+  readonly zipBody?: Blob;
   readonly responseSchema: SafeParsableSchema<TValue>;
   readonly fetchFunction: FetchFunction;
   readonly apiOrigin: string;
@@ -31,6 +37,23 @@ function buildRequestUrl(apiOrigin: string, path: string, query: Readonly<Record
     url.searchParams.set(key, value);
   }
   return url.href;
+}
+
+/**
+ * A kérés fejlécei és törzse: nyers ZIP, JSON, vagy törzs nélkül.
+ */
+function buildRequestPayload(input: Readonly<PerformRouteRequestInput<unknown>>): {
+  readonly headers: Record<string, string>;
+  readonly body: BodyInit | null;
+} {
+  if (input.zipBody !== undefined) {
+    return { headers: { 'Content-Type': 'application/zip' }, body: input.zipBody };
+  }
+  if (input.hasBody) {
+    return { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input.body) };
+  }
+  // eslint-disable-next-line unicorn/no-null -- a DOM `RequestInit#body` típusa `BodyInit | null`, nem fogad `undefined`-et.
+  return { headers: {}, body: null };
 }
 
 /**
@@ -82,7 +105,7 @@ async function buildProtocolErrorOutcome<TValue>(response: Response): Promise<Ro
 export async function performRouteRequest<TValue>(
   input: Readonly<PerformRouteRequestInput<TValue>>,
 ): Promise<RouteOutcome<TValue>> {
-  const { routeId, parameters, query, hasBody, body, responseSchema, fetchFunction, apiOrigin, signal } = input;
+  const { routeId, parameters, query, responseSchema, fetchFunction, apiOrigin, signal } = input;
 
   const pathOutcome = buildRoutePath(routeId, parameters);
   if (pathOutcome.kind === 'error') {
@@ -98,9 +121,7 @@ export async function performRouteRequest<TValue>(
       method,
       // eslint-disable-next-line unicorn/no-null -- a DOM `RequestInit#signal` típusa `AbortSignal | null`, nem fogad `undefined`-et.
       signal: signal ?? null,
-      headers: hasBody ? { 'Content-Type': 'application/json' } : {},
-      // eslint-disable-next-line unicorn/no-null -- a DOM `RequestInit#body` típusa `BodyInit | null`, nem fogad `undefined`-et.
-      body: hasBody ? JSON.stringify(body) : null,
+      ...buildRequestPayload(input),
     });
   } catch {
     return { kind: 'error', message: 'A szerver nem érhető el.', isTransient: true };

@@ -24,7 +24,7 @@ describe('createReadSettingsHandler', () => {
     expect(result).toStrictEqual({
       kind: 'ok',
       // eslint-disable-next-line unicorn/no-null -- a SettingsRecord.defaultProviderId mezője valódi ProviderId | null
-      value: { status: 200, body: { defaultProviderId: null, persistStreamDeltas: false } },
+      value: { status: 200, body: { defaultProviderId: null, persistStreamDeltas: false, builtinSkillsEnabled: true } },
     });
   });
 
@@ -39,6 +39,7 @@ describe('createReadSettingsHandler', () => {
     expect(result.kind === 'ok' && result.value.body).toStrictEqual({
       defaultProviderId: 'minimax',
       persistStreamDeltas: false,
+      builtinSkillsEnabled: true,
     });
   });
 

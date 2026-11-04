@@ -32,7 +32,10 @@ describe('buildOutgoingEnvironment', () => {
   it('alapként a folyamat teljes környezetét adja: a PATH és a HOME átmegy (SPEC-012 2.1 hiba)', () => {
     const result = buildOutgoingEnvironment([], [], buildProcessEnvironment({ PATH: '/usr/bin', HOME: '/home/teszt' }));
 
-    expect(result).toStrictEqual({ kind: 'ok', value: { PATH: '/usr/bin', HOME: '/home/teszt' } });
+    expect(result).toStrictEqual({
+      kind: 'ok',
+      value: { PATH: '/usr/bin', HOME: '/home/teszt', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
+    });
   });
 
   it('a disallowedEnv minden neve kikerül az alapból, a többi változó megmarad', () => {
@@ -42,7 +45,10 @@ describe('buildOutgoingEnvironment', () => {
       buildProcessEnvironment({ PATH: '/usr/bin', ANTHROPIC_API_KEY: 'nem-jut-ki', CLAUDE_CODE_OAUTH_TOKEN: 'atmegy' }),
     );
 
-    expect(result).toStrictEqual({ kind: 'ok', value: { PATH: '/usr/bin', CLAUDE_CODE_OAUTH_TOKEN: 'atmegy' } });
+    expect(result).toStrictEqual({
+      kind: 'ok',
+      value: { PATH: '/usr/bin', CLAUDE_CODE_OAUTH_TOKEN: 'atmegy', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
+    });
   });
 
   it('a requiredEnv blokkja felülírja az alapot, a literál a környezetben álló más értéket is', () => {
@@ -58,7 +64,12 @@ describe('buildOutgoingEnvironment', () => {
 
     expect(result).toStrictEqual({
       kind: 'ok',
-      value: { PATH: '/usr/bin', ANTHROPIC_BASE_URL: 'https://szallito.example', ANTHROPIC_AUTH_TOKEN: 'kulcs-ertek' },
+      value: {
+        PATH: '/usr/bin',
+        ANTHROPIC_BASE_URL: 'https://szallito.example',
+        ANTHROPIC_AUTH_TOKEN: 'kulcs-ertek',
+        CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
+      },
     });
   });
 
@@ -69,7 +80,7 @@ describe('buildOutgoingEnvironment', () => {
       buildProcessEnvironment({ MAX_THINKING_TOKENS: '10', PATH: '/usr/bin' }),
     );
 
-    expect(result).toStrictEqual({ kind: 'ok', value: { PATH: '/usr/bin' } });
+    expect(result).toStrictEqual({ kind: 'ok', value: { PATH: '/usr/bin', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' } });
   });
 
   it('hiányzó kötelező változóra a hibaág kizárólag a nevet adja, a környezet értékeit nem', () => {
@@ -85,8 +96,21 @@ describe('buildOutgoingEnvironment', () => {
     });
   });
 
-  it('üres környezetre és üres leíróra üres objektumot ad', () => {
-    expect(buildOutgoingEnvironment([], [], buildProcessEnvironment({}))).toStrictEqual({ kind: 'ok', value: {} });
+  it('üres környezetre és üres leíróra kizárólag az auto memory változót adja (SPEC-009 O-39, AC24)', () => {
+    expect(buildOutgoingEnvironment([], [], buildProcessEnvironment({}))).toStrictEqual({
+      kind: 'ok',
+      value: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
+    });
+  });
+
+  it('a CLAUDE_CODE_DISABLE_AUTO_MEMORY a ráírás után áll, a szerver környezetének más értéke nem nyer (SPEC-009 O-39, AC23)', () => {
+    const result = buildOutgoingEnvironment(
+      [buildLiteral('CLAUDE_CODE_DISABLE_AUTO_MEMORY', '0')],
+      [],
+      buildProcessEnvironment({ PATH: '/usr/bin', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0' }),
+    );
+
+    expect(result).toStrictEqual({ kind: 'ok', value: { PATH: '/usr/bin', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' } });
   });
 
   it('alternatív bemeneti névből a kimenetben csak a name áll, a tiltott alternatív név nem (SPEC-013 4.2)', () => {
@@ -105,6 +129,9 @@ describe('buildOutgoingEnvironment', () => {
       buildProcessEnvironment({ PATH: '/usr/bin', ANTHROPIC_API_KEY: 'kulcs-ertek' }),
     );
 
-    expect(result).toStrictEqual({ kind: 'ok', value: { PATH: '/usr/bin', ANTHROPIC_AUTH_TOKEN: 'kulcs-ertek' } });
+    expect(result).toStrictEqual({
+      kind: 'ok',
+      value: { PATH: '/usr/bin', ANTHROPIC_AUTH_TOKEN: 'kulcs-ertek', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
+    });
   });
 });

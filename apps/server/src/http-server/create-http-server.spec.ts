@@ -2,10 +2,11 @@ import { describe, expect, it, afterEach } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext, type WorkflowEdgeInput } from '@easter-workflow-builder/db';
 import { createEngine } from '@easter-workflow-builder/engine';
-import type { RouteId } from '@easter-workflow-builder/protocol';
 import { createServerLogger, type DestinationStream, type ServerLogger } from '@easter-workflow-builder/logger';
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
+import type { BinaryRequestBody, BinaryRouteHandler } from '../route-dispatch/binary-route-handler.ts';
 import type { RouteHandler, RouteHandlerContext } from '../route-dispatch/route-handler.ts';
+import type { RouteHandlers } from '../route-dispatch/route-handlers.ts';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
 import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
 import { buildEngineDependencies } from '../engine-assembly/build-engine-dependencies.ts';
@@ -13,8 +14,16 @@ import { createStartRunHandler } from '../run-endpoint/start-run.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import type { StreamConnectionDependencies } from '../stream-connection/handle-stream-connection.ts';
 import { createHttpServer, readLastEventIdHeader, type HttpServerOptions } from './create-http-server.ts';
+import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 
 const DEFAULT_HANDLER: RouteHandler = () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } });
+const DEFAULT_BINARY_HANDLER: BinaryRouteHandler = {
+  maxBodyBytes: 0,
+  accept: () => ({
+    kind: 'ok',
+    value: () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } }),
+  }),
+};
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -75,8 +84,8 @@ function buildCapturingLogger(): { logger: ServerLogger; sink: MemorySink } {
  * tesztben is előálljon, kézzel felsorolva - ugyanaz a minta, mint ahogy a
  * valós összeállítás (`route-registry` téma) is felépíti majd.
  */
-function buildHandlers(overrides: Partial<Record<RouteId, RouteHandler>>): Record<RouteId, RouteHandler> {
-  const base: Record<RouteId, RouteHandler> = {
+function buildHandlers(overrides: Partial<RouteHandlers>): RouteHandlers {
+  const base: RouteHandlers = {
     listWorkflows: DEFAULT_HANDLER,
     createWorkflow: DEFAULT_HANDLER,
     getWorkflow: DEFAULT_HANDLER,
@@ -103,12 +112,19 @@ function buildHandlers(overrides: Partial<Record<RouteId, RouteHandler>>): Recor
     setConcurrencyLimit: DEFAULT_HANDLER,
     clearConcurrencyLimit: DEFAULT_HANDLER,
     replaceStreamSubscriptions: DEFAULT_HANDLER,
+    listSkills: DEFAULT_HANDLER,
+    uploadSkill: DEFAULT_BINARY_HANDLER,
+    deleteSkill: DEFAULT_HANDLER,
+    listMcpServerDefinitions: DEFAULT_HANDLER,
+    saveMcpServerDefinition: DEFAULT_HANDLER,
+    deleteMcpServerDefinition: DEFAULT_HANDLER,
+    listServerEnvironmentNames: DEFAULT_HANDLER,
   };
   return { ...base, ...overrides };
 }
 
 function buildOptions(
-  overrides: Partial<Record<RouteId, RouteHandler>>,
+  overrides: Partial<RouteHandlers>,
   developmentOrigin: string | undefined,
   logger: ServerLogger = buildCapturingLogger().logger,
 ): HttpServerOptions {
@@ -334,7 +350,13 @@ describe('createHttpServer', () => {
       const database = okOrThrow(openDatabase(':memory:'));
       const registry = createStreamRegistry(createRandomUuidIdGenerator());
       const engine = createEngine(
-        buildEngineDependencies(database, registry, createSystemClock(), buildCapturingLogger().logger),
+        buildEngineDependencies(
+          database,
+          registry,
+          createSystemClock(),
+          buildCapturingLogger().logger,
+          TEST_SKILL_LIBRARY.rootDirectory,
+        ),
       );
       const workflowId = seedFanOutWorkflow(database, fields);
       const { baseUrl, close } = await startTestServer(
@@ -558,6 +580,98 @@ describe('createHttpServer', () => {
     expect(response.status).toBe(500);
     const payload: unknown = await response.json();
     expect(payload).toStrictEqual({ code: 'internal', message: 'Váratlan szerver hiba történt (internal).' });
+  });
+});
+
+interface SeenBinaryCall {
+  readonly parameters: Readonly<Record<string, string>>;
+  readonly body: BinaryRequestBody;
+}
+
+function recordingBinaryHandler(maxBodyBytes: number, seen: SeenBinaryCall[]): BinaryRouteHandler {
+  return {
+    maxBodyBytes,
+    accept: (parameters) => ({
+      kind: 'ok',
+      value: (body) => {
+        seen.push({ parameters, body });
+        return Promise.resolve({ kind: 'ok', value: { status: 200, body: { received: true } } });
+      },
+    }),
+  };
+}
+
+describe('createHttpServer: nyers ZIP törzsű végpont (SPEC-009 5.1, O-36)', () => {
+  let closeServer: (() => Promise<void>) | undefined;
+
+  afterEach(async () => {
+    if (closeServer === undefined) {
+      return;
+    }
+    await closeServer();
+    closeServer = undefined;
+  });
+
+  it('a korlátig érkező bináris törzset JSON értelmezés nélkül, az útvonal paraméterrel adja a kezelőnek', async () => {
+    const seen: SeenBinaryCall[] = [];
+    const { baseUrl, close } = await startTestServer(
+      buildOptions({ uploadSkill: recordingBinaryHandler(4, seen) }, undefined),
+    );
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/skills/pdf`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/zip' },
+      body: Buffer.from([0x50, 0x4b, 0x7b, 0x00]),
+    });
+
+    expect(response.status).toBe(200);
+    expect(seen).toStrictEqual([
+      { parameters: { name: 'pdf' }, body: { kind: 'complete', bytes: Buffer.from([0x50, 0x4b, 0x7b, 0x00]) } },
+    ]);
+  });
+
+  it('a kezelő korlátját túllépő törzsből csak a túllépés ténye jut el a kezelőhöz', async () => {
+    const seen: SeenBinaryCall[] = [];
+    const { baseUrl, close } = await startTestServer(
+      buildOptions({ uploadSkill: recordingBinaryHandler(4, seen) }, undefined),
+    );
+    closeServer = close;
+
+    await fetch(`${baseUrl}/api/skills/pdf`, { method: 'PUT', body: Buffer.alloc(5) });
+
+    expect(seen).toStrictEqual([{ parameters: { name: 'pdf' }, body: { kind: 'too_large' } }]);
+  });
+
+  it('a bináris kezelő hibaágát a hibaosztály szerinti kódra és errorClass mezőre képezi', async () => {
+    const message = 'A csomag túl nagy (skill_archive_too_large).';
+    const failing: BinaryRouteHandler = {
+      maxBodyBytes: 1,
+      accept: () => ({ kind: 'ok', value: () => Promise.resolve({ kind: 'error', message }) }),
+    };
+    const { baseUrl, close } = await startTestServer(buildOptions({ uploadSkill: failing }, undefined));
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/skills/pdf`, { method: 'PUT', body: Buffer.alloc(1) });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toStrictEqual({
+      code: 'unprocessable',
+      message,
+      errorClass: 'skill_archive_too_large',
+    });
+  });
+
+  it('a paraméterek elutasításakor a hibaválasz a törzs feldolgozása nélkül jön, a korlát fölötti törzsre is (ZIP 9. találat)', async () => {
+    const message = 'A(z) "Rossz" skill név nem felel meg a névszabálynak (skill_name_invalid).';
+    const rejecting: BinaryRouteHandler = { maxBodyBytes: 4, accept: () => ({ kind: 'error', message }) };
+    const { baseUrl, close } = await startTestServer(buildOptions({ uploadSkill: rejecting }, undefined));
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/skills/Rossz`, { method: 'PUT', body: Buffer.alloc(1_000_000) });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toStrictEqual({ code: 'unprocessable', message, errorClass: 'skill_name_invalid' });
   });
 });
 

@@ -1,12 +1,16 @@
 import type { AgentQuery, SdkResultMessage } from '@easter-workflow-builder/agent';
 import { hasStructuredOutput, isSdkResultMessage, isSdkSystemInitMessage } from '@easter-workflow-builder/agent';
-import type { AgentStepConfig } from '@easter-workflow-builder/db';
+import type { AgentStepConfig, McpServerDefinitionRecord } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { describeError } from '@easter-workflow-builder/core';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import { buildOutgoingEnvironment } from '../provider-environment/build-outgoing-environment.ts';
+import { hasMcpServerReferences } from '../mcp-server-resolution/has-mcp-server-references.ts';
+import { resolveMcpServers } from '../mcp-server-resolution/resolve-mcp-servers.ts';
+import { findFailedMcpServers } from '../mcp-server-resolution/find-failed-mcp-servers.ts';
+import { resolveOutgoingAgents } from '../agent-definition/resolve-outgoing-agents.ts';
 import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { AgentStepExecution } from './agent-step-execution.ts';
 import type { AgentStepOutcome } from './agent-step-outcome.ts';
@@ -14,6 +18,7 @@ import type { AgentStepRequest } from './agent-step-request.ts';
 import type { AgentStreamMessage } from './agent-stream-message.ts';
 import { buildAgentStepOptions } from './build-agent-step-options.ts';
 import { readResultTelemetry } from './read-result-telemetry.ts';
+import { areBuiltinSkillsEnabled } from './are-builtin-skills-enabled.ts';
 import { resolveSessionBinding } from './resolve-session-binding.ts';
 import type { SessionBinding } from './session-binding.ts';
 
@@ -159,6 +164,7 @@ async function consumeStream(
   dependencies: EngineDependencies,
   query: AgentQuery,
   attachment: SessionAttachment,
+  mcpServerNames: readonly string[],
 ): Promise<Outcome<AgentStepExecution>> {
   let resultMessage: SdkResultMessage | undefined;
 
@@ -167,6 +173,24 @@ async function consumeStream(
       const handled = handleStreamMessage(message, request, dependencies, attachment);
       if (handled.kind === 'error') {
         return handled;
+      }
+      // SPEC-009 6.4, O-46: egy kiadott MCP szerver sikertelen kapcsolódása a lépést megállítja. A
+      // megszakítás után a ciklus elhagyása lezárja a folyamot (az iterátor `return()` hívása).
+      const failedServers = isSdkSystemInitMessage(message) ? findFailedMcpServers(message, mcpServerNames) : [];
+      if (failedServers.length > 0) {
+        // A megszakítás hibája nem írja felül a megnevezett okot: a ciklus elhagyása így is lezárja a folyamot.
+        try {
+          await query.interrupt();
+        } catch {
+          // a lezárt folyam megszakítási hibája nem változtat az okon
+        }
+        return preStreamFailure(
+          'mcp_server_connection_failed',
+          formatEngineErrorMessage(
+            'mcp_server_connection_failed',
+            `A(z) ${request.instance.nodeId} csomópont MCP szervere nem csatlakozott: ${failedServers.map((name) => JSON.stringify(name)).join(', ')}`,
+          ),
+        );
       }
       if (isSdkResultMessage(message)) {
         resultMessage = message;
@@ -256,6 +280,39 @@ export async function runAgentStep(
     return preStreamFailure('missing_provider_env', environmentBlock.message);
   }
 
+  // A futás indítási ellenőrzése (`validateMcpServerReferences`) ugyanezt
+  // futtatta, de a definíció és a szerver környezete azóta változhatott
+  // (törlés, O-43), ezért a lépés a saját pillanatának állapotát oldja fel, a
+  // lépés és az agent definíciói hivatkozásait egyaránt (SPEC-009 6.2, M-147).
+  // A központi listát csak hivatkozás mellett olvassa: egy hibás definíció sor
+  // így nem állítja meg az MCP szervert nem használó lépést (T-012-27).
+  const mcpServerDefinitions: Outcome<readonly McpServerDefinitionRecord[]> = hasMcpServerReferences(request.config)
+    ? dependencies.database.mcpServerDefinitions.listDefinitions()
+    : { kind: 'ok', value: [] };
+  if (mcpServerDefinitions.kind === 'error') {
+    return mcpServerDefinitions;
+  }
+  const mcpServers = resolveMcpServers(
+    `A(z) ${request.instance.nodeId} csomópont`,
+    request.config.mcpServerReferences,
+    mcpServerDefinitions.value,
+    dependencies.processEnvironment,
+  );
+  if (mcpServers.kind === 'error') {
+    return preStreamFailure(mcpServers.errorKind, mcpServers.message);
+  }
+  const skillLibrary = dependencies.skillLibrary.readSkillLibrary();
+  const agents = resolveOutgoingAgents(
+    request.instance.nodeId,
+    request.config,
+    skillLibrary,
+    mcpServerDefinitions.value,
+    dependencies.processEnvironment,
+  );
+  if (agents.kind === 'error') {
+    return preStreamFailure(agents.errorKind, agents.message);
+  }
+
   const sessionBinding = resolveSessionBinding({
     graph: request.graph,
     sessionSourceNodes: request.sessionSourceNodes,
@@ -267,13 +324,36 @@ export async function runAgentStep(
     return preStreamFailure('no_resumable_session', sessionBinding.message);
   }
 
+  // A beépített skillek kapcsolója (SPEC-009 O-44) a lépés indulásakor érvényes értékkel hat: a
+  // lépés, a futás workflow sora és a globális beállítás közül a legalacsonyabb megadott szint nyer.
+  const settings = dependencies.database.settings.readSettings();
+  if (settings.kind === 'error') {
+    return settings;
+  }
+  const run = dependencies.database.runs.getRun(request.runId);
+  if (run.kind === 'error') {
+    return run;
+  }
+  const workflow = dependencies.database.workflows.getWorkflow(run.value.workflowId);
+  if (workflow.kind === 'error') {
+    return workflow;
+  }
+
   const query = dependencies.agentQueryRunner.run({
     prompt: prompt.value,
     options: buildAgentStepOptions({
       config: request.config,
       decisions: request.decisions,
       environmentBlock: environmentBlock.value,
+      mcpServers: mcpServers.value,
+      agents: agents.value,
       sessionBinding: sessionBinding.value,
+      skillLibrary,
+      builtinSkillsEnabled: areBuiltinSkillsEnabled(
+        request.config.builtinSkillsEnabled,
+        workflow.value.builtinSkillsEnabled,
+        settings.value.builtinSkillsEnabled,
+      ),
     }),
   });
   if (query.kind === 'error') {
@@ -285,7 +365,13 @@ export async function runAgentStep(
 
   agentQueryRegistry.register(request.runId, request.stepRunId, query.value);
   try {
-    return await consumeStream(request, dependencies, query.value, toSessionAttachment(sessionBinding.value));
+    return await consumeStream(
+      request,
+      dependencies,
+      query.value,
+      toSessionAttachment(sessionBinding.value),
+      Object.keys(mcpServers.value),
+    );
   } finally {
     agentQueryRegistry.unregister(request.stepRunId);
   }

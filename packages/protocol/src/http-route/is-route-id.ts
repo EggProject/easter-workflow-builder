@@ -2,9 +2,9 @@ import { isString } from '@easter-workflow-builder/typeguards';
 import type { RouteId } from './route-table.ts';
 
 /**
- * A `ROUTE_TABLE` mind a 26 kulcsa, `Record<RouteId, true>` alakban (ugyanaz
+ * A `ROUTE_TABLE` mind a 33 kulcsa, `Record<RouteId, true>` alakban (ugyanaz
  * a minta, mint a `packages/engine` `is-engine-error-kind.ts`
- * `ENGINE_ERROR_KIND_KEYS`-e): ha a `ROUTE_TABLE` egy huszonhetedik
+ * `ENGINE_ERROR_KIND_KEYS`-e): ha a `ROUTE_TABLE` egy újabb
  * végponttal bővül, ez a lista - és emiatt a guard - fordítási hibával jelzi
  * az elmaradást, nem hallgat róla.
  */
@@ -35,6 +35,13 @@ const ROUTE_ID_KEYS: Readonly<Record<RouteId, true>> = {
   setConcurrencyLimit: true,
   clearConcurrencyLimit: true,
   replaceStreamSubscriptions: true,
+  listSkills: true,
+  uploadSkill: true,
+  deleteSkill: true,
+  listMcpServerDefinitions: true,
+  saveMcpServerDefinition: true,
+  deleteMcpServerDefinition: true,
+  listServerEnvironmentNames: true,
 };
 
 /**

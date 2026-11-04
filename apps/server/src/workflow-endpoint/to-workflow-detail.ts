@@ -15,6 +15,7 @@ export function toWorkflowDetail(record: WorkflowRecord): WorkflowDetail {
     name: record.name,
     description: record.description,
     providerId: record.providerId,
+    builtinSkillsEnabled: record.builtinSkillsEnabled,
     createdAtMs: record.createdAtMs.getTime(),
     updatedAtMs: record.updatedAtMs.getTime(),
   };

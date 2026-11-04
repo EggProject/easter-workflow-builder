@@ -13,6 +13,7 @@ import {
   isStringArray,
 } from '@easter-workflow-builder/typeguards';
 import type { AgentStepConfig, PresetSystemPrompt, StructuredOutputConfig } from './agent-step-config.ts';
+import { isMcpServerReference } from './is-mcp-server-reference.ts';
 import type { SandboxConfig } from './sandbox-config.ts';
 import type { SessionMode } from './session-mode.ts';
 import type {
@@ -59,7 +60,9 @@ const AGENT_STEP_CONFIG_KEYS: Readonly<Record<keyof AgentStepConfig, true>> = {
   systemPrompt: true,
   agents: true,
   skills: true,
+  builtinSkillsEnabled: true,
   mcpServers: true,
+  mcpServerReferences: true,
   cwd: true,
   additionalDirectories: true,
   sandbox: true,
@@ -198,6 +201,35 @@ function isMcpServerRecord(value: unknown): value is Readonly<Record<string, Sto
 }
 
 /**
+ * A lépés hivatkozás mezője (SPEC-009 6.2, O-42 (b)): elhagyható, tehát a
+ * kulcs hiánya érvényes (a régi gráf és pillanatkép így áll); ha a kulcs
+ * jelen van, a rekord minden értéke hivatkozás. A név szabályt a központi
+ * definíció mentése kényszeríti ki: egy szabálytalan kulcs egyetlen
+ * definícióval sem egyezhet. A saját `__proto__` kulcsot elutasítja, mert a
+ * `protocol` `z.record` sémája csendben eldobná (T-012-27).
+ */
+function hasValidMcpServerReferences(value: Readonly<Record<string, unknown>>): boolean {
+  if (!Object.hasOwn(value, 'mcpServerReferences')) {
+    return true;
+  }
+  const references = value['mcpServerReferences'];
+  return (
+    isRecord(references) &&
+    !Object.hasOwn(references, '__proto__') &&
+    Object.values(references).every((reference: unknown) => isMcpServerReference(reference))
+  );
+}
+
+/**
+ * A lépés beépített skill felülírása (SPEC-009 O-44): elhagyható, tehát a
+ * kulcs hiánya érvényes (a régi gráf és pillanatkép így áll); ha a kulcs
+ * jelen van, az értéke logikai vagy `null`.
+ */
+function hasValidBuiltinSkillsEnabled(value: Readonly<Record<string, unknown>>): boolean {
+  return !Object.hasOwn(value, 'builtinSkillsEnabled') || isNullableBoolean(value['builtinSkillsEnabled']);
+}
+
+/**
  * Az `Options.sandbox` öt, forrásból levezethető alakú mezőjét ellenőrzi. A
  * másik öt mező alakja nyitott (lásd `sandbox-config.ts`), ezért azok értékét a
  * guard szándékosan nem szűkíti: tippelni tilos. A kulcsuk viszont ismert,
@@ -257,7 +289,9 @@ export function isAgentStepConfig(value: unknown): value is AgentStepConfig {
     isSystemPrompt(value.systemPrompt) &&
     isRecord(value.agents) &&
     isSkills(value.skills) &&
+    hasValidBuiltinSkillsEnabled(value) &&
     isMcpServerRecord(value.mcpServers) &&
+    hasValidMcpServerReferences(value) &&
     isNullableString(value.cwd) &&
     isStringArray(value.additionalDirectories) &&
     isNullableSandboxConfig(value.sandbox) &&

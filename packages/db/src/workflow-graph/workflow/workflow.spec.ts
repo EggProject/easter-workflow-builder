@@ -10,7 +10,8 @@ import { workflowTable } from './workflow.ts';
 /**
  * A `workflowTable` séma valós SQLite ellen: a commitolt migráció tényleg
  * létrehozza a táblát a séma definícióban leírt oszlopokkal, és az
- * opcionális oszlopok (`description`, `providerId`) NULL értéket engednek.
+ * opcionális oszlopok (`description`, `providerId`, `builtinSkillsEnabled`)
+ * NULL értéket engednek.
  */
 describe('workflowTable', () => {
   it('ki-be írja a kötelező és opcionális oszlopokat', () => {
@@ -25,6 +26,7 @@ describe('workflowTable', () => {
         name: 'Első workflow',
         description: 'Leírás',
         providerId: 'minimax',
+        builtinSkillsEnabled: false,
         createdAtMs: new Date(0),
         updatedAtMs: new Date(1000),
       })
@@ -36,6 +38,7 @@ describe('workflowTable', () => {
       name: 'Első workflow',
       description: 'Leírás',
       providerId: 'minimax',
+      builtinSkillsEnabled: false,
       createdAtMs: new Date(0),
       updatedAtMs: new Date(1000),
     });
@@ -43,7 +46,7 @@ describe('workflowTable', () => {
     sqlite.close();
   });
 
-  it('a description és a providerId oszlop NULL maradhat', () => {
+  it('a description, a providerId és a builtinSkillsEnabled oszlop NULL maradhat', () => {
     const sqlite = new SqliteDatabase(':memory:');
     const database = drizzle(sqlite);
     migrateDatabase(database, MIGRATIONS_FOLDER);
@@ -61,6 +64,7 @@ describe('workflowTable', () => {
     const row = database.select().from(workflowTable).where(eq(workflowTable.id, 'workflow-2')).get();
     expect(row?.description).toBeNull();
     expect(row?.providerId).toBeNull();
+    expect(row?.builtinSkillsEnabled).toBeNull();
 
     sqlite.close();
   });

@@ -13,6 +13,7 @@ import { createProviderConcurrencyRepository } from '../provider-concurrency/pro
 import { createRunEventRepository } from '../run-event/event-record/run-event-repository.ts';
 import { createHumanApprovalRepository } from '../human-approval/human-approval-repository.ts';
 import { createRunRecovery } from '../run-recovery/run-recovery.ts';
+import { createMcpServerDefinitionRepository } from '../mcp-server-definition/mcp-server-definition-repository.ts';
 import type { DatabaseContext } from './database-context.ts';
 
 const DATABASE_CLOSED_MESSAGE =
@@ -106,9 +107,22 @@ export function openDatabase(filePath: string): Outcome<DatabaseContext> {
   const settings = createAppSettingRepository(database, transaction);
   const concurrencyLimits = createProviderConcurrencyRepository(database, transaction);
   const recovery = createRunRecovery(database, transaction);
+  const mcpServerDefinitions = createMcpServerDefinitionRepository(database, transaction);
 
   return {
     kind: 'ok',
-    value: { workflows, runs, stepRuns, events, approvals, settings, concurrencyLimits, recovery, transaction, close },
+    value: {
+      workflows,
+      runs,
+      stepRuns,
+      events,
+      approvals,
+      settings,
+      concurrencyLimits,
+      recovery,
+      mcpServerDefinitions,
+      transaction,
+      close,
+    },
   };
 }

@@ -285,6 +285,9 @@ function dependenciesOf(database: DatabaseContext, agentQueryRunner: AgentQueryR
     })(),
     idGenerator: { nextId: notCalled },
     processEnvironment: { read: () => null, readAll: () => ({}) },
+    skillLibrary: {
+      readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
+    },
   };
 }
 

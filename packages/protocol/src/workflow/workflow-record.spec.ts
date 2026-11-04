@@ -13,6 +13,7 @@ const VALID_RECORD = {
   name: 'Első workflow',
   description: null,
   providerId: 'minimax',
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 2,
 };
@@ -24,6 +25,17 @@ describe('WorkflowSummarySchema', () => {
 
   it('elutasítja az ismeretlen kulcsot', () => {
     expect(WorkflowSummarySchema.safeParse({ ...VALID_RECORD, extra: true }).success).toBe(false);
+  });
+
+  it.each([true, false])('elfogadja a beépített skill felülírást: %s (SPEC-009 O-44)', (value) => {
+    expect(WorkflowSummarySchema.safeParse({ ...VALID_RECORD, builtinSkillsEnabled: value }).success).toBe(true);
+  });
+
+  it('elutasítja a hiányzó vagy nem logikai builtinSkillsEnabled mezőt', () => {
+    const withoutField: Record<string, unknown> = { ...VALID_RECORD };
+    delete withoutField['builtinSkillsEnabled'];
+    expect(WorkflowSummarySchema.safeParse(withoutField).success).toBe(false);
+    expect(WorkflowSummarySchema.safeParse({ ...VALID_RECORD, builtinSkillsEnabled: 'true' }).success).toBe(false);
   });
 });
 
@@ -39,6 +51,16 @@ describe('CreateWorkflowRequestSchema', () => {
       name: 'Új workflow',
       description: null,
       providerId: null,
+    });
+    expect(outcome.success).toBe(true);
+  });
+
+  it.each([true, false, null])('elfogadja a beépített skill felülírást: %s (SPEC-009 O-44)', (value) => {
+    const outcome = CreateWorkflowRequestSchema.safeParse({
+      name: 'Új workflow',
+      description: null,
+      providerId: null,
+      builtinSkillsEnabled: value,
     });
     expect(outcome.success).toBe(true);
   });
@@ -61,6 +83,14 @@ describe('UpdateWorkflowRequestSchema', () => {
 
   it('elfogadja a részleges frissítést', () => {
     expect(UpdateWorkflowRequestSchema.safeParse({ name: 'Új név' }).success).toBe(true);
+  });
+
+  it.each([true, false, null])('elfogadja a beépített skill felülírást: %s (SPEC-009 O-44)', (value) => {
+    expect(UpdateWorkflowRequestSchema.safeParse({ builtinSkillsEnabled: value }).success).toBe(true);
+  });
+
+  it('elutasítja a nem logikai builtinSkillsEnabled mezőt', () => {
+    expect(UpdateWorkflowRequestSchema.safeParse({ builtinSkillsEnabled: 1 }).success).toBe(false);
   });
 
   it('elutasítja az ismeretlen kulcsot', () => {

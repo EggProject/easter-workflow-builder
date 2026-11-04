@@ -299,7 +299,7 @@ function renderRouteContent(
       );
     }
     case 'settings': {
-      return <SettingsScreen />;
+      return <SettingsScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} />;
     }
     case undefined: {
       return <NotFoundRoute navigate={navigate} />;

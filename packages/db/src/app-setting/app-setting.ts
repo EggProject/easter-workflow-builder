@@ -35,6 +35,9 @@ export const appSettingTable = sqliteTable(
     id: integer('id').primaryKey(),
     defaultProviderId: text('default_provider_id'),
     persistStreamDeltas: integer('persist_stream_deltas', { mode: 'boolean' }).notNull().default(false),
+    // SPEC-009 O-44 (user döntés 2026-10-28): elérhetők-e a CLI beépített skilljei; az alapérték a
+    // beállítás előtti viselkedés (a beépítettek elérhetők).
+    builtinSkillsEnabled: integer('builtin_skills_enabled', { mode: 'boolean' }).notNull().default(true),
     updatedAtMs: integer('updated_at_ms', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [check('app_setting_id_check', sql`${table.id} = 1`)],
