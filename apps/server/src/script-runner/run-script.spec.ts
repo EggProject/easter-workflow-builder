@@ -3,7 +3,8 @@ import type { RunContext, ScriptRunRequest, ScriptRunResult } from '@easter-work
 import { describe, expect, it } from 'vitest';
 import { runScript } from './run-script.ts';
 
-// A friss kontextus 61 globális neve (research `2026-11-04-szkript-csomopont.md` Q-8).
+// A friss kontextus 61 globális nevéből (research `2026-11-04-szkript-csomopont.md` Q-8) a
+// `FinalizationRegistry` és a `WeakRef` törlése utáni 59 név (SPEC-014 5.4 "Eltávolított nevek").
 const QUICKJS_GLOBAL_NAMES = [
   'AggregateError',
   'Array',
@@ -16,7 +17,6 @@ const QUICKJS_GLOBAL_NAMES = [
   'Date',
   'Error',
   'EvalError',
-  'FinalizationRegistry',
   'Float16Array',
   'Float32Array',
   'Float64Array',
@@ -51,7 +51,6 @@ const QUICKJS_GLOBAL_NAMES = [
   'Uint8Array',
   'Uint8ClampedArray',
   'WeakMap',
-  'WeakRef',
   'WeakSet',
   'decodeURI',
   'decodeURIComponent',
@@ -179,7 +178,7 @@ describe('runScript', () => {
       expect(runContext.input).toStrictEqual({ name: 'teszt' });
     });
 
-    it('a globális objektum kulcslistája pontosan a QuickJS 61 neve, a fetch, a files és a jelen lévő kontextus nevek', async () => {
+    it('a globális objektum kulcslistája pontosan a QuickJS 59 megmaradt neve, a fetch, a files és a jelen lévő kontextus nevek', async () => {
       // A kulcslista egyezését halmazként vizsgáljuk: minden várt név benne van, és a darabszám azonos.
       const namesSource = 'return Object.getOwnPropertyNames(globalThis);';
       const countSource = 'return Object.getOwnPropertyNames(globalThis).length;';
@@ -197,6 +196,72 @@ describe('runScript', () => {
         kind: 'succeeded',
         output: fullNames.length,
       });
+    });
+  });
+
+  describe('a pinelt QuickJS ismert hibáit hordozó hat név (SPEC-014 5.4, T-4)', () => {
+    const SIX_NAMES = ['toReversed', 'with', 'toSpliced', 'toSorted', 'FinalizationRegistry', 'WeakRef'];
+
+    it('a hat név a szkript futásakor nem érhető el: az Array és a TypedArray prototípuson és a globális objektumon sincs', async () => {
+      const source = `
+        const typedArrays = [Int8Array, Uint8Array, Uint8ClampedArray, Int16Array, Uint16Array, Int32Array,
+          Uint32Array, Float16Array, Float32Array, Float64Array, BigInt64Array, BigUint64Array];
+        const methods = ["toReversed", "with", "toSpliced", "toSorted"];
+        return {
+          array: methods.map((name) => typeof [][name]),
+          typedArray: typedArrays.flatMap((C) => methods.map((name) => typeof new C(1)[name])),
+          global: [typeof FinalizationRegistry, typeof WeakRef, "WeakRef" in globalThis],
+        };`;
+      const result = await runScript(request(source));
+      expect(outputOf(result)).toStrictEqual({
+        array: ['undefined', 'undefined', 'undefined', 'undefined'],
+        typedArray: Array.from({ length: 48 }, () => 'undefined'),
+        global: ['undefined', 'undefined', false],
+      });
+    });
+
+    it('a törölt függvény a globális objektumból bejárható gráfban sehol nem marad, tehát a szkript nem állíthatja vissza', async () => {
+      // A bejárás a tulajdonság leírókat olvassa (getter hívás nélkül), és a
+      // prototípus láncot is követi; egy natív függvény neve a törölt név.
+      const source = `
+        const names = new Set(${JSON.stringify(SIX_NAMES)});
+        const seen = new Set();
+        const queue = [globalThis];
+        const found = [];
+        while (queue.length > 0) {
+          const value = queue.pop();
+          if (value === null || (typeof value !== "object" && typeof value !== "function") || seen.has(value)) continue;
+          seen.add(value);
+          if (typeof value === "function" && names.has(Object.getOwnPropertyDescriptor(value, "name")?.value)) {
+            found.push(Object.getOwnPropertyDescriptor(value, "name").value);
+          }
+          queue.push(Object.getPrototypeOf(value));
+          for (const key of Reflect.ownKeys(value)) {
+            const descriptor = Object.getOwnPropertyDescriptor(value, key);
+            queue.push(descriptor.value, descriptor.get, descriptor.set);
+          }
+        }
+        return { found, visited: seen.size > 100 };`;
+      const result = await runScript(request(source));
+      expect(outputOf(result)).toStrictEqual({ found: [], visited: true });
+    });
+
+    it('az eval, a Function konstruktor és a Reflect sem éri el a törölt neveket', async () => {
+      const source = `return [
+        eval("typeof [].toSorted"),
+        new Function("return typeof WeakRef")(),
+        typeof Reflect.get(Array.prototype, "toSpliced"),
+        typeof Reflect.get(Object.getPrototypeOf(Uint8Array.prototype), "with"),
+        Object.getOwnPropertyNames(Array.prototype).filter((name) => ${JSON.stringify(SIX_NAMES)}.includes(name)),
+      ];`;
+      const result = await runScript(request(source));
+      expect(outputOf(result)).toStrictEqual(['undefined', 'undefined', 'undefined', 'undefined', []]);
+    });
+
+    it('a megmaradt Array és TypedArray metódusok működnek', async () => {
+      await expect(
+        runScript(request('return [[3, 1, 2].slice().sort(), [...new Uint8Array([3, 1]).reverse()], [1, 2].at(-1)];')),
+      ).resolves.toStrictEqual({ kind: 'succeeded', output: [[1, 2, 3], [1, 3], 2] });
     });
   });
 

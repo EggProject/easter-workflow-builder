@@ -27,13 +27,26 @@ import { wrapScriptSource } from './wrap-script-source.ts';
  * a szkript eredményét alakítja JSON szöveggé (SPEC-014 5.6). A `JSON` és az
  * `Object.keys` a szkript előtt rögzül, tehát a szkript felülírása nem hat rájuk.
  * Globális nevet maga nem hagy hátra.
+ *
+ * Előtte törli a pinelt QuickJS ismert hibáit hordozó hat nevet (SPEC-014 5.4
+ * "Eltávolított nevek", user döntés 2026-11-04: "A hat név törlése"): az
+ * `Array.prototype` `toReversed`, `with`, `toSpliced` és `toSorted`
+ * metódusát, a `TypedArray` közös prototípusának `toReversed`, `with` és
+ * `toSorted` metódusát (`toSpliced` ott nincs), valamint a globális
+ * `FinalizationRegistry` és `WeakRef` konstruktort (research
+ * `2026-11-04-szkript-csomopont.md` 4. szekció, 10.3). A törölt függvényre más
+ * hivatkozás nem marad, tehát a szkript nem tudja visszaállítani.
  */
 const PRELUDE_SOURCE =
-  '((stringify, parse, keys, global) => (text) => {' +
+  '((stringify, parse, keys, global, typedArrayPrototype) => {' +
+  ' for (const name of ["toReversed", "with", "toSpliced", "toSorted"]) {' +
+  ' delete Array.prototype[name]; delete typedArrayPrototype[name]; }' +
+  ' delete global.FinalizationRegistry; delete global.WeakRef;' +
+  ' return (text) => {' +
   ' const values = parse(text);' +
   ' for (const key of keys(values)) { global[key] = values[key]; }' +
   ' return (value) => stringify(value);' +
-  ' })(JSON.stringify, JSON.parse, Object.keys, globalThis)';
+  ' }; })(JSON.stringify, JSON.parse, Object.keys, globalThis, Object.getPrototypeOf(Uint8Array.prototype))';
 
 /**
  * A sandbox `JSON.parse`-a, a szkript előtt rögzítve: a gazda függvények
