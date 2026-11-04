@@ -43,6 +43,7 @@ async function createHarness(): Promise<Harness> {
     reportHostCrash: (error) => {
       crashes.push(error);
     },
+    isInterrupted: () => false,
   };
   const dispose = (): void => {
     disposeQuietly([...pendingCalls, stringify, parse], context, runtime);

@@ -38,6 +38,7 @@ async function readFromSource(source: string): Promise<unknown> {
     signal: new AbortController().signal,
     pendingCalls: new Set(),
     reportHostCrash: ignoreCrash,
+    isInterrupted: () => false,
   };
   const value = context.unwrapResult(context.evalCode(source));
   handles.push(value);
@@ -71,6 +72,7 @@ describe('readJsonArgument', () => {
       signal: new AbortController().signal,
       pendingCalls: new Set(),
       reportHostCrash: ignoreCrash,
+      isInterrupted: () => false,
     };
     expect(readJsonArgument(scope, undefined)).toBeUndefined();
   });

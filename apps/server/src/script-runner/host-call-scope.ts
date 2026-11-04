@@ -14,6 +14,9 @@ import type { QuickJSContext, QuickJSDeferredPromise, QuickJSHandle, QuickJSRunt
  *   Q-2 B).
  * - `reportHostCrash`: a gazdára kijutó hiba (például a mély `JSON.stringify`
  *   `RangeError`-ja a feloldás után futó feladatban, Q-6) a lépés hibája lesz.
+ * - `isInterrupted`: az interrupt kezelő már megszakította a szkriptet (a
+ *   határidő lejárt); ezután a gazda függvény sandbox kódot nem futtat
+ *   (`install-host-functions.ts`).
  *
  * Típus-only fájl, nincs hozzá `.spec.ts`.
  */
@@ -25,4 +28,5 @@ export interface HostCallScope {
   readonly signal: AbortSignal;
   readonly pendingCalls: Set<QuickJSDeferredPromise>;
   readonly reportHostCrash: (error: unknown) => void;
+  readonly isInterrupted: () => boolean;
 }

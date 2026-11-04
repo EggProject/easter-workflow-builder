@@ -70,9 +70,9 @@ type SandboxCompletion =
  * ... 5.8). A menet:
  *
  * 1. A határidő a lépés indulásától számít (`timeoutMs` vagy 60 000 ms).
- * 2. Friss modul saját memória korláttal, új runtime `setMaxStackSize`-zal és az
- *    interrupt kezelővel (a CPU kötött kód ága, research
- *    `2026-11-04-szkript-csomopont.md` Q-1, Q-3), új kontextus.
+ * 2. Friss modul saját memória korláttal, új runtime `setMaxStackSize`-zal, új
+ *    kontextus; az interrupt kezelő (a CPU kötött kód ága, research
+ *    `2026-11-04-szkript-csomopont.md` Q-1, Q-3) közvetlenül a szkript előtt.
  * 3. A futás kontextus jelen lévő nevei JSON-ként a globális objektumra; a
  *    `undefined` értékű nevet a `JSON.stringify` kihagyja, tehát a hiányzó név a
  *    sandboxban sem létezik (SPEC-010 7.3 táblázata, a port leírása szerint).
@@ -112,12 +112,6 @@ async function runInFreshModule(
   }
   const runtime = quickJs.newRuntime();
   runtime.setMaxStackSize(SCRIPT_SANDBOX_LIMITS.maxStackSizeBytes);
-  const state = { interrupted: false };
-  const isPastDeadline = shouldInterruptAfterDeadline(deadlineMs);
-  runtime.setInterruptHandler((interruptedRuntime) => {
-    state.interrupted = isPastDeadline(interruptedRuntime) === true;
-    return state.interrupted;
-  });
   const context = runtime.newContext();
   const stepEnd = new AbortController();
   const step: SandboxStep = {
@@ -129,7 +123,7 @@ async function runInFreshModule(
     hostSignal: AbortSignal.any([request.signal, stepEnd.signal]),
     timeoutMs,
     deadlineMs,
-    state,
+    state: { interrupted: false },
   };
   try {
     return await evaluateInSandbox(step, request);
@@ -163,10 +157,21 @@ async function evaluateInSandbox(step: SandboxStep, request: ScriptRunRequest): 
     reportHostCrash: (crash) => {
       hostCrash.resolve({ kind: 'host_crashed', error: crash });
     },
+    isInterrupted: () => step.state.interrupted,
   };
   for (const handle of installHostFunctions(scope, step.root)) {
     keep(handle);
   }
+
+  // Az interrupt kezelő csak a szkript előtt áll be: az előkészítő kód (a
+  // futás kontextus és a gazda nevek) a határidő után sem szakadhat félbe, mert
+  // az ott elkapott megszakítás gazda hibaként, nem időkorlátként jelentkezne
+  // (PLAN-015 T-015-12, 1 ms-os határidő).
+  const isPastDeadline = shouldInterruptAfterDeadline(step.deadlineMs);
+  runtime.setInterruptHandler((interruptedRuntime) => {
+    step.state.interrupted = isPastDeadline(interruptedRuntime) === true;
+    return step.state.interrupted;
+  });
 
   const evaluated = context.evalCode(wrapScriptSource(request.source), SCRIPT_FILE_NAME);
   if (evaluated.error !== undefined) {
@@ -229,10 +234,13 @@ function thrownFailure(
   errorKind: 'script_evaluation_failed' | 'script_output_not_json',
   prefix: string,
 ): ScriptRunResult {
+  // A leírás a dobott érték getterét is futtathatja; az abban érkező
+  // megszakítás is időkorlát, ezért a jelzés a leírás után dönt (T-015-12).
+  const description = describeSandboxError(step.context, thrown);
   if (step.state.interrupted) {
     return timedOut(step);
   }
-  return { kind: 'failed', errorKind, message: `${prefix}: ${describeSandboxError(step.context, thrown)}` };
+  return { kind: 'failed', errorKind, message: `${prefix}: ${description}` };
 }
 
 function timedOut(step: SandboxStep): ScriptRunResult {

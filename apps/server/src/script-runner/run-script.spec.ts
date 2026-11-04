@@ -284,6 +284,45 @@ describe('runScript', () => {
       });
     });
 
+    it('az 1 ms-os határidő is script_timed_out: az interrupt kezelő csak a szkript előtt áll be (T-015-12)', async () => {
+      await expect(runScript(request('while (true) {}', { timeoutMs: 1 }))).resolves.toStrictEqual({
+        kind: 'failed',
+        errorKind: 'script_timed_out',
+        message: 'a szkript nem fejeződött be 1 ms alatt',
+      });
+    });
+
+    it('a dobott érték leírásában (getter) futó és megszakított kód is script_timed_out (T-015-12)', async () => {
+      const source = 'throw { name: "x", get message() { for (;;) {} } };';
+      await expect(runScript(request(source, { timeoutMs: 50 }))).resolves.toStrictEqual({
+        kind: 'failed',
+        errorKind: 'script_timed_out',
+        message: 'a szkript nem fejeződött be 50 ms alatt',
+      });
+    });
+
+    // A gazda függvény argumentumát a gazda a sandbox `JSON.stringify`-jával olvassa, tehát a szkript
+    // `toJSON`-ja a gazda hívásán belül fut. Az ott megszakított kód hibáját a könyvtár a sandboxba
+    // elkapható hibaként dobja vissza; a javítás előtt a szkript ezt elkapva a határidőn túl is futott,
+    // és a szinkron ciklus a gazda szálát (az eseményhurkot) korlát nélkül foglalta (T-015-12). A ciklus
+    // itt 1000 ms-ra korlátos, hogy egy visszatérő hiba ne akassza meg a tesztfuttatást.
+    it.each([
+      ['fetch', 'fetch(argument)'],
+      ['files.readText', 'files.readText(argument)'],
+      ['files.writeText', 'files.writeText(argument, "x")'],
+      ['files.list', 'files.list(argument)'],
+    ])(
+      'a(z) %s argumentumában megszakított kód elkapása után a szkript nem fut tovább a határidőn túl',
+      async (_name, call) => {
+        const source = `const until = Date.now() + 1000; let caught = 0; const argument = { toJSON() { for (;;) {} } }; while (Date.now() < until) { try { ${call}; } catch { caught += 1; } } return caught;`;
+        await expect(runScript(request(source, { timeoutMs: 50 }))).resolves.toStrictEqual({
+          kind: 'failed',
+          errorKind: 'script_timed_out',
+          message: 'a szkript nem fejeződött be 50 ms alatt',
+        });
+      },
+    );
+
     it('a soha fel nem oldott ígéretre váró szkriptet a gazda határideje állítja meg', async () => {
       await expect(
         runScript(request('await new Promise(() => {}); return 1;', { timeoutMs: 50 })),
