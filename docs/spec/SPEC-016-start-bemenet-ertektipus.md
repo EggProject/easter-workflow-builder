@@ -157,7 +157,13 @@ garantáltan sosem bukna (a halott ág tilalma, `.claude/CLAUDE.md` 5. szekció)
 - Szerkesztő: `SelectField` a hat értékre az 5.1 feliratával, az új mező alapértéke `text`; `choice` típusnál az
   opciók soronkénti `TextAreaField` mezője. A hibaüzenet a mező alatt (`.claude/CLAUDE.md` 11. szekció).
 - Futás indító ablak: az 5.1 táblázat mezői, a hibaüzenet a mező alatt.
-- Újraindításnál (`restartRun`) a tárolt bemenet változatlanul megy tovább.
+- Újraindításnál (`restartRun`) a tárolt bemenet változatlanul megy tovább, és a futás indítása a JELENLEGI gráf
+  mezőtípusai ellen ellenőriz, ugyanúgy, ahogy a meglévő `missing_required_input` ellenőrzés is a jelenlegi gráf
+  ellen fut (SPEC-004 4.8): ha egy mező típusa az eredeti futás óta megváltozott, az újraindítás
+  `invalid_input_type` hibát ad (a saját magyar mondatával), és új futás nem jön létre. Ez szándékos (K-1,
+  `docs/research/2026-11-03-szkript-kimenet-ertektipus.md` 11.5); a nem illeszkedő mező kihagyása vagy az indító
+  ablak előtöltött megnyitása nem része ennek a specnek. Teszt: `restart-run.spec.ts` "a tárolt bemenet a JELENLEGI
+  gráf mezőtípusai ellen ellenőrzött".
 - A bemutató fixtúra (`showcase-graph.ts`) `'string'` értéke `'text'` lesz; a képernyőkép lenyomata ettől elavul,
   a `bun run screenshots` újra fut (`.claude/CLAUDE.md` 12. szekció).
 
