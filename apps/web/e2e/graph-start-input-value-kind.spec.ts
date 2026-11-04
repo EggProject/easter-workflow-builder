@@ -35,6 +35,31 @@ const GRAPH: WorkflowGraphDocument = {
   edges: [],
 };
 
+/**
+ * Egy `choice` mezős Start két opcióval: a visszavonás tesztjének kiindulása.
+ */
+const CHOICE_GRAPH: WorkflowGraphDocument = {
+  nodes: [
+    {
+      id: 'n1',
+      type: 'start',
+      label: 'Kérés fogadása',
+      positionX: 0,
+      positionY: 0,
+      config: {
+        type: 'start',
+        inputFields: [
+          { name: 'szin', label: 'Szín', valueKind: 'choice', options: ['piros', 'zöld'], required: false },
+        ],
+        onUnhandledError: 'fail_run',
+      },
+      createdAtMs: 1,
+      updatedAtMs: 1,
+    },
+  ],
+  edges: [],
+};
+
 const WORKFLOW: WorkflowDetail = {
   id: 'w-alfa',
   name: 'Alfa workflow',
@@ -59,9 +84,13 @@ const INVALID_CHOICE_OPTIONS_MESSAGE = 'Legalább egy opció kell, az opciók ne
 
 const VALUE_KIND_LABELS = ['Szöveg', 'Szám', 'Igen/nem', 'Választólista', 'Lista', 'JSON adat'] as const;
 
-async function installEditorMocks(page: Page, putBodies: unknown[]): Promise<void> {
+async function installEditorMocks(
+  page: Page,
+  putBodies: unknown[],
+  graph: WorkflowGraphDocument = GRAPH,
+): Promise<void> {
   await installApiMocks(page, [
-    mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(GRAPH))),
+    mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(graph))),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
     mockRoute('replaceWorkflowGraph', async (route) => {
@@ -214,4 +243,24 @@ test('az opciók mezőbe billentyűzetről gépelve az Enter és a szóköz megm
   expect(savedInputFields(putBodies[0])).toEqual([
     { name: 'szin', label: 'Szín', valueKind: 'choice', options: ['piros', 'sötét kék'], required: false },
   ]);
+});
+
+test('a visszavonás az opciók mezőt a külső listára állítja, a begépelt vázlat nem marad vissza', async ({ page }) => {
+  await installEditorMocks(page, [], CHOICE_GRAPH);
+  await page.goto(EDITOR_URL);
+  await page.getByTestId('rf__node-n1').click();
+  const panel = page.getByRole('complementary', { name: 'Indítás beállításai' });
+  const optionsField = panel.getByRole('textbox', { name: 'Opciók (soronként egy)' });
+  await expect(optionsField).toHaveValue('piros\nzöld');
+
+  // A `fill()` a teljes szöveget egy lépésben cseréli, a leütésenkénti bevitel
+  // a valódi gépelés: a mező helyi vázlata így tér el a külső `options` listától.
+  await optionsField.click();
+  await optionsField.press('End');
+  await optionsField.press('Enter');
+  await optionsField.pressSequentially('kék');
+  await expect(optionsField).toHaveValue('piros\nzöld\nkék');
+
+  await page.getByRole('button', { name: 'Visszavonás', exact: true }).click();
+  await expect(optionsField).toHaveValue('piros\nzöld');
 });

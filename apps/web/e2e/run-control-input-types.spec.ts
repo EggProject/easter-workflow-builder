@@ -48,6 +48,32 @@ const GRAPH: WorkflowGraphDocument = {
   edges: [],
 };
 
+/**
+ * Egyetlen kötelező `choice` mezős Start: a futás indító ablak választója nem
+ * kínál "nincs kiválasztva" elemet (SPEC-016 5.1).
+ */
+const REQUIRED_CHOICE_GRAPH: WorkflowGraphDocument = {
+  nodes: [
+    {
+      id: 'n1',
+      type: 'start',
+      label: 'Kérés fogadása',
+      positionX: 0,
+      positionY: 0,
+      config: {
+        type: 'start',
+        inputFields: [
+          { name: 'color', label: 'Szín', valueKind: 'choice', options: ['piros', 'zöld'], required: true },
+        ],
+        onUnhandledError: null,
+      },
+      createdAtMs: 1,
+      updatedAtMs: 1,
+    },
+  ],
+  edges: [],
+};
+
 const WORKFLOW: WorkflowDetail = {
   id: 'w-alfa',
   name: 'Alfa workflow',
@@ -67,10 +93,10 @@ const EDITOR_URL = '/editor?workflowId=w-alfa';
 /**
  * A `POST /api/workflows/{id}/runs` törzsei, kérésenként a nyers szöveg.
  */
-async function mockEditor(page: Page, bodies: string[]): Promise<void> {
+async function mockEditor(page: Page, bodies: string[], graph: WorkflowGraphDocument = GRAPH): Promise<void> {
   await mockIdleStream(page);
   await installApiMocks(page, [
-    mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(GRAPH))),
+    mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(graph))),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
     mockRoute('startRun', async (route) => {
@@ -181,4 +207,33 @@ test('a szám mező billentyűzetről gépelve nem írja át a köztes alakot, a
 
   await expect(page).toHaveURL(/\/run\?runId=run-1$/);
   expect(bodies).toEqual([JSON.stringify({ input: { topic: 'AI', count: 1.05, urgent: false } })]);
+});
+
+test('a kötelező választó mező opciói között nincs "nincs kiválasztva", kiválasztás nélkül a beküldés a mező alatt jelez, POST nélkül', async ({
+  page,
+}) => {
+  const bodies: string[] = [];
+  await mockEditor(page, bodies, REQUIRED_CHOICE_GRAPH);
+  const dialog = await openStartModal(page);
+  const color = dialog.getByRole('combobox', { name: /^Szín/ });
+
+  await color.click();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveText(['piros', 'zöld']);
+  await expect(page.getByRole('option', { name: 'nincs kiválasztva' })).toHaveCount(0);
+  await color.click();
+  await expect(color).toHaveAttribute('aria-expanded', 'false');
+
+  // Beküldési kísérlet előtt, érintetlen mezőn nincs hibaüzenet.
+  await expect(color).not.toHaveAttribute('aria-invalid', 'true');
+  await dialog.getByRole('button', { name: 'Indítás', exact: true }).click();
+
+  await expect(color).toHaveAttribute('aria-invalid', 'true');
+  await expect(dialog.locator('.field__error')).toHaveText('Kötelező mező.');
+  await expect(dialog).toBeVisible();
+  expect(bodies).toEqual([]);
+
+  await chooseSelectOption(page, color, 'zöld');
+  await dialog.getByRole('button', { name: 'Indítás', exact: true }).click();
+  await expect(page).toHaveURL(/\/run\?runId=run-1$/);
+  expect(bodies).toEqual([JSON.stringify({ input: { color: 'zöld' } })]);
 });
