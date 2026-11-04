@@ -141,7 +141,6 @@ describe('a known mezők a Flash forrásaira és a Flash mérésekre épülnek (
       'CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS',
       [DOC_ENV_VARS],
     ],
-    ['imageInput', model?.imageInput, true, ['M-23-flash']],
     ['listedByModelsEndpoint', model?.listedByModelsEndpoint, true, ['M-35-flash']],
     ['thinking.wireShape', minimaxProvider.thinking.wireShape, '{"type":"adaptive"}', ['M-01-flash', 'M-05-flash']],
     ['thinking.sendsBudgetTokens', minimaxProvider.thinking.sendsBudgetTokens, false, ['M-05-flash', 'M-06-flash']],
@@ -166,12 +165,6 @@ describe('a known mezők a Flash forrásaira és a Flash mérésekre épülnek (
       minimaxProvider.structuredOutput.outputConfigWireField,
       'output_config.effort',
       ['M-01-flash', 'M-26-flash'],
-    ],
-    [
-      'toolChoice.rejectionBehaviour',
-      minimaxProvider.toolChoice.rejectionBehaviour,
-      'silently_dropped',
-      ['M-34-flash'],
     ],
     [
       'toolChoice.sdkSendsForcedChoice',
@@ -237,7 +230,7 @@ describe('a known mezők a Flash forrásaira és a Flash mérésekre épülnek (
   });
 });
 
-// A Flash-re lefuttatott, de a kérdést el nem döntő esetek mezői saját indoklást kapnak (thinking signature, tool_choice).
+// A Flash-re lefuttatott, de a kérdést el nem döntő (egy mintás vagy ellentmondó) esetek mezői saját indoklást kapnak (thinking signature, tool_choice, képbemenet).
 describe('a Flash-re nem mért vagy a méréssel el nem döntött mezők unknown állapotúak, a blokkoló méréssel (SPEC-013 3.2)', () => {
   const caching = minimaxProvider.promptCaching;
   const cachingMeasurements = ['M-08', 'M-15', 'M-24', 'M-33'];
@@ -246,9 +239,11 @@ describe('a Flash-re nem mért vagy a méréssel el nem döntött mezők unknown
     ['effectiveContextWindowOnWire', model?.effectiveContextWindowOnWire, ['M-20']],
     ['maxOutputTokensWireCeiling', model?.maxOutputTokensWireCeiling, ['M-22']],
     ['videoInput', model?.videoInput, ['M-16', 'M-23']],
+    ['imageInput', model?.imageInput, ['M-23', 'M-16']],
     ['thinking.interleavedSignatureRequired', minimaxProvider.thinking.interleavedSignatureRequired, ['M-05']],
     ['structuredOutput.defaultStrategy', minimaxProvider.structuredOutput.defaultStrategy, ['M-19']],
     ['toolChoice.accepted', minimaxProvider.toolChoice.accepted, ['M-34']],
+    ['toolChoice.rejectionBehaviour', minimaxProvider.toolChoice.rejectionBehaviour, ['M-34']],
     ['promptCaching.mode', caching.mode, ['M-15', 'M-20', 'M-24', 'M-33']],
     ['promptCaching.explicitBreakpointLimit', caching.explicitBreakpointLimit, cachingMeasurements],
     ['promptCaching.ttlSeconds', caching.ttlSeconds, cachingMeasurements],

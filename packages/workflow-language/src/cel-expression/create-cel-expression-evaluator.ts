@@ -15,8 +15,9 @@ import { toCelContext } from './to-cel-context.ts';
  * kikapcsolt opcionális típusok mellett értéket nem kap), ezért azt a
  * `rejectOptionalNamespace` utasítja el (O-23). Az `evaluate` a 7.3 szerint leképezett
  * kontextuson értékel ki, és az eredményt a 7.4 szerint normalizálja. Kivétel
- * egyik műveletből sem hagyja el a függvényt: a túl mély vagy körkörös adat
- * normalizálásának veremtúlcsordulása is a közös hibaleírást kapja.
+ * egyik műveletből sem hagyja el a függvényt: a körkörös adat normalizálásának
+ * `TypeError` kivétele és a túl mély adat veremtúlcsordulása is a közös
+ * hibaleírást kapja.
  */
 export function createCelExpressionEvaluator(): CelExpressionEvaluator {
   const environment = createCelEnvironment();

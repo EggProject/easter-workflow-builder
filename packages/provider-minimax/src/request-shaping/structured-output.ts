@@ -12,11 +12,13 @@ export const minimaxStructuredOutput: StructuredOutputCapability = {
       },
       blockingWireDetail: {
         state: 'known',
-        // Tipusosan ertelmezett "nincs blokkolo" ertek (Fact<string | null>), nem placeholder.
-        // eslint-disable-next-line unicorn/no-null -- lasd structured-output-strategy.ts dokumentaciojat
+        // Típusosan értelmezett "nincs blokkoló" érték (Fact<string | null>), nem placeholder.
+        // eslint-disable-next-line unicorn/no-null -- lásd structured-output-strategy.ts dokumentációját
         value: null,
         evidence: [{ kind: 'measurement', id: 'M-03-flash' }],
       },
+      // A 3 az M-03 mérési prompt körszáma: a prompt egy kikényszerített echo tool hívást is tartalmazott,
+      // tehát ez nem a strukturált kimenet minimuma, a motor maxTurns alsó korlátja mégis ebből jön.
       observedRoundTrips: {
         state: 'known',
         value: [3],

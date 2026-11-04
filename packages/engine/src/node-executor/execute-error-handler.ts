@@ -29,9 +29,10 @@ import type { NodeExecutorPorts } from './node-executor-ports.ts';
  *   jön a kísérletszám ellenőrzés és a `backoffMs[attempt - 1]` index (8.2 2.
  *   és 3. pont).
  *
- * A `stopSignal` a futás külső leállításának jele (`ActiveRunHandle
- * .requestStop`: felhasználói megszakítás vagy szabályos leállás): ezen
- * szakad meg a backoff várakozás.
+ * A `stopSignal` a futás leállításának jele (`ActiveRunHandle.requestStop`:
+ * felhasználói megszakítás vagy szabályos leállás; illetve a futás saját
+ * `fail_run` bukása, `run-supervisor/advance-run.ts`): ezen szakad meg a
+ * backoff várakozás.
  *
  * **A megismételt lépés `step_run` sorát ez a végrehajtó NEM hozza létre**
  * (T-005-25 lezárta a T-005-24 óta nyitva állt szerkezeti kérdést): a
@@ -117,16 +118,14 @@ function describeHandlerFailure(
  *    (`retry_scheduled`, `retry_exhausted`) mondja ki a hívónak.
  *
  * **A backoff várakozás a futás leállításának jelével szakad meg** (SPEC-004
- * 9. szekció, 10.2 szekció, user döntés 2026-10-26). A `ClockPort.sleep`
+ * 8.3, 9. szekció, 10.2 szekció, user döntések 2026-10-26 és 2026-11-04). A `ClockPort.sleep`
  * megszakításkor elutasíthat (a valódi óra így tesz) vagy feloldódhat; a
  * végrehajtó mindkettőt egységesen kezeli: a várakozás után a jelet nézi.
  * Megszakított várakozásnál az `interrupted` kimenettel tér vissza, `step_run`
  * állapotváltás és esemény írás NÉLKÜL, ugyanúgy, mint a `human_approval`
  * (`node-executor-result.ts`): a kezelő `running` sorát a leállítást kérő fél
- * zárja (`cancelled` a megszakításnál, `interrupted` a szabályos leállásnál).
- * A futás saját `fail_run` bukása ezt a jelet nem állítja: a testvér ágon
- * álló kezelő várakozása ott a természetes végéig tart (megnevezett hiány,
- * `packages/engine/CLAUDE.md`).
+ * zárja (`cancelled` a megszakításnál és a `fail_run` bukásnál,
+ * `interrupted` a szabályos leállásnál).
  */
 export async function executeErrorHandler(
   input: ExecuteErrorHandlerInput,

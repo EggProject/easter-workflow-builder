@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- az `AgentStepConfig` elhagyható mezői a tárolt JSON-ban `null` értékkel jelzik a hiányt (SPEC-003 4.4) */
 import { describe, expect, it } from 'vitest';
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
-import { validateAgentStepCapabilities } from '@easter-workflow-builder/engine';
+import { validateAgentStepCapabilities, validateForcedToolChoiceRisk } from '@easter-workflow-builder/engine';
 import { providerRegistry } from '@easter-workflow-builder/provider-registry';
 
 /**
@@ -77,7 +77,9 @@ describe('a motor a MiniMax-M3.1-Flash leíróval', () => {
     ]);
   });
 
-  it('strukturált kimenetnél a maxTurns alsó korlátja a Flash-re mért körszám (M-03-flash)', () => {
+  // A 3 az M-03-flash mérési prompt körszáma (egy kikényszerített echo tool hívással), nem a strukturált kimenet minimuma;
+  // a motor alsó korlátja mégis a leíró megfigyelt körszámából jön.
+  it('strukturált kimenetnél a maxTurns alsó korlátja a leíró megfigyelt körszáma (M-03-flash prompt)', () => {
     const structuredOutput = { strategy: 'sdk_output_format', schema: { type: 'object' } } as const;
     const tooFew = validateAgentStepCapabilities(
       agentStepConfig({ structuredOutput, maxTurns: 2 }),
@@ -90,5 +92,14 @@ describe('a motor a MiniMax-M3.1-Flash leíróval', () => {
 
     expect(tooFew.status === 'failed' ? tooFew.errorKind : undefined).toBe('insufficient_max_turns');
     expect(enough.status).toBe('ok');
+  });
+
+  // A rejectionBehaviour unknown: a kényszerített tool_choice nem küldése (sdkSendsForcedChoice false) miatt a
+  // motor viselkedése nem változik, nincs forced_tool_choice_silently_dropped hibaág.
+  it('a kényszerített tool_choice kockázati ág nem fut: az SDK nem küld kényszerítést', () => {
+    expect(validateForcedToolChoiceRisk(providerRegistry.minimax.toolChoice)).toStrictEqual({
+      kind: 'ok',
+      value: undefined,
+    });
   });
 });
