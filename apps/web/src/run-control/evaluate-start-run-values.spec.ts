@@ -63,6 +63,12 @@ describe('evaluateStartRunValues', () => {
     expect(Object.keys(input)).toEqual(['urgent']);
   });
 
+  it('a csak szóközt tartalmazó nem kötelező szöveg mező szóközként megy ki', () => {
+    const { input, errors } = evaluateStartRunValues([OPTIONAL_TEXT], { note: withText('  ') });
+    expect(errors.size).toBe(0);
+    expect(input).toEqual({ note: '  ' });
+  });
+
   it('az üresen hagyott kötelező mezőre hibát ad, a csak szóközt tartalmazóra is', () => {
     const blank = withText(' '.repeat(3));
     const emptyResult = evaluateStartRunValues([REQUIRED_TEXT], { topic: EMPTY_START_RUN_FIELD_VALUE });

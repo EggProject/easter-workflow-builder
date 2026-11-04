@@ -24,10 +24,19 @@ describe('readStartRunField', () => {
     expect(readStartRunField(fieldOf('text'), withText('AI hírek'))).toEqual({ status: 'present', value: 'AI hírek' });
   });
 
-  it('az üres és a csak szóközt tartalmazó szöveg mező hiányzik', () => {
+  it('az üres szöveg mező hiányzik, a csak szóközt tartalmazó nem kötelező szöveg viszont megy, ahogy ma', () => {
     const blank = withText(' '.repeat(3));
     expect(readStartRunField(fieldOf('text'), withText(''))).toEqual({ status: 'missing' });
-    expect(readStartRunField(fieldOf('text'), blank)).toEqual({ status: 'missing' });
+    expect(readStartRunField(fieldOf('text'), blank)).toEqual({ status: 'present', value: ' '.repeat(3) });
+    expect(readStartRunField(CHOICE_FIELD, blank)).toEqual({ status: 'present', value: ' '.repeat(3) });
+  });
+
+  it('a kötelező szöveg és választó mezőt a csak szóköz is üresnek számít', () => {
+    const blank = withText(' '.repeat(3));
+    const requiredText: StartInputField = { ...fieldOf('text'), required: true };
+    const requiredChoice: StartInputField = { ...CHOICE_FIELD, required: true };
+    expect(readStartRunField(requiredText, blank)).toEqual({ status: 'missing' });
+    expect(readStartRunField(requiredChoice, blank)).toEqual({ status: 'missing' });
   });
 
   it('a szám mező számként adja az értéket, a nulla is érték', () => {
