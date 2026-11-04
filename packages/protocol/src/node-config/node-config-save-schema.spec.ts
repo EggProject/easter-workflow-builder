@@ -185,6 +185,28 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
     path: ['source'],
     build: (text) => ({ type: 'script', source: text, runtime: 'expression', onUnhandledError: 'fail_run' }),
   },
+  {
+    field: 'script (javascript) source',
+    path: ['source'],
+    build: (text) => ({
+      type: 'script',
+      source: text,
+      runtime: 'javascript',
+      timeoutMs: null,
+      cwd: null,
+      onUnhandledError: 'fail_run',
+    }),
+  },
+  {
+    field: 'join script (javascript) settings.source',
+    path: ['settings', 'source'],
+    build: (text) => ({
+      type: 'join',
+      mode: 'script',
+      settings: { source: text, runtime: 'javascript', timeoutMs: null, cwd: null },
+      onUnhandledError: 'fail_run',
+    }),
+  },
 ];
 
 function issuePaths(error: z.ZodError): readonly (readonly PropertyKey[])[] {
@@ -200,8 +222,8 @@ function storedNodeWith(config: unknown): Readonly<Record<string, unknown>> {
 }
 
 describe('NodeConfigSaveSchema: a kötelező szöveg mezők (SPEC-008 5.4, O-21)', () => {
-  it('a tizenöt mező mindegyike szerepel az esetek között', () => {
-    expect(REQUIRED_FIELD_CASES).toHaveLength(15);
+  it('a tizenöt mező mindegyike és a két szkript mező JavaScript ágú párja szerepel az esetek között', () => {
+    expect(REQUIRED_FIELD_CASES).toHaveLength(17);
   });
 
   for (const { field, path, build } of REQUIRED_FIELD_CASES) {

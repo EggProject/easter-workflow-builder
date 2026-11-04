@@ -384,6 +384,71 @@ describe('a kötelező szöveg mezők mezőnként a protokoll mentési sémájá
   }
 });
 
+/**
+ * A szkript `source` mezője a JavaScript ágon is kötelező szöveg mező (SPEC-014
+ * 5.9): a tábla útvonala a `runtime` ágtól független, de a tábla alapesete
+ * (`BASE_CONFIG_BY_VARIANT`) a CEL ágat használja, ezért a JavaScript ágat külön
+ * próbáljuk. A `cwd` üres szövege nem kötelező mező, mindkét oldalon átmegy.
+ */
+describe('a szkript source mezője a JavaScript ágon is kötelező mindkét oldalon (SPEC-014 5.9)', () => {
+  const VARIANTS = [
+    {
+      label: 'script',
+      path: 'source',
+      build: (source: string, cwd: string | null): unknown => ({
+        type: 'script',
+        source,
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd,
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    {
+      label: 'join script',
+      path: 'settings.source',
+      build: (source: string, cwd: string | null): unknown => ({
+        type: 'join',
+        mode: 'script',
+        settings: { source, runtime: 'javascript', timeoutMs: null, cwd },
+        onUnhandledError: 'fail_run',
+      }),
+    },
+  ] as const;
+
+  for (const { label, path, build } of VARIANTS) {
+    for (const cwd of [null, '']) {
+      it(`${label}: a kitöltött source és a(z) ${cwd === null ? 'null' : 'üres'} cwd mindkettőn átmegy`, () => {
+        const { database, workflowId } = openDatabaseWithWorkflow();
+        const candidate = build('return 1;', cwd);
+
+        expect(NodeConfigSaveSchema.safeParse(candidate).success).toBe(true);
+        expect(replaceWithConfig(database, workflowId, candidate)).toBeUndefined();
+        database.close();
+      });
+    }
+
+    for (const [description, blank] of [
+      ['üres', ''],
+      ['csak szóközös', ' '.repeat(3)],
+    ] as const) {
+      it(`${label}: az ${description} source mindkettőn elbukik, az olvasó séma elfogadja`, () => {
+        const { database, workflowId } = openDatabaseWithWorkflow();
+        const candidate = build(blank, null);
+        const parsed = NodeConfigSaveSchema.safeParse(candidate);
+
+        expect(parsed.success).toBe(false);
+        expect(parsed.error?.issues.map((issue) => issue.path.join('.'))).toEqual([path]);
+        expect(replaceWithConfig(database, workflowId, candidate)).toContain(
+          `"${path}" kötelező szöveg mezője üres (blank_required_text_field)`,
+        );
+        expect(NodeConfigSchema.safeParse(candidate).success).toBe(true);
+        database.close();
+      });
+    }
+  }
+});
+
 interface NumberFieldCase {
   readonly field: string;
   readonly path: string;
