@@ -177,6 +177,10 @@ function createTrivialSupervisor(database: DatabaseContext): RunSupervisor {
     idGenerator: { nextId: () => 'id-1' },
     processEnvironment: { read: () => null, readAll: () => ({}) },
     structuredOutputSchemaCompiler: SCHEMA_COMPILER,
+    scriptRunner: {
+      compile: () => Promise.resolve({ kind: 'ok', value: undefined }),
+      run: () => Promise.reject(new Error('ebben a tesztben nem hívott port')),
+    },
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },
@@ -249,7 +253,7 @@ describe('runStartupRecovery', () => {
     const workflowId = createTrivialWorkflow(database);
     const supervisor = createTrivialSupervisor(database);
 
-    const started = okOrThrow(supervisor.startRun({ workflowId, input: {} }));
+    const started = okOrThrow(await supervisor.startRun({ workflowId, input: {} }));
     const handle = supervisor.getActiveRun(started.run.id);
     if (handle === undefined) {
       throw new Error('a futáshoz nincs aktív kézikönyv');

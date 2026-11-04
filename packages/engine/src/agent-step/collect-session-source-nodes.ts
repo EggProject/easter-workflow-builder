@@ -1,5 +1,5 @@
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import type { SessionSourceNodes } from './session-source-nodes.ts';
 
 /**
@@ -8,7 +8,7 @@ import type { SessionSourceNodes } from './session-source-nodes.ts';
  * bővítve), az `ai_synthesis` módú `join` node pedig a `settings`
  * alobjektumában hordozza ugyanezt (SPEC-003 4.3).
  */
-function readAgentStepConfig(config: ExecutableNodeConfig): AgentStepConfig | undefined {
+function readAgentStepConfig(config: WellFormedNodeConfig): AgentStepConfig | undefined {
   if (config.type === 'agent_step') {
     return config;
   }
@@ -28,7 +28,7 @@ function readAgentStepConfig(config: ExecutableNodeConfig): AgentStepConfig | un
  * `SessionSourceNodes` típus doksijában áll.
  */
 export function collectSessionSourceNodes(
-  nodeConfigsById: ReadonlyMap<string, ExecutableNodeConfig>,
+  nodeConfigsById: ReadonlyMap<string, WellFormedNodeConfig>,
 ): SessionSourceNodes {
   const sourceNodeIds = new Set<string>();
   const continuedNodeIds = new Set<string>();

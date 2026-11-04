@@ -5,7 +5,7 @@ import type { ProcessEnvironmentPort } from '../engine-port/process-environment-
 import type { SkillLibrarySnapshot } from '../engine-port/skill-library-snapshot.ts';
 import { resolveMcpServers } from '../mcp-server-resolution/resolve-mcp-servers.ts';
 import { agentStepConfigOf } from './agent-step-config-of.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 /**
  * A futás indítási ellenőrzése a lépések és az agent definícióik MCP
@@ -25,7 +25,7 @@ import type { ExecutableNodeConfig } from './executable-node-config.ts';
  * egyetlen adatbázis sort sem ír; az első hibánál megáll.
  */
 export function validateMcpServerReferences(
-  configsById: ReadonlyMap<string, ExecutableNodeConfig>,
+  configsById: ReadonlyMap<string, WellFormedNodeConfig>,
   definitions: readonly McpServerDefinitionRecord[],
   processEnvironment: ProcessEnvironmentPort,
   skillLibrary: SkillLibrarySnapshot,

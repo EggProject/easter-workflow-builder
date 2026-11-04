@@ -155,7 +155,10 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   `unprocessable` (a SPEC-005 8.3 "a tárolt vagy a küldött dokumentum nem dolgozható fel" sorának
   mintája); a mentés mezőútja (SPEC-005 8.5) továbbra sem kap strukturált mezőt. A SPEC-015
   `invalid_structured_output_schema` és `structured_output_schema_mismatch` osztálya motor osztály, a
-  részhalmaz szabály alá esik (SPEC-015 5.4, 5.5, AC5).
+  részhalmaz szabály alá esik (SPEC-015 5.4, 5.5, AC5). A SPEC-014 `script_compile_failed` osztálya
+  (5.7) szintén motor osztály, a részhalmaz szabály alá esik; az `unimplemented_node_type` osztály
+  a szkript végrehajtásával megszűnt, a szótárból és a motor uniójából is törölve (SPEC-014 8.
+  kritérium 1., PLAN-015 T-015-5).
 - **A `protocol` a `db` írás oldali "kötelező szöveg mező" szabályát is duplikálhatja, ugyanezzel a
   védelemmel.** A kötelező (nem nullázható, a beállítás panelen szerkesztett) szöveg mezők listája a
   `protocol` mentési sémájában és a `db` `replaceGraph` ellenőrzésében is áll, mindkét oldalon
@@ -189,6 +192,10 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   `malformed_node_config` (user döntés 2026-10-14). Sodródás védelmi ág e két mentési szabályhoz nem
   tartozik (a `join` unió negyedik, `mode: null` ága viszont a meglévő sodródás védelem bővítése; a
   szabály helye technikai döntés a user 2026-09-28-i O-29 és O-33 döntése nyomán, SPEC-008 5.4).
+  **Ugyanígy nem duplikátum a JavaScript szkript `cwd` mezőjének `/proc` és `/dev` tilalma**: kizárólag a
+  `NodeConfigSaveSchema` lexikális szabálya (a mező alatt jelez), a második védvonal az `apps/server` futtatója
+  (`fs.realpath` alapú ellenőrzés a gyökérre és minden fájl útvonalra), a lista a `protocol`
+  `FORBIDDEN_SCRIPT_PATH_PREFIXES` konstansa (user döntés 2026-11-04, SPEC-014 5.4, 5.9).
 - **A `protocol` a `db` pozitív egész szám szabályát is duplikálhatja, ugyanezzel a védelemmel.** A
   `loop.maxIterations`, az `error_handler.maxAttempts` és a `backoffMs` minden eleme a mentési sémában
   is pozitív egész (user döntés 2026-10-17, O-37), a `db` `isNodeConfig` guard `isPositiveInteger`
@@ -201,6 +208,24 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   `isNodeConfig` guard ezért a `db` `replaceGraph` hívásában fut** (`malformed_node_config`, a meglévő
   hibaleképezésen, user döntés 2026-10-17): a szám invariáns nincs típusszinten, tehát az ág nem
   halott, és típushelyesen, `as` nélkül tesztelhető valós `:memory:` adatbázison.
+
+- **A `ScriptConfig` a `runtime` szerinti diszkriminált unió mindkét oldalon, a JavaScript ág `timeoutMs`
+  mezője pedig felső határral bővíti a pozitív egész szabályt.** A `db` `ScriptConfig` és a `protocol`
+  `ScriptConfigSchema` két ága (`expression`, `javascript`) szándékos duplikátum; a `timeoutMs` `null` vagy
+  pozitív egész, legfeljebb 2147483647, mert a Node `setTimeout` ennél nagyobb késleltetést 1 ms-re állít. A
+  határ a mentési sémában és a `db` `isNodeConfig` guardjában áll, az olvasó séma csak a típust ellenőrzi. A
+  védelem az `apps/server` `node-config-drift-protection` témájában a két ág típusszintű egyenlősége és a
+  határérték mezőnkénti futásidejű ága (SPEC-014 5.3). **A JavaScript ág `memoryLimitMb` mezőjének
+  tartomány szabálya ugyanezt a védelmet kapja:** `null` vagy egész 16 és 2048 között (mindkét határ
+  megengedett; a határok forrása a research Q-9: a pinelt QuickJS modul saját `WebAssembly.Memory`
+  maximuma ezen kívül nem példányosítható), a `db` guardban és a `protocol` mentési sémájában (a hiba a
+  mező útvonalán, `config.memoryLimitMb`, a `join` `script` módján `settings.memoryLimitMb`), az olvasó
+  séma itt is csak a típust ellenőrzi; a határértékek mezőnkénti futásidejű ága az `apps/server`
+  `node-config-drift-protection` témában áll (SPEC-014 5.3, user döntés 2026-11-04). **A két gazda oldali
+  olvasási plafon (`fetchResponseLimitMb`, `fileReadLimitMb`) ugyanezt a védelmet kapja:** `null` vagy
+  pozitív egész legfeljebb 2048, mindkét oldalon, mezőnkénti futásidejű ággal; az alapérték (50 MB) a
+  futtatóé, a forrása a research `2026-11-04-szkript-csomopont.md` 11.3 (user döntés 2026-11-04, "Igen,
+  iparági alapértékkel").
 
 - **A `db` `NodeConfig` guard minden ismeretlen kulcsot elutasít, és a `protocol` ugyanazt a szabályt
   duplikálja, ugyanezzel a védelemmel.** Az `isNodeConfig` és az `isAgentStepConfig` objektumonként zárt
@@ -366,20 +391,24 @@ A rögzített verziók egyetlen forrása: `docs/research/2026-08-26-toolchain.md
 React, Vite, `@xyflow/react`, Drizzle ORM + `better-sqlite3`, `ws`, `pino` + `pino-roll`, Vitest,
 Playwright, ESLint flat config (gyökér `CLAUDE.md`). A workflow sablon nyelve Mustache
 (`mustache`), a kifejezés nyelve CEL (`@marcbachmann/cel-js`); a bevezetésük a PLAN-010 szerint
-történt, a `packages/workflow-language` csomagban (user döntés 2026-09-23, SPEC-010).
+történt, a `packages/workflow-language` csomagban (user döntés 2026-09-23, SPEC-010). A JavaScript
+szkript csomópont futtatója QuickJS WebAssembly sandboxban fut (`quickjs-emscripten-core` plusz
+`@jitl/quickjs-wasmfile-release-sync`), az `apps/server` `script-runner` témájában (user döntés
+2026-11-04, SPEC-014); a verziók a `docs/research/2026-08-26-toolchain.md` fájlban.
 
 **Miért ezek, röviden**
 
-| Döntés                                                                                                    | Indok                                                                                                                                                                                                                                                                                                                          |
-| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| TypeScript 6.0.x fix, nem frissítjük 7-re                                                                 | a `typescript-eslint` peer range-e `<6.1.0`, a TS 7 támogatás "not planned", mert nincs stabil compiler API                                                                                                                                                                                                                    |
-| Bun csak csomagkezelő és workspace, a runtime Node                                                        | a Vitest 4 Bun alatt nem támogatott, a v8 coverage `node:inspector`-t igényel, ami Bunban hiányzik                                                                                                                                                                                                                             |
-| Turborepo `tasks` séma, nincs `pipeline` kulcs                                                            | Turborepo 2.x                                                                                                                                                                                                                                                                                                                  |
-| Nincs TypeScript projekt referencia, nincs `composite`                                                    | a Turborepo hivatalos ajánlása; a build sorrendet a `turbo.json` `dependsOn` adja (SPEC-001 D-1)                                                                                                                                                                                                                               |
-| Forrás fogyasztás: az `exports` a `./src/index.ts`-re mutat                                               | méréssel igazolt, nincs build lépés a könyvtárcsomagokban (SPEC-001 V-1)                                                                                                                                                                                                                                                       |
-| Prettier formáz, ESLint nem; `eslint-config-prettier/flat` az utolsó elem, `eslint-plugin-prettier` nincs | a Prettier saját dokumentált ajánlása (SPEC-001 8.)                                                                                                                                                                                                                                                                            |
-| Az Agent SDK verziója pinelve                                                                             | a kimenő request body mezőlista verziónként bővül, egy új mező MiniMax ellen 400-at okozhat                                                                                                                                                                                                                                    |
-| Sablon nyelv Mustache, kifejezés nyelv CEL, mindkét csomag pontos verzióval pinelve                       | a Mustache logika mentes, a CEL nem Turing-teljes (user döntés, SPEC-010 4.); a CEL JS binding fiatal, ezért a frissítése előtt a blokkoló mérés regresszióként fut (SPEC-010 4.2 1. pont); a Mustache név feloldás saját adat tulajdonságra szűkített, mert szűkítés nélkül egy sablon a szervert leállíthatja (SPEC-010 6.6) |
+| Döntés                                                                                                                                                           | Indok                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TypeScript 6.0.x fix, nem frissítjük 7-re                                                                                                                        | a `typescript-eslint` peer range-e `<6.1.0`, a TS 7 támogatás "not planned", mert nincs stabil compiler API                                                                                                                                                                                                                                                                                     |
+| Bun csak csomagkezelő és workspace, a runtime Node                                                                                                               | a Vitest 4 Bun alatt nem támogatott, a v8 coverage `node:inspector`-t igényel, ami Bunban hiányzik                                                                                                                                                                                                                                                                                              |
+| Turborepo `tasks` séma, nincs `pipeline` kulcs                                                                                                                   | Turborepo 2.x                                                                                                                                                                                                                                                                                                                                                                                   |
+| Nincs TypeScript projekt referencia, nincs `composite`                                                                                                           | a Turborepo hivatalos ajánlása; a build sorrendet a `turbo.json` `dependsOn` adja (SPEC-001 D-1)                                                                                                                                                                                                                                                                                                |
+| Forrás fogyasztás: az `exports` a `./src/index.ts`-re mutat                                                                                                      | méréssel igazolt, nincs build lépés a könyvtárcsomagokban (SPEC-001 V-1)                                                                                                                                                                                                                                                                                                                        |
+| Prettier formáz, ESLint nem; `eslint-config-prettier/flat` az utolsó elem, `eslint-plugin-prettier` nincs                                                        | a Prettier saját dokumentált ajánlása (SPEC-001 8.)                                                                                                                                                                                                                                                                                                                                             |
+| Az Agent SDK verziója pinelve                                                                                                                                    | a kimenő request body mezőlista verziónként bővül, egy új mező MiniMax ellen 400-at okozhat                                                                                                                                                                                                                                                                                                     |
+| Sablon nyelv Mustache, kifejezés nyelv CEL, mindkét csomag pontos verzióval pinelve                                                                              | a Mustache logika mentes, a CEL nem Turing-teljes (user döntés, SPEC-010 4.); a CEL JS binding fiatal, ezért a frissítése előtt a blokkoló mérés regresszióként fut (SPEC-010 4.2 1. pont); a Mustache név feloldás saját adat tulajdonságra szűkített, mert szűkítés nélkül egy sablon a szervert leállíthatja (SPEC-010 6.6)                                                                  |
+| JavaScript szkript futtató: QuickJS WebAssembly (`quickjs-emscripten-core` plusz `@jitl/quickjs-wasmfile-release-sync`), mindkét csomag pontos verzióval pinelve | a `node:vm`, a Node permission model és a `worker_threads` nem megfelelő izoláció, az `isolated-vm` karbantartási módban van és natív buildet igényel, a Docker tiltott (SPEC-014 5.1); a wrapper 1.0 alatti és a README szerint nem auditált, ezért a frissítése előtt a T-015-2 próbái (`docs/research/2026-11-04-szkript-csomopont/futtat.sh`) regresszióként futnak (SPEC-014 5.2, 5.10 1.) |
 
 **Tiltások**
 

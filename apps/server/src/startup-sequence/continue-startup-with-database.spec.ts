@@ -29,6 +29,7 @@ import { PROBE_PORT_REPORT_PREFIX } from './probe-port-report.ts';
 import { readListeningPort } from './read-listening-port.ts';
 import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 import { TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER } from '../engine-assembly/test-structured-output-schema-compiler.ts';
+import { quickJsScriptRunner } from '../script-runner/quickjs-script-runner.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -213,6 +214,7 @@ describe('continueStartupWithDatabase', () => {
       agentQueryRunner: fakeAgentQueryRunner,
       providerDescriptorLookup: buildProviderDescriptorLookup(),
       structuredOutputSchemaCompiler: TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+      scriptRunner: quickJsScriptRunner,
       expressionEvaluator: createCelExpressionEvaluator(),
       templateRenderer: createMustacheTemplateRenderer(),
       eventPublisher: createRealEventPublisher(streamRegistry, clock),

@@ -31,7 +31,6 @@ import { ReactFlowProvider, useStore, type ReactFlowState } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import type { ClientRouteId } from '../client-route/client-route-table.ts';
 import { layoutGraph } from '../graph-auto-layout/layout-graph.ts';
-import { SCRIPT_UNIMPLEMENTED_ERROR_CLASS } from '../graph-node-card/script-unimplemented-error-class.ts';
 import type { UseClientRouteResult } from '../history-navigation/use-client-route.ts';
 import { useMcpServerLibrary } from '../mcp-server-config/use-mcp-server-library.ts';
 import { useServerEnvironmentNames } from '../mcp-server-config/use-server-environment-names.ts';
@@ -74,7 +73,6 @@ import { workflowEdgeToEdgeInput, workflowNodeToNodeInput } from './graph-editor
 import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 import './graph-editor-screen.css';
-import { hasScriptNode } from './has-script-node.ts';
 import { isGraphDirty } from './is-graph-dirty.ts';
 import { normalizeLoadedGraphDocument } from './normalize-loaded-graph-document.ts';
 import { resolveUndoModifier, type UndoModifier } from './resolve-undo-modifier.ts';
@@ -253,12 +251,6 @@ function RedoIcon(): ReactElement {
     </svg>
   );
 }
-
-/**
- * A "Futás indítása" gomb tiltásának okát hordozó lábléc szöveg azonosítója
- * (`aria-describedby`, SPEC-008 14. kritérium).
- */
-const SCRIPT_RUN_BLOCK_REASON_DOM_ID = 'graph-editor-script-run-block-reason';
 
 /**
  * A betöltés előtti, üres szerkesztett dokumentum története. Modul szintű
@@ -770,7 +762,6 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
 
   const isLoading = !isHydrated;
   const isStartingRun = startRunState.state.status === 'pending';
-  const hasScript = hasScriptNode(currentNodes);
   const selectedNode = currentNodes.find((node) => node.id === selectedNodeId);
   const workflowProviderId =
     // eslint-disable-next-line unicorn/no-null -- a `describeInheritedProvider` a drótszintű `string | null` alakot várja.
@@ -859,11 +850,6 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
         status={
           <>
             {isDirty && <span role="status">Mentetlen változtatások</span>}
-            {hasScript && (
-              <p id={SCRIPT_RUN_BLOCK_REASON_DOM_ID}>
-                {`A futás nem indítható: a gráf Szkript lépést tartalmaz, amit a motor a futtatáskor \`${SCRIPT_UNIMPLEMENTED_ERROR_CLASS}\` hibával elutasít.`}
-              </p>
-            )}
             {validationMessage !== undefined && <p role="alert">{validationMessage}</p>}
             {graphState.state.status === 'failure' && <Alert variant="danger">{graphState.state.message}</Alert>}
             {/* Az indítás hibája a lábléc státuszában áll, ha NINCS nyitva a
@@ -877,22 +863,18 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
           </>
         }
       >
-        {/* A futás indítása akkor aktív, ha NINCS mentetlen változás, a gráf
-            nem üres és nincs benne `script` lépés (SPEC-008 6.5 táblázat, 14.
-            kritérium). Mentetlen gráfból indítani azt jelentené, hogy a futás a
-            szerveren tárolt, RÉGI gráfról készít pillanatképet, amit a
-            felhasználó a képernyőn nem is lát. A `script` lépést a motor
-            futás indításkor elutasítja, ezért a gomb tiltott, és az okot a
-            lábléc státusza nevezi meg, a gomb `aria-describedby` hivatkozásával. */}
+        {/* A futás indítása akkor aktív, ha NINCS mentetlen változás és a gráf
+            nem üres (SPEC-008 6.5 táblázat). Mentetlen gráfból indítani azt
+            jelentené, hogy a futás a szerveren tárolt, RÉGI gráfról készít
+            pillanatképet, amit a felhasználó a képernyőn nem is lát. */}
         <Button
           type="button"
           size="sm"
           variant="secondary"
           icon={isCompactFooter}
           aria-label={isCompactFooter ? 'Futás indítása' : undefined}
-          aria-describedby={hasScript ? SCRIPT_RUN_BLOCK_REASON_DOM_ID : undefined}
           isLoading={isStartingRun}
-          disabled={isStartingRun || isLoading || isDirty || currentNodes.length === 0 || hasScript}
+          disabled={isStartingRun || isLoading || isDirty || currentNodes.length === 0}
           onClick={handleStartRunClick}
         >
           {/* A felirat SZÁNDÉKOSAN nem a puszta "Indítás": az a `start`

@@ -1,5 +1,5 @@
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 /**
  * A node agent lépés alobjektuma, vagy `undefined`, ha a node nem futtat agent
@@ -8,7 +8,7 @@ import type { ExecutableNodeConfig } from './executable-node-config.ts';
  * indítási ellenőrzések (`validateSkillReferences`,
  * `validateMcpServerReferences`) közös bemenete.
  */
-export function agentStepConfigOf(config: ExecutableNodeConfig): AgentStepConfig | undefined {
+export function agentStepConfigOf(config: WellFormedNodeConfig): AgentStepConfig | undefined {
   if (config.type === 'agent_step') {
     return config;
   }

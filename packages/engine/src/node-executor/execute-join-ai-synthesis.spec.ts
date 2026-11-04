@@ -24,7 +24,7 @@ import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts'
 import type { TemplateRendererPort } from '../engine-port/template-renderer-port.ts';
 import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-gate.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { executeJoinAiSynthesis } from './execute-join-ai-synthesis.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
@@ -51,7 +51,7 @@ function compiledOrThrow(schema: unknown): StructuredOutputValidator {
 }
 
 type JoinAiSynthesisNodeConfig = Extract<
-  ExecutableNodeConfig,
+  WellFormedNodeConfig,
   { readonly type: 'join'; readonly mode: 'ai_synthesis' }
 >;
 
@@ -310,6 +310,7 @@ function dependenciesOf(database: DatabaseContext, agentQueryRunner: AgentQueryR
     idGenerator: { nextId: notCalled },
     processEnvironment: { read: () => null, readAll: () => ({}) },
     structuredOutputSchemaCompiler: SCHEMA_COMPILER,
+    scriptRunner: { compile: notCalled, run: notCalled },
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },

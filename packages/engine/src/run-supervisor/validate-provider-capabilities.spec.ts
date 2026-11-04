@@ -7,7 +7,7 @@ import type {
   ProviderCapabilityDescriptor,
   ProviderId,
 } from '@easter-workflow-builder/provider-capability';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import type { NodePlan } from './run-execution.ts';
 import { validateProviderCapabilities } from './validate-provider-capabilities.ts';
 
@@ -126,7 +126,7 @@ function agentStepConfig(overrides: Partial<AgentStepConfig> = {}): AgentStepCon
   };
 }
 
-function planOf(config: ExecutableNodeConfig, sdkVersionPin = INSTALLED): NodePlan {
+function planOf(config: WellFormedNodeConfig, sdkVersionPin = INSTALLED): NodePlan {
   return {
     config,
     onUnhandledError: 'fail_run',

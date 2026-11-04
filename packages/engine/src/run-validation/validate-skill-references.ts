@@ -3,7 +3,7 @@ import type { AgentStepConfig } from '@easter-workflow-builder/db';
 import { parseAgentDefinition } from '../agent-definition/parse-agent-definition.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import { agentStepConfigOf } from './agent-step-config-of.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 /**
  * Egy tárolt `skills` mező első, a skill könyvtárban nem álló neve. A `null`
@@ -48,7 +48,7 @@ function skillNotFound(subject: string, missing: string): Outcome<void> {
  * a `validateRun`.
  */
 export function validateSkillReferences(
-  configsById: ReadonlyMap<string, ExecutableNodeConfig>,
+  configsById: ReadonlyMap<string, WellFormedNodeConfig>,
   availableSkillNames: readonly string[],
 ): Outcome<void> {
   const available = new Set(availableSkillNames);

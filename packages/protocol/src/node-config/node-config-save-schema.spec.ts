@@ -185,6 +185,39 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
     path: ['source'],
     build: (text) => ({ type: 'script', source: text, runtime: 'expression', onUnhandledError: 'fail_run' }),
   },
+  {
+    field: 'script (javascript) source',
+    path: ['source'],
+    build: (text) => ({
+      type: 'script',
+      source: text,
+      runtime: 'javascript',
+      timeoutMs: null,
+      cwd: null,
+      memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
+      onUnhandledError: 'fail_run',
+    }),
+  },
+  {
+    field: 'join script (javascript) settings.source',
+    path: ['settings', 'source'],
+    build: (text) => ({
+      type: 'join',
+      mode: 'script',
+      settings: {
+        source: text,
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+      },
+      onUnhandledError: 'fail_run',
+    }),
+  },
 ];
 
 function issuePaths(error: z.ZodError): readonly (readonly PropertyKey[])[] {
@@ -200,8 +233,8 @@ function storedNodeWith(config: unknown): Readonly<Record<string, unknown>> {
 }
 
 describe('NodeConfigSaveSchema: a kötelező szöveg mezők (SPEC-008 5.4, O-21)', () => {
-  it('a tizenöt mező mindegyike szerepel az esetek között', () => {
-    expect(REQUIRED_FIELD_CASES).toHaveLength(15);
+  it('a tizenöt mező mindegyike és a két szkript mező JavaScript ágú párja szerepel az esetek között', () => {
+    expect(REQUIRED_FIELD_CASES).toHaveLength(17);
   });
 
   for (const { field, path, build } of REQUIRED_FIELD_CASES) {
@@ -525,7 +558,7 @@ const MALFORMED_CONFIG_CASES: readonly MalformedConfigCase[] = [
     description: 'a választott módú join érvénytelen settings mezővel',
     config: { type: 'join', mode: 'script', settings: { source: '', runtime: 'ismeretlen' }, onUnhandledError: null },
     issues: [
-      ['invalid_value', 'settings.runtime'],
+      ['invalid_union', 'settings.runtime'],
       ['custom', 'settings.source'],
       ['custom', 'onUnhandledError'],
     ],
@@ -618,6 +651,37 @@ describe('NodeConfigSaveSchema: a szabályok a típushiba mellett is lefutnak (S
 
 const NOT_POSITIVE_INTEGER_MESSAGE = 'A mező értéke nem pozitív egész szám.';
 
+function javascriptScriptNodeWithTimeout(timeoutMs: unknown): unknown {
+  return {
+    type: 'script',
+    source: 'return 1;',
+    runtime: 'javascript',
+    timeoutMs,
+    cwd: null,
+    memoryLimitMb: null,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
+    onUnhandledError: 'fail_run',
+  };
+}
+
+function javascriptJoinScriptWithTimeout(timeoutMs: unknown): unknown {
+  return {
+    type: 'join',
+    mode: 'script',
+    settings: {
+      source: 'return 1;',
+      runtime: 'javascript',
+      timeoutMs,
+      cwd: null,
+      memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
+    },
+    onUnhandledError: 'fail_run',
+  };
+}
+
 interface PositiveIntegerFieldCase {
   readonly field: string;
   readonly path: readonly (string | number)[];
@@ -625,9 +689,10 @@ interface PositiveIntegerFieldCase {
 }
 
 /**
- * A három pozitív egész szám mező (SPEC-008 5.4, O-37), mezőnként egy
- * egyébként mentésre kész konfiggal; a `backoffMs` lista minden helyén
- * külön eset, hogy a szabály minden elemre igazolt legyen.
+ * A pozitív egész szám mezők (SPEC-008 5.4, O-37; SPEC-014 5.3 a JavaScript
+ * szkript két `timeoutMs` helye), mezőnként egy egyébként mentésre kész
+ * konfiggal; a `backoffMs` lista minden helyén külön eset, hogy a szabály
+ * minden elemre igazolt legyen.
  */
 const POSITIVE_INTEGER_FIELD_CASES: readonly PositiveIntegerFieldCase[] = [
   {
@@ -662,6 +727,16 @@ const POSITIVE_INTEGER_FIELD_CASES: readonly PositiveIntegerFieldCase[] = [
       onUnhandledError: 'fail_run',
     }),
   })),
+  {
+    field: 'script (javascript) timeoutMs',
+    path: ['timeoutMs'],
+    build: (value) => javascriptScriptNodeWithTimeout(value),
+  },
+  {
+    field: 'join script (javascript) settings.timeoutMs',
+    path: ['settings', 'timeoutMs'],
+    build: (value) => javascriptJoinScriptWithTimeout(value),
+  },
 ];
 
 describe('NodeConfigSaveSchema: a szám mezők pozitív egészek (SPEC-008 5.4, O-37)', () => {
@@ -755,6 +830,68 @@ describe('NodeConfigSaveSchema: a szám mezők pozitív egészek (SPEC-008 5.4, 
     };
 
     expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
+  });
+});
+
+const SCRIPT_TIMEOUT_TOO_LARGE_MESSAGE = 'A mező értéke legfeljebb 2147483647 lehet.';
+
+describe('NodeConfigSaveSchema: a JavaScript szkript timeoutMs mezője legfeljebb 2147483647 (SPEC-014 5.3)', () => {
+  const SCRIPT_TIMEOUT_CASES: readonly {
+    readonly field: string;
+    readonly path: readonly string[];
+    readonly build: (value: unknown) => unknown;
+  }[] = [
+    { field: 'script', path: ['timeoutMs'], build: javascriptScriptNodeWithTimeout },
+    { field: 'join script', path: ['settings', 'timeoutMs'], build: javascriptJoinScriptWithTimeout },
+  ];
+
+  for (const { field, path, build } of SCRIPT_TIMEOUT_CASES) {
+    describe(field, () => {
+      for (const value of [1, 60_000, 2_147_483_647, null]) {
+        it(`a(z) ${String(value)} átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse(build(value)).success).toBe(true);
+        });
+      }
+
+      it('a felső határ fölötti egész elbukik, a hiba a mező útvonalán áll', () => {
+        const parsed = NodeConfigSaveSchema.safeParse(build(2_147_483_648));
+
+        expect(parsed.success).toBe(false);
+        if (parsed.success) {
+          return;
+        }
+        expect(issuePaths(parsed.error)).toEqual([path]);
+        expect(parsed.error.issues[0]?.message).toBe(SCRIPT_TIMEOUT_TOO_LARGE_MESSAGE);
+      });
+
+      it('a felső határ fölötti tört csak a pozitív egész szabály hibáját kapja', () => {
+        const parsed = NodeConfigSaveSchema.safeParse(build(2_147_483_648.5));
+
+        expect(parsed.success).toBe(false);
+        if (parsed.success) {
+          return;
+        }
+        expect(parsed.error.issues.map((issue) => issue.message)).toEqual([NOT_POSITIVE_INTEGER_MESSAGE]);
+      });
+
+      it('az olvasó NodeConfigSchema a felső határ fölötti értéket elfogadja', () => {
+        expect(NodeConfigSchema.safeParse(build(2_147_483_648)).success).toBe(true);
+      });
+    });
+  }
+
+  it('a CEL ág és a más módú join mezőútvonalán nincs találat', () => {
+    expect(
+      NodeConfigSaveSchema.safeParse({
+        type: 'script',
+        source: 'x',
+        runtime: 'expression',
+        onUnhandledError: 'fail_run',
+      }).success,
+    ).toBe(true);
+    expect(NodeConfigSaveSchema.safeParse({ type: 'join', mode: 'merge', onUnhandledError: 'fail_run' }).success).toBe(
+      true,
+    );
   });
 });
 
@@ -950,4 +1087,237 @@ describe('NodeConfigSaveSchema: a start bemeneti mező valueKind típusa (SPEC-0
 
     expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
   });
+});
+
+const SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE = 'A mező értéke 16 és 2048 közötti egész szám lehet.';
+
+describe('NodeConfigSaveSchema: a JavaScript szkript memoryLimitMb mezője null vagy 16 ... 2048 közötti egész (SPEC-014 5.3)', () => {
+  const SCRIPT_MEMORY_LIMIT_CASES: readonly {
+    readonly field: string;
+    readonly path: readonly string[];
+    readonly build: (value: unknown) => unknown;
+  }[] = [
+    {
+      field: 'script',
+      path: ['memoryLimitMb'],
+      build: (memoryLimitMb) => ({
+        type: 'script',
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    {
+      field: 'join script',
+      path: ['settings', 'memoryLimitMb'],
+      build: (memoryLimitMb) => ({
+        type: 'join',
+        mode: 'script',
+        settings: {
+          source: 'return 1;',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd: null,
+          memoryLimitMb,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        },
+        onUnhandledError: 'fail_run',
+      }),
+    },
+  ];
+
+  for (const { field, path, build } of SCRIPT_MEMORY_LIMIT_CASES) {
+    describe(field, () => {
+      for (const value of [16, 17, 256, 2047, 2048, null]) {
+        it(`a(z) ${String(value)} átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse(build(value)).success).toBe(true);
+        });
+      }
+
+      for (const [description, value] of [
+        ['a tartomány alatti (15)', 15],
+        ['nulla', 0],
+        ['negatív', -16],
+        ['a tartomány fölötti (2049)', 2049],
+        ['tört', 16.5],
+        ['a tartományon belüli tört', 100.5],
+      ] as const) {
+        it(`${description} érték elbukik, a hiba a mező útvonalán áll`, () => {
+          const parsed = NodeConfigSaveSchema.safeParse(build(value));
+
+          expect(parsed.success).toBe(false);
+          if (parsed.success) {
+            return;
+          }
+          expect(issuePaths(parsed.error)).toEqual([path]);
+          expect(parsed.error.issues[0]?.message).toBe(SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE);
+        });
+      }
+
+      it('a szöveg csak a séma típushibáját kapja, a tartomány szabály nem szól mellé', () => {
+        const parsed = NodeConfigSaveSchema.safeParse(build('256'));
+
+        expect(parsed.success).toBe(false);
+        if (parsed.success) {
+          return;
+        }
+        expect(parsed.error.issues.map((issue) => issue.message)).not.toContain(
+          SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE,
+        );
+      });
+
+      it('az olvasó NodeConfigSchema a tartományon kívüli értéket elfogadja', () => {
+        for (const value of [15, 2049, 16.5]) {
+          expect(NodeConfigSchema.safeParse(build(value)).success).toBe(true);
+        }
+      });
+    });
+  }
+});
+
+const SCRIPT_CWD_FORBIDDEN_MESSAGE = 'A munkakönyvtár nem lehet a /proc vagy a /dev könyvtárban.';
+
+describe('NodeConfigSaveSchema: a JavaScript szkript cwd mezője nem mutathat a /proc vagy a /dev alá (SPEC-014 5.9)', () => {
+  const SCRIPT_CWD_CASES: readonly {
+    readonly field: string;
+    readonly path: readonly string[];
+    readonly build: (cwd: string | null) => unknown;
+  }[] = [
+    {
+      field: 'script',
+      path: ['cwd'],
+      build: (cwd) => ({
+        type: 'script',
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd,
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    {
+      field: 'join script',
+      path: ['settings', 'cwd'],
+      build: (cwd) => ({
+        type: 'join',
+        mode: 'script',
+        settings: {
+          source: 'return 1;',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd,
+          memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        },
+        onUnhandledError: 'fail_run',
+      }),
+    },
+  ];
+
+  for (const { field, path, build } of SCRIPT_CWD_CASES) {
+    describe(field, () => {
+      for (const cwd of ['/srv/adat', '/', 'relativ/ut', '/procs', null]) {
+        it(`a(z) ${String(cwd)} átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse(build(cwd)).success).toBe(true);
+        });
+      }
+
+      for (const cwd of ['/proc', '/proc/self', '/dev', '/dev/shm', '/srv/../proc/1']) {
+        it(`a(z) ${cwd} elbukik, a hiba a mező útvonalán áll`, () => {
+          const parsed = NodeConfigSaveSchema.safeParse(build(cwd));
+
+          expect(parsed.success).toBe(false);
+          if (parsed.success) {
+            return;
+          }
+          expect(issuePaths(parsed.error)).toEqual([path]);
+          expect(parsed.error.issues[0]?.message).toBe(SCRIPT_CWD_FORBIDDEN_MESSAGE);
+        });
+      }
+    });
+  }
+});
+
+const SCRIPT_READ_LIMIT_OUT_OF_RANGE_MESSAGE = 'A mező értéke 1 és 2048 közötti egész szám lehet.';
+
+describe('NodeConfigSaveSchema: a JavaScript szkript két olvasási plafon mezője null vagy 1 ... 2048 közötti egész (SPEC-014 5.3)', () => {
+  const SCRIPT_READ_LIMIT_CASES: readonly {
+    readonly field: string;
+    readonly path: readonly string[];
+    readonly build: (value: unknown) => unknown;
+  }[] = (['fetchResponseLimitMb', 'fileReadLimitMb'] as const).flatMap((key) => [
+    {
+      field: `script ${key}`,
+      path: [key],
+      build: (value: unknown) => ({
+        type: 'script',
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+        [key]: value,
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    {
+      field: `join script ${key}`,
+      path: ['settings', key],
+      build: (value: unknown) => ({
+        type: 'join',
+        mode: 'script',
+        settings: {
+          source: 'return 1;',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd: null,
+          memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+          [key]: value,
+        },
+        onUnhandledError: 'fail_run',
+      }),
+    },
+  ]);
+
+  for (const { field, path, build } of SCRIPT_READ_LIMIT_CASES) {
+    describe(field, () => {
+      for (const value of [1, 50, 2048, null]) {
+        it(`a(z) ${String(value)} átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse(build(value)).success).toBe(true);
+        });
+      }
+
+      for (const [description, value] of [
+        ['nulla', 0],
+        ['negatív', -1],
+        ['a tartomány fölötti (2049)', 2049],
+        ['tört', 1.5],
+      ] as const) {
+        it(`${description} érték elbukik, a hiba a mező útvonalán áll`, () => {
+          const parsed = NodeConfigSaveSchema.safeParse(build(value));
+
+          expect(parsed.success).toBe(false);
+          if (parsed.success) {
+            return;
+          }
+          expect(issuePaths(parsed.error)).toEqual([path]);
+          expect(parsed.error.issues[0]?.message).toBe(SCRIPT_READ_LIMIT_OUT_OF_RANGE_MESSAGE);
+        });
+      }
+    });
+  }
 });

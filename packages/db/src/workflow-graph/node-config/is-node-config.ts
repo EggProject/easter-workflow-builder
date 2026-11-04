@@ -12,15 +12,16 @@ import type {
   BranchNodeConfig,
   BranchOption,
   ErrorHandlerNodeConfig,
+  ExpressionScriptNodeConfig,
   FanOutNodeConfig,
   HumanApprovalNodeConfig,
   JoinAiSynthesisNodeConfig,
   JoinMergeNodeConfig,
   JoinScriptNodeConfig,
+  JavaScriptScriptNodeConfig,
   JoinUnselectedNodeConfig,
   LoopNodeConfig,
   NodeConfig,
-  ScriptNodeConfig,
   StartChoiceInputField,
   StartInputField,
   StartNodeConfig,
@@ -28,6 +29,11 @@ import type {
   SubWorkflowNodeConfig,
   UnhandledErrorPolicy,
 } from './node-config.ts';
+import type { ExpressionScriptConfig } from './expression-script-config.ts';
+import type { JavaScriptScriptConfig } from './javascript-script-config.ts';
+import { MAX_SCRIPT_MEMORY_LIMIT_MB } from './max-script-memory-limit-mb.ts';
+import { MAX_SCRIPT_TIMEOUT_MS } from './max-script-timeout-ms.ts';
+import { MIN_SCRIPT_MEMORY_LIMIT_MB } from './min-script-memory-limit-mb.ts';
 import type { ScriptConfig } from './script-config.ts';
 import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
 import { isAgentStepConfig } from '../agent-step-config/is-agent-step-config.ts';
@@ -137,15 +143,37 @@ const SUB_WORKFLOW_NODE_CONFIG_KEYS: Readonly<Record<keyof SubWorkflowNodeConfig
   onUnhandledError: true,
 };
 
-const SCRIPT_CONFIG_KEYS: Readonly<Record<keyof ScriptConfig, true>> = {
+const EXPRESSION_SCRIPT_CONFIG_KEYS: Readonly<Record<keyof ExpressionScriptConfig, true>> = {
   source: true,
   runtime: true,
 };
 
-const SCRIPT_NODE_CONFIG_KEYS: Readonly<Record<keyof ScriptNodeConfig, true>> = {
+const JAVASCRIPT_SCRIPT_CONFIG_KEYS: Readonly<Record<keyof JavaScriptScriptConfig, true>> = {
+  source: true,
+  runtime: true,
+  timeoutMs: true,
+  cwd: true,
+  memoryLimitMb: true,
+  fetchResponseLimitMb: true,
+  fileReadLimitMb: true,
+};
+
+const EXPRESSION_SCRIPT_NODE_CONFIG_KEYS: Readonly<Record<keyof ExpressionScriptNodeConfig, true>> = {
   type: true,
   source: true,
   runtime: true,
+  onUnhandledError: true,
+};
+
+const JAVASCRIPT_SCRIPT_NODE_CONFIG_KEYS: Readonly<Record<keyof JavaScriptScriptNodeConfig, true>> = {
+  type: true,
+  source: true,
+  runtime: true,
+  timeoutMs: true,
+  cwd: true,
+  memoryLimitMb: true,
+  fetchResponseLimitMb: true,
+  fileReadLimitMb: true,
   onUnhandledError: true,
 };
 
@@ -181,6 +209,34 @@ function isPositiveInteger(value: unknown): value is number {
 }
 
 /**
+ * A JavaScript szkript időkorlátja (SPEC-014 5.3): `null` az alapérték, egyébként
+ * pozitív egész legfeljebb `MAX_SCRIPT_TIMEOUT_MS`. Alsó határt nem ad, mert a
+ * pozitív egész szabály a projekt minden időkorlát mezőjén ugyanaz.
+ */
+function isScriptTimeoutMs(value: unknown): value is number | null {
+  return value === null || (isPositiveInteger(value) && value <= MAX_SCRIPT_TIMEOUT_MS);
+}
+
+/**
+ * A JavaScript szkript memória korlátja (SPEC-014 5.3): `null` az alapérték,
+ * egyébként egész, `MIN_SCRIPT_MEMORY_LIMIT_MB` és `MAX_SCRIPT_MEMORY_LIMIT_MB`
+ * között (mindkét határ megengedett; a határok forrása a research Q-9).
+ */
+function isScriptMemoryLimitMb(value: unknown): value is number | null {
+  return value === null || (isInt(value) && value >= MIN_SCRIPT_MEMORY_LIMIT_MB && value <= MAX_SCRIPT_MEMORY_LIMIT_MB);
+}
+
+/**
+ * A JavaScript szkript gazda oldali olvasási plafonja (`fetchResponseLimitMb`,
+ * `fileReadLimitMb`, SPEC-014 5.3): `null` az alapérték, egyébként pozitív
+ * egész, legfeljebb `MAX_SCRIPT_MEMORY_LIMIT_MB` (a modul plafonja fölötti
+ * tartalom a sandboxba sosem férne be).
+ */
+function isScriptReadLimitMb(value: unknown): value is number | null {
+  return value === null || (isPositiveInteger(value) && value <= MAX_SCRIPT_MEMORY_LIMIT_MB);
+}
+
+/**
  * A user 1. döntése (SPEC-004 8.3): a node config `onUnhandledError` mezője.
  */
 function isUnhandledErrorPolicy(value: unknown): value is UnhandledErrorPolicy {
@@ -200,12 +256,37 @@ function isStringRecord(value: unknown): value is Readonly<Record<string, string
 }
 
 /**
- * A `ScriptConfig` alak, a hívó által megadott zárt kulcslistával: a `join`
- * `script` módjának `settings` alobjektuma a saját két kulcsával, a `script`
- * node a burkolóval (`type`, `onUnhandledError`) bővített listával hívja.
+ * A `ScriptConfig` alak, a `runtime` szerinti ág zárt kulcslistájával, amit a
+ * hívó ad meg: a `join` `script` módjának `settings` alobjektuma a két ág saját
+ * kulcsaival, a `script` node a burkolóval (`type`, `onUnhandledError`) bővített
+ * listákkal hívja. Ismeretlen `runtime` értékre a guard hamisat ad.
  */
-function isScriptConfig(value: unknown, knownKeys: Readonly<Record<keyof ScriptConfig, true>>): value is ScriptConfig {
-  return isRecordWithKnownKeys(value, knownKeys) && isString(value.source) && value.runtime === 'expression';
+function isScriptConfig(
+  value: unknown,
+  expressionKeys: Readonly<Record<string, true>>,
+  javascriptKeys: Readonly<Record<string, true>>,
+): value is ScriptConfig {
+  if (!isRecord(value) || !isString(value['source'])) {
+    return false;
+  }
+  switch (value['runtime']) {
+    case 'expression': {
+      return isRecordWithKnownKeys(value, expressionKeys);
+    }
+    case 'javascript': {
+      return (
+        isRecordWithKnownKeys(value, javascriptKeys) &&
+        isScriptTimeoutMs(value['timeoutMs']) &&
+        (value['cwd'] === null || isString(value['cwd'])) &&
+        isScriptMemoryLimitMb(value['memoryLimitMb']) &&
+        isScriptReadLimitMb(value['fetchResponseLimitMb']) &&
+        isScriptReadLimitMb(value['fileReadLimitMb'])
+      );
+    }
+    default: {
+      return false;
+    }
+  }
 }
 
 /**
@@ -302,7 +383,7 @@ function isJoinConfig(value: UnknownRecord): boolean {
     case 'script': {
       return (
         isRecordWithKnownKeys(value, JOIN_SCRIPT_NODE_CONFIG_KEYS) &&
-        isScriptConfig(settings, SCRIPT_CONFIG_KEYS) &&
+        isScriptConfig(settings, EXPRESSION_SCRIPT_CONFIG_KEYS, JAVASCRIPT_SCRIPT_CONFIG_KEYS) &&
         isOnUnhandledErrorValid
       );
     }
@@ -425,7 +506,8 @@ export function isNodeConfig(value: unknown): value is NodeConfig {
       // marad `ScriptConfig`, `onUnhandledError` nélkül); a hívási helyen kell
       // hozzáadni a feltételt, ugyanúgy, mint az `agent_step` ágnál.
       return (
-        isScriptConfig(value, SCRIPT_NODE_CONFIG_KEYS) && isNullableUnhandledErrorPolicy(value['onUnhandledError'])
+        isScriptConfig(value, EXPRESSION_SCRIPT_NODE_CONFIG_KEYS, JAVASCRIPT_SCRIPT_NODE_CONFIG_KEYS) &&
+        isNullableUnhandledErrorPolicy(value['onUnhandledError'])
       );
     }
   }

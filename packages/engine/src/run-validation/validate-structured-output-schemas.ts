@@ -3,7 +3,7 @@ import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { StructuredOutputSchemaCompilerPort } from '../engine-port/structured-output-schema-compiler-port.ts';
 import { agentStepConfigOf } from './agent-step-config-of.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 /**
  * A futás indítási ellenőrzése a strukturált kimenetet váró lépések sémájára
@@ -24,7 +24,7 @@ import type { ExecutableNodeConfig } from './executable-node-config.ts';
  * hibánál megáll.
  */
 export function validateStructuredOutputSchemas(
-  configsById: ReadonlyMap<string, ExecutableNodeConfig>,
+  configsById: ReadonlyMap<string, WellFormedNodeConfig>,
   compiler: StructuredOutputSchemaCompilerPort,
 ): Outcome<ReadonlyMap<string, StructuredOutputValidator>> {
   const validators = new Map<string, StructuredOutputValidator>();

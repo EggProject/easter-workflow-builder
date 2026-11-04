@@ -64,6 +64,57 @@ describe('findBlankRequiredTextField', () => {
     ).toBe('settings.source');
   });
 
+  it('a join script módjában a JavaScript ágú settings.source is kötelező (SPEC-014 5.9)', () => {
+    expect(
+      findBlankRequiredTextField({
+        type: 'join',
+        mode: 'script',
+        settings: {
+          source: ' ',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd: null,
+          memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        },
+        onUnhandledError: null,
+      }),
+    ).toBe('settings.source');
+  });
+
+  it('a script node source mezője mindkét ágon kötelező, a JavaScript ág többi mezője nem', () => {
+    expect(
+      findBlankRequiredTextField({ type: 'script', source: '', runtime: 'expression', onUnhandledError: null }),
+    ).toBe('source');
+    expect(
+      findBlankRequiredTextField({
+        type: 'script',
+        source: '',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+        onUnhandledError: null,
+      }),
+    ).toBe('source');
+    expect(
+      findBlankRequiredTextField({
+        type: 'script',
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: '',
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+        onUnhandledError: null,
+      }),
+    ).toBeUndefined();
+  });
+
   it('a join ai_synthesis módjában a settings.promptTemplate kötelező', () => {
     expect(
       findBlankRequiredTextField({

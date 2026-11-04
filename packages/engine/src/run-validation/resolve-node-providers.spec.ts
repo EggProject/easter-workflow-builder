@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- az `AgentStepConfig` nullázható mezői és a "nincs felülírás" provider szintek a tárolt JSON-ban `null` értéket hordoznak (SPEC-003 4.4), nem helyőrző `undefined`-et */
 import { describe, expect, it } from 'vitest';
 import type { ProviderId } from '@easter-workflow-builder/provider-capability';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 import { resolveNodeProviders } from './resolve-node-providers.ts';
 
 // A megosztott `AgentStepConfig` mezői, a lépés szintű `providerId` nélkül. Az
@@ -29,11 +29,11 @@ const AGENT_SETTINGS = {
   structuredOutput: null,
 } as const;
 
-function agentStep(providerId: ProviderId | null): ExecutableNodeConfig {
+function agentStep(providerId: ProviderId | null): WellFormedNodeConfig {
   return { type: 'agent_step', ...AGENT_SETTINGS, providerId, onUnhandledError: 'fail_run' };
 }
 
-function joinAiSynthesis(providerId: ProviderId | null): ExecutableNodeConfig {
+function joinAiSynthesis(providerId: ProviderId | null): WellFormedNodeConfig {
   return {
     type: 'join',
     mode: 'ai_synthesis',
@@ -42,11 +42,11 @@ function joinAiSynthesis(providerId: ProviderId | null): ExecutableNodeConfig {
   };
 }
 
-const START: ExecutableNodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
+const START: WellFormedNodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
 
 describe('resolveNodeProviders', () => {
   it('a globális alapértelmezést minden node megkapja, az agent jellegűeket is beleértve', () => {
-    const configsById: ReadonlyMap<string, ExecutableNodeConfig> = new Map<string, ExecutableNodeConfig>([
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
       ['start', START],
       ['a', agentStep(null)],
       ['j', joinAiSynthesis(null)],
@@ -63,7 +63,7 @@ describe('resolveNodeProviders', () => {
   });
 
   it('a workflow felülírás erősebb a globális alapértelmezésnél', () => {
-    const configsById: ReadonlyMap<string, ExecutableNodeConfig> = new Map<string, ExecutableNodeConfig>([
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
       ['start', START],
     ]);
 
@@ -74,7 +74,7 @@ describe('resolveNodeProviders', () => {
   });
 
   it('az agent_step lépés felülírása a legerősebb', () => {
-    const configsById: ReadonlyMap<string, ExecutableNodeConfig> = new Map<string, ExecutableNodeConfig>([
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
       ['a', agentStep('claude-subscription')],
     ]);
 
@@ -85,7 +85,7 @@ describe('resolveNodeProviders', () => {
   });
 
   it('az ai_synthesis módú join settings alobjektumának providerId mezője is lépés szintű felülírás', () => {
-    const configsById: ReadonlyMap<string, ExecutableNodeConfig> = new Map<string, ExecutableNodeConfig>([
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
       ['j', joinAiSynthesis('claude-subscription')],
     ]);
 
@@ -96,8 +96,8 @@ describe('resolveNodeProviders', () => {
   });
 
   it('a merge módú join nem hordoz lépés szintű felülírást', () => {
-    const merge: ExecutableNodeConfig = { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' };
-    const configsById: ReadonlyMap<string, ExecutableNodeConfig> = new Map<string, ExecutableNodeConfig>([
+    const merge: WellFormedNodeConfig = { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' };
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
       ['j', merge],
     ]);
 
@@ -108,7 +108,7 @@ describe('resolveNodeProviders', () => {
   });
 
   it('egyetlen szint nélkül no_default_provider hibát ad', () => {
-    const configsById: ReadonlyMap<string, ExecutableNodeConfig> = new Map<string, ExecutableNodeConfig>([
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
       ['start', START],
     ]);
 

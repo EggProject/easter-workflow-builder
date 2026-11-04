@@ -1,6 +1,6 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 /**
  * A SPEC-004 4.7 táblázat 9. sora: "minden node configjában van
@@ -13,7 +13,7 @@ import type { ExecutableNodeConfig } from './executable-node-config.ts';
  * közül nem választ magától, ezért a hiányzó érték elutasítás, nem
  * alapértelmezés.
  */
-export function validateUnhandledErrorPolicy(configsById: ReadonlyMap<string, ExecutableNodeConfig>): Outcome<void> {
+export function validateUnhandledErrorPolicy(configsById: ReadonlyMap<string, WellFormedNodeConfig>): Outcome<void> {
   for (const [nodeId, config] of configsById) {
     if (config.onUnhandledError === null) {
       return {

@@ -8,14 +8,14 @@ import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import type { RunContext } from '../run-context/run-context.ts';
 import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { runAgentNodeLifecycle } from './agent-node-lifecycle.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionResult } from './node-executor-result.ts';
 
 type JoinAiSynthesisNodeConfig = Extract<
-  ExecutableNodeConfig,
+  WellFormedNodeConfig,
   { readonly type: 'join'; readonly mode: 'ai_synthesis' }
 >;
 

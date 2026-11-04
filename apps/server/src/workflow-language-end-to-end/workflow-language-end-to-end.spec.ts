@@ -36,6 +36,7 @@ import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
 import { createHttpServer } from '../http-server/create-http-server.ts';
 import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 import { TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER } from '../engine-assembly/test-structured-output-schema-compiler.ts';
+import { quickJsScriptRunner } from '../script-runner/quickjs-script-runner.ts';
 
 /**
  * SPEC-010 12.3, 16. szekció 48 ... 50. kritérium (PLAN-010 T-010-16):
@@ -156,6 +157,7 @@ async function startServer(agentQueryRunner: AgentQueryRunner): Promise<RunningS
     agentQueryRunner,
     providerDescriptorLookup: buildProviderDescriptorLookup(),
     structuredOutputSchemaCompiler: TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+    scriptRunner: quickJsScriptRunner,
     expressionEvaluator: createCelExpressionEvaluator(),
     templateRenderer: createMustacheTemplateRenderer(),
     eventPublisher: createRealEventPublisher(streamRegistry, clock),

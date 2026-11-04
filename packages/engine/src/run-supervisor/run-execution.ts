@@ -7,7 +7,7 @@ import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import type { UnhandledErrorRecord } from '../error-policy/unhandled-error-record.ts';
 import type { ExecutedStepInstance } from '../run-context/executed-step-instance.ts';
 import type { StepInstanceReference } from '../run-context/step-instance-reference.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import type { RunTopology } from '../scheduling/run-topology.ts';
 import type { SchedulerState } from '../scheduling/scheduler-state.ts';
 
@@ -31,7 +31,7 @@ import type { SchedulerState } from '../scheduling/scheduler-state.ts';
  *   bemenete (`execute-branch.ts`).
  */
 export interface NodePlan {
-  readonly config: ExecutableNodeConfig;
+  readonly config: WellFormedNodeConfig;
   readonly onUnhandledError: UnhandledErrorPolicy;
   readonly providerId: ProviderId;
   readonly descriptor: ProviderCapabilityDescriptor<string, string>;
@@ -91,7 +91,7 @@ export interface PendingFailure {
  * - `stopController`: a futás leállításának jele; a `requestStop` és a
  *   `fail_run` leállítási menete (`advance-run.ts` `stopFailedRun`) szakítja
  *   meg, és a jelén szakad meg az `error_handler` backoff várakozása (8.2 3.
- *   pont). A `stopRequested` jelzőt a `fail_run` nem állítja.
+ *   pont) és a futó szkript lépés (SPEC-014 5.8). A `stopRequested` jelzőt a `fail_run` nem állítja.
  */
 export interface RunExecution {
   readonly runId: string;

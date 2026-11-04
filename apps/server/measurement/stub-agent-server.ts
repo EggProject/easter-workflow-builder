@@ -26,6 +26,7 @@ import { buildProviderDescriptorLookup } from '../src/engine-assembly/build-prov
 import { createProcessEnvironmentReader } from '../src/engine-assembly/create-process-environment-reader.ts';
 import { createSkillLibraryReader } from '../src/engine-assembly/create-skill-library-reader.ts';
 import { createStructuredOutputSchemaCompiler } from '../src/engine-assembly/create-structured-output-schema-compiler.ts';
+import { quickJsScriptRunner } from '../src/script-runner/quickjs-script-runner.ts';
 import { createRandomUuidIdGenerator } from '../src/engine-assembly/create-random-uuid-id-generator.ts';
 import { createRealEventPublisher } from '../src/engine-assembly/create-real-event-publisher.ts';
 import { createSystemClock } from '../src/engine-assembly/create-system-clock.ts';
@@ -139,6 +140,7 @@ const engine = createEngine({
   processEnvironment: createProcessEnvironmentReader(),
   skillLibrary: createSkillLibraryReader(skillLibrary.rootDirectory),
   structuredOutputSchemaCompiler,
+  scriptRunner: quickJsScriptRunner,
 });
 const server = createHttpServer({
   handlers: buildRouteHandlers(database, engine, streamRegistry, skillLibrary, structuredOutputSchemaCompiler),

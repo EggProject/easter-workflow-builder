@@ -439,9 +439,8 @@ for (const { menuItem, fields } of ADDED_NODE_CASES) {
       await expectFieldError(locator, message);
     }
     // A panelen pontosan ennyi mező érvénytelen: a felsorolás teljes. Az
-    // `aria-invalid` állapotra nincs `getByRole` opció, és a `role="alert"`
-    // számlálása a panel nem mezőhöz tartozó figyelmeztetését (a `script`
-    // típusé) is beszámolná, ezért itt attribútum szelektor áll.
+    // `aria-invalid` állapotra nincs `getByRole` opció, ezért itt attribútum
+    // szelektor áll.
     await expect(panel.locator('[aria-invalid="true"]')).toHaveCount(fields.length);
     expect(putBodies).toHaveLength(0);
   });

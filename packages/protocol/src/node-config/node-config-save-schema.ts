@@ -1,10 +1,18 @@
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
 import { BLANK_FIELD_MESSAGE } from './blank-field-message.ts';
 import { findBlankTextFields } from './find-blank-text-fields.ts';
+import { findForbiddenScriptCwdFields } from './find-forbidden-script-cwd-fields.ts';
 import { findInvalidChoiceOptions } from './find-invalid-choice-options.ts';
+import { findIntegerFieldsAbove } from './find-integer-fields-above.ts';
+import { findIntegerFieldsOutsideRange } from './find-integer-fields-outside-range.ts';
 import { findInvalidMcpServerReferenceEnvironmentNames } from './find-invalid-mcp-server-reference-environment-names.ts';
 import { findNonPositiveIntegerFields } from './find-non-positive-integer-fields.ts';
 import { findUnsupportedAgentDefinitionFields } from './find-unsupported-agent-definition-fields.ts';
+import {
+  MAX_SCRIPT_MEMORY_LIMIT_MB,
+  MAX_SCRIPT_TIMEOUT_MS,
+  MIN_SCRIPT_MEMORY_LIMIT_MB,
+} from './javascript-script-config.ts';
 import { NodeConfigSchema, type NodeConfig } from './node-config.ts';
 import { REQUIRED_TEXT_FIELD_PATHS } from './required-text-field-paths.ts';
 
@@ -14,6 +22,31 @@ import { REQUIRED_TEXT_FIELD_PATHS } from './required-text-field-paths.ts';
  * 6. szekció).
  */
 const NOT_POSITIVE_INTEGER_MESSAGE = 'A mező értéke nem pozitív egész szám.';
+
+/**
+ * A JavaScript szkript `timeoutMs` mezője felső határát meghaladó érték
+ * hibaüzenete (SPEC-014 5.3).
+ */
+const SCRIPT_TIMEOUT_TOO_LARGE_MESSAGE = `A mező értéke legfeljebb ${String(MAX_SCRIPT_TIMEOUT_MS)} lehet.`;
+
+/**
+ * A JavaScript szkript `memoryLimitMb` mezője tartományán kívüli érték
+ * hibaüzenete (SPEC-014 5.3): a tört is ide tartozik, a mező egész MB.
+ */
+const SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE = `A mező értéke ${String(MIN_SCRIPT_MEMORY_LIMIT_MB)} és ${String(MAX_SCRIPT_MEMORY_LIMIT_MB)} közötti egész szám lehet.`;
+
+/**
+ * A JavaScript szkript olvasási plafon mezőinek (`fetchResponseLimitMb`,
+ * `fileReadLimitMb`) tartományán kívüli érték hibaüzenete (SPEC-014 5.3): pozitív
+ * egész, legfeljebb a modul plafonja (`MAX_SCRIPT_MEMORY_LIMIT_MB`).
+ */
+const SCRIPT_READ_LIMIT_OUT_OF_RANGE_MESSAGE = `A mező értéke 1 és ${String(MAX_SCRIPT_MEMORY_LIMIT_MB)} közötti egész szám lehet.`;
+
+/**
+ * A JavaScript szkript `/proc` vagy `/dev` alá mutató `cwd` mezőjének
+ * hibaüzenete (user döntés 2026-11-04, "/proc és /dev tiltva", SPEC-014 5.9).
+ */
+const SCRIPT_CWD_FORBIDDEN_MESSAGE = 'A munkakönyvtár nem lehet a /proc vagy a /dev könyvtárban.';
 
 /**
  * A szerver oldali env változó név hibaüzenete (SPEC-009 6.1, T-012-27), a
@@ -83,13 +116,140 @@ const POSITIVE_INTEGER_FIELD_PATHS = {
   agent_step: [],
   branch: [],
   fan_out: [],
-  join: [],
+  join: ['settings.timeoutMs'],
   loop: ['maxIterations'],
   human_approval: [],
   error_handler: ['maxAttempts', 'backoffMs.*'],
   sub_workflow: [],
-  script: [],
+  script: ['timeoutMs'],
 } as const satisfies Readonly<Record<NodeConfig['type'], readonly string[]>>;
+
+/**
+ * A JavaScript szkript `timeoutMs` mezőjének útvonala (SPEC-014 5.3): a `script`
+ * node-on és a `join` `settings` alobjektumán. Az `ai_synthesis` és a `merge`
+ * módnak, valamint a CEL ágnak nincs ilyen mezője, ott az útvonal nem a várt
+ * alakra mutat, tehát nincs találat. A felső határ a `db` `isNodeConfig`
+ * guardjának szabályát duplikálja (`MAX_SCRIPT_TIMEOUT_MS`).
+ */
+const SCRIPT_TIMEOUT_FIELD_PATHS = {
+  start: [],
+  agent_step: [],
+  branch: [],
+  fan_out: [],
+  join: ['settings.timeoutMs'],
+  loop: [],
+  human_approval: [],
+  error_handler: [],
+  sub_workflow: [],
+  script: ['timeoutMs'],
+} as const satisfies Readonly<Record<NodeConfig['type'], readonly string[]>>;
+
+/**
+ * A JavaScript szkript felső határ fölötti `timeoutMs` értékének felvétele a mező útvonalára (SPEC-014 5.3).
+ */
+function addScriptTimeoutTooLargeIssues(config: NodeConfig, context: CustomIssueSink): void {
+  const paths: readonly string[] = SCRIPT_TIMEOUT_FIELD_PATHS[config.type];
+  for (const path of paths) {
+    for (const fieldPath of findIntegerFieldsAbove(config, path, MAX_SCRIPT_TIMEOUT_MS)) {
+      context.addIssue({ code: 'custom', path: [...fieldPath], message: SCRIPT_TIMEOUT_TOO_LARGE_MESSAGE });
+    }
+  }
+}
+
+/**
+ * A JavaScript szkript `memoryLimitMb` mezőjének útvonala (SPEC-014 5.3): a
+ * `script` node-on és a `join` `settings` alobjektumán, a `SCRIPT_TIMEOUT_FIELD_PATHS`
+ * mintájára. A tartomány a `db` `isNodeConfig` guardjának szabályát duplikálja.
+ */
+const SCRIPT_MEMORY_LIMIT_FIELD_PATHS = {
+  start: [],
+  agent_step: [],
+  branch: [],
+  fan_out: [],
+  join: ['settings.memoryLimitMb'],
+  loop: [],
+  human_approval: [],
+  error_handler: [],
+  sub_workflow: [],
+  script: ['memoryLimitMb'],
+} as const satisfies Readonly<Record<NodeConfig['type'], readonly string[]>>;
+
+/**
+ * A JavaScript szkript tartományon kívüli `memoryLimitMb` értékének felvétele a mező útvonalára (SPEC-014 5.3).
+ */
+function addScriptMemoryLimitOutOfRangeIssues(config: NodeConfig, context: CustomIssueSink): void {
+  const paths: readonly string[] = SCRIPT_MEMORY_LIMIT_FIELD_PATHS[config.type];
+  for (const path of paths) {
+    for (const fieldPath of findIntegerFieldsOutsideRange(
+      config,
+      path,
+      MIN_SCRIPT_MEMORY_LIMIT_MB,
+      MAX_SCRIPT_MEMORY_LIMIT_MB,
+    )) {
+      context.addIssue({ code: 'custom', path: [...fieldPath], message: SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE });
+    }
+  }
+}
+
+/**
+ * A JavaScript szkript két olvasási plafon mezőjének útvonala (SPEC-014 5.3), a
+ * `SCRIPT_MEMORY_LIMIT_FIELD_PATHS` mintájára. A tartomány a `db` `isNodeConfig`
+ * guardjának szabályát duplikálja.
+ */
+const SCRIPT_READ_LIMIT_FIELD_PATHS = {
+  start: [],
+  agent_step: [],
+  branch: [],
+  fan_out: [],
+  join: ['settings.fetchResponseLimitMb', 'settings.fileReadLimitMb'],
+  loop: [],
+  human_approval: [],
+  error_handler: [],
+  sub_workflow: [],
+  script: ['fetchResponseLimitMb', 'fileReadLimitMb'],
+} as const satisfies Readonly<Record<NodeConfig['type'], readonly string[]>>;
+
+/**
+ * A JavaScript szkript tartományon kívüli olvasási plafon értékének felvétele a mező útvonalára (SPEC-014 5.3).
+ */
+function addScriptReadLimitOutOfRangeIssues(config: NodeConfig, context: CustomIssueSink): void {
+  const paths: readonly string[] = SCRIPT_READ_LIMIT_FIELD_PATHS[config.type];
+  for (const path of paths) {
+    for (const fieldPath of findIntegerFieldsOutsideRange(config, path, 1, MAX_SCRIPT_MEMORY_LIMIT_MB)) {
+      context.addIssue({ code: 'custom', path: [...fieldPath], message: SCRIPT_READ_LIMIT_OUT_OF_RANGE_MESSAGE });
+    }
+  }
+}
+
+/**
+ * A JavaScript szkript `cwd` mezőjének útvonala (SPEC-014 5.9), a
+ * `SCRIPT_TIMEOUT_FIELD_PATHS` mintájára: a `script` node-on és a `join`
+ * `settings` alobjektumán.
+ */
+const SCRIPT_CWD_FIELD_PATHS = {
+  start: [],
+  agent_step: [],
+  branch: [],
+  fan_out: [],
+  join: ['settings.cwd'],
+  loop: [],
+  human_approval: [],
+  error_handler: [],
+  sub_workflow: [],
+  script: ['cwd'],
+} as const satisfies Readonly<Record<NodeConfig['type'], readonly string[]>>;
+
+/**
+ * A `/proc` vagy `/dev` alá mutató `cwd` felvétele a mező útvonalára (SPEC-014 5.9).
+ */
+function addScriptForbiddenCwdIssues(config: NodeConfig, context: CustomIssueSink): void {
+  const paths: readonly string[] = SCRIPT_CWD_FIELD_PATHS[config.type];
+  for (const path of paths) {
+    for (const fieldPath of findForbiddenScriptCwdFields(config, path)) {
+      context.addIssue({ code: 'custom', path: [...fieldPath], message: SCRIPT_CWD_FORBIDDEN_MESSAGE });
+    }
+  }
+}
 
 function requiredTextFieldPathsOf(config: NodeConfig): readonly string[] {
   if (config.type !== 'join') {
@@ -117,14 +277,19 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
 }
 
 /**
- * A mentési séma (SPEC-008 5.4): a `NodeConfigSchema` olvasó séma plusz hét
+ * A mentési séma (SPEC-008 5.4): a `NodeConfigSchema` olvasó séma plusz nyolc
  * írás oldali szabály, egyetlen `superRefine` hívásban:
  *
  * 1. a kötelező szöveg mezők nem üresek (user döntés 2026-09-28, O-21);
  * 2. az `onUnhandledError` mind a tíz típusnál nem `null` (O-29);
  * 3. a `join` `mode` mezője nem `null` (O-33);
  * 4. a `loop` `maxIterations`, az `error_handler` `maxAttempts` mezője és a
- *    `backoffMs` minden eleme pozitív egész (user döntés 2026-10-17, O-37);
+ *    `backoffMs` minden eleme pozitív egész (user döntés 2026-10-17, O-37); a
+ *    JavaScript szkript `timeoutMs` mezője is pozitív egész, és legfeljebb
+ *    `MAX_SCRIPT_TIMEOUT_MS`, a `memoryLimitMb` mezője pedig `null` vagy
+ *    `MIN_SCRIPT_MEMORY_LIMIT_MB` és `MAX_SCRIPT_MEMORY_LIMIT_MB` közötti egész,
+ *    a `fetchResponseLimitMb` és a `fileReadLimitMb` mezője `null` vagy 1 és
+ *    `MAX_SCRIPT_MEMORY_LIMIT_MB` közötti egész (SPEC-014 5.3);
  * 5. a lépés `mcpServerReferences` hivatkozásainak `envBindings` értéke és nem
  *    `null` `authEnvName` mezője env változó név alakú (SPEC-009 6.1,
  *    T-012-27); az agent definíciók azonos mezőjét a motor indításkori
@@ -136,7 +301,12 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  * 7. a `start` bemeneti mező `choice` típusának `options` listája nem üres,
  *    minden eleme nem üres, és az elemek egyediek (SPEC-016 5.3): a `db`
  *    `isNodeConfig` guard szabályának szándékos duplikátuma, a mezőnkénti
- *    egyezését az `apps/server` `node-config-drift-protection` tesztje őrzi.
+ *    egyezését az `apps/server` `node-config-drift-protection` tesztje őrzi;
+ * 8. a JavaScript szkript `cwd` mezője lexikálisan nem mutat a `/proc` vagy a
+ *    `/dev` alá (user döntés 2026-11-04, SPEC-014 5.9). A szabálynak nincs `db`
+ *    oldali párja, az `onUnhandledError` szabályának mintájára: a második
+ *    védvonal a futtató, ami a gyökeret és minden útvonalat az `fs.realpath`
+ *    alakján is ellenőrzi (relatív út, szimbolikus link).
  *
  * **A szabályok a konfig típushibája mellett is lefutnak** (user döntés
  * 2026-10-16, "Egyszerre látsszon mind", SPEC-008 81. kritérium): a zod
@@ -196,6 +366,10 @@ export const NodeConfigSaveSchema = NodeConfigSchema.superRefine(
         context.addIssue({ code: 'custom', path: [...fieldPath], message: NOT_POSITIVE_INTEGER_MESSAGE });
       }
     }
+    addScriptTimeoutTooLargeIssues(config, context);
+    addScriptMemoryLimitOutOfRangeIssues(config, context);
+    addScriptReadLimitOutOfRangeIssues(config, context);
+    addScriptForbiddenCwdIssues(config, context);
     addInvalidChoiceOptionIssues(config, context);
     const agentStep = agentStepPathOf(config);
     if (agentStep !== undefined) {

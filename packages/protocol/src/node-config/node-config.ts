@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { AgentStepConfigSchema } from './agent-step-config.ts';
+import { ExpressionScriptConfigSchema } from './expression-script-config.ts';
+import { JavaScriptScriptConfigSchema } from './javascript-script-config.ts';
 import { ScriptConfigSchema } from './script-config.ts';
 
 /**
@@ -260,14 +262,32 @@ export const SubWorkflowNodeConfigSchema = z
 export type SubWorkflowNodeConfig = z.infer<typeof SubWorkflowNodeConfigSchema>;
 
 /**
- * Nem AI transzformáció. Tárolható, de a futás indítása elutasítja.
+ * Nem AI transzformáció (SPEC-014 5.3): a `runtime` szerinti beágyazott
+ * diszkriminált unió, a `JoinNodeConfigSchema` mintájára. Mindkét ág `type:
+ * 'script'` literált hordoz, így a külső, `type` mezőn álló unió tagja lehet.
  */
-export const ScriptNodeConfigSchema = ScriptConfigSchema.unwrap()
+export const ExpressionScriptNodeConfigSchema = ExpressionScriptConfigSchema.unwrap()
   .extend({
     type: z.literal('script'),
     onUnhandledError: UnhandledErrorPolicySchema.nullable(),
   })
   .readonly();
+
+export type ExpressionScriptNodeConfig = z.infer<typeof ExpressionScriptNodeConfigSchema>;
+
+export const JavaScriptScriptNodeConfigSchema = JavaScriptScriptConfigSchema.unwrap()
+  .extend({
+    type: z.literal('script'),
+    onUnhandledError: UnhandledErrorPolicySchema.nullable(),
+  })
+  .readonly();
+
+export type JavaScriptScriptNodeConfig = z.infer<typeof JavaScriptScriptNodeConfigSchema>;
+
+export const ScriptNodeConfigSchema = z.discriminatedUnion('runtime', [
+  ExpressionScriptNodeConfigSchema,
+  JavaScriptScriptNodeConfigSchema,
+]);
 
 export type ScriptNodeConfig = z.infer<typeof ScriptNodeConfigSchema>;
 

@@ -475,6 +475,7 @@ function buildRequest(
     sessionSourceNodes: execution.sessionSourceNodes,
     sessionInstances: execution.sessionInstances,
     structuredOutputValidator: execution.structuredOutputValidators.get(instance.nodeId),
+    stopSignal: execution.stopController.signal,
   };
 
   const config = plan.config;
@@ -494,7 +495,6 @@ function buildRequest(
       config,
       failedErrorKind: failure.errorKind,
       failedAttempt: failure.attempt,
-      stopSignal: execution.stopController.signal,
     },
   };
 }
@@ -581,7 +581,8 @@ async function stopFailedRun(
  * backoffra váró `error_handler` a várakozás kivárása nélkül, `interrupted`
  * kimenettel tér vissza, újabb kísérletet nem ütemez, és a `running` sorát a
  * `finishRun` zárja `cancelled` állapotba (`cancelStoppedStepRuns`, SPEC-004
- * 8.2 3. pont).
+ * 8.2 3. pont). Ugyanígy zár a futó JavaScript szkript lépés: a
+ * `scriptRunner` a jelre `aborted` eredményt ad (SPEC-014 5.8).
  *
  * Utána ugyanaz a három primitíva, ugyanabban a sorrendben, amit a külső
  * megszakítás is használ (`run-interrupt/stop-and-await-run-tree.ts` 2 ... 4.
@@ -692,9 +693,10 @@ async function runSchedulingLoop(
  * előtt helyet kapott testvér sora is lehet még `pending`, és a korai
  * lezárása a `markStepRunning`-ot buktatná. A `waiting_approval`
  * sor itt már nem létezik, azt a hurok a várakozás lezárásával egy időben
- * zárja (`runSchedulingLoop`). `running` sort egyedül a backoff várakozásában
- * megszakított `error_handler` hagy (`execute-error-handler.ts`, `interrupted`
- * kimenet, sor írás nélkül): a hurok ekkorra minden elindított példányt
+ * zárja (`runSchedulingLoop`). `running` sort a backoff várakozásában
+ * megszakított `error_handler` (`execute-error-handler.ts`) és a futás közben
+ * megszakított szkript lépés (`execute-script.ts`, SPEC-014 5.8) hagy,
+ * `interrupted` kimenettel, sor írás nélkül: a hurok ekkorra minden elindított példányt
  * megvárt, és a futó agent lépés a saját végrehajtóján zár. Ugyanaz a végállapot, amit a külső megszakítás
  * `cancelRunTree` tranzakciója ír ugyanezekre a sorokra (9. szekció 5.
  * pont); lépés eseményt az sem ír.

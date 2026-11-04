@@ -1,7 +1,7 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { ProviderId } from '@easter-workflow-builder/provider-capability';
 import { resolveEffectiveProvider } from '../provider-resolution/resolve-effective-provider.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 /**
  * A node saját, lépés szintű provider felülírása (SPEC-004 11.1 3. pont).
@@ -11,7 +11,7 @@ import type { ExecutableNodeConfig } from './executable-node-config.ts';
  * és a `join` node `ai_synthesis` módja, ahol a `settings` alobjektum maga az
  * `AgentStepConfig`. Minden más node típusnál nincs mit felülírni.
  */
-function stepProviderOverride(config: ExecutableNodeConfig): ProviderId | null {
+function stepProviderOverride(config: WellFormedNodeConfig): ProviderId | null {
   if (config.type === 'agent_step') {
     return config.providerId;
   }
@@ -44,7 +44,7 @@ function stepProviderOverride(config: ExecutableNodeConfig): ProviderId | null {
  * fogalmazza meg.
  */
 export function resolveNodeProviders(
-  configsById: ReadonlyMap<string, ExecutableNodeConfig>,
+  configsById: ReadonlyMap<string, WellFormedNodeConfig>,
   globalDefaultProviderId: ProviderId | null,
   workflowProviderId: ProviderId | null,
 ): Outcome<ReadonlyMap<string, ProviderId>> {

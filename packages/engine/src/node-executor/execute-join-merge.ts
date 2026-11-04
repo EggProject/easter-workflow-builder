@@ -1,5 +1,5 @@
 import type { Outcome } from '@easter-workflow-builder/core';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { beginStepRun } from './begin-step-run.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import { finishStepRunWithOutput } from './finish-step-run-with-output.ts';
@@ -7,7 +7,7 @@ import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
-type JoinMergeNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'join'; readonly mode: 'merge' }>;
+type JoinMergeNodeConfig = Extract<WellFormedNodeConfig, { readonly type: 'join'; readonly mode: 'merge' }>;
 
 /**
  * A `join` node `merge` módjának bemenete (SPEC-004 5. szekció 5. sora, 5.6

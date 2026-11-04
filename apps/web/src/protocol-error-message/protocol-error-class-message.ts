@@ -21,7 +21,6 @@ const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>
   invalid_start_node: 'A gráfban pontosan egy Indítás csomópontnak kell lennie.',
   dangling_edge: 'A gráf egyik éle nem létező csomópontra hivatkozik.',
   unreachable_node: 'A gráf egyik csomópontja nem érhető el az Indítás csomópontból.',
-  unimplemented_node_type: 'A gráf szkriptet futtató lépést tartalmaz, amit a rendszer még nem hajt végre.',
   branch_key_unknown:
     'Egy Elágazás csomópont éle vagy alapértelmezett ága olyan kulcsra hivatkozik, ami nincs az ágai között.',
   invalid_error_handler_edge: 'Egy Hiba esetén él nem Hibakezelő csomópontra mutat.',
@@ -55,6 +54,7 @@ const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>
   agent_mcp_server_override_conflict:
     'Egy agent definíció olyan MCP szervert ír felül, amit a lépés is használ, ezért a felülírás nem érvényesülne.',
   missing_mcp_server_env: 'Egy lépés MCP szerveréhez rendelt szerver oldali env változó nincs beállítva.',
+  script_compile_failed: 'A workflow egyik szkriptje nem fordítható le, ezért a futás nem indítható.',
   already_decided: 'Ezt a jóváhagyást már eldöntötték.',
   // SPEC-009 5.4 tábla: a skill feltöltés elutasítási okai (O-41, user döntés 2026-10-28).
   skill_archive_unreadable: 'A feltöltött fájl nem érvényes ZIP csomag.',

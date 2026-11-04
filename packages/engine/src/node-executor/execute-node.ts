@@ -6,15 +6,17 @@ import { executeFanOut } from './execute-fan-out.ts';
 import { executeHumanApproval } from './execute-human-approval.ts';
 import { executeJoinAiSynthesis } from './execute-join-ai-synthesis.ts';
 import { executeJoinMerge } from './execute-join-merge.ts';
+import { executeJoinScript } from './execute-join-script.ts';
 import { executeLoop } from './execute-loop.ts';
+import { executeScript } from './execute-script.ts';
 import { executeStart } from './execute-start.ts';
 import { executeSubWorkflow } from './execute-sub-workflow.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import type { ExecuteNodeRequest } from './execute-node-request.ts';
 import type { NodeExecutionResult } from './node-executor-result.ts';
 import type { NodeExecutorDependencies } from './node-executor-dependencies.ts';
 
-type JoinNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'join' }>;
+type JoinNodeConfig = Extract<WellFormedNodeConfig, { readonly type: 'join' }>;
 
 /**
  * A `join` node két módjának szétválasztása **önálló függvényben**, nem a
@@ -27,8 +29,8 @@ type JoinNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'join' }>;
  * kimerítőség ugyanúgy fordítási idejű marad
  * (`switch-exhaustiveness-check`).
  *
- * A `script` mód itt sem jelenik meg: az `ExecutableNodeConfig` már kizárta
- * (4.7, F-19).
+ * A `script` mód a közös szkript végrehajtón fut (`execute-join-script.ts`,
+ * SPEC-014 5.8).
  */
 function executeJoinNode(
   config: JoinNodeConfig,
@@ -39,6 +41,12 @@ function executeJoinNode(
   switch (config.mode) {
     case 'merge': {
       return Promise.resolve(executeJoinMerge({ instance, config, joinInputs }, dependencies.ports));
+    }
+    case 'script': {
+      return executeJoinScript(
+        { instance, config, runContext, joinInputs, stopSignal: request.stopSignal },
+        dependencies.ports,
+      );
     }
     case 'ai_synthesis': {
       return executeJoinAiSynthesis(
@@ -68,18 +76,17 @@ function executeJoinNode(
  * a `NodeExecutionOutcome` értékből építi a `scheduling` téma
  * `SchedulingEvent` bemenetét (`node-executor-outcome.ts`).
  *
- * **A `switch` kimerítő, és nincs benne `script` ág.** A bemenet configja
- * `ExecutableNodeConfig`, ami a validáció típusszintű szűkítése (4.7, "A
- * validáció eredménye típusszintű szűkítés"): a `script` node és a `join`
- * `script` módja a futás indításakor már `unimplemented_node_type` hibával
- * elutasításra került (F-19). Így nem keletkezik olyan kódág, ami logikailag
- * sosem fut, és a 100 százalékos lefedettségi küszöb kizárás nélkül tartható
- * (`.claude/CLAUDE.md` 5. szekció).
+ * **A `switch` kimerítő.** A bemenet configja `WellFormedNodeConfig`, a
+ * `malformed_node_config` ellenőrzés típusszintű szűkítése (SPEC-008 O-33): a
+ * választatlan `join` ág nem jut ide, tehát nincs sosem futó `case null`. A
+ * `script` node és a `join` `script` módja a SPEC-014 5.8 óta végrehajtható, a
+ * közös szkript végrehajtón (`execute-script.ts`).
  *
  * **Miért nem `async` a függvény.** Öt végrehajtó szinkron (`start`,
  * `branch`, `fan_out`, `loop`, `join` `merge`: egyik sem vár külső
- * eseményre), öt pedig `Promise`-t ad (`agent_step`, `join`
- * `ai_synthesis`, `human_approval`, `sub_workflow`, `error_handler`). Egy
+ * eseményre), hét pedig `Promise`-t ad (`agent_step`, `join`
+ * `ai_synthesis`, `human_approval`, `sub_workflow`, `error_handler`, és a
+ * két szkript ág). Egy
  * `async` burkoló a szinkron ágakat is egy mikrotaszkkal késleltetné, és a
  * `require-await` szabály miatt egy felesleges `await`-et is igényelne; a
  * `Promise.resolve(...)` burkolás ezzel szemben pontosan azt fejezi ki, ami
@@ -144,6 +151,12 @@ export function executeNode(
     }
     case 'human_approval': {
       return executeHumanApproval({ instance, config, runContext }, ports, dependencies.approvalRegistry);
+    }
+    case 'script': {
+      return executeScript(
+        { instance, nodeType: 'script', script: config, runContext, stopSignal: request.stopSignal },
+        ports,
+      );
     }
     case 'sub_workflow': {
       return executeSubWorkflow(

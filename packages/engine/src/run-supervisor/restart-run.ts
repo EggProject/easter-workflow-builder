@@ -76,11 +76,9 @@ export function restartRun(runId: string, dependencies: RestartRunDependencies):
     });
   }
 
-  return Promise.resolve(
-    dependencies.runSupervisor.startRun({
-      workflowId: original.value.workflowId,
-      input: sourceInput,
-      restartedFromRunId: runId,
-    }),
-  );
+  return dependencies.runSupervisor.startRun({
+    workflowId: original.value.workflowId,
+    input: sourceInput,
+    restartedFromRunId: runId,
+  });
 }

@@ -8,12 +8,12 @@ import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import type { RunContext } from '../run-context/run-context.ts';
 import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { runAgentNodeLifecycle } from './agent-node-lifecycle.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionResult } from './node-executor-result.ts';
 
-type AgentStepNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'agent_step' }>;
+type AgentStepNodeConfig = Extract<WellFormedNodeConfig, { readonly type: 'agent_step' }>;
 
 /**
  * Az `agent_step` node bemenete (SPEC-004 5. szekció 2. sora, 5.2 szekció).

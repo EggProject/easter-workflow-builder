@@ -90,14 +90,14 @@ export interface RunSupervisorDependencies {
  * `ChildWorkflowRunner`-ként a `node-executor` rétegnek
  * (`child-workflow-runner.ts` doksija).
  *
- * A `startRun` **szinkron**, mert a 4.8 menet 1 ... 7. lépése egyetlen `await`
- * pontot sem tartalmaz: a `db` csomag minden művelete szinkron
- * (`better-sqlite3`). A `SPEC-004` 3.1 szekció `Engine.startRun` szignatúrája
- * `Promise`-t ad; a burkolást a `createEngine` (T-005-28) végzi el, ahogy a
- * `startChildRun` is teszi itt.
+ * A `startRun` **aszinkron**: a `db` csomag minden művelete szinkron
+ * (`better-sqlite3`), a JavaScript szkript források fordítása viszont saját,
+ * eldobott WebAssembly modulon fut, aminek a példányosítása aszinkron (SPEC-014
+ * 5.4, research `2026-11-04-szkript-csomopont.md` 7.3). A menet egyetlen
+ * `await` pontja ez a fordítás, az első írás előtt.
  */
 export interface RunSupervisor extends ChildWorkflowRunner {
-  readonly startRun: (request: StartRunRequest) => Outcome<StartedRun>;
+  readonly startRun: (request: StartRunRequest) => Promise<Outcome<StartedRun>>;
 
   /**
    * A jelenleg futó (nem terminális) futások kézikönyvei. A `run-interrupt`

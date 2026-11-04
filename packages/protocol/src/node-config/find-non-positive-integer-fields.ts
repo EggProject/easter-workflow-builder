@@ -1,23 +1,5 @@
-import { isInt, isNumber, isRecord } from '@easter-workflow-builder/typeguards';
-
-function collectNonPositiveIntegerFields(
-  value: unknown,
-  segments: readonly string[],
-  prefix: readonly (string | number)[],
-): readonly (readonly (string | number)[])[] {
-  const [head, ...rest] = segments;
-  if (head === undefined) {
-    return isNumber(value) && !(isInt(value) && value > 0) ? [prefix] : [];
-  }
-  if (head === '*') {
-    return Array.isArray(value)
-      ? value.flatMap((element: unknown, index: number) =>
-          collectNonPositiveIntegerFields(element, rest, [...prefix, index]),
-        )
-      : [];
-  }
-  return isRecord(value) ? collectNonPositiveIntegerFields(value[head], rest, [...prefix, head]) : [];
-}
+import { isInt } from '@easter-workflow-builder/typeguards';
+import { collectNumberFields } from './collect-number-fields.ts';
 
 /**
  * Egy ponttal összefűzött mezőútvonal (`backoffMs.*`, a lista minden elemén
@@ -34,5 +16,5 @@ function collectNonPositiveIntegerFields(
  * `findBlankTextFields` mintájára.
  */
 export function findNonPositiveIntegerFields(value: unknown, path: string): readonly (readonly (string | number)[])[] {
-  return collectNonPositiveIntegerFields(value, path.split('.'), []);
+  return collectNumberFields(value, path.split('.'), [], (candidate) => !(isInt(candidate) && candidate > 0));
 }

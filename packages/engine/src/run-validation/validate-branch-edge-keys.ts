@@ -2,7 +2,7 @@ import type { Outcome } from '@easter-workflow-builder/core';
 import type { SnapshotEdge } from '@easter-workflow-builder/db';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 // Egyetlen `branch` node kimenő éleinek ellenőrzése. Külön függvényben áll, és
 // nem a hívó ciklusába ágyazva, mert az `on_error` él átugrása egymásba
@@ -45,7 +45,7 @@ function validateBranchNodeEdges(
  */
 export function validateBranchEdgeKeys(
   graph: ExecutableGraph,
-  configsById: ReadonlyMap<string, ExecutableNodeConfig>,
+  configsById: ReadonlyMap<string, WellFormedNodeConfig>,
 ): Outcome<void> {
   for (const [nodeId, config] of configsById) {
     if (config.type !== 'branch') {

@@ -1,8 +1,9 @@
 import type { JoinNodeConfig } from '@easter-workflow-builder/protocol';
-import { SelectField, TextAreaField } from '@easter-workflow-builder/ui';
-import type { ChangeEvent, ReactElement } from 'react';
+import { SelectField } from '@easter-workflow-builder/ui';
+import type { ReactElement } from 'react';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
 import { DEFAULT_AGENT_STEP_SETTINGS } from './default-agent-step-settings.ts';
+import { ScriptConfigFields } from './ScriptConfigFields.tsx';
 import { useFieldError } from './use-field-error.ts';
 
 export interface JoinNodeFieldsProperties {
@@ -38,13 +39,14 @@ const MODE_OPTIONS = [
  * A `join` node szerkesztett mezői: `mode` és a módhoz tartozó `settings`
  * (SPEC-008 5.1). A `merge` módnak nincs beállítása (user döntés
  * 2026-10-26: a `settings` mező kikerült); a `script` mód a közös
- * `ScriptConfig` alakot hordozza; az `ai_synthesis` mód a teljes
+ * `ScriptConfig` alakot hordozza, a `script` node-dal AZONOS
+ * `ScriptConfigFields` komponensen át (SPEC-014 5.9); az `ai_synthesis` mód a teljes
  * `AgentStepConfig`-ot, a `agent_step` node-dal AZONOS
  * `AgentStepConfigFields` komponensen át.
  *
- * CSOPORTOSÍTÁS: a mód választó és a módhoz tartozó egyetlen beállítás
- * elöl áll, panel nélkül - a `script` módnak összesen két mezője van, a
- * `merge` módnál csak a mód választó áll. Az `ai_synthesis` mód a saját panelezését az
+ * CSOPORTOSÍTÁS: a mód választó és a módhoz tartozó beállítás elöl áll,
+ * panel nélkül - a `script` mód mezői a `ScriptConfigFields` csoportosítása
+ * szerint, a `merge` módnál csak a mód választó áll. Az `ai_synthesis` mód a saját panelezését az
  * `AgentStepConfigFields`-től örökli, tehát a mód választó után ugyanaz a
  * "elöl a prompt, panelben a felülírások" tagolás jelenik meg. A
  * választatlan (`mode: null`) állapotban is csak a mód választó áll, mert a
@@ -54,7 +56,6 @@ const MODE_OPTIONS = [
 export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): ReactElement {
   const { config, onChange, inheritedProviderDescription } = properties;
   const modeError = useFieldError('mode');
-  const sourceError = useFieldError('settings.source');
 
   function handleModeChange(nextMode: SelectedJoinMode): void {
     const { onUnhandledError } = config;
@@ -94,13 +95,11 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
     return (
       <>
         {modeSelect}
-        <TextAreaField
-          size="sm"
-          label="Forrás (source)"
-          value={config.settings.source}
-          error={sourceError}
-          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-            onChange({ ...config, settings: { ...config.settings, source: event.target.value } });
+        <ScriptConfigFields
+          fieldPathPrefix="settings."
+          config={config.settings}
+          onChange={(nextSettings) => {
+            onChange({ ...config, settings: nextSettings });
           }}
         />
       </>

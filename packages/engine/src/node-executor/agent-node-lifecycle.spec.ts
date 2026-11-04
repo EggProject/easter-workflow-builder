@@ -332,6 +332,7 @@ function dependenciesOf(parts: {
     idGenerator: { nextId: notCalled },
     processEnvironment: { read: () => null, readAll: () => ({}) },
     structuredOutputSchemaCompiler: SCHEMA_COMPILER,
+    scriptRunner: { compile: notCalled, run: notCalled },
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },

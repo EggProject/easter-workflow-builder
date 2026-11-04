@@ -3,7 +3,7 @@ import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import type { RunContext } from '../run-context/run-context.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { beginStepRun } from './begin-step-run.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import { finishStepRunFailed } from './finish-step-run-failed.ts';
@@ -12,7 +12,7 @@ import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
-type LoopNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'loop' }>;
+type LoopNodeConfig = Extract<WellFormedNodeConfig, { readonly type: 'loop' }>;
 
 /**
  * A `loop` node bemenete (SPEC-004 5. szekció 6. sora, 4.6 szekció). Az

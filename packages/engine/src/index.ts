@@ -15,6 +15,12 @@ export type { IdGeneratorPort } from './engine-port/id-generator-port.ts';
 export type { ProcessEnvironmentPort } from './engine-port/process-environment-port.ts';
 export type { SkillLibraryPort } from './engine-port/skill-library-port.ts';
 export type { SkillLibrarySnapshot } from './engine-port/skill-library-snapshot.ts';
+// A JavaScript szkript futtató port (SPEC-014 5.2): a típusa már áll, az
+// `EngineDependencies` mezőjeként a szerver oldali megvalósítással együtt kerül
+// be (PLAN-015, research `2026-11-04-szkript-csomopont.md` T-015-4 szekció).
+export type { ScriptRunnerPort } from './engine-port/script-runner-port.ts';
+export type { ScriptRunRequest } from './engine-port/script-run-request.ts';
+export type { ScriptRunResult } from './engine-port/script-run-result.ts';
 export type { EngineDependencies } from './engine-port/engine-dependencies.ts';
 // A motor teljes felülete és a `createEngine` összeállítás (SPEC-004 3.1
 // szekció, PLAN-005 T-005-28): az `Engine` interfész, a négy eredmény típus
@@ -81,13 +87,12 @@ export { validateScopeBalance } from './branch-scope/validate-scope-balance.ts';
 export { resolveEffectiveProvider } from './provider-resolution/resolve-effective-provider.ts';
 
 // run-validation: a futás indítási validációja. A SPEC-004 4.7 táblázatának
-// mind a tíz ellenőrzése, a 4.2 fenntartott `branch_key` szabálya, a 4.8
-// 2. lépésének node-onkénti provider feloldása, és a 4.7 "A validáció
-// eredménye típusszintű szűkítés" bekezdésének `ExecutableNodeConfig` uniója
-// (PLAN-005 T-005-15). A `validateRun` az egyetlen belépési pont; a
-// tizenegy ellenőrző függvény azért is szerepel a barrelben, mert
+// ellenőrzései, a 4.2 fenntartott `branch_key` szabálya, a 4.8 2. lépésének
+// node-onkénti provider feloldása, és a `malformed_node_config` után maradó
+// `WellFormedNodeConfig` unió (PLAN-005 T-005-15; a `script` ágak szűkítése a
+// SPEC-014 5.8 óta nincs). A `validateRun` az egyetlen belépési pont; az
+// ellenőrző függvények azért is szerepelnek a barrelben, mert
 // mindegyik önállóan futtatható, adatbázis nélküli tiszta függvény.
-export type { ExecutableNodeConfig } from './run-validation/executable-node-config.ts';
 export type { WellFormedNodeConfig } from './run-validation/well-formed-node-config.ts';
 export type { ValidatedRun } from './run-validation/validated-run.ts';
 export { validateRun } from './run-validation/validate-run.ts';
@@ -95,7 +100,6 @@ export { validateStartNode } from './run-validation/validate-start-node.ts';
 export { validateEdgeEndpoints } from './run-validation/validate-edge-endpoints.ts';
 export { validateNodeReachability } from './run-validation/validate-node-reachability.ts';
 export { validateNodeConfigs } from './run-validation/validate-node-configs.ts';
-export { validateImplementedNodeTypes } from './run-validation/validate-implemented-node-types.ts';
 export { validateBranchEdgeKeys } from './run-validation/validate-branch-edge-keys.ts';
 export { validateDefaultBranchKey } from './run-validation/validate-default-branch-key.ts';
 export { validateErrorHandlerEdges } from './run-validation/validate-error-handler-edges.ts';

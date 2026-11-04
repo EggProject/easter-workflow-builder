@@ -234,7 +234,7 @@ test('üres inputFields lista esetén a modális nem nyílik meg, a futás közv
   expect(recording.bodies).toEqual([JSON.stringify({ input: {} })]);
 });
 
-test('script lépésnél a "Futás indítása" gomb tiltott, az okot a lábléc megnevezi, és az elérhető a felolvasónak (SPEC-008 14. kritérium)', async ({
+test('script lépésnél a "Futás indítása" gomb engedélyezett, tiltási ok nincs, és a futás elindul (SPEC-014 5.9)', async ({
   page,
 }) => {
   const recording: StartRunRecording = { bodies: [] };
@@ -242,25 +242,13 @@ test('script lépésnél a "Futás indítása" gomb tiltott, az okot a lábléc 
   await page.goto(EDITOR_URL);
 
   const startButton = page.getByRole('button', { name: 'Futás indítása', exact: true });
-  await expect(startButton).toBeDisabled();
-  const reason = page.getByText('amit a motor a futtatáskor `unimplemented_node_type` hibával elutasít');
-  await expect(reason).toBeVisible();
-  // Az ok a gomb hozzáférhető leírása: a `disabled` gombra nem érkezik
-  // fókusz, ezért csak az `aria-describedby` hivatkozás juttatja el a
-  // felolvasóhoz.
-  await expect(startButton).toHaveAccessibleDescription(/unimplemented_node_type/);
-  expect(recording.bodies).toEqual([]);
-});
-
-test('script lépés nélkül nincs tiltási ok szöveg, és a gomb nem hordoz leírás hivatkozást', async ({ page }) => {
-  const recording: StartRunRecording = { bodies: [] };
-  await mockEditor(page, START_WITHOUT_FIELDS, recording);
-  await page.goto(EDITOR_URL);
-
-  const startButton = page.getByRole('button', { name: 'Futás indítása', exact: true });
   await expect(startButton).toBeEnabled();
   await expect(startButton).not.toHaveAttribute('aria-describedby');
-  await expect(page.getByText('unimplemented_node_type')).toHaveCount(0);
+  await startButton.click();
+
+  // A navigáció a futás nézetre és a `POST` kérés törzse a siker bizonyítéka.
+  await expect(page).toHaveURL(/\/run\?runId=run-1$/);
+  expect(recording.bodies).toEqual([JSON.stringify({ input: {} })]);
 });
 
 test('nem üres inputFields lista esetén a modális nyílik meg, és a mezők a lista alapján épülnek', async ({ page }) => {

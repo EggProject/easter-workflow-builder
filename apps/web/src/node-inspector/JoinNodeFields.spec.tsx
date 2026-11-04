@@ -279,6 +279,49 @@ describe('JoinNodeFields', () => {
     expect(errorElement?.textContent).toBe('A mező nem lehet üres.');
   });
 
+  it('"script" módra a JavaScript runtime mezői a `settings` alá írnak, a hibájuk a `settings.` útvonalon jelenik meg', () => {
+    const onChange = vi.fn();
+    const javascriptConfig: JoinNodeConfig = {
+      type: 'join',
+      mode: 'script',
+      settings: {
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+      },
+      onUnhandledError: null,
+    };
+    act(() => {
+      root.render(
+        <FieldErrorVisibilityContext.Provider value>
+          <FieldErrorsContext.Provider value={new Map([['settings.memoryLimitMb', 'Memória hiba']])}>
+            <JoinNodeFields config={javascriptConfig} onChange={onChange} inheritedProviderDescription="nincs" />
+          </FieldErrorsContext.Provider>
+        </FieldErrorVisibilityContext.Provider>,
+      );
+    });
+    expect(container.querySelector('.field__error')?.textContent).toBe('Memória hiba');
+    const cwd = [...container.querySelectorAll('.field')]
+      .find((field) => field.querySelector('.field__label')?.textContent === 'Munkakönyvtár (cwd)')
+      ?.querySelector('input');
+    if (cwd === null || cwd === undefined) {
+      throw new Error('a teszt nem találta a munkakönyvtár mezőt');
+    }
+    act(() => {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+      descriptor?.set?.call(cwd, '/munka');
+      cwd.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...javascriptConfig,
+      settings: { ...javascriptConfig.settings, cwd: '/munka' },
+    });
+  });
+
   it('"script" módra a `settings.source` mezőnkénti hibája a forrás mező alatt jelenik meg', () => {
     act(() => {
       root.render(

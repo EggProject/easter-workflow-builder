@@ -1,7 +1,7 @@
 import type { ProviderId } from '@easter-workflow-builder/provider-capability';
 import type { FanOutJoinPairing } from '../branch-scope/fan-out-join-pairing.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 /**
  * A `validateRun` sikeres ágának eredménye: minden, amit a validáció menet
@@ -18,9 +18,9 @@ import type { ExecutableNodeConfig } from './executable-node-config.ts';
  *   visszaél, mert a kettő várakozási szabálya különbözik.
  * - `fanOutJoinPairing`: a `validateScopeBalance` mellékterméke (4.5): melyik
  *   `join` node melyik `fan_out` hatókörét zárja.
- * - `nodeConfigsById`: a `malformed_node_config` és az
- *   `unimplemented_node_type` ellenőrzés **melléktermékeként** eltárolt,
- *   típusszintűen szűkített config node azonosító szerint. A validáció úgyis
+ * - `nodeConfigsById`: a `malformed_node_config` ellenőrzés
+ *   **melléktermékeként** eltárolt, típusszintűen szűkített config node
+ *   azonosító szerint. A validáció úgyis
  *   szűkít az `isNodeConfig` guarddal, ezért a szűkített értéket eldobni és
  *   később újra kiszámolni felesleges és hibalehetőség lenne.
  * - `effectiveProviderByNodeId`: a háromszintű provider feloldás eredménye
@@ -32,6 +32,6 @@ export interface ValidatedRun {
   readonly startNodeId: string;
   readonly loopBackEdgeIds: ReadonlySet<string>;
   readonly fanOutJoinPairing: FanOutJoinPairing;
-  readonly nodeConfigsById: ReadonlyMap<string, ExecutableNodeConfig>;
+  readonly nodeConfigsById: ReadonlyMap<string, WellFormedNodeConfig>;
   readonly effectiveProviderByNodeId: ReadonlyMap<string, ProviderId>;
 }

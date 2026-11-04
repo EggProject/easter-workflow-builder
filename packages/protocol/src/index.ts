@@ -168,6 +168,16 @@ export type { SandboxConfig } from './node-config/sandbox-config.ts';
 export { SandboxConfigSchema } from './node-config/sandbox-config.ts';
 export type { ScriptConfig } from './node-config/script-config.ts';
 export { ScriptConfigSchema } from './node-config/script-config.ts';
+export type { ExpressionScriptConfig } from './node-config/expression-script-config.ts';
+export { ExpressionScriptConfigSchema } from './node-config/expression-script-config.ts';
+export type { JavaScriptScriptConfig } from './node-config/javascript-script-config.ts';
+export {
+  JavaScriptScriptConfigSchema,
+  MAX_SCRIPT_MEMORY_LIMIT_MB,
+  MAX_SCRIPT_TIMEOUT_MS,
+  MIN_SCRIPT_MEMORY_LIMIT_MB,
+} from './node-config/javascript-script-config.ts';
+export { FORBIDDEN_SCRIPT_PATH_PREFIXES } from './node-config/forbidden-script-path-prefixes.ts';
 export type { McpServerReference } from './node-config/mcp-server-reference.ts';
 export { McpServerReferenceSchema } from './node-config/mcp-server-reference.ts';
 export type { AgentStepConfig, PresetSystemPrompt, StructuredOutputConfig } from './node-config/agent-step-config.ts';
@@ -181,12 +191,14 @@ export type {
   BranchNodeConfig,
   BranchOption,
   ErrorHandlerNodeConfig,
+  ExpressionScriptNodeConfig,
   FanOutNodeConfig,
   HumanApprovalNodeConfig,
   JoinAiSynthesisNodeConfig,
   JoinMergeNodeConfig,
   JoinNodeConfig,
   JoinScriptNodeConfig,
+  JavaScriptScriptNodeConfig,
   JoinUnselectedNodeConfig,
   LoopNodeConfig,
   NodeConfig,
@@ -204,12 +216,14 @@ export {
   BranchNodeConfigSchema,
   BranchOptionSchema,
   ErrorHandlerNodeConfigSchema,
+  ExpressionScriptNodeConfigSchema,
   FanOutNodeConfigSchema,
   HumanApprovalNodeConfigSchema,
   JoinAiSynthesisNodeConfigSchema,
   JoinMergeNodeConfigSchema,
   JoinNodeConfigSchema,
   JoinScriptNodeConfigSchema,
+  JavaScriptScriptNodeConfigSchema,
   JoinUnselectedNodeConfigSchema,
   LoopNodeConfigSchema,
   NodeConfigSchema,

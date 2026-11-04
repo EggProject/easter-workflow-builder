@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- az `AgentStepConfig` nullázható mezői (SPEC-003 4.3) a tárolt alakban valódi `null` értéket hordoznak */
 import { describe, expect, it } from 'vitest';
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 import { validateSkillReferences } from './validate-skill-references.ts';
 
 function agentStepConfig(skills: AgentStepConfig['skills'], agents: AgentStepConfig['agents'] = {}): AgentStepConfig {
@@ -28,21 +28,21 @@ function agentStepConfig(skills: AgentStepConfig['skills'], agents: AgentStepCon
   };
 }
 
-function agentNode(skills: AgentStepConfig['skills']): ExecutableNodeConfig {
+function agentNode(skills: AgentStepConfig['skills']): WellFormedNodeConfig {
   return { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig(skills) };
 }
 
-function synthesisNode(skills: AgentStepConfig['skills']): ExecutableNodeConfig {
+function synthesisNode(skills: AgentStepConfig['skills']): WellFormedNodeConfig {
   return { type: 'join', mode: 'ai_synthesis', settings: agentStepConfig(skills), onUnhandledError: 'fail_run' };
 }
 
 function configsOf(
-  entries: readonly (readonly [string, ExecutableNodeConfig])[],
-): ReadonlyMap<string, ExecutableNodeConfig> {
-  return new Map<string, ExecutableNodeConfig>(entries);
+  entries: readonly (readonly [string, WellFormedNodeConfig])[],
+): ReadonlyMap<string, WellFormedNodeConfig> {
+  return new Map<string, WellFormedNodeConfig>(entries);
 }
 
-function withAgents(agents: AgentStepConfig['agents']): ExecutableNodeConfig {
+function withAgents(agents: AgentStepConfig['agents']): WellFormedNodeConfig {
   return { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig(null, agents) };
 }
 

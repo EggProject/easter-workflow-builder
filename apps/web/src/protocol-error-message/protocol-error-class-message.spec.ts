@@ -16,7 +16,6 @@ describe('protocolErrorClassMessage', () => {
     ['invalid_start_node', 'A gráfban pontosan egy Indítás csomópontnak kell lennie.'],
     ['dangling_edge', 'A gráf egyik éle nem létező csomópontra hivatkozik.'],
     ['unreachable_node', 'A gráf egyik csomópontja nem érhető el az Indítás csomópontból.'],
-    ['unimplemented_node_type', 'A gráf szkriptet futtató lépést tartalmaz, amit a rendszer még nem hajt végre.'],
     [
       'branch_key_unknown',
       'Egy Elágazás csomópont éle vagy alapértelmezett ága olyan kulcsra hivatkozik, ami nincs az ágai között.',
@@ -55,6 +54,7 @@ describe('protocolErrorClassMessage', () => {
     ['provider_descriptor_sdk_mismatch', 'A provider leírója nem a telepített Agent SDK verzióhoz készült.'],
     ['template_render_failed', 'A workflow egyik sablonja hibás, ezért a futás nem indítható.'],
     ['expression_evaluation_failed', 'A workflow egyik kifejezése hibás, ezért a futás nem indítható.'],
+    ['script_compile_failed', 'A workflow egyik szkriptje nem fordítható le, ezért a futás nem indítható.'],
     ['skill_not_found', 'Egy lépés olyan skillre hivatkozik, ami nincs a skill könyvtárban.'],
     [
       'mcp_server_not_found',

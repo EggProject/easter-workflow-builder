@@ -2,7 +2,7 @@ import { isString } from '@easter-workflow-builder/typeguards';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { RunContext } from '../run-context/run-context.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { beginStepRun } from './begin-step-run.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import { finishStepRunFailed } from './finish-step-run-failed.ts';
@@ -11,7 +11,7 @@ import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
-type BranchNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'branch' }>;
+type BranchNodeConfig = Extract<WellFormedNodeConfig, { readonly type: 'branch' }>;
 
 /**
  * A `branch` node bemenete (SPEC-004 5. szekció 3. sora). Az
