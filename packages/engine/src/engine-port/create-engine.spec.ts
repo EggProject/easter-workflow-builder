@@ -2625,6 +2625,53 @@ describe('createEngine', () => {
       const rows = okOrThrow(harness.database.stepRuns.listStepRuns(runId));
       expect(rows.find((row) => row.nodeId === 'eh')?.status).toBe('interrupted');
     });
+
+    it('REGRESSZIÓ: a testvér ág fail_run bukása a backoff várakozás kivárása nélkül zár: a futás failed, a kezelő lépése cancelled, újrapróbálás nélkül (user döntés 2026-11-04)', async () => {
+      // A `jov` elutasítása a testvér ágon `fail_run` bukást ad, miközben az
+      // `eh` egy óra hosszú backoffra vár. A javítás előtt a `fail_run` a
+      // várakozás jelét nem szakította meg, a futás a backoff végéig `running`
+      // maradt, és a kezelő a végén `succeeded` lett.
+      const scripted = scriptedRunner(['fails_when_released']);
+      const waiting = abortableClock();
+      const harness = openHarness({ agentQueryRunner: scripted.runner, clock: waiting.clock });
+      const workflowId = createWorkflow(
+        harness.database,
+        'eh-varakozas-fail-run',
+        [
+          startNode('start'),
+          agentNode('a1', 'hibas'),
+          errorHandlerNode('eh', 2, [3_600_000]),
+          agentNode('a2', 'jo'),
+          approvalNode('jov', null),
+        ],
+        [
+          edgeOf('e1', 'start', 'a1'),
+          edgeOf('e2', 'a1', 'eh', 'on_error'),
+          edgeOf('e3', 'a1', 'a2'),
+          edgeOf('e4', 'start', 'jov'),
+        ],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const runId = started.run.id;
+      await waitForStepRunning(harness.database, runId, 'a1');
+      scripted.releaseFailure();
+      await waitForStepRunning(harness.database, runId, 'eh');
+      const approvalStepRunId = await waitForPendingApproval(harness.database, runId);
+
+      okOrThrow(await harness.engine.decideApproval({ stepRunId: approvalStepRunId, decision: 'rejected' }));
+      const status = await waitForRunStatus(harness.database, runId, TERMINAL_RUN_STATUSES);
+
+      expect(status).toBe('failed');
+      expect(okOrThrow(harness.database.runs.getRun(runId)).errorKind).toBe('approval_rejected');
+      expect(waiting.sleepMs).toStrictEqual([3_600_000]);
+      expect(scripted.calls.run).toBe(1);
+      const rows = okOrThrow(harness.database.stepRuns.listStepRuns(runId));
+      const handler = rows.find((row) => row.nodeId === 'eh');
+      expect(handler?.status).toBe('cancelled');
+      expect(hasPublishedEvent(harness.published, 'step_finished', handler?.id ?? '')).toBe(false);
+      expect(rows.some((row) => row.nodeId === 'a1' && row.attempt === 2)).toBe(false);
+      expect(rows.some((row) => row.nodeId === 'a2')).toBe(false);
+    });
   });
 
   describe('restartRun', () => {
