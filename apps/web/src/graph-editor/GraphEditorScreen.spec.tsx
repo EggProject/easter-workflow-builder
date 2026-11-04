@@ -1081,7 +1081,9 @@ describe('GraphEditorScreen', () => {
 
     expect(container.querySelector('.toast__title')?.textContent).toBe('A mentés sikertelen');
     expect(schemaControl()?.getAttribute('aria-invalid')).toBe('true');
-    expect(container.querySelector(':scope .node-inspector .field__error')?.textContent).toContain('A séma érvénytelen');
+    expect(container.querySelector(':scope .node-inspector .field__error')?.textContent).toContain(
+      'A séma érvénytelen',
+    );
 
     await clickSave(container);
 
