@@ -15,6 +15,7 @@ import { cancelActiveRunTree } from '../run-interrupt/cancel-active-run-tree.ts'
 import { validateLanguageFields } from '../run-validation/validate-language-fields.ts';
 import { validateRun } from '../run-validation/validate-run.ts';
 import { validateSkillReferences } from '../run-validation/validate-skill-references.ts';
+import { validateStructuredOutputSchemas } from '../run-validation/validate-structured-output-schemas.ts';
 import { validateMcpServerReferences } from '../run-validation/validate-mcp-server-references.ts';
 import { agentStepConfigOf } from '../run-validation/agent-step-config-of.ts';
 import { hasMcpServerReferences } from '../mcp-server-resolution/has-mcp-server-references.ts';
@@ -174,6 +175,13 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
     const languageFields = validateLanguageFields(validated.value.nodeConfigsById, ports);
     if (languageFields.kind === 'error') {
       return languageFields;
+    }
+
+    // 3. (a strukturált kimenet sémáinak fordítása, SPEC-015 5.4): tiszta
+    //    számítás, port nélkül; ugyanaz a fordító dönt a gráf mentésekor (5.7).
+    const structuredOutputSchemas = validateStructuredOutputSchemas(validated.value.nodeConfigsById);
+    if (structuredOutputSchemas.kind === 'error') {
+      return structuredOutputSchemas;
     }
 
     // 3. (a lépések skill hivatkozásai, SPEC-009 5.1, O-13): a skill könyvtár

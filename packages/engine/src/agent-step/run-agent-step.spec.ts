@@ -434,6 +434,98 @@ describe('runAgentStep', () => {
     database.close();
   });
 
+  it('a sémára illeszkedő strukturált kimenettel a lépés succeeded, a kimenet tárolható (SPEC-015 AC1)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const request = requestOf({
+      runId,
+      stepRunId,
+      config: agentStepConfig({
+        structuredOutput: {
+          strategy: 'sdk_output_format',
+          schema: { type: 'object', properties: { osszeg: { type: 'number' } }, required: ['osszeg'] },
+        },
+      }),
+    });
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), newCapture()),
+    });
+
+    const execution = okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry));
+
+    expect(execution.outcome).toStrictEqual({ status: 'succeeded', output: { osszeg: 4 } });
+
+    database.close();
+  });
+
+  it('a sémára nem illeszkedő kimenet structured_output_schema_mismatch, az útvonallal és a kulcsszóval, kimenet nélkül (SPEC-015 AC1)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const request = requestOf({
+      runId,
+      stepRunId,
+      config: agentStepConfig({
+        structuredOutput: {
+          strategy: 'sdk_output_format',
+          schema: { type: 'object', properties: { osszeg: { type: 'string' } }, required: ['osszeg'] },
+        },
+      }),
+    });
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), newCapture()),
+    });
+
+    const execution = okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry));
+
+    expect(execution.outcome).toStrictEqual({
+      status: 'failed',
+      errorKind: 'structured_output_schema_mismatch',
+      errorMessage:
+        'A kimenet nem illeszkedik a strukturált kimenet sémájára: a(z) "/osszeg" útvonalon a(z) "type" kulcsszó nem teljesül (must be string) (structured_output_schema_mismatch).',
+    });
+    // A számadatok a hibás ágon is kimennek, a nyers result üzenet a naplóban marad.
+    expect(execution.tokens?.inputTokens).toBe(11);
+    expect(
+      okOrThrow(database.events.readEventsForStep(stepRunId, 100)).some((event) => event.kind === 'sdk_result'),
+    ).toBe(true);
+
+    database.close();
+  });
+
+  it('a nem fordítható séma invalid_structured_output_schema, futtatás nélkül (SPEC-015 5.4)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const captured = newCapture();
+    const request = requestOf({
+      runId,
+      stepRunId,
+      config: agentStepConfig({
+        structuredOutput: {
+          strategy: 'sdk_output_format',
+          schema: { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object' },
+        },
+      }),
+    });
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+    });
+
+    const execution = okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry));
+
+    expect(failedOutcomeOf(execution)).toStrictEqual({
+      kind: 'invalid_structured_output_schema',
+      message:
+        'A(z) a csomópont strukturált kimenet sémája nem fordítható: A strukturált kimenet sémája érvénytelen: no schema with key or ref "https://json-schema.org/draft/2020-12/schema" (invalid_structured_output_schema).',
+    });
+    expect(captured.request).toBeUndefined();
+    expect(execution.tokens).toBeUndefined();
+
+    database.close();
+  });
+
   it('strukturált kimenetet nem váró lépés a kimenet hiánya ellenére sikeres', async () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRun(database);

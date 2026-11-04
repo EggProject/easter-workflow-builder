@@ -690,6 +690,37 @@ describe('createRunSupervisor', () => {
       expect(harness.published).toStrictEqual([]);
     });
 
+    it('érvénytelen strukturált kimenet séma esetén invalid_structured_output_schema, és nem jön létre workflow_run sor (SPEC-015 5.4, AC3)', () => {
+      const harness = openHarness();
+      const workflowId = createWorkflow(
+        harness.database,
+        'sema',
+        [
+          startNode('start'),
+          nodeOf('a1', {
+            type: 'agent_step',
+            onUnhandledError: 'fail_run',
+            ...agentStepConfig('sikeres'),
+            structuredOutput: {
+              strategy: 'sdk_output_format',
+              schema: { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object' },
+            },
+          }),
+        ],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+
+      expect(outcome).toStrictEqual({
+        kind: 'error',
+        message:
+          'A(z) a1 csomópont strukturált kimenet sémája nem fordítható: A strukturált kimenet sémája érvénytelen: no schema with key or ref "https://json-schema.org/draft/2020-12/schema" (invalid_structured_output_schema).',
+      });
+      expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+      expect(harness.published).toStrictEqual([]);
+    });
+
     it('hiányzó kötelező bemenet esetén nem jön létre workflow_run sor', () => {
       const harness = openHarness();
       const workflowId = createWorkflow(

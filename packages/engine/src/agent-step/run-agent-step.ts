@@ -1,5 +1,11 @@
-import type { AgentQuery, SdkResultMessage } from '@easter-workflow-builder/agent';
-import { hasStructuredOutput, isSdkResultMessage, isSdkSystemInitMessage } from '@easter-workflow-builder/agent';
+import type { AgentQuery, SdkResultMessage, StructuredOutputValidator } from '@easter-workflow-builder/agent';
+import {
+  checkStructuredOutput,
+  compileStructuredOutputSchema,
+  hasStructuredOutput,
+  isSdkResultMessage,
+  isSdkSystemInitMessage,
+} from '@easter-workflow-builder/agent';
 import type { AgentStepConfig, McpServerDefinitionRecord } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { describeError } from '@easter-workflow-builder/core';
@@ -59,15 +65,24 @@ function preStreamFailure(errorKind: EngineErrorKind, errorMessage: string): Out
 /**
  * A lépés zárásának feltétele (SPEC-004 5.2 9. pont): `succeeded` akkor és
  * csak akkor, ha a `result` üzenet `subtype` értéke `success`, **és** ha a
- * lépés strukturált kimenetet vár, a kimenet ténylegesen megérkezett. Ez az
- * F-6 közvetlen következménye: a HTTP siker önmagában nem jelent kitöltött
- * kimenetet, és nincs 400-as biztonsági háló.
+ * lépés strukturált kimenetet vár, a kimenet ténylegesen megérkezett és a
+ * lépés sémájára illeszkedik. Ez az F-6 közvetlen következménye: a HTTP siker
+ * önmagában nem jelent kitöltött kimenetet, és nincs 400-as biztonsági háló.
+ * A séma szerinti ellenőrzés az SDK saját ellenőrzése mellett fut (SPEC-015
+ * 5.1); eltérésnél a lépés nem kérdez újra (5.5), a nem illeszkedő kimenet
+ * nem tárolódik, a nyers `result` üzenet a transcriptben marad.
+ *
+ * A `validator` pontosan akkor van megadva, ha a lépés strukturált kimenetet
+ * vár (`compileStepSchema`).
  *
  * A `result` üzenet hiánya külön ág: a folyam kimerült anélkül, hogy a
  * futtatás eredményt adott volna, tehát a provider hívás nem ért célba
  * (`provider_call_failed`).
  */
-function classifyResult(config: AgentStepConfig, resultMessage: SdkResultMessage | undefined): AgentStepOutcome {
+function classifyResult(
+  validator: StructuredOutputValidator | undefined,
+  resultMessage: SdkResultMessage | undefined,
+): AgentStepOutcome {
   if (resultMessage === undefined) {
     return {
       status: 'failed',
@@ -90,7 +105,11 @@ function classifyResult(config: AgentStepConfig, resultMessage: SdkResultMessage
     };
   }
 
-  if (config.structuredOutput !== null && !hasStructuredOutput(resultMessage)) {
+  if (validator === undefined) {
+    return { status: 'succeeded', output: resultMessage.structured_output };
+  }
+
+  if (!hasStructuredOutput(resultMessage)) {
     return {
       status: 'failed',
       errorKind: 'missing_structured_output',
@@ -101,7 +120,40 @@ function classifyResult(config: AgentStepConfig, resultMessage: SdkResultMessage
     };
   }
 
+  const checked = checkStructuredOutput(validator, resultMessage.structured_output);
+  if (checked.kind === 'error') {
+    return {
+      status: 'failed',
+      errorKind: 'structured_output_schema_mismatch',
+      errorMessage: formatEngineErrorMessage('structured_output_schema_mismatch', checked.message),
+    };
+  }
+
   return { status: 'succeeded', output: resultMessage.structured_output };
+}
+
+/**
+ * A lépés sémájának fordítása a futtatás előtt (SPEC-015 5.4): strukturált
+ * kimenet nélkül `undefined`. A futás indítása minden sémát már lefordított
+ * (`validateStructuredOutputSchemas`), a lépés mégis maga fordít, mert az
+ * ellenőrzőt nem a futás állapota hordozza; egy itt bukó séma a lépést a
+ * futtatás előtt, `invalid_structured_output_schema` osztállyal állítja meg.
+ */
+function compileStepSchema(nodeId: string, config: AgentStepConfig): Outcome<StructuredOutputValidator | undefined> {
+  if (config.structuredOutput === null) {
+    return { kind: 'ok', value: undefined };
+  }
+  const compiled = compileStructuredOutputSchema(config.structuredOutput.schema);
+  if (compiled.kind === 'error') {
+    return {
+      kind: 'error',
+      message: formatEngineErrorMessage(
+        'invalid_structured_output_schema',
+        `A(z) ${nodeId} csomópont strukturált kimenet sémája nem fordítható: ${compiled.message}`,
+      ),
+    };
+  }
+  return compiled;
 }
 
 /**
@@ -165,6 +217,7 @@ async function consumeStream(
   query: AgentQuery,
   attachment: SessionAttachment,
   mcpServerNames: readonly string[],
+  validator: StructuredOutputValidator | undefined,
 ): Promise<Outcome<AgentStepExecution>> {
   let resultMessage: SdkResultMessage | undefined;
 
@@ -213,7 +266,7 @@ async function consumeStream(
     };
   }
 
-  return { kind: 'ok', value: buildExecution(classifyResult(request.config, resultMessage), resultMessage) };
+  return { kind: 'ok', value: buildExecution(classifyResult(validator, resultMessage), resultMessage) };
 }
 
 /**
@@ -243,8 +296,8 @@ async function consumeStream(
  * **A visszatérési érték két szintje.** Az `Outcome` **hibaága kizárólag
  * adatbázis hibát** jelent (esemény hozzáfűzés vagy session csatolás): olyat,
  * amiről nem a lépés tehet, és amitől a záró tranzakció sem futtatható le. A
- * lépés saját hibái (renderelés, env, session, provider hívás, `subtype`,
- * hiányzó strukturált kimenet) a **sikeres** ágon, az `AgentStepExecution`
+ * lépés saját hibái (séma fordítás, renderelés, env, session, provider hívás,
+ * `subtype`, hiányzó vagy a sémára nem illeszkedő strukturált kimenet) a **sikeres** ágon, az `AgentStepExecution`
  * `outcome` mezőjében érkeznek, a hibaosztály nevével együtt, mert azok mellé
  * a token adatok is kimehetnek.
  *
@@ -263,6 +316,11 @@ export async function runAgentStep(
   dependencies: EngineDependencies,
   agentQueryRegistry: AgentQueryRegistry,
 ): Promise<Outcome<AgentStepExecution>> {
+  const validator = compileStepSchema(request.instance.nodeId, request.config);
+  if (validator.kind === 'error') {
+    return preStreamFailure('invalid_structured_output_schema', validator.message);
+  }
+
   const prompt = dependencies.templateRenderer.render(request.config.promptTemplate, request.runContext);
   if (prompt.kind === 'error') {
     return preStreamFailure(
@@ -371,6 +429,7 @@ export async function runAgentStep(
       query.value,
       toSessionAttachment(sessionBinding.value),
       Object.keys(mcpServers.value),
+      validator.value,
     );
   } finally {
     agentQueryRegistry.unregister(request.stepRunId);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { EngineErrorKind } from './engine-error-kind.ts';
 import { isEngineErrorKind } from './is-engine-error-kind.ts';
 
-// Az `engine-error-kind.ts` mind az ötvennégy értéke, ugyanabban a
+// Az `engine-error-kind.ts` mind az ötvenhat értéke, ugyanabban a
 // sorrendben. Az `EngineErrorKind[]` annotáció fordítási idejű állítás is: ha
 // az unió bővül vagy szűkül, ez a lista nem maradhat érintetlenül.
 const allEngineErrorKinds: readonly EngineErrorKind[] = [
@@ -26,6 +26,8 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
   'template_render_failed',
   'agent_result_not_success',
   'missing_structured_output',
+  'structured_output_schema_mismatch',
+  'invalid_structured_output_schema',
   'provider_call_failed',
   'no_resumable_session',
   'branch_no_matching_edge',
@@ -63,9 +65,9 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
 ];
 
 describe('isEngineErrorKind', () => {
-  it('mind az ötvennégy ágra igazat ad', () => {
+  it('mind az ötvenhat ágra igazat ad', () => {
     expect(allEngineErrorKinds.every((kind) => isEngineErrorKind(kind))).toBe(true);
-    expect(allEngineErrorKinds).toHaveLength(54);
+    expect(allEngineErrorKinds).toHaveLength(56);
   });
 
   it('hamisat ad ismeretlen szövegre', () => {
