@@ -13,7 +13,8 @@
     "@easter-workflow-builder/core": "workspace:*",
     "@easter-workflow-builder/logger": "workspace:*",
     "@easter-workflow-builder/provider-registry": "workspace:*",
-    "@easter-workflow-builder/typeguards": "workspace:*"
+    "@easter-workflow-builder/typeguards": "workspace:*",
+    "ajv": "8.20.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",

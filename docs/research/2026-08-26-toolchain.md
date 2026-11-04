@@ -38,6 +38,7 @@ verzió-döntéseinek forrása. Ha frissítesz egy csomagot, ide is vezesd át.
 | `yauzl`                          | 3.4.0                      | **pinelve**, ZIP kicsomagolás, SPEC-009, lásd lent    |
 | `@types/yauzl`                   | 3.4.0                      | **pinelve**, dev függőség, SPEC-009, lásd lent        |
 | `yaml`                           | 2.9.1                      | **pinelve**, `SKILL.md` frontmatter, SPEC-009, lent   |
+| `ajv`                            | 8.20.0                     | **pinelve**, JSON Schema ellenőrzés, SPEC-015, lent   |
 
 ## `drizzle-kit` és `@types/better-sqlite3` verzió, 2026-08-27 (T-003-2, SPEC-003)
 
@@ -271,6 +272,19 @@ csomag (eemeli/yaml) a repóban már tranzitívan jelen volt (az `eslint-plugin-
 használt felület a telepített `dist/public-api.d.ts` `parseDocument` függvénye és a
 `Document.errors` tömbje (`dist/doc/Document.d.ts`): hibás YAML-ra a függvény nem dob, a hibát a
 tömb hordozza. A választás technikai döntés, a SPEC-009 9. szekciójában rögzítve.
+
+## Strukturált kimenet séma ellenőrző, 2026-11-04 (SPEC-015, PLAN-016 T-016-2)
+
+Élő lekérdezés `curl`-lel, két független forrással (a választás indoka: SPEC-015 5.2).
+
+| Csomag | Verzió   | Forrás 1                                                          | Forrás 2                                                                                                       |
+| ------ | -------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `ajv`  | `8.20.0` | `https://registry.npmjs.org/ajv` (`dist-tags.latest`, 2026-04-24) | `https://data.jsdelivr.com/v1/packages/npm/ajv` (`tags.latest`), plusz a GitHub `v8.20.0` release (2026-04-24) |
+
+**Pontos verzióval** a `packages/agent` `package.json` fájljában áll. Függőségei a registry szerint:
+`fast-deep-equal`, `fast-uri`, `json-schema-traverse`, `require-from-string`; saját típusdeklarációval
+szállít. A repóban tranzitívan már jelen volt ugyanez a verzió (a `@modelcontextprotocol/sdk` és az
+`ajv-formats` függősége a `bun.lock` szerint).
 
 ## GitHub Actions verziók
 
