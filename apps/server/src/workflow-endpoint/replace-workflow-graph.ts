@@ -6,6 +6,7 @@ import {
 import type { DatabaseContext, WorkflowNodeInput } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { RouteHandler, RouteHandlerResult } from '../route-dispatch/route-handler.ts';
+import { findInvalidStructuredOutputSchemas } from './find-invalid-structured-output-schemas.ts';
 import { toWorkflowGraphDocument } from './to-workflow-graph-document.ts';
 
 /**
@@ -64,6 +65,17 @@ export function createReplaceWorkflowGraphHandler(database: DatabaseContext): Ro
     const parsedBody = ReplaceGraphRequestSchema.safeParse(context.body);
     if (!parsedBody.success) {
       return Promise.resolve({ kind: 'error', message: zodErrorToProtocolErrorBody(parsedBody.error).message });
+    }
+
+    // A strukturált kimenet sémája a mentéskor is lefordul (SPEC-015 5.7): a nem
+    // fordítható séma mezőútja ugyanabban az `invalid_request` alakban megy ki,
+    // mint a törzs séma hibája, írás nélkül.
+    const invalidSchemas = findInvalidStructuredOutputSchemas(parsedBody.data.nodes);
+    if (invalidSchemas.length > 0) {
+      return Promise.resolve({
+        kind: 'error',
+        message: zodErrorToProtocolErrorBody({ issues: invalidSchemas }).message,
+      });
     }
 
     const workflowId = context.parameters['workflowId'] ?? '';

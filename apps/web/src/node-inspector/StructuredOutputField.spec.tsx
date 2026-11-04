@@ -83,7 +83,7 @@ describe('StructuredOutputField', () => {
   it('`null` értékre a jelölőnégyzet kikapcsolva, a mezők rejtve', () => {
     act(() => {
       // eslint-disable-next-line unicorn/no-null -- a teszt a "nincs felülírás" állapotot vizsgálja.
-      root.render(<StructuredOutputField value={null} onChange={vi.fn()} />);
+      root.render(<StructuredOutputField fieldPathPrefix="" value={null} onChange={vi.fn()} />);
     });
     expect(container.querySelector('button.select')).toBeNull();
   });
@@ -92,7 +92,7 @@ describe('StructuredOutputField', () => {
     const onChange = vi.fn();
     act(() => {
       // eslint-disable-next-line unicorn/no-null -- lásd fent.
-      root.render(<StructuredOutputField value={null} onChange={onChange} />);
+      root.render(<StructuredOutputField fieldPathPrefix="" value={null} onChange={onChange} />);
     });
     const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
     if (checkbox === null) {
@@ -107,7 +107,13 @@ describe('StructuredOutputField', () => {
   it('a jelölőnégyzet kikapcsolására `null`-t ad', () => {
     const onChange = vi.fn();
     act(() => {
-      root.render(<StructuredOutputField value={{ strategy: 'sdk_output_format', schema: {} }} onChange={onChange} />);
+      root.render(
+        <StructuredOutputField
+          fieldPathPrefix=""
+          value={{ strategy: 'sdk_output_format', schema: {} }}
+          onChange={onChange}
+        />,
+      );
     });
     const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
     if (checkbox === null) {
@@ -124,7 +130,13 @@ describe('StructuredOutputField', () => {
   it('a stratégia választó az egyetlen stratégiát kínálja, és a választás a mezőt írja', () => {
     const onChange = vi.fn();
     act(() => {
-      root.render(<StructuredOutputField value={{ strategy: 'sdk_output_format', schema: {} }} onChange={onChange} />);
+      root.render(
+        <StructuredOutputField
+          fieldPathPrefix=""
+          value={{ strategy: 'sdk_output_format', schema: {} }}
+          onChange={onChange}
+        />,
+      );
     });
     chooseOption(container, STRATEGY_LABEL, 'sdk_output_format');
     expect(onChange).toHaveBeenCalledWith({ strategy: 'sdk_output_format', schema: {} });
@@ -133,7 +145,13 @@ describe('StructuredOutputField', () => {
   it('a séma JSON szerkesztése frissíti a schema mezőt', () => {
     const onChange = vi.fn();
     act(() => {
-      root.render(<StructuredOutputField value={{ strategy: 'sdk_output_format', schema: {} }} onChange={onChange} />);
+      root.render(
+        <StructuredOutputField
+          fieldPathPrefix=""
+          value={{ strategy: 'sdk_output_format', schema: {} }}
+          onChange={onChange}
+        />,
+      );
     });
     const textarea = container.querySelector('textarea');
     if (textarea === null) {

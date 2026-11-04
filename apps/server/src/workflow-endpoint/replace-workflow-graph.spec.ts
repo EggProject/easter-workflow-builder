@@ -150,6 +150,136 @@ describe('createReplaceWorkflowGraphHandler', () => {
     expect(okOrThrow(database.workflows.readGraph(created.id)).nodes).toEqual([]);
   });
 
+  describe('a strukturált kimenet sémája (SPEC-015 5.7, AC3)', () => {
+    function agentSettings(structuredOutput: unknown): Record<string, unknown> {
+      return {
+        promptTemplate: 'p',
+        providerId: null,
+        modelId: null,
+        effort: null,
+        thinking: null,
+        allowedTools: [],
+        disallowedTools: [],
+        permissionMode: null,
+        maxTurns: null,
+        maxBudgetUsd: null,
+        systemPrompt: null,
+        agents: {},
+        skills: null,
+        mcpServers: {},
+        cwd: null,
+        additionalDirectories: [],
+        sandbox: null,
+        sessionMode: 'isolated',
+        structuredOutput,
+      };
+    }
+
+    const newerDraftSchema = { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object' };
+
+    it('az agent_step és a join ai_synthesis érvénytelen sémája invalid_request a két mezőúttal, írás nélkül', async () => {
+      const database = openMemoryDatabase();
+      const created = okOrThrow(
+        database.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null }),
+      );
+
+      const result = await createReplaceWorkflowGraphHandler(database)({
+        parameters: { workflowId: created.id },
+        query: new URLSearchParams(),
+        body: {
+          nodes: [
+            { id: 'n0', type: 'start', label: 'Start', positionX: 0, positionY: 0, config: startNodeConfig() },
+            {
+              id: 'n1',
+              type: 'agent_step',
+              label: 'Lépés',
+              positionX: 0,
+              positionY: 0,
+              config: {
+                type: 'agent_step',
+                onUnhandledError: 'fail_run',
+                ...agentSettings({ strategy: 'sdk_output_format', schema: { type: 'strin' } }),
+              },
+            },
+            {
+              id: 'n2',
+              type: 'join',
+              label: 'Összefésülés',
+              positionX: 0,
+              positionY: 0,
+              config: {
+                type: 'join',
+                mode: 'ai_synthesis',
+                onUnhandledError: 'fail_run',
+                settings: agentSettings({ strategy: 'sdk_output_format', schema: newerDraftSchema }),
+              },
+            },
+          ],
+          edges: [],
+        },
+      });
+
+      expect(result.kind === 'error' && result.message).toBe(
+        'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.structuredOutput.schema, nodes.2.config.settings.structuredOutput.schema (invalid_request).',
+      );
+      expect(okOrThrow(database.workflows.readGraph(created.id)).nodes).toEqual([]);
+    });
+
+    it('az érvényes séma és a strukturált kimenet nélküli lépés mentése sikeres', async () => {
+      const database = openMemoryDatabase();
+      const created = okOrThrow(
+        database.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null }),
+      );
+
+      const result = await createReplaceWorkflowGraphHandler(database)({
+        parameters: { workflowId: created.id },
+        query: new URLSearchParams(),
+        body: {
+          nodes: [
+            { id: 'n0', type: 'start', label: 'Start', positionX: 0, positionY: 0, config: startNodeConfig() },
+            {
+              id: 'n1',
+              type: 'agent_step',
+              label: 'Lépés',
+              positionX: 0,
+              positionY: 0,
+              config: {
+                type: 'agent_step',
+                onUnhandledError: 'fail_run',
+                ...agentSettings({ strategy: 'sdk_output_format', schema: { type: 'object', required: ['a'] } }),
+              },
+            },
+            {
+              id: 'n2',
+              type: 'join',
+              label: 'Összefésülés',
+              positionX: 0,
+              positionY: 0,
+              config: {
+                type: 'join',
+                mode: 'ai_synthesis',
+                onUnhandledError: 'fail_run',
+                settings: agentSettings(null),
+              },
+            },
+            {
+              id: 'n3',
+              type: 'agent_step',
+              label: 'Másik',
+              positionX: 0,
+              positionY: 0,
+              config: { type: 'agent_step', onUnhandledError: 'fail_run', ...agentSettings(null) },
+            },
+          ],
+          edges: [],
+        },
+      });
+
+      expect(result.kind).toBe('ok');
+      expect(okOrThrow(database.workflows.readGraph(created.id)).nodes).toHaveLength(4);
+    });
+  });
+
   it('nem létező node-ra mutató él idegenkulcs-sértést ad, ami conflict hibaosztályra képződik', async () => {
     const database = openMemoryDatabase();
     const created = okOrThrow(

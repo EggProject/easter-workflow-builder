@@ -29,7 +29,7 @@ describe('JsonTextAreaField', () => {
 
   it('a kezdő értéket formázott JSON szövegként mutatja', () => {
     act(() => {
-      root.render(<JsonTextAreaField label="Sandbox" value={{ enabled: true }} onChange={vi.fn()} />);
+      root.render(<JsonTextAreaField error={undefined} label="Sandbox" value={{ enabled: true }} onChange={vi.fn()} />);
     });
     const textarea = container.querySelector('textarea');
     expect(textarea?.value).toContain('"enabled": true');
@@ -38,7 +38,7 @@ describe('JsonTextAreaField', () => {
   it('érvényes JSON szerkesztésre az onChange a beolvasott értékkel hívódik, hiba nélkül', () => {
     const onChange = vi.fn();
     act(() => {
-      root.render(<JsonTextAreaField label="Sandbox" value={{}} onChange={onChange} />);
+      root.render(<JsonTextAreaField error={undefined} label="Sandbox" value={{}} onChange={onChange} />);
     });
     const textarea = container.querySelector('textarea');
     if (textarea === null) {
@@ -54,7 +54,7 @@ describe('JsonTextAreaField', () => {
   it('érvénytelen JSON szerkesztésre hibát mutat, és nem hívja az onChange-et', () => {
     const onChange = vi.fn();
     act(() => {
-      root.render(<JsonTextAreaField label="Sandbox" value={{}} onChange={onChange} />);
+      root.render(<JsonTextAreaField error={undefined} label="Sandbox" value={{}} onChange={onChange} />);
     });
     const textarea = container.querySelector('textarea');
     if (textarea === null) {
@@ -68,6 +68,38 @@ describe('JsonTextAreaField', () => {
     // `field-error-visibility` téma), tehát a mező elhagyása kell hozzá.
     expect(container.querySelector('.field__error')).toBeNull();
     act(() => {
+      textarea.focus();
+      textarea.blur();
+    });
+    expect(container.querySelector('.field__error')?.textContent).toContain('Érvénytelen JSON');
+  });
+
+  it('a kívülről kapott hibát a mező alatt mutatja, ha a mező érintett (SPEC-015 5.7)', () => {
+    act(() => {
+      root.render(<JsonTextAreaField error="Külső hiba." label="Séma" value={{}} onChange={vi.fn()} />);
+    });
+    const textarea = container.querySelector('textarea');
+    if (textarea === null) {
+      throw new Error('a teszt nem találta a textarea-t');
+    }
+    act(() => {
+      textarea.focus();
+      textarea.blur();
+    });
+    expect(container.querySelector('.field__error')?.textContent).toBe('Külső hiba.');
+    expect(textarea.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('a saját JSON szintaxis hibája előbbre való, mint a kívülről kapott hiba', () => {
+    act(() => {
+      root.render(<JsonTextAreaField error="Külső hiba." label="Séma" value={{}} onChange={vi.fn()} />);
+    });
+    const textarea = container.querySelector('textarea');
+    if (textarea === null) {
+      throw new Error('a teszt nem találta a textarea-t');
+    }
+    act(() => {
+      typeInto(textarea, '{nem json');
       textarea.focus();
       textarea.blur();
     });

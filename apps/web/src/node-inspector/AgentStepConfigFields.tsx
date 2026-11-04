@@ -269,6 +269,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
             />
             <StructuredOutputField
               value={config.structuredOutput}
+              fieldPathPrefix={fieldPathPrefix}
               onChange={(nextValue) => {
                 setField('structuredOutput', nextValue);
               }}

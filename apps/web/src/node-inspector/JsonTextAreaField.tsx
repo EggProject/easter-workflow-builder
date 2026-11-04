@@ -5,6 +5,11 @@ export interface JsonTextAreaFieldProperties {
   readonly label: string;
   readonly value: unknown;
   readonly onChange: (nextValue: unknown) => void;
+  /**
+   * A mező kívülről kapott hibája (a panel hibatérképéből); a saját JSON
+   * szintaxis hibája ennél előbbre való, mert az a begépelt szövegről szól.
+   */
+  readonly error: string | undefined;
 }
 
 /**
@@ -19,7 +24,7 @@ export interface JsonTextAreaFieldProperties {
  * gépelését egy kívülről érkező prop frissítéssel.
  */
 export function JsonTextAreaField(properties: Readonly<JsonTextAreaFieldProperties>): ReactElement {
-  const { label, value, onChange } = properties;
+  const { label, value, onChange, error } = properties;
   const [text, setText] = useState(() => JSON.stringify(value, undefined, 2));
   const [parseError, setParseError] = useState<string | undefined>(undefined);
 
@@ -36,5 +41,7 @@ export function JsonTextAreaField(properties: Readonly<JsonTextAreaFieldProperti
   }
 
   // A 6 soros kezdő magasság forrás nélküli felületi érték: nyitott kérdés: SPEC-008 O-35.
-  return <TextAreaField size="sm" label={label} value={text} onChange={handleChange} rows={6} error={parseError} />;
+  return (
+    <TextAreaField size="sm" label={label} value={text} onChange={handleChange} rows={6} error={parseError ?? error} />
+  );
 }

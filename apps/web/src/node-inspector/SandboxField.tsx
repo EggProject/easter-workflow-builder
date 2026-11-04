@@ -43,6 +43,7 @@ export function SandboxField(properties: Readonly<SandboxFieldProperties>): Reac
       />
       {isEnabled && (
         <JsonTextAreaField
+          error={undefined}
           label="Sandbox beállítás (nyers JSON - öt mezője dokumentálatlan, unknown alakú)"
           value={value}
           onChange={(nextValue) => {

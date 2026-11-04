@@ -1,5 +1,11 @@
 import type { FetchFunction, Outcome } from '@easter-workflow-builder/core';
-import { buildRoutePath, ProtocolErrorBodySchema, ROUTE_TABLE, type RouteId } from '@easter-workflow-builder/protocol';
+import {
+  buildRoutePath,
+  ProtocolErrorBodySchema,
+  readInvalidRequestFieldPaths,
+  ROUTE_TABLE,
+  type RouteId,
+} from '@easter-workflow-builder/protocol';
 import { protocolErrorClassMessage } from '../protocol-error-message/protocol-error-class-message.ts';
 import { protocolErrorMessage } from '../protocol-error-message/protocol-error-message.ts';
 import type { RouteOutcome } from './route-outcome.ts';
@@ -99,7 +105,7 @@ async function buildProtocolErrorOutcome<TValue>(response: Response): Promise<Ro
   }
   const { code, errorClass } = parsed.data;
   const message = errorClass === undefined ? protocolErrorMessage(code) : protocolErrorClassMessage(errorClass);
-  return { kind: 'error', message, isTransient };
+  return { kind: 'error', message, isTransient, invalidFieldPaths: readInvalidRequestFieldPaths(parsed.data) };
 }
 
 export async function performRouteRequest<TValue>(

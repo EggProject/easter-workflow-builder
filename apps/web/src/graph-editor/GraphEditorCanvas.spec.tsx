@@ -197,6 +197,7 @@ describe('GraphEditorCanvas', () => {
             onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
+            rejectedSchemaFieldPaths={[]}
           />
         </>,
       );
