@@ -444,9 +444,18 @@ ideiglenes fájlba írása az `extraArgs` `mcp-config` kulcsával, O-52, és a s
 programja, ami csak a deklarált neveket, a `PATH` és a `HOME` változót adja tovább, O-45) az
 `apps/server` `sdk-query-hardening` témájában áll, mert folyamat és fájlrendszer hozzáférést igényel.
 A kiadott szerver `failed` vagy `needs-auth` állapota az `init` üzenetben a lépést
-`mcp_server_connection_failed` hibával megállítja (O-46). Nyitva marad a strukturált kimenet **séma szerinti** ellenőrzése (SPEC-004 17. szekció 21. kritérium "illeszkedik a sémára" fordulata): a motorban nincs JSON Schema
-validátor, és a portlista zárt (3.2), tehát a `runAgentStep` ma a kimenet **meglétét** ellenőrzi
-(`hasStructuredOutput`, F-6). Ez nem elfogadott végállapot, hanem megnevezett hiány.
+`mcp_server_connection_failed` hibával megállítja (O-46).
+
+**A strukturált kimenet séma szerinti ellenőrzése (SPEC-015, a korábbi megnevezett hiány lezárva).**
+A `runAgentStep` a futtatás előtt lefordítja a lépés sémáját (az `agent` csomag
+`compileStructuredOutputSchema` függvénye, Ajv draft-07; a fordítás tiszta számítás, ezért a
+portlista nem bővül, SPEC-015 5.3), a `result` `success` ágán pedig a jelenlét (`hasStructuredOutput`,
+F-6) után a kimenetet a sémára ellenőrzi (`checkStructuredOutput`): eltérésnél a lépés `failed`
+`structured_output_schema_mismatch` osztállyal, az üzenetben az Ajv első hibájának útvonalával és
+kulcsszavával, kimenet tárolása nélkül; a motor nem kérdez újra (SPEC-015 5.5). A futás indítása
+minden `agent_step` és `join` `ai_synthesis` sémát lefordít (`validateStructuredOutputSchemas`), a
+nem fordítható séma `invalid_structured_output_schema` osztállyal, adat írás nélkül utasítja el a
+futást (5.4). A `join` `ai_synthesis` ugyanazon a `runAgentStep` úton jár (5.6).
 
 **A `validateRun` az első hibánál megáll, nem gyűjt hibalistát.** A SPEC-004 egyetlen helyen sem
 mondja ki, melyik a kettő közül, ezért ez **tervezési döntés, nem mérésből jövő szám**: az
