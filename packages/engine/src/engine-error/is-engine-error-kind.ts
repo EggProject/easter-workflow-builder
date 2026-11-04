@@ -2,7 +2,7 @@ import { isString } from '@easter-workflow-builder/typeguards';
 import type { EngineErrorKind } from './engine-error-kind.ts';
 
 /**
- * Az ötvenhárom ág kulcsonként. A `Record<EngineErrorKind, true>` annotáció
+ * Az ötvennégy ág kulcsonként. A `Record<EngineErrorKind, true>` annotáció
  * miatt a fordító hibát ad, ha az `EngineErrorKind` unió bővül, de ez a lista
  * nem: a guard így nem tud csendben lemaradni egy hibaosztályról (ugyanaz a
  * minta, mint az `is-node-type.ts` `NODE_TYPE_KEYS`-e és az
@@ -24,6 +24,7 @@ const ENGINE_ERROR_KIND_KEYS: Readonly<Record<EngineErrorKind, true>> = {
   malformed_node_config: true,
   unhandled_error_policy_missing: true,
   missing_required_input: true,
+  invalid_input_type: true,
   expression_evaluation_failed: true,
   template_render_failed: true,
   agent_result_not_success: true,
@@ -65,7 +66,7 @@ const ENGINE_ERROR_KIND_KEYS: Readonly<Record<EngineErrorKind, true>> = {
 };
 
 /**
-Az ötvenhárom `EngineErrorKind` érték egyike-e a bemenet (SPEC-004, lásd `engine-error-kind.ts`).
+Az ötvennégy `EngineErrorKind` érték egyike-e a bemenet (SPEC-004, lásd `engine-error-kind.ts`).
 */
 export function isEngineErrorKind(value: unknown): value is EngineErrorKind {
   return isString(value) && Object.hasOwn(ENGINE_ERROR_KIND_KEYS, value);

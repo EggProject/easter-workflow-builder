@@ -8,7 +8,9 @@ type RequiredTextFieldPathTable = Readonly<Record<Exclude<NodeConfig['type'], 'j
  * (SPEC-008 5.4 táblázata, user döntés 2026-09-28, O-21): ponttal
  * összefűzött mezőútvonal a `config`-on belül, a lista minden elemén `*`
  * áll. Kötelező az a szöveg mező, aminek a típusa nem nullázható `string`,
- * és amit a beállítás panel szerkeszt. A `join` választatlan (`mode: null`,
+ * és amit a beállítás panel szerkeszt. A `start` bemeneti mező `valueKind`
+ * mezője nem szerepel: zárt felsorolás, aminek nincs "üres" állapota
+ * (SPEC-016 5.2). A `join` választatlan (`mode: null`,
  * O-33) ágának nincs `settings` mezője, tehát kötelező szöveg mezője sincs:
  * a tábla csak a három kiválasztott módot sorolja.
  *
@@ -19,7 +21,7 @@ type RequiredTextFieldPathTable = Readonly<Record<Exclude<NodeConfig['type'], 'j
  * `node-config-drift-protection` regressziós tesztje őrzi.
  */
 export const REQUIRED_TEXT_FIELD_PATHS = {
-  start: ['inputFields.*.name', 'inputFields.*.label', 'inputFields.*.valueKind'],
+  start: ['inputFields.*.name', 'inputFields.*.label'],
   agent_step: ['promptTemplate'],
   branch: ['expression', 'branches.*.key', 'branches.*.label'],
   fan_out: ['itemsExpression', 'branchLabelTemplate'],

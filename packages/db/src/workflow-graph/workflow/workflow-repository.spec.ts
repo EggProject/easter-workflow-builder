@@ -10,7 +10,7 @@ import { MIGRATIONS_FOLDER } from '../../migration/migrations-folder.ts';
 import { workflowTable } from './workflow.ts';
 import { workflowNodeTable } from './workflow-node.ts';
 import { workflowEdgeTable } from './workflow-edge.ts';
-import type { NodeConfig } from '../node-config/node-config.ts';
+import type { NodeConfig, StartInputField } from '../node-config/node-config.ts';
 import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
 import { graphSnapshotTable } from '../../graph-snapshot/stored-snapshot/graph-snapshot.ts';
 import {
@@ -194,7 +194,7 @@ interface RequiredFieldCase {
 }
 
 /**
- * A SPEC-008 5.4 táblázatának tizenhat kötelező szöveg mezője (O-21),
+ * A SPEC-008 5.4 táblázatának tizenöt kötelező szöveg mezője (O-21; a `valueKind` kikerült, SPEC-016 5.2),
  * mezőnként egy egyébként érvényes konfiggal, amiben csak a vizsgált mező
  * szövege változik.
  */
@@ -214,15 +214,6 @@ const requiredFieldCases: readonly RequiredFieldCase[] = [
     build: (text) => ({
       type: 'start',
       inputFields: [{ name: 'topic', label: text, valueKind: 'text', required: true }],
-      onUnhandledError: null,
-    }),
-  },
-  {
-    field: 'start inputFields[].valueKind',
-    path: 'inputFields.0.valueKind',
-    build: (text) => ({
-      type: 'start',
-      inputFields: [{ name: 'topic', label: 'Téma', valueKind: text, required: true }],
       onUnhandledError: null,
     }),
   },
@@ -337,6 +328,10 @@ const requiredFieldCases: readonly RequiredFieldCase[] = [
     build: (text) => ({ type: 'script', source: text, runtime: 'expression', onUnhandledError: null }),
   },
 ];
+
+function choiceField(options: readonly string[]): StartInputField {
+  return { name: 'szin', label: 'Szín', valueKind: 'choice', options, required: true };
+}
 
 describe('createWorkflowRepository', () => {
   describe('createWorkflow / getWorkflow', () => {
@@ -833,9 +828,109 @@ describe('createWorkflowRepository', () => {
     }
   });
 
+  describe('a start bemeneti mező valueKind típusa és a choice opciói (SPEC-016 5.2, 5.3)', () => {
+    const startWithFields = (inputFields: readonly StartInputField[]): NodeConfig => ({
+      type: 'start',
+      inputFields,
+      onUnhandledError: null,
+    });
+    it('mind a hat valueKind értékkel írható és ugyanúgy olvasható vissza', () => {
+      const { sqlite, repository } = openRepository();
+      const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));
+      const config = startWithFields([
+        { name: 'a', label: 'A', valueKind: 'text', required: true },
+        { name: 'b', label: 'B', valueKind: 'number', required: false },
+        { name: 'c', label: 'C', valueKind: 'boolean', required: false },
+        choiceField(['piros', 'zöld']),
+        { name: 'e', label: 'E', valueKind: 'list', required: false },
+        { name: 'f', label: 'F', valueKind: 'json', required: false },
+      ]);
+
+      okOrThrow(
+        repository.replaceGraph(workflow.id, [{ id: 'node-s', label: '', positionX: 0, positionY: 0, config }], []),
+      );
+
+      expect(okOrThrow(repository.readGraph(workflow.id)).nodes.map((node) => node.config)).toStrictEqual([config]);
+      sqlite.close();
+    });
+
+    // A hibás `choice` alakok: a `replaceGraph` `malformed_node_config` hibát
+    // ad és semmi nem íródik, a `readGraph` pedig `corrupt_node_config` hibát,
+    // ha ilyen adat tárolva van (minden úton szigorú, O-2). Az `options` a nem
+    // choice ágon szétterített objektumból jön, hogy a fordító ne jelezzen
+    // többlet mezőt (ugyanaz a minta, mint az ismeretlen kulcsnál).
+    const optionsOnPlainBranch = { options: ['x'] };
+    const rejectedConfigs: readonly (readonly [string, NodeConfig])[] = [
+      ['üres options lista', startWithFields([choiceField([])])],
+      ['üres opció', startWithFields([choiceField(['piros', ''])])],
+      ['csak szóközös opció', startWithFields([choiceField(['piros', '  '])])],
+      ['duplikált opció', startWithFields([choiceField(['piros', 'zöld', 'piros'])])],
+      [
+        'options a nem choice ágon',
+        startWithFields([{ ...optionsOnPlainBranch, name: 'a', label: 'A', valueKind: 'text', required: true }]),
+      ],
+    ];
+
+    for (const [description, config] of rejectedConfigs) {
+      it(`${description}: a replaceGraph malformed_node_config hibaágat ad, sort nem ír`, () => {
+        const { sqlite, repository } = openRepository();
+        const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));
+        const before = okOrThrow(repository.readGraph(workflow.id));
+
+        const message = errorOrThrow(
+          repository.replaceGraph(workflow.id, [{ id: 'node-s', label: '', positionX: 0, positionY: 0, config }], []),
+        );
+
+        expect(message).toContain('(malformed_node_config)');
+        expect(okOrThrow(repository.readGraph(workflow.id))).toStrictEqual(before);
+        sqlite.close();
+      });
+    }
+
+    // A régi szabad szöveges érték (`string`) típushelyesen nem írható le
+    // `NodeConfig`-ként, ezért tárolt adatként, nyers beszúrással próbáljuk.
+    const storedRejectedConfigs: readonly (readonly [string, unknown])[] = [
+      ...rejectedConfigs,
+      [
+        'ismeretlen valueKind (a régi szabad szöveg)',
+        {
+          type: 'start',
+          inputFields: [{ name: 'a', label: 'A', valueKind: 'string', required: true }],
+          onUnhandledError: null,
+        },
+      ],
+    ];
+
+    for (const [description, config] of storedRejectedConfigs) {
+      it(`${description}: a readGraph corrupt_node_config hibaágat ad (minden úton szigorú, O-2)`, () => {
+        const { sqlite, database, repository } = openRepository();
+        const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));
+        database
+          .insert(workflowNodeTable)
+          .values({
+            id: 'stored-node',
+            workflowId: workflow.id,
+            type: 'start',
+            label: '',
+            positionX: 0,
+            positionY: 0,
+            config,
+            createdAtMs: new Date(0),
+            updatedAtMs: new Date(0),
+          })
+          .run();
+
+        const message = errorOrThrow(repository.readGraph(workflow.id));
+
+        expect(message).toContain('corrupt_node_config');
+        sqlite.close();
+      });
+    }
+  });
+
   describe('replaceGraph: a kötelező szöveg mezők írás oldali szabálya (SPEC-008 5.4, O-21)', () => {
-    it('a tizenhat mező mindegyike szerepel az esetek között', () => {
-      expect(requiredFieldCases).toHaveLength(16);
+    it('a tizenöt mező mindegyike szerepel az esetek között', () => {
+      expect(requiredFieldCases).toHaveLength(15);
     });
 
     for (const { field, path, build } of requiredFieldCases) {

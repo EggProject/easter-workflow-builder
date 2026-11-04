@@ -154,7 +154,7 @@ const DOCUMENT: GraphSnapshotDocument = {
   nodes: [
     node('start', {
       type: 'start',
-      inputFields: [{ name: 'tema', label: 'Téma', valueKind: 'string', required: true }],
+      inputFields: [{ name: 'tema', label: 'Téma', valueKind: 'text', required: true }],
       onUnhandledError: 'fail_run',
     }),
     node('ag', { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig() }),

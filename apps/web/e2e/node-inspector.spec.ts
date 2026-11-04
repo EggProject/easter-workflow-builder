@@ -27,7 +27,7 @@ import { mockIdleStream } from './sse-mock.ts';
 
 const START_CONFIG: NodeConfig = {
   type: 'start',
-  inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }],
+  inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }],
   onUnhandledError: null,
 };
 
@@ -590,7 +590,7 @@ test.describe('start node', () => {
     await expect(rows).toHaveCount(2);
     await rows.nth(1).getByLabel('Név').fill('count');
     await rows.nth(1).getByLabel('Címke').fill('Darabszám');
-    await rows.nth(1).getByLabel('Érték típusa').fill('number');
+    await chooseSelectOption(page, rows.nth(1).getByRole('combobox', { name: 'Érték típusa' }), 'Szám');
     // A checkbox saját .ctrl__box rétege fedi az inputot (workflow-list.spec.ts
     // azonos indoklása), ezért a hozzá tartozó SZÖVEGRE kattintunk.
     await rows.nth(1).getByText('Kötelező').click();
@@ -606,7 +606,7 @@ test.describe('start node', () => {
     await expect(reopenedRows).toHaveCount(1);
     await expect(reopenedRows.nth(0).getByLabel('Név')).toHaveValue('count');
     await expect(reopenedRows.nth(0).getByLabel('Címke')).toHaveValue('Darabszám');
-    await expect(reopenedRows.nth(0).getByLabel('Érték típusa')).toHaveValue('number');
+    await expect(reopenedRows.nth(0).getByRole('combobox', { name: 'Érték típusa' })).toContainText('Szám');
     await expect(reopenedRows.nth(0).getByLabel('Kötelező')).toBeChecked();
   });
 });

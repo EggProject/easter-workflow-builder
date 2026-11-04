@@ -22,14 +22,52 @@ export const UnhandledErrorPolicySchema = z.enum(['fail_run', 'fail_branch']);
 
 export type UnhandledErrorPolicy = z.infer<typeof UnhandledErrorPolicySchema>;
 
-export const StartInputFieldSchema = z
+/**
+ * A `start` bemeneti mező értéktípusa (SPEC-016 5.1): a `db` `StartInputValueKind`
+ * uniójának szándékos duplikátuma, a sodródás védelmét az `apps/server`
+ * `enum-drift-protection` témája adja. Zárt felsorolás az olvasó és a mentési
+ * sémában is, visszafelé kompatibilitási ág nélkül (SPEC-016 5.2, O-2).
+ */
+export const StartInputValueKindSchema = z.enum(['text', 'number', 'boolean', 'choice', 'list', 'json']);
+
+export type StartInputValueKind = z.infer<typeof StartInputValueKindSchema>;
+
+/**
+ * A `choice` nélküli öt ág egy sémán áll, a `choice` ágnak saját, kötelező
+ * `options` listája van (SPEC-016 5.3). A diszkriminált unió kulcsa a `valueKind`.
+ */
+export const StartPlainInputFieldSchema = z
   .strictObject({
     name: z.string(),
     label: z.string(),
-    valueKind: z.string(),
+    valueKind: StartInputValueKindSchema.exclude(['choice']),
     required: z.boolean(),
   })
   .readonly();
+
+export type StartPlainInputField = z.infer<typeof StartPlainInputFieldSchema>;
+
+/**
+ * Az `options` nem üres, nem üres elemű és egyedi elemű voltát a mentési séma
+ * (`NodeConfigSaveSchema`) érvényesíti, a `db` `isNodeConfig` guardjának
+ * szándékos duplikátumaként; az olvasó séma csak az alakot ellenőrzi.
+ */
+export const StartChoiceInputFieldSchema = z
+  .strictObject({
+    name: z.string(),
+    label: z.string(),
+    valueKind: z.literal('choice'),
+    options: z.array(z.string()).readonly(),
+    required: z.boolean(),
+  })
+  .readonly();
+
+export type StartChoiceInputField = z.infer<typeof StartChoiceInputFieldSchema>;
+
+export const StartInputFieldSchema = z.discriminatedUnion('valueKind', [
+  StartPlainInputFieldSchema,
+  StartChoiceInputFieldSchema,
+]);
 
 export type StartInputField = z.infer<typeof StartInputFieldSchema>;
 

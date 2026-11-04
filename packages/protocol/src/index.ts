@@ -190,8 +190,11 @@ export type {
   LoopNodeConfig,
   NodeConfig,
   ScriptNodeConfig,
+  StartChoiceInputField,
   StartInputField,
+  StartInputValueKind,
   StartNodeConfig,
+  StartPlainInputField,
   SubWorkflowNodeConfig,
   UnhandledErrorPolicy,
 } from './node-config/node-config.ts';
@@ -210,8 +213,11 @@ export {
   LoopNodeConfigSchema,
   NodeConfigSchema,
   ScriptNodeConfigSchema,
+  StartChoiceInputFieldSchema,
   StartInputFieldSchema,
+  StartInputValueKindSchema,
   StartNodeConfigSchema,
+  StartPlainInputFieldSchema,
   SubWorkflowNodeConfigSchema,
   UnhandledErrorPolicySchema,
 } from './node-config/node-config.ts';

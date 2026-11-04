@@ -43,7 +43,7 @@ interface RequiredFieldCase {
 }
 
 /**
- * A SPEC-008 5.4 táblázatának tizenhat mezője, mezőnként egy egyébként
+ * A SPEC-008 5.4 táblázatának tizenöt mezője (a `valueKind` kikerült, SPEC-016 5.2), mezőnként egy egyébként
  * érvényes konfiggal, amiben csak a vizsgált mező szövege változik.
  */
 const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
@@ -52,7 +52,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
     path: ['inputFields', 0, 'name'],
     build: (text) => ({
       type: 'start',
-      inputFields: [{ name: text, label: 'Téma', valueKind: 'string', required: true }],
+      inputFields: [{ name: text, label: 'Téma', valueKind: 'text', required: true }],
       onUnhandledError: 'fail_run',
     }),
   },
@@ -61,16 +61,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
     path: ['inputFields', 0, 'label'],
     build: (text) => ({
       type: 'start',
-      inputFields: [{ name: 'topic', label: text, valueKind: 'string', required: true }],
-      onUnhandledError: 'fail_run',
-    }),
-  },
-  {
-    field: 'start inputFields[].valueKind',
-    path: ['inputFields', 0, 'valueKind'],
-    build: (text) => ({
-      type: 'start',
-      inputFields: [{ name: 'topic', label: 'Téma', valueKind: text, required: true }],
+      inputFields: [{ name: 'topic', label: text, valueKind: 'text', required: true }],
       onUnhandledError: 'fail_run',
     }),
   },
@@ -209,8 +200,8 @@ function storedNodeWith(config: unknown): Readonly<Record<string, unknown>> {
 }
 
 describe('NodeConfigSaveSchema: a kötelező szöveg mezők (SPEC-008 5.4, O-21)', () => {
-  it('a tizenhat mező mindegyike szerepel az esetek között', () => {
-    expect(REQUIRED_FIELD_CASES).toHaveLength(16);
+  it('a tizenöt mező mindegyike szerepel az esetek között', () => {
+    expect(REQUIRED_FIELD_CASES).toHaveLength(15);
   });
 
   for (const { field, path, build } of REQUIRED_FIELD_CASES) {
@@ -324,7 +315,7 @@ const SAVABLE_CONFIG_BY_VARIANT: readonly {
 }[] = [
   {
     variant: 'start',
-    config: { type: 'start', inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }] },
+    config: { type: 'start', inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }] },
   },
   { variant: 'agent_step', config: { ...VALID_AGENT_STEP_SETTINGS, type: 'agent_step' } },
   {
@@ -846,5 +837,117 @@ describe('NodeConfigSaveSchema: az agent definíció memory mezője és közvetl
     expect(
       NodeConfigSchema.safeParse(agentStepWithAgents({ a: { description: 'd', prompt: 'p', memory: 'user' } })).success,
     ).toBe(true);
+  });
+});
+
+function savableStartWith(...inputFields: readonly unknown[]): unknown {
+  return { type: 'start', inputFields, onUnhandledError: 'fail_run' };
+}
+
+function choiceFieldWith(options: unknown): unknown {
+  return { name: 'szin', label: 'Szín', valueKind: 'choice', options, required: true };
+}
+
+function plainFieldWith(valueKind: string, extra: Readonly<Record<string, unknown>>): unknown {
+  return { name: 'a', label: 'A', valueKind, required: false, ...extra };
+}
+
+describe('NodeConfigSaveSchema: a choice bemeneti mező opciói (SPEC-016 5.3)', () => {
+  it('érvényes opciókkal átmegy', () => {
+    const config = savableStartWith(choiceFieldWith(['piros', 'zöld']));
+
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
+  });
+
+  for (const [description, options] of [
+    ['üres lista', []],
+    ['üres elem', ['piros', '']],
+    ['csak szóközös elem', ['piros', ' '.repeat(3)]],
+    ['duplikált elem', ['piros', 'zöld', 'piros']],
+  ] as const) {
+    const config = savableStartWith(choiceFieldWith(options));
+
+    it(`${description} elbukik, a hiba a mező options útvonalán áll`, () => {
+      const parsed = NodeConfigSaveSchema.safeParse(config);
+
+      expect(parsed.success).toBe(false);
+      if (parsed.success) {
+        return;
+      }
+      expect(issuePaths(parsed.error)).toEqual([['inputFields', 0, 'options']]);
+      expect(parsed.error.issues[0]?.message).toBe(
+        'Legalább egy opció kell, az opciók nem lehetnek üresek és nem ismétlődhetnek.',
+      );
+    });
+
+    it(`${description}: a ReplaceGraphRequestSchema a teljes útvonalon utasítja el`, () => {
+      const request = ReplaceGraphRequestSchema.safeParse({ nodes: [nodeWith(config)], edges: [] });
+
+      expect(request.success).toBe(false);
+      if (request.success) {
+        return;
+      }
+      expect(issuePaths(request.error)).toEqual([['nodes', 0, 'config', 'inputFields', 0, 'options']]);
+    });
+
+    it(`${description}: az olvasó sémák elfogadják (csak az írás oldala szigorodik)`, () => {
+      const stored = storedNodeWith(config);
+
+      expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+      expect(WorkflowNodeSchema.safeParse(stored).success).toBe(true);
+    });
+  }
+
+  it('a hibát egy másik, típushibás mező mellett is jelzi (when feltétel)', () => {
+    const field = { name: 7, label: 'Szín', valueKind: 'choice', options: [], required: true };
+    const parsed = NodeConfigSaveSchema.safeParse(savableStartWith(field));
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      return;
+    }
+    expect(issuePaths(parsed.error)).toEqual([
+      ['inputFields', 0, 'name'],
+      ['inputFields', 0, 'options'],
+    ]);
+  });
+
+  it('nem szöveg elemű options a séma saját típushibája, mellé nem kerül második hiba', () => {
+    const parsed = NodeConfigSaveSchema.safeParse(savableStartWith(choiceFieldWith([1])));
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      return;
+    }
+    expect(issuePaths(parsed.error)).toEqual([['inputFields', 0, 'options', 0]]);
+  });
+});
+
+describe('NodeConfigSaveSchema: a start bemeneti mező valueKind típusa (SPEC-016 5.1, 5.2)', () => {
+  for (const valueKind of ['text', 'number', 'boolean', 'list', 'json'] as const) {
+    it(`a(z) ${valueKind} options nélkül átmegy`, () => {
+      const config = savableStartWith(plainFieldWith(valueKind, {}));
+
+      expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
+    });
+
+    it(`a(z) ${valueKind} ágon az options ismeretlen kulcs, elbukik`, () => {
+      const config = savableStartWith(plainFieldWith(valueKind, { options: ['x'] }));
+
+      expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
+    });
+  }
+
+  it('a régi szabad szöveges érték elbukik az olvasó és a mentési sémán is', () => {
+    const config = savableStartWith(plainFieldWith('string', {}));
+
+    expect(NodeConfigSchema.safeParse(config).success).toBe(false);
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
+  });
+
+  it('a choice ágon az options hiánya elbukik', () => {
+    const config = savableStartWith(plainFieldWith('choice', {}));
+
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
   });
 });

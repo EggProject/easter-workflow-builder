@@ -312,7 +312,7 @@ flowchart TD
 1. `readGraph(workflowId)`, majd a globális beállítás olvasása (`readSettings`).
 2. **Provider feloldás** minden node-ra, háromszinten (10. szekció).
 3. **Gráf validáció** (4.5, 4.6, 4.7) és **provider validáció** (11.2) a feloldott providerekkel.
-4. A bemenet ellenőrzése a `start` node `inputFields` listája ellen: minden `required: true` mezőnek szerepelnie kell, különben `missing_required_input`.
+4. A bemenet ellenőrzése a `start` node `inputFields` listája ellen: minden `required: true` mezőnek szerepelnie kell, különben `missing_required_input`; ezután minden **jelen lévő** mező értéke a `valueKind` típusára is ellenőrzött, eltérésnél `invalid_input_type` (SPEC-016 5.5). Az elfogadott érték: `text` szöveg, `number` véges szám, `boolean` logikai érték, `choice` az `options` egyik eleme, `list` szövegek tömbje; a `json` ágon nincs ellenőrzés, mert a drót JSON-t ad, és egy ottani ág garantáltan sosem futna. A hiányzó nem kötelező mező nem hiba.
 5. A pillanatkép dokumentum összeállítása, a feloldott `effectiveProviderId` értékkel node-onként (SPEC-003 5.1).
 6. `startRun(...)` a `db` felé, ami egy tranzakcióban oldja fel a pillanatképet, írja a futást, fagyasztja be a delta kapcsolót és írja a `run_started` eseményt.
 7. `markRunRunning`, majd a `start` node példány ütemezése.

@@ -123,7 +123,10 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   fut, és minden validáló függvény `Outcome<T>` alakban ad választ, hogy a dobó kivétel ne törje
   meg a projekt `Outcome` konvencióját (SPEC-005 7.2, 7.3, 7.4).
 - **A `protocol` a `db` domain uniót is duplikálhatja, ha gépi sodródás védelem tartozik hozzá.**
-  A hat drótszintű felsorolás mellé a `node-config` téma is így kerül be: a tíz ág Zod sémája a
+  A hat drótszintű felsorolás mellé a `StartInputValueKind` hat értéke is így kerül be (a `StartInputField`
+  `valueKind` mezőjének zárt felsorolása; a védelem az `enum-drift-protection` témában áll, típusszintű
+  kétirányú egyenlőséggel és a `db` `isNodeConfig` guardján átengedett futásidejű ággal, SPEC-016 5.1,
+  5.2), és a `node-config` téma is így kerül be: a tíz ág Zod sémája a
   `db` `NodeConfig` uniójának szándékos duplikátuma, mert az `apps/web` a `db` csomagtól nem
   függhet, tehát enélkül a szerkesztő űrlapjának nincs típusa. A védelem helye kötött, az
   `apps/server` csomag (az egyetlen, ahol a két oldal egyszerre látszik), a formája pedig a
@@ -160,7 +163,15 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   az üres mezőt továbbra is elfogadja, mert a pillanatkép megváltoztathatatlan (10. szekció 2. pont), és
   egy régi, üres mezőt hordozó gráfnak és futásnak olvashatónak kell maradnia (user döntés 2026-09-28,
   SPEC-008 5.4, O-21). Az ismeretlen kulcs szabálya viszont az olvasó utat is szigorítja (lásd a
-  "minden ismeretlen kulcsot elutasít" pontot lejjebb). **Ugyanez a minta a központi MCP szerver
+  "minden ismeretlen kulcsot elutasít" pontot lejjebb). **Kimondott kivétel a "csak az írás oldala
+  szigorodik" szabály alól: a `start` bemeneti mező `valueKind` felsorolása és a `choice` ág `options`
+  szabálya** (nem üres lista, nem üres elemek, egyediség). Ezek a `db` oldalon az olvasó úton is szigorúak
+  (`readGraph`, a futás indítás és a pillanatkép ellenőrzése ugyanazt az `isNodeConfig` guardot futtatja,
+  mint a `replaceGraph`), mert tárolt adat nincs, ami olvashatóságot követelne, és visszafelé kompatibilitási
+  ág sincs (user döntés 2026-11-04, SPEC-016 5.2, O-2). A `valueKind` ezért **kikerült a kötelező szöveg
+  mezők mindkét oldali táblájából** (a zárt felsorolásnak nincs "üres" állapota), a `choice` `options`
+  mentési szabálya pedig a `protocol` mentési sémájában is áll, a `db` guard párjaként; a `protocol`
+  olvasó sémái az üres `options` listát továbbra is elfogadják. **Ugyanez a minta a központi MCP szerver
   definíción** (SPEC-009 6.1): a `stdio` `command` és a `sse`, `http` `url` kötelező, nem üres szöveg, a
   `protocol` `McpServerDefinitionSaveSchema` és a `db` `saveDefinition` (`blank_required_text_field`)
   `MCP_SERVER_DEFINITION_REQUIRED_TEXT_FIELDS` táblája szerint; a védelem az `apps/server`
@@ -192,7 +203,8 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
 - **A `db` `NodeConfig` guard minden ismeretlen kulcsot elutasít, és a `protocol` ugyanazt a szabályt
   duplikálja, ugyanezzel a védelemmel.** Az `isNodeConfig` és az `isAgentStepConfig` objektumonként zárt
   kulcslistával dolgozik: a tíz `NodeConfig` típus (a `join` mind a négy ága), az `AgentStepConfig`, a
-  `StartInputField`, a `BranchOption`, a `ScriptConfig`, a `PresetSystemPrompt`, a
+  `StartInputField` (ágonként: a `choice` ág zárt kulcslistája az `options` kulcsot is tartalmazza, a másik
+  öt értéké nem, tehát ott az `options` ismeretlen kulcsként bukik; SPEC-016 5.3), a `BranchOption`, a `ScriptConfig`, a `PresetSystemPrompt`, a
   `StructuredOutputConfig`, a `SandboxConfig` és a három `StorableMcpServer` variáns. A lista
   `Readonly<Record<keyof T, true>>` alakú, tehát a típus bővülésekor a `typecheck` kapu jelez, ha a lista
   nem; az ellenőrzést a `typeguards` `isRecordWithKnownKeys` guardja végzi. A szabály a `replaceGraph`

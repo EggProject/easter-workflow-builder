@@ -1,6 +1,7 @@
-import type { StartInputField, StartNodeConfig } from '@easter-workflow-builder/protocol';
-import { Button, Checkbox, TextField } from '@easter-workflow-builder/ui';
+import type { StartInputField, StartInputValueKind, StartNodeConfig } from '@easter-workflow-builder/protocol';
+import { Button, Checkbox, SelectField, TextField } from '@easter-workflow-builder/ui';
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
+import { StartInputOptionsField } from './StartInputOptionsField.tsx';
 import { FieldErrorsContext } from './field-errors-context.ts';
 
 export interface StartNodeFieldsProperties {
@@ -8,7 +9,32 @@ export interface StartNodeFieldsProperties {
   readonly onChange: (nextConfig: StartNodeConfig) => void;
 }
 
-const EMPTY_INPUT_FIELD: StartInputField = { name: '', label: '', valueKind: 'string', required: false };
+// Az új mező alapértéke a `text` (SPEC-016 5.1, O-3).
+const EMPTY_INPUT_FIELD: StartInputField = { name: '', label: '', valueKind: 'text', required: false };
+
+/**
+ * A hat érték felirata az 5.1 táblázat szerint. A `satisfies` őrzi, hogy minden
+ * felsorolt érték valóban `StartInputValueKind` legyen.
+ */
+const VALUE_KIND_OPTIONS = [
+  { value: 'text', label: 'Szöveg' },
+  { value: 'number', label: 'Szám' },
+  { value: 'boolean', label: 'Igen/nem' },
+  { value: 'choice', label: 'Választólista' },
+  { value: 'list', label: 'Lista' },
+  { value: 'json', label: 'JSON adat' },
+] as const satisfies readonly { readonly value: StartInputValueKind; readonly label: string }[];
+
+/**
+ * Típusváltás: a `choice` ág üres opciólistával indul (amit a mentési séma a
+ * mező alatt jelez), a többi ágon az `options` mező nem létezik (SPEC-016 5.3).
+ */
+function withValueKind(field: StartInputField, valueKind: StartInputValueKind): StartInputField {
+  const { name, label, required } = field;
+  return valueKind === 'choice'
+    ? { name, label, required, valueKind, options: [] }
+    : { name, label, required, valueKind };
+}
 
 /**
  * A `start` node szerkesztett mezője: a bemeneti mezők listája (SPEC-008
@@ -27,10 +53,8 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
     onChange({ ...config, inputFields: nextInputFields });
   }
 
-  function updateField(index: number, patch: Partial<StartInputField>): void {
-    setInputFields(
-      config.inputFields.map((field, fieldIndex) => (fieldIndex === index ? { ...field, ...patch } : field)),
-    );
+  function updateField(index: number, update: (field: StartInputField) => StartInputField): void {
+    setInputFields(config.inputFields.map((field, fieldIndex) => (fieldIndex === index ? update(field) : field)));
   }
 
   return (
@@ -43,7 +67,7 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
             value={field.name}
             error={fieldErrors.get(`inputFields.${String(index)}.name`)}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              updateField(index, { name: event.target.value });
+              updateField(index, (current) => ({ ...current, name: event.target.value }));
             }}
           />
           <TextField
@@ -52,23 +76,32 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
             value={field.label}
             error={fieldErrors.get(`inputFields.${String(index)}.label`)}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              updateField(index, { label: event.target.value });
+              updateField(index, (current) => ({ ...current, label: event.target.value }));
             }}
           />
-          <TextField
+          <SelectField
             size="sm"
             label="Érték típusa"
+            options={VALUE_KIND_OPTIONS}
             value={field.valueKind}
-            error={fieldErrors.get(`inputFields.${String(index)}.valueKind`)}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              updateField(index, { valueKind: event.target.value });
+            onChange={(valueKind) => {
+              updateField(index, (current) => withValueKind(current, valueKind));
             }}
           />
+          {field.valueKind === 'choice' && (
+            <StartInputOptionsField
+              options={field.options}
+              error={fieldErrors.get(`inputFields.${String(index)}.options`)}
+              onChange={(options) => {
+                updateField(index, (current) => ({ ...current, options }));
+              }}
+            />
+          )}
           <Checkbox
             label="Kötelező"
             checked={field.required}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              updateField(index, { required: event.target.checked });
+              updateField(index, (current) => ({ ...current, required: event.target.checked }));
             }}
           />
           <Button

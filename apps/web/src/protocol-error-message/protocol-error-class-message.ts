@@ -30,6 +30,7 @@ const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>
   insufficient_backoff_list:
     'Egy Hibakezelő csomópont várakozási listája rövidebb, mint amit a próbálkozások száma megkövetel.',
   missing_required_input: 'A futás egy kötelező bemeneti mezője hiányzik.',
+  invalid_input_type: 'A futás bemenetének egy mezője nem a beállított típusú.',
   no_default_provider: 'Nincs alapértelmezett provider beállítva, válassz egyet a Beállítások képernyőn.',
   structured_output_strategy_unsupported:
     'Egy lépés strukturált kimenet stratégiáját a választott provider nem támogatja.',

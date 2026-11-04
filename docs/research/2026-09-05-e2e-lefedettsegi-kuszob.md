@@ -2212,3 +2212,60 @@ felett van, tehát a ratchet szerint a küszöb felfelé követi a mért érték
 **Igazolás.** Ugyanazon a nyers adaton a beállított küszöbökkel a `bun run coverage:e2e:report` exit 0;
 egy századdal magasabb küszöbökkel (99.64 / 99.26 / 99.90 / 99.62) mind a négy metrika `ERROR` sorral
 bukik (négy `ERROR`).
+
+## 56. A SPEC-016 (indítási bemenet értéktípus) utáni újramérés (2026-11-04): a `branches` és a `lines` küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `feat/spec-016-bemenet-ertektipus` ág (PLAN-017) a Start bemeneti mező `valueKind`
+típusát (hat típus, `choice` opciólista) és a futás indító ablak típus szerinti mezőit valósítja meg. Az
+első tiszta mérés az ág `5c9957e` fején a `bun run coverage:e2e:report` kapun elbukott: `branches`
+1363 / 1375 (99.12, küszöb 99.25), a fedetlen ágak száma 10-ről 12-re nőtt, mind a nyolc shard zöld. A
+szabálykönyv 8. szekciója szerint ez valódi romlás, tehát teszt kellett, nem küszöbcsökkentés. A két új
+fedetlen ág, mindkettő termékkód, amit e2e korábban csak véletlenül sem ért el:
+
+1. `node-inspector/StartInputOptionsField.tsx`: az `isDraftCurrent ? draft : toStringListFieldValue(options)`
+   második ága (a külső `options` eltér a vázlattól, például visszavonás után).
+2. `run-control/StartRunField.tsx`: a `field.required ? [] : [NO_CHOICE_OPTION]` első ága (kötelező
+   `choice` mező a futás indító ablakban).
+
+A pótlás két célzott e2e teszt, amelyek a viselkedést állítják és megvárják (a 12. szekció "véletlenül
+fedett sor" szabálya): a `run-control-input-types.spec.ts` "a kötelező választó mező opciói között nincs
+'nincs kiválasztva'..." tesztje (opciólista, a mező alatti `Kötelező mező.` hiba `POST` nélkül, a
+kiválasztás utáni `POST` törzs), és a `graph-start-input-value-kind.spec.ts` "a visszavonás az opciók
+mezőt a külső listára állítja..." tesztje. **Szándékos rontással igazolva:** a `StartRunField.tsx`
+feltételének megfordítása a kötelező választó tesztet `toHaveText` állításon buktatja (az opciólistában
+megjelenik a "nincs kiválasztva"), a `StartInputOptionsField.tsx` `value={draft}` rontása a visszavonás
+tesztet `toHaveValue` állításon buktatja (a mező a begépelt vázlatot mutatja a külső lista helyett);
+mindkettő visszaállítva, a rontás nem került commitba.
+
+**A mérés** a 29. szekció tiszta eljárásával, a 47. szekció sandbox módja szerint, az ág végső fején
+(`T-017-12` commit, a `main` `564e1eb`, a fetch után nem mozdult): `rm -rf apps/web/e2e/.nyc_output
+apps/web/coverage-e2e apps/web/test-results`, az `apps/web` alatt `bun x playwright test --shard=<i>/8`
+nyolc egymás utáni futásban, `flock /tmp/playwright-gep.lock` alatt, `workers: 3` mellett, majd
+`nyc report --reporter=json-summary`. Mind a nyolc shard zöld (96 + 96 + 96 + 96 + 95 + 95 + 95 + 95 = 764
+teszt).
+
+| Metrika    | 55. szekció: fedett / összes | Most: fedett / összes | Fedetlen, 55. szekció -> most | Pontos arány | Új küszöb | Küszöb előtte |
+| ---------- | ---------------------------- | --------------------- | ----------------------------- | ------------ | --------- | ------------- |
+| statements | 2703 / 2713                  | 2764 / 2774           | 10 -> 10                      | 99,6395      | 99.63     | 99.63         |
+| branches   | 1325 / 1335                  | 1365 / 1375           | 10 -> 10                      | 99,2727      | **99.27** | 99.25         |
+| functions  | 947 / 948                    | 970 / 971             | 1 -> 1                        | 99,8970      | 99.89     | 99.89         |
+| lines      | 2586 / 2596                  | 2642 / 2652           | 10 -> 10                      | 99,6229      | **99.62** | 99.61         |
+
+A fedetlen tételek fájlonként (statements / branches / functions / lines), a mért fán: `app-mount/mount-app.tsx`
+(3/2/0/3), `frontend-config/read-frontend-config.ts` (4/6/0/4), `graph-editor/is-valid-connection.ts`
+(1/1/0/1), `rest-client/perform-route-request.ts` (1/1/0/1), `stream-client/use-stream-connection.ts`
+(1/0/1/1): ugyanaz az öt fájl és ugyanazok a darabszámok, mint az 55. szekcióban; új fájl nem került a
+listára, és az új `StartRunField.tsx` és `StartInputOptionsField.tsx` sorain nincs fedetlen tétel. A `main`
+`564e1eb` fejét külön nem mértük újra, az összehasonlítás alapja az 55. szekció mérése.
+
+**Levezetés.** Az összes darabszám +61 / +40 / +23 / +56 tétellel nőtt (2713 -> 2774, 1335 -> 1375,
+948 -> 971, 2596 -> 2652), a fedett darab ugyanennyivel (+61 / +40 / +23 / +56), tehát a fedetlen darab
+egyik metrikán sem nőtt. A mért százalék a `branches` és a `lines` metrikán a korábbi küszöb felett van
+(99.27 kontra 99.25, 99.62 kontra 99.61), a `statements` és a `functions` metrikán egyenlő vele. A
+ratchet (8. szekció) szerint a küszöb felfelé követi a mért értéket, felfelé kerekítés nélkül, az `nyc`
+két tizedesre lefelé kerekített kimenete szerint (5. szekció). Lefelé követés nincs, tehát a fedett kód
+törlésének tételes levezetésére (15. szekció) itt nincs szükség (`apps/web/package.json`).
+
+**Igazolás.** Ugyanazon a nyers adaton a beállított küszöbökkel a `bun run coverage:e2e:report` exit 0;
+egy századdal magasabb küszöbökkel (99.64 / 99.28 / 99.90 / 99.63) mind a négy metrika `ERROR` sorral
+bukik (négy `ERROR`).

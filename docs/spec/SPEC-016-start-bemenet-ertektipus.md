@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                                                                                           |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | jóváhagyott: a 7. szekció O-1 ... O-3 termékkérdése lezárva (user döntés 2026-11-04); a technikai döntések forrásból lezárva (5. szekció)                                                                                                 |
+| Státusz  | végrehajtva (`feat/spec-016-bemenet-ertektipus` ág, PLAN-017): a 7. szekció O-1 ... O-3 termékkérdése lezárva (user döntés 2026-11-04); a technikai döntések forrásból lezárva (5. szekció)                                               |
 | Dátum    | 2026-11-03, átvezetve 2026-11-04                                                                                                                                                                                                          |
 | Előzmény | [`SPEC-003`](SPEC-003-domain-perzisztencia.md) 4.3, [`SPEC-004`](SPEC-004-vegrehajto-motor.md) 4.8 4. lépés, [`SPEC-008`](SPEC-008-graf-szerkeszto-es-futas-nezet.md) 5.1 és 6.5, [`SPEC-010`](SPEC-010-sablon-es-kifejezes-nyelv.md) 7.3 |
 | Bemenet  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md) 2., 5. és 9. szekció; a hiányleltár H-12 tétele                                                                            |
@@ -60,8 +60,7 @@ Teljes lista: research 5. szekció (E-1 ... E-6). Kivonat:
   az n8n és a Windmill tömb és objektum típussal egészíti ki (E-2, E-3), és a Windmill a bemenetet a típusra
   ellenőrzi (E-3).
 - A CEL szigorú típusú: szöveget számmal nem hasonlít, a JSON szám `double` (E-4). Ma tehát egy
-  `input.darab > 3` kifejezés hibát ad, mert a `darab` szövegként érkezik. A `cel-js` viselkedése mérendő
-  (E-5).
+  `input.darab > 3` kifejezés hibát ad, mert a `darab` szövegként érkezik. A `cel-js` 8.0.0-n mérve (E-5).
 - A böngésző beviteli mezője szöveget ad, a számot a `valueAsNumber` adja, üresen `NaN` (E-6).
 
 ## 4. Fogalmak
@@ -130,8 +129,9 @@ Teljes lista: research 5. szekció (E-1 ... E-6). Kivonat:
 - A JSON mező szövege, ha nem értelmezhető (`JSON.parse` kivétel), a mező alatti hibát ad, és a futás nem indul.
 - A szám a CEL-ben `double` (E-4, SPEC-010 M-122), tehát `input.darab > 3` működik, de `input.darab + 1` int
   literállal a CEL szabálya szerint nem (nincs automatikus aritmetikai konverzió, E-4); a helyes alak
-  `input.darab + 1.0`. A viselkedést a PLAN-017 T-017-2 lépése a `cel-js`-en méri (E-5), és a SPEC-010
-  dokumentációja mondja ki.
+  `input.darab + 1.0`. A `cel-js` 8.0.0-n mérve (E-5, research 10. szekció): az egész JSON szám (`5`) is `double`,
+  tehát `input.darab + 1` egész értékre is hiba; a szöveg és szám egyenlősége (`input.s == 5`) nem hiba, hanem
+  `false`. A SPEC-010 dokumentációja ezt mondja ki (PLAN-017 T-017-10).
 
 ### 5.5 A motor ellenőrzi a típust
 
@@ -157,7 +157,13 @@ garantáltan sosem bukna (a halott ág tilalma, `.claude/CLAUDE.md` 5. szekció)
 - Szerkesztő: `SelectField` a hat értékre az 5.1 feliratával, az új mező alapértéke `text`; `choice` típusnál az
   opciók soronkénti `TextAreaField` mezője. A hibaüzenet a mező alatt (`.claude/CLAUDE.md` 11. szekció).
 - Futás indító ablak: az 5.1 táblázat mezői, a hibaüzenet a mező alatt.
-- Újraindításnál (`restartRun`) a tárolt bemenet változatlanul megy tovább.
+- Újraindításnál (`restartRun`) a tárolt bemenet változatlanul megy tovább, és a futás indítása a JELENLEGI gráf
+  mezőtípusai ellen ellenőriz, ugyanúgy, ahogy a meglévő `missing_required_input` ellenőrzés is a jelenlegi gráf
+  ellen fut (SPEC-004 4.8): ha egy mező típusa az eredeti futás óta megváltozott, az újraindítás
+  `invalid_input_type` hibát ad (a saját magyar mondatával), és új futás nem jön létre. Ez szándékos (K-1,
+  `docs/research/2026-11-03-szkript-kimenet-ertektipus.md` 11.5); a nem illeszkedő mező kihagyása vagy az indító
+  ablak előtöltött megnyitása nem része ennek a specnek. Teszt: `restart-run.spec.ts` "a tárolt bemenet a JELENLEGI
+  gráf mezőtípusai ellen ellenőrzött".
 - A bemutató fixtúra (`showcase-graph.ts`) `'string'` értéke `'text'` lesz; a képernyőkép lenyomata ettől elavul,
   a `bun run screenshots` újra fut (`.claude/CLAUDE.md` 12. szekció).
 
@@ -169,7 +175,7 @@ garantáltan sosem bukna (a halott ág tilalma, `.claude/CLAUDE.md` 5. szekció)
   `choice` opción kívüli értéke hiba.
 - `apps/web`: a választó a szerkesztőben, az opciók mezője, a típusos mezők a futás indító ablakban, a küldött JSON
   alakja, az érvénytelen JSON mező alatti hibája; e2e a futás indításra `page.route()` mockkal.
-- Mérés: a `cel-js` 8.0.0 viselkedése szöveg, szám és logikai bemenetre (E-5).
+- Mérés: a `cel-js` 8.0.0 viselkedése szöveg, szám és logikai bemenetre (E-5); elvégezve, research 10. szekció.
 
 ## 7. Nyitott kérdések
 
@@ -183,9 +189,9 @@ garantáltan sosem bukna (a halott ág tilalma, `.claude/CLAUDE.md` 5. szekció)
 
 ### 7.2 Technikai, nyitva
 
-| #   | Kérdés                                   | Mi a viselkedés addig                      | Mi zárná le      |
-| --- | ---------------------------------------- | ------------------------------------------ | ---------------- |
-| T-1 | A `cel-js` 8.0.0 típus viselkedése (E-5) | a CEL szabálya (E-4) a dokumentált elvárás | a T-017-2 mérése |
+| #   | Kérdés                                   | Mi a viselkedés addig                                                                                               | Mi zárná le |
+| --- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------- |
+| T-1 | A `cel-js` 8.0.0 típus viselkedése (E-5) | **lezárva** 2026-11-04 (T-017-2): mérve, research 10. szekció; az 5.4 állítása igaz, az egész JSON szám is `double` |             |
 
 ## 8. Elfogadási kritériumok
 

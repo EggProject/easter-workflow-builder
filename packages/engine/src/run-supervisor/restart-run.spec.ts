@@ -292,6 +292,33 @@ async function runToEnd(supervisor: RunSupervisor, runId: string): Promise<void>
   okOrThrow(await handle.completion);
 }
 
+function startWithField(valueKind: 'text' | 'number', isRequired: boolean): NodeConfig {
+  return {
+    type: 'start',
+    inputFields: [{ name: 'tema', label: 'Téma', valueKind, required: isRequired }],
+    onUnhandledError: 'fail_run',
+  };
+}
+
+async function startOriginalThenChangeGraph(
+  changedConfig: NodeConfig,
+): Promise<{ readonly database: DatabaseContext; readonly outcome: Outcome<StartedRun> }> {
+  const database = openMemoryDatabase();
+  okOrThrow(database.settings.setDefaultProvider('minimax'));
+  const supervisor = createTrivialSupervisor(database);
+  const workflow = okOrThrow(
+    database.workflows.createWorkflow({ name: 'tipusvaltas', description: null, providerId: null }),
+  );
+  const originalStart = nodeOf('start', startWithField('text', true));
+  okOrThrow(database.workflows.replaceGraph(workflow.id, [originalStart], []));
+  const original = okOrThrow(supervisor.startRun({ workflowId: workflow.id, input: { tema: 'nyuszi' } }));
+  await runToEnd(supervisor, original.run.id);
+
+  okOrThrow(database.workflows.replaceGraph(workflow.id, [nodeOf('start', changedConfig)], []));
+
+  return { database, outcome: await restartRun(original.run.id, { database, runSupervisor: supervisor }) };
+}
+
 describe('restartRun - valós RunSupervisor-ral (AC-55, SPEC-003 27. kritérium)', () => {
   it('a workflow AKTUÁLIS gráfjáról készít új pillanatképet, nem az eredeti futáséról, és rögzíti a restartedFromRunId származást', async () => {
     const database = openMemoryDatabase();
@@ -330,5 +357,32 @@ describe('restartRun - valós RunSupervisor-ral (AC-55, SPEC-003 27. kritérium)
     expect(restartedRow.restartedFromRunId).toBe(original.run.id);
 
     database.close();
+  });
+
+  describe('a tárolt bemenet a JELENLEGI gráf mezőtípusai ellen ellenőrzött (SPEC-016 5.6, K-1)', () => {
+    it('a mező típusa megváltozott: a tárolt szöveg az új szám típuson invalid_input_type, és nem jön létre új futás', async () => {
+      const { database, outcome } = await startOriginalThenChangeGraph(startWithField('number', true));
+
+      expect(outcome.kind === 'error' ? outcome.message : '').toContain('invalid_input_type');
+      expect(okOrThrow(database.runs.listRuns())).toHaveLength(1);
+
+      database.close();
+    });
+
+    it('a meglévő required precedens ugyanígy: egy azóta kötelezővé vált új mező hiánya missing_required_input', async () => {
+      const { database, outcome } = await startOriginalThenChangeGraph({
+        type: 'start',
+        inputFields: [
+          { name: 'tema', label: 'Téma', valueKind: 'text', required: true },
+          { name: 'darab', label: 'Darab', valueKind: 'number', required: true },
+        ],
+        onUnhandledError: 'fail_run',
+      });
+
+      expect(outcome.kind === 'error' ? outcome.message : '').toContain('missing_required_input');
+      expect(okOrThrow(database.runs.listRuns())).toHaveLength(1);
+
+      database.close();
+    });
   });
 });

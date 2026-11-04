@@ -57,6 +57,9 @@ export type {
   UnhandledErrorPolicy,
 } from './workflow-graph/node-config/node-config.ts';
 export { isNodeConfig } from './workflow-graph/node-config/is-node-config.ts';
+// A Start bemeneti mező értéktípusa (SPEC-016 5.1): az `apps/server` `enum-drift-protection`
+// témája a `protocol` párjával veti össze, a motor a futás indításakor ez alapján ellenőriz.
+export type { StartInputValueKind } from './workflow-graph/node-config/start-input-value-kind.ts';
 // A kötelező szöveg mezők táblája (SPEC-008 5.4, O-21): a `replaceGraph` írás oldali
 // ellenőrzése ebből dolgozik, és az `apps/server` `node-config-drift-protection` témája
 // ezt veti össze a `protocol` mentési sémájának táblájával.

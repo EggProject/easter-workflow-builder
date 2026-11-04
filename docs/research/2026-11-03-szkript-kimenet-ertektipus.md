@@ -8,7 +8,9 @@
 - Kapcsolódó user döntések: SPEC-009 14.6 O-23 (szkript: "saját spec, később"), O-24 (strukturált kimenet:
   "saját spec"), O-25 (valueKind: "saját kis spec"), mind 2026-10-26.
 - Nem futott: valódi API hívás, kód módosítás, teszt. Ahol egy állítás mérésen múlna, "nem ellenőrzött".
-- Frissítve 2026-11-04: a 8. szekció (JavaScript sandbox hálózattal és fájllal) és a 9. szekció (a user döntései).
+- Frissítve 2026-11-04: a 8. szekció (JavaScript sandbox hálózattal és fájllal), a 9. szekció (a user döntései) és
+  a 10. szekció (a `cel-js` típus viselkedésének mérése, PLAN-017 T-017-2; ez kódot futtatott, a fenti "Nem futott"
+  pont a 10. szekcióra nem vonatkozik).
 
 Jelölés: **ellenőrzött** = elsődleges forrás plusz legalább két független megerősítés; **részben** = egy
 elsődleges forrás, vagy csak azonos gyártó több oldala; **nem ellenőrzött** = nincs elég megerősítés, a spec
@@ -92,12 +94,12 @@ erre nem épít döntést.
 | E-2 | n8n "Execute Sub-workflow Trigger" mező típusai: string, number, boolean, array, object, any                                                                                                                                                                    | <https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executeworkflowtrigger>; a node forrása; <https://github.com/n8n-io/n8n/pull/11922>                                                                                                          | részben                                    |
 | E-3 | Windmill: "Arguments can specify a type `integer`, `number`, `string`, `boolean`, `object`, `array` or `any`. The user's input will be validated against that type."                                                                                            | <https://www.windmill.dev/docs/core_concepts/json_schema_and_parsing>; két további Windmill oldal                                                                                                                                                                | részben (egy gyártó)                       |
 | E-4 | A CEL szigorú típusú: a JSON szám `double`, a `string` és a szám között nincs rendezés ("Comparisons require strict type equality at type-check time"), futásidőben `no_matching_overload`; az `int` és `double` között nincs automatikus aritmetikai konverzió | <https://github.com/google/cel-spec/blob/master/doc/langdef.md>; <https://github.com/cel-expr/cel-spec/wiki/proposal-210>; SPEC-010 M-122                                                                                                                        | ellenőrzött                                |
-| E-5 | Ugyanez a `@marcbachmann/cel-js` 8.0.0-ban (szöveg kontra szám összehasonlítás, `double + 1` int literállal)                                                                                                                                                    | nincs mérés                                                                                                                                                                                                                                                      | nem ellenőrzött                            |
+| E-5 | Ugyanez a `@marcbachmann/cel-js` 8.0.0-ban: a JS `number` mindig `double` (az egész is), a szöveg és a szám rendezése és aritmetikája `no such overload` hiba, az egyenlőségük `false`; `double + 1` int literállal hiba, `+ 1.0`-val működik                   | saját mérés, 10. szekció; a telepített forrás `lib/operators.js` `debugType`                                                                                                                                                                                     | mérve (10. szekció)                        |
 | E-6 | A HTML `input.value` mindig szöveg, a `type="number"` számát a `valueAsNumber` adja (üresen `NaN`); a checkbox állapota a `checked` logikai érték                                                                                                               | <https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value>; <https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/valueAsNumber>; <https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/checkbox>              | részben (egy gyártó, plusz Stack Overflow) |
 
 **Következmény (E-4):** ma a futás bemenete szövegként érkezik (C-16), tehát egy `input.darab > 3` alakú
 `branch` kifejezés a CEL szabálya szerint futásidőben hibát ad, nem számként hasonlít. A `cel-js`
-viselkedése erre mérendő (E-5, PLAN-017 F0).
+8.0.0-ban ez mérve (E-5, 10. szekció).
 
 ## 6. A `fail_run` és az `error_handler` backoff ütközése
 
@@ -147,7 +149,8 @@ csoportjába (két ág, hosszú backoff, a futás a bukás után a backoff kivá
 2. K-2, K-3: az SDK újrapróbálásainak száma és belső validátora (melyik kulcsszót kényszeríti).
 3. K-6: a `MiniMax-M3.1-Flash` viselkedése a séma kulcsszavaira (mérés nélkül a leíró csak a használhatóságot
    tudja, C-12).
-4. E-5: a `cel-js` 8.0.0 típus viselkedése szöveg és szám bemenetre (mérés: PLAN-017 T-017-2).
+4. ~~E-5: a `cel-js` 8.0.0 típus viselkedése szöveg és szám bemenetre.~~ Lezárva 2026-11-04: mérve, 10. szekció
+   (PLAN-017 T-017-2).
 5. 6. szekció: a megszakítás végállapota egy már `fail_run` állapotú futáson.
 6. J-8: a bellard QuickJS 2025-09-13 érintettsége a quickjs-ng 2026-os hibáiban; a WebAssembly modul szintű
    memória plafon; hogy egy motor memóriahiba a WebAssembly lineáris memóriájában marad-e (PLAN-015 T-015-2).
@@ -205,3 +208,184 @@ lista mintája szerint; zárt felsorolás az olvasó úton is.
 `ProtocolErrorClass` szótárt és az `error-class-drift-protection` témát bővíti, tehát párhuzamosan ütköznének; a
 PLAN-017 a legkisebb és külső függőség nélküli; a PLAN-016 egy függőséget (Ajv) hoz; a PLAN-015 a legnagyobb, új
 futtatóval és a nyitott O-5, O-6 kérdéssel.
+
+## 10. A `cel-js` típus viselkedésének mérése (PLAN-017 T-017-2, 2026-11-04)
+
+**Módszer.** Eldobható próba a repón kívül (`/tmp/cel-probe/`), Node v26.7.0 alatt
+`node --experimental-strip-types`, a termék saját kiértékelőjén át: a
+`packages/workflow-language/src/cel-expression/create-cel-expression-evaluator.ts` `createCelExpressionEvaluator()`
+függvénye, abszolút útvonallal importálva. Ez ugyanazt a környezetet építi, amit a termék (`createCelEnvironment`:
+opció nélküli `Environment`, a hét `RunContext` név `dyn` típussal), a kontextust a `toCelContext` képezi le (az
+`input` értéke változatlanul megy át, `BigInt` átalakítás csak az `itemIndex` és az `iteration` egész értékén van),
+az eredményt a `normalizeCelResult` normalizálja, a hibát a `describeCelError` írja le. Esetenként előbb `compile`,
+utána `evaluate` a `{ input }` kontextuson. A könyvtár nyers hibaszövegéhez egy második próba ugyanígy épített
+`Environment`-et használt (`registerVariable('input', 'dyn')`), a termék leképező rétegei nélkül.
+
+**Verzió.** `@marcbachmann/cel-js` 8.0.0: a `packages/workflow-language/node_modules/@marcbachmann/cel-js` link célja
+`node_modules/.bun/@marcbachmann+cel-js@8.0.0/...`, a `package.json` `version` mezője `8.0.0`.
+
+**A bemenet:** `{ s: '5', n5: 5, n25: 2.5, n55: 5.5, b: true, lista: ['a', 'b'], obj: { k: 'v', n: 7 } }`.
+
+**Eredmények.** Mind a 44 kifejezés `compile` eredménye `ok` (a `dyn` változó miatt a típus ellenőrzés a fordításkor
+nem jelez, minden eltérés futásidőben jön). A "termék" oszlop az `evaluate` `Outcome` értéke, a "könyvtár" oszlop a
+nyers `EvaluationError` szövegének első sora, ahol hiba van.
+
+| Kifejezés                                                 | Termék (`evaluate`)                                                                | Könyvtár hibaszövege                     |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------- |
+| `input.s > 3`                                             | hiba: "a művelet ezekre az operandus típusokra nem értelmezett (pozíció: 0)"       | `no such overload: dyn<string> > int`    |
+| `input.s > 3.0`                                           | hiba, ugyanaz a mondat                                                             | `no such overload: dyn<string> > double` |
+| `input.s + 1`                                             | hiba, ugyanaz a mondat                                                             | `no such overload: dyn<string> + int`    |
+| `input.s == 5`                                            | `false`                                                                            | nincs hiba                               |
+| `input.s == '5'`                                          | `true`                                                                             |                                          |
+| `input.n5 > 3`, `input.n5 > 3.0`                          | `true`, `true`                                                                     |                                          |
+| `input.n5 + 1`                                            | hiba, ugyanaz a mondat                                                             | `no such overload: dyn<double> + int`    |
+| `input.n5 + 1.0`                                          | `6`                                                                                |                                          |
+| `input.n5 * 2`                                            | hiba, ugyanaz a mondat                                                             | `no such overload: dyn<double> * int`    |
+| `input.n5 * 2.0`                                          | `10`                                                                               |                                          |
+| `input.n5 == 5`, `input.n5 == 5.0`                        | `true`, `true`                                                                     |                                          |
+| `input.n5 == '5'`                                         | `false`                                                                            |                                          |
+| `int(input.n5) + 1`, `input.n5 + double(1)`               | `6`, `6`                                                                           |                                          |
+| `type(input.n5)`, `type(input.n25)`                       | hiba: "a kifejezés eredményében nem JSON érték áll" (a nyers érték `Type<double>`) |                                          |
+| `input.n25 > 3`, `input.n25 > 3.0`                        | `false`, `false`                                                                   |                                          |
+| `input.n25 + 1`                                           | hiba, ugyanaz a mondat                                                             | (azonos alak, `dyn<double> + int`)       |
+| `input.n25 + 1.0`, `input.n25 == 2.5`                     | `3.5`, `true`                                                                      |                                          |
+| `input.n55 > 3`, `input.n55 + 1`, `input.n55 + 1.0`       | `true`, hiba (ugyanaz a mondat), `6.5`                                             |                                          |
+| `input.b == true`, `!input.b`, `input.b && true`          | `true`, `false`, `true`                                                            |                                          |
+| `input.b == 1`                                            | `false`                                                                            |                                          |
+| `size(input.lista)`, `size(input.lista) > 1`              | `2`, `true`                                                                        |                                          |
+| `'a' in input.lista`, `'c' in input.lista`                | `true`, `false`                                                                    |                                          |
+| `input.lista[0]`, `input.lista == ["a", "b"]`             | `"a"`, `true`                                                                      |                                          |
+| `input.obj.k`, `input.obj.k == 'v'`                       | `"v"`, `true`                                                                      |                                          |
+| `input.obj.n + 1`, `input.obj.n + 1.0`                    | hiba (ugyanaz a mondat), `8`                                                       |                                          |
+| `input.obj.hianyzo`                                       | hiba: "a hivatkozott kulcs nem létezik (pozíció: 10)"                              | `No such key: hianyzo`                   |
+| `has(input.obj.k)`, `'k' in input.obj`, `size(input.obj)` | `true`, `true`, `2`                                                                |                                          |
+
+**Az egész JSON szám is `double`.** A nyers könyvtáron `type(x)` az `x = 5` és az `x = 2.5` értékre is
+`Type<double>`, és mindkettőre `x + 1` hiba (`no such overload: dyn<double> + int`), `x + 1.0` szám. A forrás
+ugyanezt mondja: a telepített `lib/operators.js` `debugType` függvénye a `typeof v` szerint dönt, a `'number'`
+ágon `doubleType`, a `'bigint'` ágon `intType`; a `lib/registry.js` `double` ellenőrzője `typeof v === 'number'`.
+Egy JS `number` tehát egész értékkel is `double`, `int` csak `BigInt` lehet. A termékben az `input` értéke
+`BigInt` átalakítás nélkül megy át (`toCelContext`), tehát a Start bemenet minden száma `double`.
+
+**Eltérés a csomag README-jétől.** A README "Integer values are `BigInt`" szakasza szerint "Pass integer context
+values as `BigInt` too, or use `unlistedVariablesAreDyn: true` to accept plain numbers via coercion", és a példája
+`evaluate('count + 1', { count: 5 })`. Mérve (8.0.0): a globális `evaluate('count + 1', { count: 5 })`, a
+`new Environment({ unlistedVariablesAreDyn: true })` `count + 1` és `input.x + 1` kifejezése is
+`no such overload: dyn<double> + int` hibát ad, a README `numbers.map(n, n * 2)` példája `[1, 2]` értékre
+`no such overload: dyn<double> * int`. A README állítása a telepített verzióra nem igaz; a termék ezt az opciót
+amúgy sem kapcsolja be (SPEC-010 7.1).
+
+**Következtetés.**
+
+1. A SPEC-016 5.4 állítása mérve igaz: `input.darab > 3` (int literállal is) működik, `input.darab + 1` hiba,
+   `input.darab + 1.0` működik, egész (`5`) és tört (`2.5`, `5.5`) JSON számra egyformán. A cel-js az egész JSON
+   számot NEM adja `int`-ként. Az összehasonlítás `double` és `int` literál között működik (a CEL vegyes numerikus
+   összehasonlítása, SPEC-010 M-122), az aritmetika nem; a kerülő út a `double` literál, a `double(1)` vagy az
+   `int(input.darab)`.
+2. A szöveg és a szám között a rendezés (`>`) és az aritmetika (`+`) futásidejű hiba, tehát a mai, szövegként érkező
+   bemenetre `input.darab > 3` hibát ad (SPEC-016 3. szekció, E-4 következménye igaz). Az egyenlőség viszont NEM
+   hiba: `input.s == 5` és `input.n5 == '5'` `false`, `input.b == 1` szintén `false`. Az E-4 sora a rendezésről
+   szól; a vegyes típusú egyenlőség a cel-js-ben csendben `false`, ami egy szövegként érkező számra írt `== 5`
+   feltételt hiba nélkül hamissá tesz. Ezt a típusos bemenet (SPEC-016 5.4) szünteti meg.
+3. A logikai érték, a szöveg tömb (`size`, `in`, index, lista egyenlőség) és a JSON objektum (mező elérés, `has`,
+   `in`, `size`) a várt módon működik; a hiányzó kulcs elérése hiba, a `has()` nem.
+4. A `type(...)` eredménye a termékben nem JSON érték, tehát kimenetként hibát ad; feltételben (`type(x) == double`)
+   nem mértük.
+
+## 11. SPEC-016 kritérium tábla és adverzariális átvizsgálás (PLAN-017 T-017-11, 2026-11-04)
+
+**Módszer.** Független átvizsgálás a `564e1eb..74de57f` változáson: a kód és a tesztek olvasása (nem a commit
+üzenetek), a teljes unit teszt (`timeout 165 flock /tmp/kapu-gep.lock bun run test`: kilépési kód 0, 744 teszt fájl,
+7969 teszt, mind a négy metrika 100 százalék), a változáshoz tartozó öt e2e spec fájl (`graph-start-input-value-kind`,
+`run-control-input-types`, `rest-error-class`, `node-inspector`, `run-control`; 18 + 47 teszt, mind zöld, 3 worker,
+`flock /tmp/playwright-gep.lock`), eldobható e2e próbák (a futás után törölve), a `cel-js` mérés részleges
+megismétlése és hat szándékos rontás. A kilenc kapu teljes futása és a teljes e2e a T-017-12 merge kapuja.
+
+### 11.1 Kritérium tábla
+
+| AC  | Bizonyító tesztek (fájl, teszt)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Státusz                                                                                                                                                   |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `is-start-input-value-kind.spec.ts` "hamisat ad ismeretlen szövegre, a régi szabad szöveges értékre is"; `enum-drift-protection.spec.ts` "StartInputValueKind (SPEC-016 5.1, a hetedik felsorolás)" (típusszint, kétirányú) és "a db isNodeConfig guardja a protokoll StartInputValueKind minden értékét elfogadja" (hat érték plusz "a felsoroláson kívüli érték elbukik"); `node-config-save-schema.spec.ts` "a régi szabad szöveges érték elbukik az olvasó és a mentési sémán is"; `node-config-drift-protection.spec.ts` "a régi szabad szöveges valueKind"; `workflow-repository.spec.ts` "mind a hat valueKind értékkel írható és ugyanúgy olvasható vissza" | teljesül; a `db` repository szintű ismeretlen érték tesztje hatástalan (11.3, H3), a viselkedést a közös guard tesztjei és a sodródás védelem fogják (R5) |
+| 2   | `graph-snapshot-document-v1-fixture.spec.ts` (a lenyomat literál), változatlanul zöld; `git diff 564e1eb..HEAD -- packages/db/src/graph-snapshot` üres                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | teljesül                                                                                                                                                  |
+| 3   | `workflow-repository.spec.ts` "üres options lista / üres opció / csak szóközös opció / duplikált opció / options a nem choice ágon: a replaceGraph malformed_node_config hibaágat ad, sort nem ír" és a `readGraph` `corrupt_node_config` párjai; `node-config-save-schema.spec.ts` "NodeConfigSaveSchema: a choice bemeneti mező opciói (SPEC-016 5.3)" és "a(z) ... ágon az options ismeretlen kulcs, elbukik"; `node-config-drift-protection.spec.ts` "choice mező ..." esetek (mindkét oldal ugyanarra a bemenetre) és "start text bemeneti mezőjén az options kulcs"; `graph-start-input-value-kind.spec.ts` (e2e) négy teszt                                  | teljesül; a `trim()` alapú "nem üres" mindkét oldalon azonos; az `is-node-config.spec.ts` új `choice` elutasító esetei hatástalanok (11.3, H3)            |
+| 4   | `run-control-input-types.spec.ts` (e2e) mindhárom teszt; `StartRunModal.spec.tsx` "mind a hat típus mezője látszik ...", "az érvénytelen JSON a mező alatt jelez, és a futás nem indul", "a kötelező, üresen hagyott választólista a mező alatt jelez"; `StartRunField.spec.tsx`; `read-start-run-field.spec.ts`; `evaluate-start-run-values.spec.ts`                                                                                                                                                                                                                                                                                                               | részben: a szám mező billentyűzetről gépelt tizedes értéket elront (11.3, H1), a mért tesztek a `fill()` egy lépéses bevitelével ezt nem látják           |
+| 5   | `validate-run-input.spec.ts` "típus ellenőrzés (SPEC-016 5.5)" (öt típus hibás értékei, `NaN`, végtelen, nem szöveg elemű lista, `choice` opción kívül, `json` minden érték, hiányzó és `undefined` nem kötelező mező); `create-run-supervisor.spec.ts` "a mező típusától eltérő bemenet esetén invalid_input_type, és nem jön létre workflow_run sor"; `create-http-server.spec.ts` "REGRESSZIÓ: a valódi motor invalid_input_type elutasítása 422 ..."; `protocol-error-class.spec.ts`; `protocol-error-class-message.spec.ts`; `map-outcome-message-to-error-code.spec.ts`; `is-engine-error-kind.spec.ts`                                                       | teljesül; egy prototípus kulcs nevű mező hamis hibát ad (11.3, H4)                                                                                        |
+| 6   | research 10. szekció; SPEC-010 új bekezdése ("A Start bemenet számára ..."); a mérés kilenc esete megismételve (11.2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | teljesül                                                                                                                                                  |
+| 7   | dokumentum átvezetések: SPEC-003 4.3, SPEC-004 4.8 4. lépés, SPEC-005 8.5 (50 tag, a kódban 50), SPEC-008 5.1, 5.4, 6.5, SPEC-010, `apps/web/CLAUDE.md` (285. sortól), `packages/db/CLAUDE.md` (84. sortól), `packages/protocol/CLAUDE.md`, `apps/server/CLAUDE.md`, szabálykönyv 5. szekció (kivétel kimondva), hiányleltár H-12 (lezárva); `is-engine-error-kind.ts` "ötvennégy" (a kódban 54)                                                                                                                                                                                                                                                                    | teljesül; a nevek, a darabszámok és az útvonalak egyeznek a kóddal                                                                                        |
+| 8   | unit teszt 100 százalék (fent); a kilenc kapu és a teljes e2e a T-017-12-ben                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | részben: ebben a lépésben csak a `test`, a `format:check` és a `docs:check` futott                                                                        |
+
+### 11.2 A `cel-js` mérés megismétlése
+
+Eldobható próba `/tmp/t11/cel/` alatt, Node v26.7.0, `node --experimental-strip-types`, a termék
+`createCelExpressionEvaluator()` függvényén át, a 10. szekció bemenetének részhalmazával. Kilenc eset, mind egyezik
+a 10. szekcióval: `input.n5 > 3` `true`; `input.n5 + 1` hiba ("a művelet ezekre az operandus típusokra nem
+értelmezett (pozíció: 0)"); `input.n5 + 1.0` `6`; `input.s == 5` `false`; `input.s > 3` hiba (ugyanaz a mondat);
+`input.b == 1` `false`; `'c' in input.lista` `false`; `input.obj.n + 1.0` `8`; `size(input.lista) > 1` `true`.
+
+### 11.3 Talált hibák
+
+| #   | Súlyosság | Hely                                                                                                                                                                                 | Hiba                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Javasolt javítás                                                                                                                                                                              |
+| --- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1  | magas     | `apps/web/src/run-control/StartRunField.tsx:51`, `:55`                                                                                                                               | A szám mező vezérelt értéke `String(value.number)`, az állapot csak a `valueAsNumber`. Billentyűzetről gépelve az `1.0` köztes állapot `1`-re íródik vissza, tehát `1.05` gépelése `15`-öt küld. Mérve eldobható e2e próbával (`pressSequentially`, valódi Chromium): `1.05` a mezőben és a `POST` törzsben `15`, `2.50` `2.5`, `-3` és `10` helyes. A meglévő tesztek `fill()`-t használnak, ami egy lépésben írja az értéket, ezért nem látják. Csendes adathiba.                                                                                                                         | A mező nyers szövegét tárolni (`value.text`), és a számot olvasáskor képezni (`valueAsNumber` vagy az input elem állapota); regressziós e2e `pressSequentially('1.05')` bevitellel.           |
+| H2  | közepes   | `apps/web/src/node-inspector/StartNodeFields.tsx:101`                                                                                                                                | A `choice` opciók `TextAreaField` mezője minden leütésnél `fromStringListFieldValue` (trim, üres sorok elhagyása), majd `toStringListFieldValue` körön megy át, ezért gépeléskor az `Enter` és a sor végi szóköz eltűnik. Mérve eldobható e2e próbával: `piros`, `Enter`, `sötét kék` gépelése után a mező értéke `pirossötétkék`. Több opció csak beillesztéssel adható meg; a tesztek `fill()`-t használnak. A minta a projektben már megvolt (`ErrorHandlerNodeFields.tsx`, `AgentDefinitionEntryFields.tsx`), itt új helyre került.                                                     | A szerkesztett nyers szöveget helyi állapotban tartani, és csak a config felé felbontani; regressziós e2e billentyűzetes bevitellel. A meglévő két hely ugyanebben javítható, ha a user kéri. |
+| H3  | közepes   | `packages/db/src/workflow-graph/node-config/is-node-config.spec.ts:160-213`; `packages/db/src/workflow-graph/workflow/workflow-repository.spec.ts:895`                               | Az új elutasító esetek (ismeretlen `valueKind`, `choice` options nélkül, nem szövegtömb, üres lista, üres elem, csak szóközös elem, duplikált elem, rossz `name`, nem logikai `required`) `onUnhandledError` mező nélküli `start` konfigot adnak, ami e nélkül is elbukik, tehát a teszt nem azt bizonyítja, amit a neve mond. Mérve: az egyediség és a nem üres lista ellenőrzését kikapcsolva az `is-node-config.spec.ts` 89 tesztje zöld marad; a `readGraph` ismeretlen `valueKind` esete ugyanígy hatástalan (R5). A lefedettség 100 százalék marad, mert más tesztek fedik az ágakat. | Az esetekbe `onUnhandledError: null` mező; utána a rontások (R2, R5) a guard saját tesztjén is bukjanak.                                                                                      |
+| H4  | alacsony  | `packages/engine/src/run-supervisor/validate-run-input.ts:84`, `:96`                                                                                                                 | A `input[field.name]` olvasás az `Object.prototype` örökölt tagjait is látja. Egy `toString` (vagy `constructor`, `valueOf`) nevű, nem kötelező, kitöltetlen mező `invalid_input_type` hibát ad ("elvárt: szöveg"), mert az érték az örökölt függvény. Mérve eldobható unit próbával `JSON.parse('{}')` bemenettel; a szerver `StartRunRequestSchema` (`z.record`) kimenete is `Object.prototype` örökös (mérve). A kötelező ágon a hiba már a változás előtt is megvolt (a hiányzó kötelező mező átment).                                                                                  | `Object.hasOwn(input, field.name) ? input[field.name] : undefined`; unit teszt `toString` nevű mezőre.                                                                                        |
+| H5  | alacsony  | `apps/web/src/node-inspector/StartNodeFields.tsx:87`; `apps/web/src/run-control/StartRunModal.spec.tsx:138`; `packages/engine/src/run-supervisor/validate-run-input.spec.ts:102-103` | Apróságok: a típusválasztó még az `inputFields.<n>.valueKind` mezőhibát olvassa, amit a zárt felsorolás mellett a felület nem tud előidézni; a "minden bemeneti mezőre rajzol egy szöveges mezőt" teszt név elavult; a `NaN` és a végtelen eset neve a `%j` formázás miatt egyformán "(null)", tehát két azonos nevű teszt van.                                                                                                                                                                                                                                                             | A hibaolvasás törlése vagy megtartásának indoka, a teszt nevek pontosítása.                                                                                                                   |
+
+**Megfigyelés, nem hiba.** A `db` guard a `choice` opciószabályt az olvasó úton is futtatja, a `protocol` olvasó
+sémája nem; a szabálykönyv 5. szekciója és a `protocol` CLAUDE.md ezt kimondja, a kód egyezik vele.
+
+### 11.4 Szándékos rontások
+
+Minden rontás után `git checkout -- .`, a `git status` tiszta.
+
+| #   | Rontás                                                                                   | Eredmény                                                                                                                                                                                |
+| --- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | motor: a `number` ág mindig átenged (`validate-run-input.ts`)                            | 5 teszt bukik: `validate-run-input.spec.ts` három esete, `create-run-supervisor.spec.ts`, `create-http-server.spec.ts` REGRESSZIÓ                                                       |
+| R2  | `db`: a `choice` egyediség kikapcsolva (`is-node-config.ts`)                             | 3 teszt bukik: `workflow-repository.spec.ts` két "duplikált opció" esete, `node-config-drift-protection.spec.ts` "choice mező duplikált opcióval"; az `is-node-config.spec.ts` nem      |
+| R2b | `db`: az egyediség és a nem üres lista együtt kikapcsolva, csak `is-node-config.spec.ts` | 89 teszt zöld (H3)                                                                                                                                                                      |
+| R3  | `protocol`: a mentési `choice` szabály kikapcsolva (`node-config-save-schema.ts`)        | 13 teszt bukik: a `node-config-save-schema.spec.ts` kilenc és a `node-config-drift-protection.spec.ts` négy esete                                                                       |
+| R4  | kliens: az értelmezhetetlen JSON nem ad hibát (`evaluate-start-run-values.ts`)           | 2 unit (`StartRunModal.spec.tsx`, `evaluate-start-run-values.spec.ts`) és 1 e2e (`run-control-input-types.spec.ts` JSON tesztje) bukik                                                  |
+| R5  | `db`: az `isStartInputValueKind` minden szöveget elfogad                                 | 3 teszt bukik: `enum-drift-protection.spec.ts`, `node-config-drift-protection.spec.ts`, `is-start-input-value-kind.spec.ts`; a `workflow-repository.spec.ts` `readGraph` esete nem (H3) |
+
+**A 11.3 tételek javítása a 11.6 szekcióban áll** (a javítás utáni állapot, a commitok és a bizonyító tesztek).
+
+### 11.5 Termékdöntést igénylő kérdés
+
+**K-1. Újraindítás megváltozott típus után.** A `restartRun` a tárolt bemenetet változatlanul adja tovább
+(`restart-run.ts`, SPEC-016 5.6), és a `startRun` a JELENLEGI gráf ellen ellenőriz. Ha a mező típusa az eredeti
+futás óta megváltozott (például `text` helyett `number`), az újraindítás `invalid_input_type` hibát ad. A SPEC-016
+ezt nem mondja ki, és nincs rá teszt. Opciók: (a) így marad, a hiba a saját magyar mondatával jelenik meg, és a
+viselkedés tesztet és egy mondatot kap a SPEC-016 5.6-ban (ajánlott); (b) az újraindítás a nem illeszkedő mezőt
+kihagyja (kötelező mezőnél `missing_required_input`); (c) az újraindítás az indító ablakot nyitja az eredeti
+értékekkel előtöltve.
+
+**Döntés (K-1, 2026-11-04): az (a) opció.** Az újraindítás a tárolt bemenetet változatlanul adja tovább, és a futás
+indítása a jelenlegi gráf ellen ellenőriz, a meglévő `required` precedensnek megfelelően; a viselkedést a
+`restart-run.spec.ts` két új tesztje rögzíti, a SPEC-016 5.6 egy mondatot kapott. Részletek: 11.6.
+
+### 11.6 A talált hibák javítása (2026-11-04)
+
+Minden javítás után a bizonyító teszt a javítás előtti termékkódon bukott (a termékfájl `git stash` vagy
+`git checkout` alapú visszavételével, a teszt fájl érintetlenül hagyásával), a javított kódon zöld.
+
+| #   | Javítás                                                                                                                                                                                                                                                                                                                         | Commit               | Bizonyító teszt                                                                                                                                                                                                                                                                          | A javítás előtti kódon                                                                                                                  |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| H1  | javítva: a szám mező vezérelt értéke a begépelt nyers szöveg (`value.text`), az érték továbbra is a `valueAsNumber` (`StartRunField.tsx`)                                                                                                                                                                                       | `eec5a6f`            | e2e `run-control-input-types.spec.ts` "a szám mező billentyűzetről gépelve ..." (`pressSequentially('1.05')`, a `POST` törzsben `1.05`); unit `StartRunModal.spec.tsx` és `StartRunField.spec.tsx` (két új teszt)                                                                        | e2e: a mező értéke `15`; unit: három teszt bukik (`1.0` helyett `1`)                                                                    |
+| H2  | javítva: a `choice` opciók mezője új `StartInputOptionsField` komponens, a nyers szöveget helyben tartja, a configba a bontott lista megy, a kívülről jövő más tartalmú listát követi                                                                                                                                           | `8b1a2e3`            | e2e `graph-start-input-value-kind.spec.ts` "az opciók mezőbe billentyűzetről gépelve ..." (`piros`, `Enter`, `sötét kék`, a `PUT` törzsben `['piros', 'sötét kék']`); unit `StartNodeFields.spec.tsx`, `StartInputOptionsField.spec.tsx`                                                 | e2e: `toHaveValue('piros\n')` bukik (az `Enter` eltűnik); a `StartNodeFields.spec.tsx` állapotos tesztje bukik                          |
+| H3  | javítva: az `onUnhandledError: null` pótolva az `is-node-config.spec.ts` minden `start` elutasító esetében és a `workflow-repository.spec.ts` tárolt `valueKind` esetében                                                                                                                                                       | `bc33fde`            | ugyanezek a tesztek; szándékos rontások: az egyediség és a nem üres lista kikapcsolása 12 tesztet buktat (4 `is-node-config.spec.ts`, 8 `workflow-repository.spec.ts`), az `isStartInputValueKind` minden szöveget elfogad 3 tesztet (köztük a `readGraph` ismeretlen `valueKind` esete) | a rontások a javítás előtti tesztekkel: R2b 89 teszt zöld az `is-node-config.spec.ts`-ben (11.4), a `readGraph` esete hatástalan        |
+| H4  | javítva: `Object.hasOwn` alapú olvasás a `required` és a típus ellenőrzésben (`validate-run-input.ts`)                                                                                                                                                                                                                          | `755b9a0`            | `validate-run-input.spec.ts` "az Object.prototype örökölt tagjai nem bemeneti értékek" (négy nevű nem kötelező mező, kötelező `toString` mező `missing_required_input`, saját `toString` kulcs ellenőrzött)                                                                              | 5 teszt bukik (a négy nem kötelező név `invalid_input_type`-ot ad, a kötelező `toString` típushibát a `missing_required_input` helyett) |
+| H5  | javítva: a halott `inputFields.<n>.valueKind` hibaolvasás törölve (a zárt felsorolás mellett a felület nem tud ilyen hibát előidézni, és a lefedettségi küszöböt nem érinti, mert nem elágazás); a `StartRunModal.spec.tsx` teszt neve pontosítva; a `NaN`/végtelen eset egyedi neve (`it.each` objektum sorok `$label` címmel) | `8b1a2e3`, `755b9a0` | a meglévő tesztek zöldek; a nevek egyediek (`NaN`, `Infinity`)                                                                                                                                                                                                                           | a két azonos nevű teszt ("(null)") megszűnt                                                                                             |
+| K-1 | rögzítve: így marad; teszt a `restart-run.spec.ts` valós `RunSupervisor`-os blokkjában (megváltozott mezőtípus `invalid_input_type`, azóta kötelezővé vált új mező `missing_required_input`, mindkét esetben új futás nélkül); SPEC-016 5.6 egy mondat                                                                          | `9d5bf6f`            | `restart-run.spec.ts` "a tárolt bemenet a JELENLEGI gráf mezőtípusai ellen ellenőrzött" (2 teszt)                                                                                                                                                                                        | nem értelmezhető: a viselkedés nem változott, a teszt a meglévő viselkedést rögzíti                                                     |
+
+**H3 kiterjesztés.** Az `is-node-config.spec.ts` elutasító táblájában a javítás minden `start` esetre kiterjed, nem csak
+a T-017-3 által hozzáadottakra (a korábbi `inputFields nem tömb`, `mező nem rekord`, `name hiányzik`, `label rossz
+típusú`, `valueKind rossz típusú`, `required nem logikai` esetek ugyanezt a hibát hordozták). A T-017-4 tesztjeit
+átnéztem: a `node-config-save-schema.spec.ts`, a `find-invalid-choice-options.spec.ts` és az `apps/server`
+sodródás védelem (`node-config-drift-protection.spec.ts`, `enum-drift-protection.spec.ts`) elutasító esetei
+mind teljes, egyébként érvényes konfigot (`onUnhandledError: 'fail_run'`) adnak, tehát csak a vizsgált okból
+bukhatnak.
+
+**Nem javított, jelzett tétel.** Az `ErrorHandlerNodeFields.tsx` és az `AgentDefinitionEntryFields.tsx` ugyanazt a
+trim és üres sor elhagyás körös hibás mintát hordozza, mint a H2 előtti `StartNodeFields.tsx`. Ez a SPEC-016 előtti,
+más tárgyú kód, ezért nem része ennek a javításnak; felhasználói döntés kell hozzá.

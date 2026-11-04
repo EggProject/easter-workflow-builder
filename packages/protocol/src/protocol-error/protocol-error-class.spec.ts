@@ -6,6 +6,10 @@ describe('ProtocolErrorClassSchema', () => {
     expect(ProtocolErrorClassSchema.safeParse(errorClass).success).toBe(true);
   });
 
+  it('tartalmazza a futás bemenete típus ellenőrzésének hibaosztályát (SPEC-016 5.5)', () => {
+    expect(ProtocolErrorClassSchema.safeParse('invalid_input_type').success).toBe(true);
+  });
+
   it('a szótáron kívüli hibaosztályt elutasítja (a kliens ilyenkor a kód mondatát mutatja)', () => {
     expect(ProtocolErrorClassSchema.safeParse('database_closed').success).toBe(false);
   });

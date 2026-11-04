@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- a node config nullázható mezői a tárolt JSON-ban `null` értéket hordoznak (SPEC-003 4.3); az `undefined` nem éli túl a JSON oszlopot, tehát a `null` itt adat, nem helyőrző */
 import { describe, expect, it } from 'vitest';
 import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
-import type { NodeConfig } from './node-config.ts';
+import type { NodeConfig, StartInputField } from './node-config.ts';
 import { isNodeConfig } from './is-node-config.ts';
 
 const agentStepConfig: AgentStepConfig = {
@@ -91,6 +91,26 @@ describe('isNodeConfig', () => {
     expect(validConfigs).toHaveLength(13);
   });
 
+  it('igazat ad a start bemeneti mező mind a hat valueKind értékére (SPEC-016 5.1)', () => {
+    const fields: readonly StartInputField[] = [
+      { name: 'a', label: 'A', valueKind: 'text', required: true },
+      { name: 'b', label: 'B', valueKind: 'number', required: false },
+      { name: 'c', label: 'C', valueKind: 'boolean', required: false },
+      { name: 'd', label: 'D', valueKind: 'choice', options: ['piros', 'zöld'], required: true },
+      { name: 'e', label: 'E', valueKind: 'list', required: false },
+      { name: 'f', label: 'F', valueKind: 'json', required: false },
+    ];
+
+    expect(isNodeConfig({ type: 'start', inputFields: fields, onUnhandledError: null })).toBe(true);
+    expect(fields.map((field) => field.valueKind)).toHaveLength(6);
+  });
+
+  it('igazat ad a choice egyetlen elemű, szóközt tartalmazó, de nem üres opcióira', () => {
+    const field: StartInputField = { name: 'd', label: 'D', valueKind: 'choice', options: ['két szó'], required: true };
+
+    expect(isNodeConfig({ type: 'start', inputFields: [field], onUnhandledError: null })).toBe(true);
+  });
+
   it('igazat ad üres start bemeneti mezőlistára és üres branch listára', () => {
     expect(isNodeConfig({ type: 'start', inputFields: [], onUnhandledError: null })).toBe(true);
     expect(
@@ -125,20 +145,111 @@ describe('isNodeConfig', () => {
   // Áganként legalább egy hibás mező. A guard minden operandusának a hamis
   // ágát is végig kell járni a 100 százalékos lefedettséghez.
   const rejectedConfigs: readonly (readonly [string, unknown])[] = [
-    ['start: inputFields nem tömb', { type: 'start', inputFields: {} }],
-    ['start: mező nem rekord', { type: 'start', inputFields: ['topic'] }],
-    ['start: name hiányzik', { type: 'start', inputFields: [{ label: 'T', valueKind: 'text', required: true }] }],
+    ['start: inputFields nem tömb', { type: 'start', onUnhandledError: null, inputFields: {} }],
+    ['start: mező nem rekord', { type: 'start', onUnhandledError: null, inputFields: ['topic'] }],
+    [
+      'start: name hiányzik',
+      { type: 'start', onUnhandledError: null, inputFields: [{ label: 'T', valueKind: 'text', required: true }] },
+    ],
     [
       'start: label rossz típusú',
-      { type: 'start', inputFields: [{ name: 'topic', label: 7, valueKind: 'text', required: true }] },
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 'topic', label: 7, valueKind: 'text', required: true }],
+      },
     ],
     [
       'start: valueKind rossz típusú',
-      { type: 'start', inputFields: [{ name: 'topic', label: 'T', valueKind: 7, required: true }] },
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 'topic', label: 'T', valueKind: 7, required: true }],
+      },
+    ],
+    [
+      'start: valueKind ismeretlen érték (a régi szabad szöveg, SPEC-016 5.2)',
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 'topic', label: 'T', valueKind: 'string', required: true }],
+      },
+    ],
+    [
+      'start: valueKind hiányzik',
+      { type: 'start', inputFields: [{ name: 'topic', label: 'T', required: true }], onUnhandledError: null },
+    ],
+    [
+      'start: choice options nélkül',
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 't', label: 'T', valueKind: 'choice', required: true }],
+      },
+    ],
+    [
+      'start: choice options nem szövegtömb',
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 't', label: 'T', valueKind: 'choice', options: [1], required: true }],
+      },
+    ],
+    [
+      'start: choice üres options lista',
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 't', label: 'T', valueKind: 'choice', options: [], required: true }],
+      },
+    ],
+    [
+      'start: choice üres elem',
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 't', label: 'T', valueKind: 'choice', options: ['a', ''], required: true }],
+      },
+    ],
+    [
+      'start: choice csak szóközös elem',
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 't', label: 'T', valueKind: 'choice', options: ['a', ' '.repeat(3)], required: true }],
+      },
+    ],
+    [
+      'start: choice duplikált elem',
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 't', label: 'T', valueKind: 'choice', options: ['a', 'b', 'a'], required: true }],
+      },
+    ],
+    [
+      'start: choice name rossz típusú',
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 7, label: 'T', valueKind: 'choice', options: ['a'], required: true }],
+      },
+    ],
+    [
+      'start: a choice ág required mezője nem logikai',
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 't', label: 'T', valueKind: 'choice', options: ['a'], required: 'igen' }],
+      },
     ],
     [
       'start: required nem logikai',
-      { type: 'start', inputFields: [{ name: 'topic', label: 'T', valueKind: 'text', required: 'igen' }] },
+      {
+        type: 'start',
+        onUnhandledError: null,
+        inputFields: [{ name: 'topic', label: 'T', valueKind: 'text', required: 'igen' }],
+      },
     ],
     ['start: onUnhandledError érvénytelen', { type: 'start', inputFields: [], onUnhandledError: 'unknown_policy' }],
     ['agent_step: hibás belső config', { type: 'agent_step', promptTemplate: 7 }],
@@ -291,6 +402,24 @@ describe('isNodeConfig', () => {
       {
         type: 'start',
         inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true, [UNKNOWN_KEY]: true }],
+        onUnhandledError: null,
+      },
+    ],
+    [
+      'a choice ágú start bemeneti mező',
+      {
+        type: 'start',
+        inputFields: [
+          { name: 'szin', label: 'Szín', valueKind: 'choice', options: ['piros'], required: true, [UNKNOWN_KEY]: true },
+        ],
+        onUnhandledError: null,
+      },
+    ],
+    [
+      'az options kulcs a nem choice ágon (text)',
+      {
+        type: 'start',
+        inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', options: ['a'], required: true }],
         onUnhandledError: null,
       },
     ],

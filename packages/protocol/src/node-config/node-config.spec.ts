@@ -28,7 +28,7 @@ describe('NodeConfigSchema', () => {
   it('elfogadja a start node teljes alakját', () => {
     const config = {
       type: 'start',
-      inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }],
+      inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }],
       onUnhandledError: 'fail_run',
     };
     expect(NodeConfigSchema.safeParse(config).success).toBe(true);

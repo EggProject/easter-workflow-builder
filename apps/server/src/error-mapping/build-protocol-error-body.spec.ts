@@ -33,6 +33,16 @@ describe('buildProtocolErrorBody', () => {
     },
   );
 
+  it('a motor invalid_input_type üzenetéből unprocessable kódot és errorClass mezőt ad (SPEC-016 5.5)', () => {
+    const message = formatEngineErrorMessage('invalid_input_type', 'A "darab" mező nem a beállított típusú');
+
+    expect(buildProtocolErrorBody(message)).toStrictEqual({
+      code: 'unprocessable',
+      message,
+      errorClass: 'invalid_input_type',
+    });
+  });
+
   it('az already_decided hibaosztályból conflict kódot és errorClass mezőt ad', () => {
     const message = 'A(z) "s1" lépés futáshoz tartozó jóváhagyás már el van döntve (already_decided).';
 

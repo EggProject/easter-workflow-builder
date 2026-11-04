@@ -3,10 +3,36 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StartRunModal } from './StartRunModal.tsx';
-import { REQUIRED_START_FIELD_MESSAGE } from './start-run-values.ts';
+import { INVALID_JSON_START_FIELD_MESSAGE, REQUIRED_START_FIELD_MESSAGE } from './evaluate-start-run-values.ts';
 
-const REQUIRED_FIELD: StartInputField = { name: 'topic', label: 'Téma', valueKind: 'string', required: true };
-const OPTIONAL_FIELD: StartInputField = { name: 'note', label: 'Megjegyzés', valueKind: 'string', required: false };
+const REQUIRED_FIELD: StartInputField = { name: 'topic', label: 'Téma', valueKind: 'text', required: true };
+const OPTIONAL_FIELD: StartInputField = { name: 'note', label: 'Megjegyzés', valueKind: 'text', required: false };
+
+const ALL_KIND_FIELDS: readonly StartInputField[] = [
+  REQUIRED_FIELD,
+  { name: 'count', label: 'Darab', valueKind: 'number', required: false },
+  { name: 'urgent', label: 'Sürgős', valueKind: 'boolean', required: false },
+  { name: 'color', label: 'Szín', valueKind: 'choice', options: ['piros', 'zöld'], required: false },
+  { name: 'tags', label: 'Címkék', valueKind: 'list', required: false },
+  { name: 'payload', label: 'Adat', valueKind: 'json', required: false },
+];
+
+/**
+ * A `detail: 1` kötelező: a `SelectField` a `detail === 0` kattintást
+ * billentyűzetből származónak tekinti, és szándékosan nem nyit rá.
+ */
+function clickOn(target: Element): void {
+  act(() => {
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  });
+}
+
+function typeIntoTextArea(textarea: HTMLTextAreaElement, value: string): void {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+  descriptor?.set?.call(textarea, value);
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  textarea.dispatchEvent(new Event('change', { bubbles: true }));
+}
 
 function typeInto(input: HTMLInputElement, value: string): void {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
@@ -19,7 +45,7 @@ describe('StartRunModal', () => {
   let container: HTMLDivElement;
   let root: Root;
   const onClose = vi.fn();
-  const onSubmit = vi.fn();
+  const onSubmit = vi.fn<(input: Readonly<Record<string, unknown>>) => void>();
 
   beforeEach(() => {
     onClose.mockClear();
@@ -68,6 +94,37 @@ describe('StartRunModal', () => {
     return input;
   }
 
+  function fieldTextArea(label: string): HTMLTextAreaElement {
+    const textarea = [...container.querySelectorAll<HTMLTextAreaElement>('textarea')].find(
+      (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === label,
+    );
+    if (textarea === undefined) {
+      throw new Error(`a teszt nem talált "${label}" feliratú többsoros mezőt`);
+    }
+    return textarea;
+  }
+
+  function chooseOption(optionLabel: string): void {
+    const trigger = container.querySelector<HTMLButtonElement>('button.select');
+    if (trigger === null) {
+      throw new Error('a teszt nem találta a választót');
+    }
+    clickOn(trigger);
+    const option = [
+      ...document.body.querySelectorAll<HTMLElement>(
+        `[id="${CSS.escape(trigger.getAttribute('aria-controls') ?? '')}"] [role="option"]`,
+      ),
+    ].find((candidate) => candidate.querySelector('.menu__text')?.textContent === optionLabel);
+    if (option === undefined) {
+      throw new Error(`a teszt nem talált "${optionLabel}" feliratú opciót`);
+    }
+    clickOn(option);
+  }
+
+  function submittedInput(): Readonly<Record<string, unknown>> {
+    return onSubmit.mock.calls[0]?.[0] ?? {};
+  }
+
   function submitForm(): void {
     const form = container.querySelector('form');
     if (form === null) {
@@ -78,7 +135,7 @@ describe('StartRunModal', () => {
     });
   }
 
-  it('minden bemeneti mezőre rajzol egy szöveges mezőt, a kötelezőt megjelölve', () => {
+  it('a szöveg típusú bemeneti mezőkre szöveges mezőt rajzol, a kötelezőt megjelölve', () => {
     renderModal();
 
     expect(fieldInput('Téma').required).toBe(true);
@@ -148,6 +205,90 @@ describe('StartRunModal', () => {
 
     expect(onSubmit).toHaveBeenCalledWith({ topic: 'AI' });
     expect(container.querySelectorAll('.field__error')).toHaveLength(0);
+  });
+
+  it('mind a hat típus mezője látszik, és a küldött törzs az 5.1 JSON alak (szám szám, logikai logikai, lista tömb, JSON érték)', () => {
+    renderModal({ fields: ALL_KIND_FIELDS });
+
+    expect(container.querySelectorAll('input[type="number"]')).toHaveLength(1);
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(1);
+    expect(container.querySelectorAll('button.select')).toHaveLength(1);
+    expect(container.querySelectorAll('textarea')).toHaveLength(2);
+
+    act(() => {
+      typeInto(fieldInput('Téma'), 'AI hírek');
+      typeInto(fieldInput('Darab'), '3');
+      container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
+      typeIntoTextArea(fieldTextArea('Címkék (soronként egy)'), 'a\n\n b \n');
+      typeIntoTextArea(fieldTextArea('Adat'), '{"k": [1, 2]}');
+    });
+    chooseOption('zöld');
+    submitForm();
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      topic: 'AI hírek',
+      count: 3,
+      urgent: true,
+      color: 'zöld',
+      tags: ['a', 'b'],
+      payload: { k: [1, 2] },
+    });
+  });
+
+  it('a szám mező a gépelés köztes alakját (1.0) nem írja át, így az 1.05 begépelése 1.05-öt küld', () => {
+    renderModal({ fields: [{ name: 'count', label: 'Darab', valueKind: 'number', required: false }] });
+
+    for (const partial of ['1', '1.0', '1.05']) {
+      act(() => {
+        typeInto(fieldInput('Darab'), partial);
+      });
+      expect(fieldInput('Darab').value).toBe(partial);
+    }
+    submitForm();
+
+    expect(onSubmit).toHaveBeenCalledWith({ count: 1.05 });
+  });
+
+  it('az üresen hagyott nem kötelező mezők kulcsa hiányzik, a logikai mező viszont hamis értékkel megy', () => {
+    renderModal({ fields: ALL_KIND_FIELDS });
+    act(() => {
+      typeInto(fieldInput('Téma'), 'AI');
+    });
+
+    submitForm();
+
+    expect(onSubmit).toHaveBeenCalledWith({ topic: 'AI', urgent: false });
+    expect(Object.keys(submittedInput())).toEqual(['topic', 'urgent']);
+  });
+
+  it('az érvénytelen JSON a mező alatt jelez, és a futás nem indul', () => {
+    renderModal({ fields: ALL_KIND_FIELDS });
+    act(() => {
+      typeInto(fieldInput('Téma'), 'AI');
+      typeIntoTextArea(fieldTextArea('Adat'), '{"k": ');
+    });
+
+    submitForm();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    const textarea = fieldTextArea('Adat');
+    expect(textarea.getAttribute('aria-invalid')).toBe('true');
+    const errorId = textarea.getAttribute('aria-describedby');
+    const error = errorId === null ? undefined : container.querySelector(`#${errorId}`);
+    expect(error?.textContent).toBe(INVALID_JSON_START_FIELD_MESSAGE);
+    expect(error?.closest('.field')).toBe(textarea.closest('.field'));
+    expect(container.querySelectorAll('.field__error')).toHaveLength(1);
+  });
+
+  it('a kötelező, üresen hagyott választólista a mező alatt jelez', () => {
+    renderModal({
+      fields: [{ name: 'color', label: 'Szín', valueKind: 'choice', options: ['piros'], required: true }],
+    });
+
+    submitForm();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(container.querySelector('.field__error')?.textContent).toBe(REQUIRED_START_FIELD_MESSAGE);
   });
 
   it('a küldés alatt mindkét gomb letiltva, az indításon spinner áll', () => {

@@ -1,12 +1,9 @@
 import type { StartInputField } from '@easter-workflow-builder/protocol';
-import { Alert, Button, FieldErrorVisibilityContext, Modal, TextField } from '@easter-workflow-builder/ui';
-import { useEffect, useState, type ChangeEvent, type ReactElement, type SubmitEvent } from 'react';
-import {
-  buildInitialStartRunValues,
-  buildStartRunInput,
-  findStartRunValueErrors,
-  type StartRunValues,
-} from './start-run-values.ts';
+import { Alert, Button, FieldErrorVisibilityContext, Modal } from '@easter-workflow-builder/ui';
+import { useEffect, useState, type ReactElement, type SubmitEvent } from 'react';
+import { evaluateStartRunValues } from './evaluate-start-run-values.ts';
+import { StartRunField } from './StartRunField.tsx';
+import { buildInitialStartRunValues, EMPTY_START_RUN_FIELD_VALUE, type StartRunValues } from './start-run-values.ts';
 
 export interface StartRunModalProperties {
   readonly open: boolean;
@@ -45,10 +42,9 @@ const FORM_DOM_ID = 'start-run-form';
  * ellenőrzi), ezért az a láb fölött, a design system `danger` `Alert`
  * blokkjában áll (`role="alert"`, SPEC-007 8.4, user döntés 2026-09-24).
  *
- * A mezők `TextField` elemek, mert a `StartInputField.valueKind`
- * értékkészletét egyetlen forrás sem sorolja fel (lásd a `start-run-values.ts`
- * `StartRunValues` doksiját), tehát egy `valueKind` szerint váltó mezőtípus
- * tippelés lenne.
+ * A mezők beviteli eleme a `StartInputField.valueKind` szerint változik, és az
+ * indítás bemenete az 5.1 táblázat típusos JSON alakja (SPEC-016 5.1, 5.4);
+ * a mezőt a `StartRunField`, a kiértékelést az `evaluateStartRunValues` adja.
  */
 export function StartRunModal(properties: Readonly<StartRunModalProperties>): ReactElement {
   const { open, fields, isSubmitting, errorMessage, onClose, onSubmit } = properties;
@@ -69,7 +65,7 @@ export function StartRunModal(properties: Readonly<StartRunModalProperties>): Re
     // tartalmazza a `react-hooks/exhaustive-deps` szabályt.
   }, [open]);
 
-  const errors = findStartRunValueErrors(fields, values);
+  const { input, errors } = evaluateStartRunValues(fields, values);
 
   function handleSubmit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -77,7 +73,7 @@ export function StartRunModal(properties: Readonly<StartRunModalProperties>): Re
       setIsSubmitAttempted(true);
       return;
     }
-    onSubmit(buildStartRunInput(values));
+    onSubmit(input);
   }
 
   return (
@@ -108,14 +104,13 @@ export function StartRunModal(properties: Readonly<StartRunModalProperties>): Re
             marad a mezőn, mert az a kötelezőség HOZZÁFÉRHETŐSÉGI jelzése. */}
         <form id={FORM_DOM_ID} noValidate onSubmit={handleSubmit}>
           {fields.map((field) => (
-            <TextField
+            <StartRunField
               key={field.name}
-              label={field.label}
-              value={values[field.name] ?? ''}
-              required={field.required}
+              field={field}
+              value={values[field.name] ?? EMPTY_START_RUN_FIELD_VALUE}
               error={errors.get(field.name)}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                setValues((previous) => ({ ...previous, [field.name]: event.target.value }));
+              onChange={(nextValue) => {
+                setValues((previous) => ({ ...previous, [field.name]: nextValue }));
               }}
             />
           ))}
