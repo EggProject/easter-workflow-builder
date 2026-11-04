@@ -72,7 +72,8 @@ döntéshez szükséges kivonat:
   be (J-4, J-5). A memória korlátot a gazda állítja, alapból nincs korlát, túllépéskor a sandboxban
   `InternalError` keletkezik, nem folyamatleállás (J-7). Mérve (PLAN-015 T-015-2, `../research/2026-11-04-szkript-csomopont.md` Q-4): a
   `setMemoryLimit` ebben a buildben foglalásonként 8 bájtot számol, nem a foglalt méretet, és a tényleges plafon a
-  modul 2048 MB-os WebAssembly memóriája; a 7.2 T-3 sora.
+  modul 2048 MB-os WebAssembly memóriája; a 7.2 T-3 sora. A modul saját `WebAssembly.Memory`-val 16 ... 2048 MB
+  maximummal példányosítható, e fölött `LinkError` (Q-9).
 - Az interrupt kezelő csak futó bytecode alatt hívódik, tehát egy gazda ígéretre váró szkriptet nem állít
   meg (J-6; mérve: a várakozás alatt nulla kezelő hívás, `../research/2026-11-04-szkript-csomopont.md` Q-2).
 - Az asyncify változat egyszerre csak egy felfüggesztett hívást bír, és kontextusonként új WebAssembly modult
@@ -113,7 +114,7 @@ döntéshez szükséges kivonat:
 | Új függőség    | nincs                                                                                              | `quickjs-emscripten-core` és `@jitl/quickjs-wasmfile-release-sync` `0.32.0` (a teljes `quickjs-emscripten` helyett, `../research/2026-11-04-szkript-csomopont.md` 3. szekció), pinelve, a toolchain research fájlba vezetve, két forrásból (`.claude/CLAUDE.md` 4. szekció 4. pont) |
 | Mit ér el      | kizárólag a futás kontextust (S-12, nyelvi garancia)                                               | a futás kontextust, a `fetch` és a `files` gazda függvényt (5.4); `require`, `process`, időzítő, modul betöltő nincs                                                                                                                                                                |
 | Időkorlát      | nincs (SPEC-010 O-2): a szinkron kiértékelés alatt a szerver mást nem szolgál ki, kimondott korlát | alapérték 60 000 ms, csomópontonként felülírható (5.3, 5.4)                                                                                                                                                                                                                         |
-| Memória korlát | a parse idejű `limits` alapértékei (SPEC-010 M-125)                                                | 128 MB a QuickJS futtatón (`setMemoryLimit`), iparági alapérték (J-14)                                                                                                                                                                                                              |
+| Memória korlát | a parse idejű `limits` alapértékei (SPEC-010 M-125)                                                | lépésenként friss WebAssembly modul saját `WebAssembly.Memory` maximummal, csomópontonként beállítható (`memoryLimitMb`), alapból a teljes rendszermemória, legfeljebb a modul 2048 MB-os plafonja (5.4, user döntés 2026-11-04)                                                    |
 | Aszinkron kód  | nincs                                                                                              | a gazda függvények ígéretet adnak (`newPromise`), a szkript `await`-tel használja; a futtató az ígéret alapú utat használja, nem az asyncify változatot (J-3)                                                                                                                       |
 
 Az asyncify változat elvetésének oka: egyszerre egy felfüggesztett hívás, és kontextusonként új WebAssembly
@@ -124,7 +125,7 @@ gazda hívást is indíthat egyszerre (`Promise.all`).
 
 - `db`: a `ScriptConfig` diszkriminált unió lesz a `runtime` mezőn:
   `{ runtime: 'expression'; source: string }` vagy
-  `{ runtime: 'javascript'; source: string; timeoutMs: number | null; cwd: string | null }`.
+  `{ runtime: 'javascript'; source: string; timeoutMs: number | null; cwd: string | null; memoryLimitMb: number | null }`.
   A `timeoutMs` `null` jelentése az alapérték (60 000 ms), a `null` a meglévő konvenció a hiányra (az `undefined`
   nem éli túl a JSON oszlopot, `agent-step-config.ts` `PresetSystemPrompt` doksija).
 - A `cwd` a fájl hozzáférés gyökere (O-5), az agent lépés `cwd` mezőjének mintájára; a `null` a szerver folyamat
@@ -133,6 +134,11 @@ gazda hívást is indíthat egyszerre (`Promise.all`).
   korlát azonnal lejárna). A pozitív egész szabály a meglévő `isPositiveInteger` és a mentési séma duplikátuma
   szerint, a felső határral bővítve, mindkét oldalon, az `apps/server` `node-config-drift-protection`
   témájában mezőnként futásidejű ággal (`.claude/CLAUDE.md` 5. szekció, O-37 precedens).
+- A `memoryLimitMb` a lépés memória korlátja egész MB-ban (1 MB = 1024 * 1024 bájt); a `null` az alapérték (5.4
+  "Memória"). Egész, legalább 16 és legfeljebb 2048: a pinelt modul ezen kívül nem példányosítható (research Q-9). A
+  szabály mindkét oldalon áll (`db` guard és `protocol` mentési séma), az `apps/server` `node-config-drift-protection`
+  témájában mezőnként futásidejű ággal, a `timeoutMs` mintájára; a tartományon kívüli érték a mentéskor a mező alatti
+  hibát ad.
 - A user kérése a nagyobb érték megadhatósága; a szabály a kisebb értéket sem tiltja, mert a pozitív egész
   szabály a projektben minden időkorlát mezőn ugyanaz, és egy alsó határra nincs forrás.
 - Zárt kulcslista mindkét ágra (`isRecordWithKnownKeys`, `z.strictObject`), a `protocol` oldalon
@@ -143,8 +149,11 @@ gazda hívást is indíthat egyszerre (`Promise.all`).
 
 ### 5.4 A JavaScript sandbox gazda felülete
 
-**Életciklus.** Szkript lépésenként új QuickJS runtime és kontextus, a lépés végén (siker, hiba, időkorlát)
-felszabadítva (`dispose`). Egy lépés állapota nem szivároghat át a következőbe.
+**Életciklus.** Szkript lépésenként új WebAssembly modul, benne új QuickJS runtime és kontextus, a lépés végén (siker,
+hiba, időkorlát) felszabadítva (`dispose`), a modul eldobva (user döntés 2026-11-04, "friss motor lepesenkent"). Egy
+lépés állapota nem szivároghat át a következőbe. A futás indításának fordítási ellenőrzése is saját, eldobott modulon
+fut. A lebontás hibája (a `JS_FreeRuntime` assertje, research Q-2, Q-3) elkapott, és a lépés eredményét nem
+változtatja meg, mert a modul úgyis eldobott.
 
 **Globális nevek.** A futás kontextus hét neve (5.5), plusz `fetch` és `files`. Semmi más nem kerül a globális
 objektumra (J-4, J-5); a `console` sem, mert a lépés kimenete a visszatérési érték, a napló nem része a
@@ -174,13 +183,25 @@ interrupt kezelő a gazda ígéretre várakozás alatt nem fut (J-6): (1) CPU k�
 `AbortSignal.timeout` megszakítja a folyamatban lévő gazda hívásokat és a teljes kiértékelés várakozását. Bármelyik
 ág lejár, a lépés `script_timed_out` osztállyal bukik, és a runtime felszabadul.
 
-**Memória.** `setMemoryLimit(128 * 1024 * 1024)` (J-14). A túllépés a sandboxban `InternalError`, amit a szkript
-elkaphat (J-7); ha nem kapja el, a lépés `script_evaluation_failed`. A WebAssembly modul szintű memória plafon
-nem ellenőrzött (J-8), a T-015-2 méri.
+**Memória.** A user döntése (2026-11-04), szó szerint: "friss motor lepesenkent es lehessen beallitani, de default
+teljes rendszermemoria". A korlát a lépés saját `WebAssembly.Memory` objektumának maximuma
+(`new WebAssembly.Memory({ initial: 256, maximum })`, átadva a `newVariant(variant, { wasmMemory })` úton, research
+Q-5): a foglalás a maximumnál megáll, a sandboxban `InternalError: out of memory` jön, amit a szkript elkaphat; ha nem
+kapja el, a lépés `script_evaluation_failed`. A gazda folyamat és a többi lépés nem érintett. A `setMemoryLimit` nem
+használt, mert ebben a buildben nem bájtkorlát (research Q-4).
 
-**Stack.** A `setMaxStackSize` értékére nincs forrásolt iparági szám; a QuickJS alapértéke marad, és a T-015-2
-méri, hogy a mély rekurzió a lépés hibájával vagy a folyamat hibájával végződik-e. Ha a folyamatot érinti, a
-lépés a mért értékkel kap korlátot, a research fájlba vezetve.
+- A maximum a csomópont `memoryLimitMb` mezője, MB-ban, 16 ... 2048 (5.3).
+- Üresen (`null`) a teljes rendszermemória (`os.totalmem()`), de legfeljebb a modul plafonja (2048 MB): a kettő közül a
+  kisebb, lefelé kerekítve egész MB-ra. A plafont a pinelt modul import deklarációja adja, e fölötti maximummal a modul
+  nem példányosítható (research Q-9), tehát a teljes rendszermemória a gyakorlatban legfeljebb ennyi.
+- A 2048 fölötti vagy 16 alatti beállított érték a mentéskor a mező alatti hibát ad (5.9); a motor a guard miatt ilyen
+  értéket nem kap.
+
+**Stack.** `setMaxStackSize(131072)` (user döntés 2026-11-04: "Közepes, kb. 740 szint", research Q-6: 742 rekurziós
+mélység). Ezen az értéken a mért esetek többsége (rekurzió, sok argumentum, `JSON.parse`, getter, Proxy, `toString`) a
+sandboxban `RangeError`-t ad, amit a szkript elkaphat; a mély forrás elemzés és a mély `JSON.stringify` a gazdán
+(`RangeError: Maximum call stack size exceeded`) bukik. A gazdára kijutó `RangeError` a lépés `script_evaluation_failed`
+hibája, és a modult eldobjuk.
 
 **Párhuzamosság.** A szkript lépés nem foglal párhuzamossági helyet (nincs provider hívás, SPEC-004 7.2). A
 QuickJS a gazda szálán fut, tehát a CPU kötött szkript a 60 másodperces határig az eseményhurkot foglalja:
@@ -204,13 +225,13 @@ vezérlés a csomópont egyetlen névtelen kimenő élén megy tovább (SPEC-008
 
 ### 5.7 Hibaosztályok
 
-| Eset                               | CEL                                                                                                                 | JavaScript                                                                                                  |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| fordítási hiba a futás indításakor | a meglévő nyelvi mező ellenőrzés (`validateLanguageFields`), ugyanazzal az osztállyal, mint a `branch` kifejezésnél | új osztály: `script_compile_failed` (a törzs a QuickJS-ben lefordul-e, futtatás nélkül)                     |
-| futásidejű hiba                    | `expression_evaluation_failed` (meglévő)                                                                            | új osztály: `script_evaluation_failed` (dobott kivétel, gyökéren kívüli út, el nem kapott memória túllépés) |
-| időkorlát                          | nincs (SPEC-010 O-2)                                                                                                | új osztály: `script_timed_out`                                                                              |
-| nem JSON kimenet                   | nem fordulhat elő (a CEL értéke JSON leképezhető, SPEC-010 7.4)                                                     | új osztály: `script_output_not_json`                                                                        |
-| tárolhatatlan kimenet              | `step_output_not_storable` (meglévő)                                                                                | ugyanaz                                                                                                     |
+| Eset                               | CEL                                                                                                                 | JavaScript                                                                                                                                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| fordítási hiba a futás indításakor | a meglévő nyelvi mező ellenőrzés (`validateLanguageFields`), ugyanazzal az osztállyal, mint a `branch` kifejezésnél | új osztály: `script_compile_failed` (a törzs a QuickJS-ben lefordul-e, futtatás nélkül)                                                    |
+| futásidejű hiba                    | `expression_evaluation_failed` (meglévő)                                                                            | új osztály: `script_evaluation_failed` (dobott kivétel, gyökéren kívüli út, el nem kapott memória túllépés, a gazdára kijutó `RangeError`) |
+| időkorlát                          | nincs (SPEC-010 O-2)                                                                                                | új osztály: `script_timed_out`                                                                                                             |
+| nem JSON kimenet                   | nem fordulhat elő (a CEL értéke JSON leképezhető, SPEC-010 7.4)                                                     | új osztály: `script_output_not_json`                                                                                                       |
+| tárolhatatlan kimenet              | `step_output_not_storable` (meglévő)                                                                                | ugyanaz                                                                                                                                    |
 
 A `script_compile_failed` REST hiba is (a futás indítása utasítja el), tehát a `protocol` `ProtocolErrorClass`
 szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-protection` téma őrzésével
@@ -239,7 +260,9 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
   időkorlát mező (`TextField` `type="number"`, másodpercben, mert a döntés is másodpercben szól (O-4); a tárolt
   érték ezredmásodperc, a mező értékének ezerszerese), üresen az alapérték (`null`). A felületen ma nincs
   `timeoutMs` mező, tehát nincs követendő minta. JavaScript esetén a "Munkakönyvtár (cwd)" `TextField` is
-  megjelenik (az agent lépés mintájára), üresen `null`.
+  megjelenik (az agent lépés mintájára), üresen `null`. JavaScript esetén a "Memória korlát (MB)" `TextField`
+  `type="number"` is megjelenik, üresen `null` (alapérték: a rendszermemória, legfeljebb 2048 MB); a 16 ... 2048
+  tartományon kívüli érték a mentéskor a mező alatti hibát ad.
 - A mentési séma a `source` mezőt a kötelező szöveg mezők közé veszi fel (a meglévő `required-text-field-paths`
   tábla mindkét oldalon, a sodródás védelemmel), mert üres szkript nem futtatható. A hiba a mező alatt.
 - A futás nézet a szkript lépést a meglévő csomópont állapot jelvényekkel mutatja; új transcript sor típus
@@ -261,7 +284,9 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
    a sandboxból (nincs `process`). A szerző saját figyelmeztetése szerint egy hitelesített gazda `fetch`
    kiadása a sandbox értelmét veszi el (J-4).
 5. **Szolgáltatás kiesés.** A CPU kötött szkript a határidőig az eseményhurkot foglalja (5.4), a nagyobb
-   `timeoutMs` ezt arányosan növeli.
+   `timeoutMs` ezt arányosan növeli. A memória alapértéke a rendszermemória (legfeljebb 2048 MB) lépésenként: több
+   párhuzamos szkript lépés együtt a gép memóriáját meghaladó foglalást kísérelhet meg (a user döntése az alapértékről,
+   kimondott kockázat).
 
 ## 6. Tesztelés
 
@@ -291,12 +316,12 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
 
 ### 7.2 Technikai, nyitva
 
-| #   | Kérdés                                                                           | Mi a viselkedés addig                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Mi zárná le                                                                                                 |
-| --- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| T-1 | A QuickJS memória korlát értéke                                                  | **lezárva**: 128 MB, iparági alapérték (J-14)                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                                                             |
-| T-2 | Az interrupt kezelő gazda ígéretre várakozás alatt (S-7, J-6)                    | **lezárva** (mérés, `../research/2026-11-04-szkript-csomopont.md` Q-1 ... Q-3, 5. szekció): a várakozás alatt a kezelő nem fut, a gazda oldali `AbortSignal` ág kell; a CPU kötött kód és a mikrofeladat lánc a határidőn megáll; a tiszta lebontáshoz minden handle (a függő `deferred` is) felszabadítandó, és a megszakított `then` lánc után a `dispose` assertet adhat, ezért a hibája elkapandó                                                                                                |                                                                                                             |
-| T-3 | A WebAssembly modul szintű memória plafon és a mély rekurzió hatása (J-8)        | **mérve, nyitva** (`../research/2026-11-04-szkript-csomopont.md` Q-4 ... Q-6, 5. szekció): a mérés az 5.4 "Memória" és "Stack" pontjának mechanizmusát cáfolja. A `setMemoryLimit` nem bájtkorlát, a plafon modulonként 2048 MB; a bájtkorlát lépésenként friss modullal és saját `WebAssembly.Memory` maximummal mérten elérhető. Alapértéken a mély rekurzió a gazdán bukik (`RangeError`), és nincs mért `setMaxStackSize` érték, ami minden esetet a sandboxban tart használható mélység mellett | a koordinátor és a user döntése az 5.4 két pontjáról                                                        |
-| T-4 | A pinelt bellard QuickJS változat érintett-e a quickjs-ng 2026-os hibáiban (J-8) | **mérve, kimondott korláttal nyitva** (`../research/2026-11-04-szkript-csomopont.md` 4. szekció): a pin (`f1139494`, 2025-12-22) legalább két, az ng advisory-kkal azonos függvényt érintő hibát tartalmaz, amit a bellard repó a pin után javított, és újabb `quickjs-emscripten` kiadás nincs; hogy a hiba a lineáris memórián belül marad-e, nem ellenőrzött (5.10 1.)                                                                                                                            | egy újabb pint hozó `quickjs-emscripten` kiadás, vagy a lineáris memórián belül maradás forrásolt igazolása |
+| #   | Kérdés                                                                           | Mi a viselkedés addig                                                                                                                                                                                                                                                                                                                                                                                 | Mi zárná le                                                                                                 |
+| --- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| T-1 | A QuickJS memória korlát értéke                                                  | **lezárva**: a 128 MB-os `setMemoryLimit` helyett lépésenként friss modul saját `WebAssembly.Memory` maximummal, csomópontonként beállítva, alapból a rendszermemória, legfeljebb 2048 MB (user döntés 2026-11-04, 5.4 "Memória")                                                                                                                                                                     |                                                                                                             |
+| T-2 | Az interrupt kezelő gazda ígéretre várakozás alatt (S-7, J-6)                    | **lezárva** (mérés, `../research/2026-11-04-szkript-csomopont.md` Q-1 ... Q-3, 5. szekció): a várakozás alatt a kezelő nem fut, a gazda oldali `AbortSignal` ág kell; a CPU kötött kód és a mikrofeladat lánc a határidőn megáll; a tiszta lebontáshoz minden handle (a függő `deferred` is) felszabadítandó, és a megszakított `then` lánc után a `dispose` assertet adhat, ezért a hibája elkapandó |                                                                                                             |
+| T-3 | A WebAssembly modul szintű memória plafon és a mély rekurzió hatása (J-8)        | **lezárva** (mérés: research Q-4 ... Q-6, Q-9; user döntés 2026-11-04, research 6. szekció): memória az 5.4 "Memória" pontja szerint (friss modul lépésenként, beállítható, alapból a rendszermemória, legfeljebb a 2048 MB-os modul plafon); stack `setMaxStackSize(131072)` ("Közepes, kb. 740 szint"), a gazdára kijutó `RangeError` a lépés `script_evaluation_failed` hibája, a modul eldobva    |                                                                                                             |
+| T-4 | A pinelt bellard QuickJS változat érintett-e a quickjs-ng 2026-os hibáiban (J-8) | **mérve, kimondott korláttal nyitva** (`../research/2026-11-04-szkript-csomopont.md` 4. szekció): a pin (`f1139494`, 2025-12-22) legalább két, az ng advisory-kkal azonos függvényt érintő hibát tartalmaz, amit a bellard repó a pin után javított, és újabb `quickjs-emscripten` kiadás nincs; hogy a hiba a lineáris memórián belül marad-e, nem ellenőrzött (5.10 1.)                             | egy újabb pint hozó `quickjs-emscripten` kiadás, vagy a lineáris memórián belül maradás forrásolt igazolása |
 
 ## 8. Elfogadási kritériumok
 
@@ -314,7 +339,9 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
 6. A JavaScript lépés a határidőn (alapból 60 000 ms, a `timeoutMs` szerint felülírva) `script_timed_out`
    osztállyal bukik, CPU kötött és gazda ígéretre váró kódra is; a `timeoutMs` pozitív egész, legfeljebb
    2147483647, mindkét oldalon, a sodródás védelemmel.
-7. A memória korlát 128 MB, a túllépés a lépés hibája, a szerver folyamat fut tovább (unit teszt).
+7. A memória korlát a lépés saját `WebAssembly.Memory` maximuma (`memoryLimitMb`, alapból a rendszermemória, legfeljebb
+   2048 MB, 16 ... 2048 mindkét oldalon a sodródás védelemmel); a túllépés és a gazdára kijutó `RangeError` a lépés
+   hibája, a szerver folyamat fut tovább (unit teszt); a `setMaxStackSize` 131072.
 8. A fájl és a hálózat gazda függvénye az O-5 és az O-6 user döntése szerint működik (a gyökér a `cwd`, címszűrés nincs); a gyökéren kívüli út és a
    szimbolikus link kivezetése elutasítva, átirányítás nincs követve, csak `http:` és `https:`.
 9. A szerkesztő tiltása és figyelmeztetése megszűnt; `runtime` választó, időkorlát mező; a `source` kötelező

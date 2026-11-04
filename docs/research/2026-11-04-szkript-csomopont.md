@@ -172,6 +172,27 @@ a kettő aránya esetenként más, ezért a sandboxban maradás határa esetfüg
 és csak a fő szálon, alapértelmezett Node stack mellett futott; egy `worker_threads` szálon vagy más
 `--stack-size` mellett nem mértem.
 
+### Q-9: a saját `WebAssembly.Memory` megengedett tartománya (a T-3 user döntéséhez)
+
+Script: `q9-memory-bounds.mjs` (a sorai a `kimenet.jsonl` végén, egy külön, 2026-11-04-i futásból). A pinelt `emscripten-module.wasm` import szekciójának memória bejegyzése a bináris
+formátum szerint kiolvasva: minimum 256 lap, maximum 32768 lap (64 KiB-os lapokkal 16 MB és 2048 MB). A saját memória
+példányosítása a modullal:
+
+| `initial` (lap) | `maximum` (lap) | Maximum (MB) | Eredmény                                                                                              |
+| --------------- | --------------- | ------------ | ----------------------------------------------------------------------------------------------------- |
+| 128             | 128             | 8            | `LinkError`: "memory import has 128 pages which is smaller than the declared initial of 256"          |
+| 255             | 255             | 15,94        | `LinkError`, ugyanez                                                                                  |
+| 256             | 256             | 16           | működik                                                                                               |
+| 256             | 32768           | 2048         | működik                                                                                               |
+| 256             | 32769           | 2048,06      | `LinkError`: "memory import has a larger maximum size 32769 than the module's declared maximum 32768" |
+| 256             | 65536           | 4096         | `LinkError`, ugyanez                                                                                  |
+
+- **A lépésenkénti memória korlát tartománya a pinelt buildben 16 ... 2048 MB.** A felső határ a modul saját,
+  deklarált import maximuma, nem a gép memóriája: e fölötti `maximum`-mal a modul nem példányosítható. Az alsó határ
+  a modul deklarált kezdő mérete. A hiba a gazdán, a modul betöltésekor jön (a szkript el sem indul).
+- A mérő gép memóriája 3906 MB (`os.totalmem()`), tehát ezen a gépen a "teljes rendszermemória" és a modul plafonja
+  közül a plafon a kisebb.
+
 ### Q-7: fordítás futtatás nélkül és a csomagolás (`script_compile_failed`)
 
 Script: `q7-compile.mjs`. A `context.evalCode(code, filename, { compileOnly: true })` a pinelt verzióban létezik
@@ -292,3 +313,25 @@ termék és kockázati döntés; ez a fájl nem dönti el.
 a csomagolásból kitörő törzs lefordul, ez a T-015-12 tétele.
 
 **Globális nevek.** A 61 név a 2. szekció Q-8 pontjában; a `console` nincs, egyezik az 5.4 "Globális nevek" pontjával.
+
+## 6. A user döntései a T-3 mérés nyomán (2026-11-04)
+
+**Memória.** A kérdés: "a mérés szerint a tervezett 128 MB-os korlát a közös motorban nem hat, egy szkript kb. 2 GB
+memóriát vihet el"; opciók: "Friss motor lépésenként (128 MB-ra korlátozott)" vagy "Közös motor, 2 GB". A user
+válasza szó szerint: "friss motor lepesenkent es lehessen beallitani, de default teljes rendszermemoria". A
+végrehajtás:
+
+1. Minden JavaScript szkript lépés (és a futás indításakor a fordítási ellenőrzés) friss WebAssembly modult kap, saját,
+   maximummal korlátozott `WebAssembly.Memory`-val (Q-5). A `setMemoryLimit` nem kerül a futtatóba, mert ebben a
+   buildben nem bájtkorlát (Q-4).
+2. A korlát csomópontonként beállítható (`memoryLimitMb`, egész MB, 1 MB = 1024 * 1024 bájt).
+3. Az alapérték (üres mező, `null`) a teljes rendszermemória (`os.totalmem()`), de legfeljebb a modul plafonja: a
+   kettő közül a kisebb, lefelé kerekítve egész MB-ra. A plafon fölötti érték a modulon nem példányosítható (Q-9),
+   tehát a "teljes rendszermemória" a gyakorlatban ennél nem lehet több.
+4. A beállított érték 16 és 2048 között lehet (Q-9 tartománya); ezen kívüli érték a mentéskor a mező alatti hibát ad, a
+   meglévő pozitív egész szabály mintájára, mindkét oldalon, a sodródás védelemmel.
+
+**Mély rekurzió.** A user választása: "Közepes, kb. 740 szint": `setMaxStackSize(131072)` (Q-6 131072 bájtos sora,
+742 mélység). A gazdára kijutó `RangeError` (a Q-6 táblája szerint ezen az értéken a mély forrás elemzés és a mély
+`JSON.stringify`) a lépés `script_evaluation_failed` hibája, és a modult eldobjuk (a lépésenkénti friss modul miatt a
+következő lépés újat kap).

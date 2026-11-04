@@ -24,6 +24,7 @@ run() { timeout 150 node "$@" 2>/dev/null | grep '^MEASUREMENT ' | sed 's/^MEASU
   run q6-recursion.mjs default
   for sz in 524288 327680 262144 131072 65536; do run q6-recursion.mjs "$sz"; done
   for sz in 131072 65536 32768 16384 8192; do for hd in 0 2000 5000; do run q6b-recursion-margin.mjs "$sz" "$hd"; done; done
+  run q9-memory-bounds.mjs
   run q7-compile.mjs
   run q8-globals.mjs
 } > kimenet.jsonl
