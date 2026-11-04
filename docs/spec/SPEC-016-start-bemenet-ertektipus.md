@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                                                                                           |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | jóváhagyott: a 7. szekció O-1 ... O-3 termékkérdése lezárva (user döntés 2026-11-04); a technikai döntések forrásból lezárva (5. szekció)                                                                                                 |
+| Státusz  | végrehajtva (`feat/spec-016-bemenet-ertektipus` ág, PLAN-017): a 7. szekció O-1 ... O-3 termékkérdése lezárva (user döntés 2026-11-04); a technikai döntések forrásból lezárva (5. szekció)                                               |
 | Dátum    | 2026-11-03, átvezetve 2026-11-04                                                                                                                                                                                                          |
 | Előzmény | [`SPEC-003`](SPEC-003-domain-perzisztencia.md) 4.3, [`SPEC-004`](SPEC-004-vegrehajto-motor.md) 4.8 4. lépés, [`SPEC-008`](SPEC-008-graf-szerkeszto-es-futas-nezet.md) 5.1 és 6.5, [`SPEC-010`](SPEC-010-sablon-es-kifejezes-nyelv.md) 7.3 |
 | Bemenet  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md) 2., 5. és 9. szekció; a hiányleltár H-12 tétele                                                                            |

@@ -288,8 +288,10 @@ olvashatatlan lenne).
 (a nem kötelező mező egy "nincs kiválasztva" ürítő opciót is kap); `list` és `json`
 `TextAreaField` (a lista címkéje a "(soronként egy)" tagot kapja, mert a design systemnek nincs
 "hint" szlotja a `.field` recepten). Az üres nem kötelező mező kulcsa hiányzik a `StartRunRequest.input`
-mezőből; a `boolean` mező mindig `true` vagy `false` értéket küld; a csak szóközt tartalmazó szöveg
-is üres. Az értelmezhetetlen JSON a mező alatti hibát ad, és a futás nem indul. A szerkesztett állapot
+mezőből; a `boolean` mező mindig `true` vagy `false` értéket küld; a szöveg és a választó mezőt a mai
+szabály szerint csak az üres szöveg teszi üressé, kötelező mezőnél a csak szóköz is (a csak szóközt
+tartalmazó nem kötelező szöveg szóközként megy ki), a lista és a JSON mezőt a csak szóköz is üressé
+teszi. Az értelmezhetetlen JSON a mező alatti hibát ad, és a futás nem indul. A szerkesztett állapot
 mezőnként `{ text, number, checked }`, amiből a mező `valueKind` típusa a megfelelő helyet olvassa
 (`start-run-values.ts`), a mező olvasatát a `read-start-run-field.ts`, a bemenetet és a hibákat egy
 bejárásban az `evaluate-start-run-values.ts` adja, a beviteli elemet a `StartRunField`.

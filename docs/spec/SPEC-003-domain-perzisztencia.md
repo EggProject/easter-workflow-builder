@@ -250,7 +250,7 @@ A `NodeType` unió a felhasználó által jóváhagyott tíz típus:
 
 | `type`           | Felelősség                                        | A `config` lényegi mezői                                                                         |
 | ---------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `start`          | belépési pont, bemeneti séma                      | `inputFields: readonly { name, label, valueKind, required }[]`                                   |
+| `start`          | belépési pont, bemeneti séma                      | `inputFields: readonly StartInputField[]`, lásd lent                                             |
 | `agent_step`     | a fő típus, egy agent futtatás                    | `AgentStepConfig`, lásd 4.4                                                                      |
 | `branch`         | determinisztikus elágazás, **nem** AI             | `expression: string`, `branches: readonly { key, label }[]`, `defaultBranchKey: string \| null`  |
 | `fan_out`        | párhuzamos ágak nyitása                           | `itemsExpression: string`, `branchLabelTemplate: string`                                         |
@@ -260,6 +260,8 @@ A `NodeType` unió a felhasználó által jóváhagyott tíz típus:
 | `error_handler`  | hibakezelés és retry policy                       | `maxAttempts: number` (kötelező), `backoffMs: readonly number[]` (kötelező), `handledErrorKinds` |
 | `sub_workflow`   | másik workflow hívása, rekurzióvédelemmel         | `targetWorkflowId: string`, `inputMapping: Readonly<Record<string, string>>`                     |
 | `script`         | nem AI transzformáció, **később implementálandó** | `source: string`, `runtime: 'expression'`                                                        |
+
+**A `start` bemeneti mezője (`StartInputField`) a `valueKind` szerinti diszkriminált unió** (SPEC-016 5.1, 5.3). A mezők `name`, `label`, `required` és `valueKind`; a `valueKind` hat értékű zárt felsorolás: `text`, `number`, `boolean`, `choice`, `list`, `json`. A `choice` ágon kötelező az `options: readonly string[]` mező (nem üres lista, minden eleme nem üres szöveg, az elemek egyediek), a többi ágon a mező nem létezik. A felsorolás minden úton szigorú (írás, olvasás, futás indítás, pillanatkép), visszafelé kompatibilitási ág nélkül, mert tárolt adat nincs (SPEC-016 5.2, user döntés 2026-11-04). A `GRAPH_DOCUMENT_VERSION` nem nő (5.2).
 
 A `join` `ai_synthesis` módja **teljes értékű agent lépés**: az alobjektuma pontosan az `AgentStepConfig` (4.4). A `merge` módnak nincs alobjektuma (user döntés 2026-10-26: a `settings` mező kikerült, a mód a bemenetek listáját adja), a `script` mód alobjektuma ugyanaz a `ScriptConfig`, mint a `script` node-é.
 
