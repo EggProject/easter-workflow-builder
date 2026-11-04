@@ -1,8 +1,8 @@
 import type { StartInputField, StartInputValueKind, StartNodeConfig } from '@easter-workflow-builder/protocol';
-import { Button, Checkbox, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
+import { Button, Checkbox, SelectField, TextField } from '@easter-workflow-builder/ui';
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
+import { StartInputOptionsField } from './StartInputOptionsField.tsx';
 import { FieldErrorsContext } from './field-errors-context.ts';
-import { fromStringListFieldValue, toStringListFieldValue } from './string-list-field-value.ts';
 
 export interface StartNodeFieldsProperties {
   readonly config: StartNodeConfig;
@@ -84,22 +84,16 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
             label="Érték típusa"
             options={VALUE_KIND_OPTIONS}
             value={field.valueKind}
-            error={fieldErrors.get(`inputFields.${String(index)}.valueKind`)}
             onChange={(valueKind) => {
               updateField(index, (current) => withValueKind(current, valueKind));
             }}
           />
           {field.valueKind === 'choice' && (
-            <TextAreaField
-              size="sm"
-              label="Opciók (soronként egy)"
-              value={toStringListFieldValue(field.options)}
+            <StartInputOptionsField
+              options={field.options}
               error={fieldErrors.get(`inputFields.${String(index)}.options`)}
-              onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-                updateField(index, (current) => ({
-                  ...current,
-                  options: fromStringListFieldValue(event.target.value),
-                }));
+              onChange={(options) => {
+                updateField(index, (current) => ({ ...current, options }));
               }}
             />
           )}

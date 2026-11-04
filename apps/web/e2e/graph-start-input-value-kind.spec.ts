@@ -189,3 +189,29 @@ test('a választólistáról másik típusra váltás után a PUT törzsben ninc
   expect(putBodies).toHaveLength(1);
   expect(savedInputFields(putBodies[0])).toEqual([{ name: 'szin', label: 'Szín', valueKind: 'json', required: false }]);
 });
+
+test('az opciók mezőbe billentyűzetről gépelve az Enter és a szóköz megmarad, a PUT törzs a bontott listát hordozza', async ({
+  page,
+}) => {
+  const putBodies: unknown[] = [];
+  await installEditorMocks(page, putBodies);
+  await page.goto(EDITOR_URL);
+  const { row } = await addInputField(page);
+  await chooseSelectOption(page, row.getByRole('combobox', { name: 'Érték típusa' }), 'Választólista');
+  const optionsField = row.getByRole('textbox', { name: 'Opciók (soronként egy)' });
+
+  // A `fill()` egy lépésben írja az értéket, ezért a köztes alakot (a sor végi
+  // Enter-t, a szóközt) nem látja: a leütésenkénti bevitel a valódi gépelés.
+  await optionsField.pressSequentially('piros');
+  await optionsField.press('Enter');
+  await expect(optionsField).toHaveValue('piros\n');
+  await optionsField.pressSequentially('sötét kék');
+  await expect(optionsField).toHaveValue('piros\nsötét kék');
+
+  await page.getByRole('button', { name: 'Mentés', exact: true }).click();
+  await expect(page.getByText('Gráf mentve')).toBeVisible();
+  expect(putBodies).toHaveLength(1);
+  expect(savedInputFields(putBodies[0])).toEqual([
+    { name: 'szin', label: 'Szín', valueKind: 'choice', options: ['piros', 'sötét kék'], required: false },
+  ]);
+});

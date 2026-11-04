@@ -293,8 +293,12 @@ szabály szerint csak az üres szöveg teszi üressé, kötelező mezőnél a cs
 tartalmazó nem kötelező szöveg szóközként megy ki), a lista és a JSON mezőt a csak szóköz is üressé
 teszi. Az értelmezhetetlen JSON a mező alatti hibát ad, és a futás nem indul. A szerkesztett állapot
 mezőnként `{ text, number, checked }`, amiből a mező `valueKind` típusa a megfelelő helyet olvassa
-(`start-run-values.ts`), a mező olvasatát a `read-start-run-field.ts`, a bemenetet és a hibákat egy
+(`start-run-values.ts`; a `number` mező a begépelt nyers szöveget a `text` helyen is tárolja, mert a
+beviteli elem a köztes alakot, `1.0`, csak azt mutathatja vissza, az érték mégis a `valueAsNumber`), a mező olvasatát a `read-start-run-field.ts`, a bemenetet és a hibákat egy
 bejárásban az `evaluate-start-run-values.ts` adja, a beviteli elemet a `StartRunField`.
+A szerkesztőben a `choice` opciók mezője (`StartInputOptionsField`) a begépelt nyers szöveget helyben
+tartja, és csak a configba bontja soronként (trim, üres sor elhagyása), különben az `Enter` és a sor végi
+szóköz a leütés pillanatában eltűnne; a helyi szöveg a kívülről jövő, más tartalmú listát követi.
 
 **A "megszakítás folyamatban" állapotnak EGYETLEN forrása van.** Az állapot addig áll, amíg a
 megszakítás kérése folyamatban van, VAGY a kérés lefutott és a futás állapota még nem terminális

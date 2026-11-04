@@ -1,6 +1,6 @@
 import type { StartNodeConfig } from '@easter-workflow-builder/protocol';
 import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
-import { act } from 'react';
+import { act, useState, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StartNodeFields } from './StartNodeFields.tsx';
@@ -286,6 +286,42 @@ describe('StartNodeFields', () => {
         ],
       }),
     );
+  });
+
+  it('gépelés közben az opciók mezőben az Enter és a szóköz megmarad, a configba a bontott lista kerül', () => {
+    let latest: StartNodeConfig = {
+      ...EMPTY_CONFIG,
+      inputFields: [{ name: 'a', label: 'A', valueKind: 'choice', options: [], required: false }],
+    };
+    function Host(): ReactElement {
+      const [config, setConfig] = useState(latest);
+      return (
+        <StartNodeFields
+          config={config}
+          onChange={(next) => {
+            latest = next;
+            setConfig(next);
+          }}
+        />
+      );
+    }
+    act(() => {
+      root.render(<Host />);
+    });
+    const optionsTextarea = container.querySelector('textarea');
+    if (optionsTextarea === null) {
+      throw new Error('a teszt nem találta az opciók mezőt');
+    }
+
+    for (const partial of ['piros', 'piros\n', 'piros\nsötét ', 'piros\nsötét kék']) {
+      act(() => {
+        typeIntoTextArea(optionsTextarea, partial);
+      });
+      expect(optionsTextarea.value).toBe(partial);
+    }
+    expect(latest.inputFields).toEqual([
+      { name: 'a', label: 'A', valueKind: 'choice', options: ['piros', 'sötét kék'], required: false },
+    ]);
   });
 
   it('az `inputFields.0.options` mezőnkénti hibája megjelenik az opciók mező alatt', () => {
