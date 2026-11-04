@@ -893,7 +893,11 @@ describe('createWorkflowRepository', () => {
       ...rejectedConfigs,
       [
         'ismeretlen valueKind (a régi szabad szöveg)',
-        { type: 'start', inputFields: [{ name: 'a', label: 'A', valueKind: 'string', required: true }] },
+        {
+          type: 'start',
+          inputFields: [{ name: 'a', label: 'A', valueKind: 'string', required: true }],
+          onUnhandledError: null,
+        },
       ],
     ];
 
