@@ -59,8 +59,9 @@ const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas:
 const EDITOR_URL = '/editor?workflowId=w-alfa';
 
 const BLANK_FIELD_MESSAGE = 'A mező nem lehet üres.';
-const NOT_POSITIVE_INTEGER_MESSAGE = 'A mező értéke nem pozitív egész szám.';
-const TIMEOUT_TOO_LARGE_MESSAGE = 'A mező értéke legfeljebb 2147483647 lehet.';
+// Az időkorlát mező a séma ezredmásodperces mondata helyett a saját, másodperces mondatát mutatja (T-015-12).
+const TIMEOUT_SECONDS_MESSAGE =
+  'Az időkorlát pozitív szám legyen másodpercben, legfeljebb három tizedesjeggyel, és legfeljebb 2 147 483,647 másodperc.';
 const MEMORY_OUT_OF_RANGE_MESSAGE = 'A mező értéke 16 és 2048 közötti egész szám lehet.';
 
 /**
@@ -275,11 +276,11 @@ test('az időkorlát mentési hibái a mező alatt állnak: az ezredmásodpercn�
 
   await timeout.fill('1.0004');
   await saveButton(page).click();
-  await expectFieldError(timeout, NOT_POSITIVE_INTEGER_MESSAGE);
+  await expectFieldError(timeout, TIMEOUT_SECONDS_MESSAGE);
   await timeout.fill('0');
-  await expectFieldError(timeout, NOT_POSITIVE_INTEGER_MESSAGE);
+  await expectFieldError(timeout, TIMEOUT_SECONDS_MESSAGE);
   await timeout.fill('3000000');
-  await expectFieldError(timeout, TIMEOUT_TOO_LARGE_MESSAGE);
+  await expectFieldError(timeout, TIMEOUT_SECONDS_MESSAGE);
   expect(putBodies).toHaveLength(0);
 
   // A tizedes másodperc, aminek az ezerszerese egész, hibátlan.

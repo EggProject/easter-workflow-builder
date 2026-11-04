@@ -5,6 +5,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ScriptConfigFields } from './ScriptConfigFields.tsx';
+import { TIMEOUT_SECONDS_FIELD_ERROR_MESSAGE } from './timeout-seconds-field-error-message.ts';
 import { FieldErrorsContext } from './field-errors-context.ts';
 
 function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
@@ -265,11 +266,17 @@ describe('ScriptConfigFields', () => {
       );
     });
     const messages = [...container.querySelectorAll('.field__error')].map((element) => element.textContent);
-    expect(messages).toEqual(['Forrás hiba', 'Időkorlát hiba', 'Munkakönyvtár hiba', 'Memória hiba']);
+    // Az időkorlát mező a séma ezredmásodperces mondata helyett a saját, másodperces mondatát mutatja (T-015-12).
+    expect(messages).toEqual([
+      'Forrás hiba',
+      TIMEOUT_SECONDS_FIELD_ERROR_MESSAGE,
+      'Munkakönyvtár hiba',
+      'Memória hiba',
+    ]);
     const timeout = inputByLabel(container, 'Időkorlát (másodperc)');
     expect(timeout.getAttribute('aria-invalid')).toBe('true');
     const errorId = CSS.escape(timeout.getAttribute('aria-describedby') ?? '');
-    expect(container.querySelector(`#${errorId}`)?.textContent).toBe('Időkorlát hiba');
+    expect(container.querySelector(`#${errorId}`)?.textContent).toBe(TIMEOUT_SECONDS_FIELD_ERROR_MESSAGE);
   });
 
   it('előtag nélkül a node saját útvonalai (`source`, `timeoutMs`) számítanak', () => {
@@ -283,7 +290,7 @@ describe('ScriptConfigFields', () => {
       );
     });
     expect([...container.querySelectorAll('.field__error')].map((element) => element.textContent)).toEqual([
-      'Időkorlát hiba',
+      TIMEOUT_SECONDS_FIELD_ERROR_MESSAGE,
     ]);
   });
 });

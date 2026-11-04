@@ -4,6 +4,7 @@ import { SelectField, TextAreaField, TextField } from '@easter-workflow-builder/
 import type { ChangeEvent, ReactElement } from 'react';
 import { fromNumberFieldValue, toNumberFieldValue } from './nullable-number-field-value.ts';
 import { fromTextFieldValue, toTextFieldValue } from './nullable-text-field-value.ts';
+import { TIMEOUT_SECONDS_FIELD_ERROR_MESSAGE } from './timeout-seconds-field-error-message.ts';
 import { fromTimeoutSecondsFieldValue, toTimeoutSecondsFieldValue } from './timeout-seconds-field-value.ts';
 import { useFieldError } from './use-field-error.ts';
 
@@ -43,7 +44,10 @@ const RUNTIME_OPTIONS = [
 export function ScriptConfigFields(properties: Readonly<ScriptConfigFieldsProperties>): ReactElement {
   const { config, onChange, fieldPathPrefix } = properties;
   const sourceError = useFieldError(`${fieldPathPrefix}source`);
-  const timeoutError = useFieldError(`${fieldPathPrefix}timeoutMs`);
+  // A séma ezredmásodpercben fogalmaz, a mező másodpercben szerkeszt: a mező
+  // alatt a saját, másodperces mondat áll (T-015-12).
+  const timeoutError =
+    useFieldError(`${fieldPathPrefix}timeoutMs`) === undefined ? undefined : TIMEOUT_SECONDS_FIELD_ERROR_MESSAGE;
   const cwdError = useFieldError(`${fieldPathPrefix}cwd`);
   const memoryLimitError = useFieldError(`${fieldPathPrefix}memoryLimitMb`);
 
