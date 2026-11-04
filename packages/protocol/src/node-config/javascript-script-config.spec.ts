@@ -1,8 +1,8 @@
-/* eslint-disable unicorn/no-null -- a `timeoutMs` és a `cwd` nullázható mezők, a dróton ténylegesen `null` értéket hordoznak */
+/* eslint-disable unicorn/no-null -- a `timeoutMs`, a `cwd` és a `memoryLimitMb` nullázható mezők, a dróton ténylegesen `null` értéket hordoznak */
 import { describe, expect, it } from 'vitest';
 import { JavaScriptScriptConfigSchema } from './javascript-script-config.ts';
 
-const VALID = { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null };
+const VALID = { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: null };
 
 describe('JavaScriptScriptConfigSchema', () => {
   it('elfogadja a null és a megadott timeoutMs és cwd értéket', () => {
@@ -18,12 +18,32 @@ describe('JavaScriptScriptConfigSchema', () => {
     }
   });
 
-  it('a hiányzó timeoutMs vagy cwd mezőt elutasítja', () => {
-    expect(JavaScriptScriptConfigSchema.safeParse({ source: 'x', runtime: 'javascript', cwd: null }).success).toBe(
-      false,
-    );
+  it('az olvasó séma a megadott és a tartományon kívüli memoryLimitMb értéket is elfogadja', () => {
+    for (const memoryLimitMb of [256, 0, 15, 2049, 16.5]) {
+      expect(JavaScriptScriptConfigSchema.safeParse({ ...VALID, memoryLimitMb }).success).toBe(true);
+    }
+  });
+
+  it('a hiányzó memoryLimitMb mezőt és a nem szám értéket elutasítja', () => {
     expect(
-      JavaScriptScriptConfigSchema.safeParse({ source: 'x', runtime: 'javascript', timeoutMs: null }).success,
+      JavaScriptScriptConfigSchema.safeParse({ source: 'x', runtime: 'javascript', timeoutMs: null, cwd: null })
+        .success,
+    ).toBe(false);
+    expect(JavaScriptScriptConfigSchema.safeParse({ ...VALID, memoryLimitMb: '256' }).success).toBe(false);
+  });
+
+  it('a hiányzó timeoutMs vagy cwd mezőt elutasítja', () => {
+    expect(
+      JavaScriptScriptConfigSchema.safeParse({ source: 'x', runtime: 'javascript', cwd: null, memoryLimitMb: null })
+        .success,
+    ).toBe(false);
+    expect(
+      JavaScriptScriptConfigSchema.safeParse({
+        source: 'x',
+        runtime: 'javascript',
+        timeoutMs: null,
+        memoryLimitMb: null,
+      }).success,
     ).toBe(false);
   });
 

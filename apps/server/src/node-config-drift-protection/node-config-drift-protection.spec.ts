@@ -15,6 +15,8 @@ import {
 } from '@easter-workflow-builder/db';
 import {
   MAX_SCRIPT_TIMEOUT_MS as PROTOCOL_MAX_SCRIPT_TIMEOUT_MS,
+  MAX_SCRIPT_MEMORY_LIMIT_MB as PROTOCOL_MAX_SCRIPT_MEMORY_LIMIT_MB,
+  MIN_SCRIPT_MEMORY_LIMIT_MB as PROTOCOL_MIN_SCRIPT_MEMORY_LIMIT_MB,
   NodeConfigSaveSchema,
   NodeConfigSchema,
   REQUIRED_TEXT_FIELD_PATHS as PROTOCOL_REQUIRED_TEXT_FIELD_PATHS,
@@ -163,7 +165,13 @@ const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
   {
     type: 'join',
     mode: 'script',
-    settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: 120_000, cwd: 'munka/almappa' },
+    settings: {
+      source: 'return 1;',
+      runtime: 'javascript',
+      timeoutMs: 120_000,
+      cwd: 'munka/almappa',
+      memoryLimitMb: 512,
+    },
     onUnhandledError: null,
   },
   { type: 'join', mode: 'ai_synthesis', settings: VALID_AGENT_STEP_SETTINGS, onUnhandledError: null },
@@ -190,7 +198,15 @@ const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
     onUnhandledError: null,
   },
   { type: 'script', source: 'x + 1', runtime: 'expression', onUnhandledError: null },
-  { type: 'script', source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, onUnhandledError: null },
+  {
+    type: 'script',
+    source: 'return 1;',
+    runtime: 'javascript',
+    timeoutMs: null,
+    cwd: null,
+    memoryLimitMb: null,
+    onUnhandledError: null,
+  },
 ];
 
 function describeVariant(config: ProtocolNodeConfig): string {
@@ -401,6 +417,7 @@ describe('a szkript source mezője a JavaScript ágon is kötelező mindkét old
         runtime: 'javascript',
         timeoutMs: null,
         cwd,
+        memoryLimitMb: null,
         onUnhandledError: 'fail_run',
       }),
     },
@@ -410,7 +427,7 @@ describe('a szkript source mezője a JavaScript ágon is kötelező mindkét old
       build: (source: string, cwd: string | null): unknown => ({
         type: 'join',
         mode: 'script',
-        settings: { source, runtime: 'javascript', timeoutMs: null, cwd },
+        settings: { source, runtime: 'javascript', timeoutMs: null, cwd, memoryLimitMb: null },
         onUnhandledError: 'fail_run',
       }),
     },
@@ -496,6 +513,7 @@ const POSITIVE_INTEGER_FIELD_CASES: readonly NumberFieldCase[] = [
       runtime: 'javascript',
       timeoutMs: value,
       cwd: null,
+      memoryLimitMb: null,
       onUnhandledError: 'fail_run',
     }),
   },
@@ -505,7 +523,7 @@ const POSITIVE_INTEGER_FIELD_CASES: readonly NumberFieldCase[] = [
     build: (value) => ({
       type: 'join',
       mode: 'script',
-      settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: value, cwd: null },
+      settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: value, cwd: null, memoryLimitMb: null },
       onUnhandledError: 'fail_run',
     }),
   },
@@ -619,6 +637,7 @@ describe('a JavaScript szkript timeoutMs felső határa a protokoll mentési sé
         runtime: 'javascript',
         timeoutMs: value,
         cwd: null,
+        memoryLimitMb: null,
         onUnhandledError: 'fail_run',
       }),
     },
@@ -628,7 +647,7 @@ describe('a JavaScript szkript timeoutMs felső határa a protokoll mentési sé
       build: (value) => ({
         type: 'join',
         mode: 'script',
-        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: value, cwd: null },
+        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: value, cwd: null, memoryLimitMb: null },
         onUnhandledError: 'fail_run',
       }),
     },
@@ -655,6 +674,77 @@ describe('a JavaScript szkript timeoutMs felső határa a protokoll mentési sé
         expect(NodeConfigSchema.safeParse(build(2_147_483_648)).success).toBe(true);
         expect(isNodeConfig(build(2_147_483_648))).toBe(false);
       });
+    });
+  }
+});
+
+/**
+ * A JavaScript szkript `memoryLimitMb` tartománya (SPEC-014 5.3, research Q-9):
+ * `null` vagy egész 16 és 2048 között, mindkét határ megengedett. A `protocol`
+ * mentési sémájának szabálya a `db` `isNodeConfig` guard szabályának szándékos
+ * duplikátuma; a hibás érték mindkét oldalon elbukik, a jó mindkettőn átmegy. Az
+ * olvasó séma a tartományon kívüli számot is elfogadja (O-37 mintája), a `db`
+ * guard viszont mindkét irányban szigorú.
+ */
+describe('a JavaScript szkript memoryLimitMb tartománya a protokoll mentési sémáján és a db isNodeConfig guardján is ugyanúgy dönt', () => {
+  const builders: readonly {
+    readonly field: string;
+    readonly path: string;
+    readonly build: (value: unknown) => unknown;
+  }[] = [
+    {
+      field: 'script',
+      path: 'memoryLimitMb',
+      build: (value) => ({
+        type: 'script',
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb: value,
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    {
+      field: 'join script',
+      path: 'settings.memoryLimitMb',
+      build: (value) => ({
+        type: 'join',
+        mode: 'script',
+        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: value },
+        onUnhandledError: 'fail_run',
+      }),
+    },
+  ];
+
+  it('a határok a protokoll oldalon 16 és 2048', () => {
+    expect(PROTOCOL_MIN_SCRIPT_MEMORY_LIMIT_MB).toBe(16);
+    expect(PROTOCOL_MAX_SCRIPT_MEMORY_LIMIT_MB).toBe(2048);
+  });
+
+  for (const { field, path, build } of builders) {
+    describe(field, () => {
+      for (const value of [16, 2048, null]) {
+        it(`a(z) ${String(value)} mindkettőn átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse(build(value)).success).toBe(true);
+          expect(isNodeConfig(build(value))).toBe(true);
+        });
+      }
+
+      for (const value of [15, 2049, 16.5]) {
+        it(`a(z) ${String(value)} mindkettőn elbukik, a protokoll a mező útvonalán`, () => {
+          const parsed = NodeConfigSaveSchema.safeParse(build(value));
+
+          expect(parsed.success).toBe(false);
+          expect(parsed.error?.issues.map((issue) => issue.path.join('.'))).toEqual([path]);
+          expect(isNodeConfig(build(value))).toBe(false);
+        });
+
+        it(`az olvasó séma a(z) ${String(value)} értéket elfogadja, a db guard nem`, () => {
+          expect(NodeConfigSchema.safeParse(build(value)).success).toBe(true);
+          expect(isNodeConfig(build(value))).toBe(false);
+        });
+      }
     });
   }
 });
@@ -784,6 +874,7 @@ const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
       runtime: 'javascript',
       timeoutMs: 60_000,
       cwd: 'munka/almappa',
+      memoryLimitMb: null,
       onUnhandledError: 'fail_run',
     },
     accepted: true,
@@ -795,7 +886,14 @@ const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
   },
   {
     label: 'script javascript ág timeoutMs nélkül',
-    config: { type: 'script', source: 'x', runtime: 'javascript', cwd: null, onUnhandledError: 'fail_run' },
+    config: {
+      type: 'script',
+      source: 'x',
+      runtime: 'javascript',
+      cwd: null,
+      memoryLimitMb: null,
+      onUnhandledError: 'fail_run',
+    },
     accepted: false,
   },
   {
@@ -806,6 +904,7 @@ const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
       runtime: 'javascript',
       timeoutMs: null,
       cwd: 7,
+      memoryLimitMb: null,
       onUnhandledError: 'fail_run',
     },
     accepted: false,
@@ -924,7 +1023,14 @@ const UNKNOWN_KEY_CASES: readonly { readonly label: string; readonly config: unk
     config: {
       type: 'join',
       mode: 'script',
-      settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, [UNKNOWN_KEY]: true },
+      settings: {
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb: null,
+        [UNKNOWN_KEY]: true,
+      },
       onUnhandledError: 'fail_run',
     },
   },

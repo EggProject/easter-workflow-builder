@@ -208,7 +208,13 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   pozitív egész, legfeljebb 2147483647, mert a Node `setTimeout` ennél nagyobb késleltetést 1 ms-re állít. A
   határ a mentési sémában és a `db` `isNodeConfig` guardjában áll, az olvasó séma csak a típust ellenőrzi. A
   védelem az `apps/server` `node-config-drift-protection` témájában a két ág típusszintű egyenlősége és a
-  határérték mezőnkénti futásidejű ága (SPEC-014 5.3).
+  határérték mezőnkénti futásidejű ága (SPEC-014 5.3). **A JavaScript ág `memoryLimitMb` mezőjének
+  tartomány szabálya ugyanezt a védelmet kapja:** `null` vagy egész 16 és 2048 között (mindkét határ
+  megengedett; a határok forrása a research Q-9: a pinelt QuickJS modul saját `WebAssembly.Memory`
+  maximuma ezen kívül nem példányosítható), a `db` guardban és a `protocol` mentési sémájában (a hiba a
+  mező útvonalán, `config.memoryLimitMb`, a `join` `script` módján `settings.memoryLimitMb`), az olvasó
+  séma itt is csak a típust ellenőrzi; a határértékek mezőnkénti futásidejű ága az `apps/server`
+  `node-config-drift-protection` témában áll (SPEC-014 5.3, user döntés 2026-11-04).
 
 - **A `db` `NodeConfig` guard minden ismeretlen kulcsot elutasít, és a `protocol` ugyanazt a szabályt
   duplikálja, ugyanezzel a védelemmel.** Az `isNodeConfig` és az `isAgentStepConfig` objektumonként zárt

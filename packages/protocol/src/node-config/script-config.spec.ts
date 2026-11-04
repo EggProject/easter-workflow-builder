@@ -16,6 +16,7 @@ describe('ScriptConfigSchema', () => {
       runtime: 'javascript',
       timeoutMs: null,
       cwd: null,
+      memoryLimitMb: null,
     });
 
     expect(parsed.success).toBe(true);

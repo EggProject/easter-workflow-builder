@@ -98,7 +98,13 @@ describe('NodeConfigSchema', () => {
     const config = {
       type: 'join',
       mode: 'script',
-      settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: 120_000, cwd: 'munka/almappa' },
+      settings: {
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: 120_000,
+        cwd: 'munka/almappa',
+        memoryLimitMb: null,
+      },
       onUnhandledError: null,
     };
     expect(NodeConfigSchema.safeParse(config).success).toBe(true);
@@ -188,6 +194,7 @@ describe('NodeConfigSchema', () => {
       runtime: 'javascript',
       timeoutMs: null,
       cwd: null,
+      memoryLimitMb: null,
       onUnhandledError: null,
     };
     expect(NodeConfigSchema.safeParse(config).success).toBe(true);

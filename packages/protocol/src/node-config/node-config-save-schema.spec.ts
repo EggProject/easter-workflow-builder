@@ -194,6 +194,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
       runtime: 'javascript',
       timeoutMs: null,
       cwd: null,
+      memoryLimitMb: null,
       onUnhandledError: 'fail_run',
     }),
   },
@@ -203,7 +204,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
     build: (text) => ({
       type: 'join',
       mode: 'script',
-      settings: { source: text, runtime: 'javascript', timeoutMs: null, cwd: null },
+      settings: { source: text, runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: null },
       onUnhandledError: 'fail_run',
     }),
   },
@@ -647,6 +648,7 @@ function javascriptScriptNodeWithTimeout(timeoutMs: unknown): unknown {
     runtime: 'javascript',
     timeoutMs,
     cwd: null,
+    memoryLimitMb: null,
     onUnhandledError: 'fail_run',
   };
 }
@@ -655,7 +657,7 @@ function javascriptJoinScriptWithTimeout(timeoutMs: unknown): unknown {
   return {
     type: 'join',
     mode: 'script',
-    settings: { source: 'return 1;', runtime: 'javascript', timeoutMs, cwd: null },
+    settings: { source: 'return 1;', runtime: 'javascript', timeoutMs, cwd: null, memoryLimitMb: null },
     onUnhandledError: 'fail_run',
   };
 }
@@ -1065,4 +1067,86 @@ describe('NodeConfigSaveSchema: a start bemeneti mező valueKind típusa (SPEC-0
 
     expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
   });
+});
+
+const SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE = 'A mező értéke 16 és 2048 közötti egész szám lehet.';
+
+describe('NodeConfigSaveSchema: a JavaScript szkript memoryLimitMb mezője null vagy 16 ... 2048 közötti egész (SPEC-014 5.3)', () => {
+  const SCRIPT_MEMORY_LIMIT_CASES: readonly {
+    readonly field: string;
+    readonly path: readonly string[];
+    readonly build: (value: unknown) => unknown;
+  }[] = [
+    {
+      field: 'script',
+      path: ['memoryLimitMb'],
+      build: (memoryLimitMb) => ({
+        type: 'script',
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb,
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    {
+      field: 'join script',
+      path: ['settings', 'memoryLimitMb'],
+      build: (memoryLimitMb) => ({
+        type: 'join',
+        mode: 'script',
+        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb },
+        onUnhandledError: 'fail_run',
+      }),
+    },
+  ];
+
+  for (const { field, path, build } of SCRIPT_MEMORY_LIMIT_CASES) {
+    describe(field, () => {
+      for (const value of [16, 17, 256, 2047, 2048, null]) {
+        it(`a(z) ${String(value)} átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse(build(value)).success).toBe(true);
+        });
+      }
+
+      for (const [description, value] of [
+        ['a tartomány alatti (15)', 15],
+        ['nulla', 0],
+        ['negatív', -16],
+        ['a tartomány fölötti (2049)', 2049],
+        ['tört', 16.5],
+        ['a tartományon belüli tört', 100.5],
+      ] as const) {
+        it(`${description} érték elbukik, a hiba a mező útvonalán áll`, () => {
+          const parsed = NodeConfigSaveSchema.safeParse(build(value));
+
+          expect(parsed.success).toBe(false);
+          if (parsed.success) {
+            return;
+          }
+          expect(issuePaths(parsed.error)).toEqual([path]);
+          expect(parsed.error.issues[0]?.message).toBe(SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE);
+        });
+      }
+
+      it('a szöveg csak a séma típushibáját kapja, a tartomány szabály nem szól mellé', () => {
+        const parsed = NodeConfigSaveSchema.safeParse(build('256'));
+
+        expect(parsed.success).toBe(false);
+        if (parsed.success) {
+          return;
+        }
+        expect(parsed.error.issues.map((issue) => issue.message)).not.toContain(
+          SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE,
+        );
+      });
+
+      it('az olvasó NodeConfigSchema a tartományon kívüli értéket elfogadja', () => {
+        for (const value of [15, 2049, 16.5]) {
+          expect(NodeConfigSchema.safeParse(build(value)).success).toBe(true);
+        }
+      });
+    });
+  }
 });

@@ -171,7 +171,12 @@ export { ScriptConfigSchema } from './node-config/script-config.ts';
 export type { ExpressionScriptConfig } from './node-config/expression-script-config.ts';
 export { ExpressionScriptConfigSchema } from './node-config/expression-script-config.ts';
 export type { JavaScriptScriptConfig } from './node-config/javascript-script-config.ts';
-export { JavaScriptScriptConfigSchema, MAX_SCRIPT_TIMEOUT_MS } from './node-config/javascript-script-config.ts';
+export {
+  JavaScriptScriptConfigSchema,
+  MAX_SCRIPT_MEMORY_LIMIT_MB,
+  MAX_SCRIPT_TIMEOUT_MS,
+  MIN_SCRIPT_MEMORY_LIMIT_MB,
+} from './node-config/javascript-script-config.ts';
 export type { McpServerReference } from './node-config/mcp-server-reference.ts';
 export { McpServerReferenceSchema } from './node-config/mcp-server-reference.ts';
 export type { AgentStepConfig, PresetSystemPrompt, StructuredOutputConfig } from './node-config/agent-step-config.ts';

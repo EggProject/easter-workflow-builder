@@ -60,7 +60,13 @@ const validConfigs: readonly NodeConfig[] = [
   {
     type: 'join',
     mode: 'script',
-    settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: 120_000, cwd: 'munka/almappa' },
+    settings: {
+      source: 'return 1;',
+      runtime: 'javascript',
+      timeoutMs: 120_000,
+      cwd: 'munka/almappa',
+      memoryLimitMb: null,
+    },
     onUnhandledError: 'fail_run',
   },
   { type: 'join', mode: 'ai_synthesis', settings: agentStepConfig, onUnhandledError: 'fail_run' },
@@ -87,7 +93,15 @@ const validConfigs: readonly NodeConfig[] = [
     onUnhandledError: 'fail_branch',
   },
   { type: 'script', source: 'a + b', runtime: 'expression', onUnhandledError: null },
-  { type: 'script', source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, onUnhandledError: null },
+  {
+    type: 'script',
+    source: 'return 1;',
+    runtime: 'javascript',
+    timeoutMs: null,
+    cwd: null,
+    memoryLimitMb: 256,
+    onUnhandledError: null,
+  },
 ];
 
 describe('isNodeConfig', () => {
@@ -400,21 +414,37 @@ describe('isNodeConfig', () => {
     ].flatMap(([description, timeoutMs]): readonly (readonly [string, unknown])[] => [
       [
         `script: javascript ág ${String(description)} timeoutMs`,
-        { type: 'script', source: 'a', runtime: 'javascript', timeoutMs, cwd: null, onUnhandledError: null },
+        {
+          type: 'script',
+          source: 'a',
+          runtime: 'javascript',
+          timeoutMs,
+          cwd: null,
+          memoryLimitMb: null,
+          onUnhandledError: null,
+        },
       ],
       [
         `join script: javascript ág ${String(description)} timeoutMs`,
         {
           type: 'join',
           mode: 'script',
-          settings: { source: 'a', runtime: 'javascript', timeoutMs, cwd: null },
+          settings: { source: 'a', runtime: 'javascript', timeoutMs, cwd: null, memoryLimitMb: null },
           onUnhandledError: null,
         },
       ],
     ]),
     [
       'script: javascript ág szám cwd',
-      { type: 'script', source: 'a', runtime: 'javascript', timeoutMs: null, cwd: 7, onUnhandledError: null },
+      {
+        type: 'script',
+        source: 'a',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: 7,
+        memoryLimitMb: null,
+        onUnhandledError: null,
+      },
     ],
     [
       'script: javascript ág hiányzó cwd',
@@ -422,7 +452,11 @@ describe('isNodeConfig', () => {
     ],
     [
       'join script: javascript ág szám cwd',
-      { type: 'join', mode: 'script', settings: { source: 'a', runtime: 'javascript', timeoutMs: null, cwd: 7 } },
+      {
+        type: 'join',
+        mode: 'script',
+        settings: { source: 'a', runtime: 'javascript', timeoutMs: null, cwd: 7, memoryLimitMb: null },
+      },
     ],
     [
       'join script: ismeretlen runtime',
@@ -503,7 +537,14 @@ describe('isNodeConfig', () => {
       {
         type: 'join',
         mode: 'script',
-        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, [UNKNOWN_KEY]: true },
+        settings: {
+          source: 'return 1;',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd: null,
+          memoryLimitMb: null,
+          [UNKNOWN_KEY]: true,
+        },
         onUnhandledError: null,
       },
     ],
@@ -553,9 +594,58 @@ describe('isNodeConfig', () => {
           runtime: 'javascript',
           timeoutMs,
           cwd: 'munka',
+          memoryLimitMb: null,
           onUnhandledError: null,
         }),
       ).toBe(true);
+    }
+  });
+
+  describe('a javascript szkript memoryLimitMb mezője null vagy 16 ... 2048 közötti egész (SPEC-014 5.3)', () => {
+    const builders: readonly (readonly [string, (memoryLimitMb: unknown) => unknown])[] = [
+      [
+        'script',
+        (memoryLimitMb) => ({
+          type: 'script',
+          source: 'a',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd: null,
+          memoryLimitMb,
+          onUnhandledError: null,
+        }),
+      ],
+      [
+        'join script',
+        (memoryLimitMb) => ({
+          type: 'join',
+          mode: 'script',
+          settings: { source: 'a', runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb },
+          onUnhandledError: null,
+        }),
+      ],
+    ];
+
+    for (const [label, build] of builders) {
+      for (const memoryLimitMb of [null, 16, 17, 128, 2047, 2048]) {
+        it(`${label}: a(z) ${String(memoryLimitMb)} érvényes`, () => {
+          expect(isNodeConfig(build(memoryLimitMb))).toBe(true);
+        });
+      }
+
+      for (const [description, memoryLimitMb] of [
+        ['a tartomány alatti (15)', 15],
+        ['nulla', 0],
+        ['negatív', -16],
+        ['a tartomány fölötti (2049)', 2049],
+        ['nem egész', 16.5],
+        ['szöveg', '128'],
+        ['hiányzó', undefined],
+      ] as const) {
+        it(`${label}: ${description} érték érvénytelen`, () => {
+          expect(isNodeConfig(build(memoryLimitMb))).toBe(false);
+        });
+      }
     }
   });
 

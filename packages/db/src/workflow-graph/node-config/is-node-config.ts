@@ -31,7 +31,9 @@ import type {
 } from './node-config.ts';
 import type { ExpressionScriptConfig } from './expression-script-config.ts';
 import type { JavaScriptScriptConfig } from './javascript-script-config.ts';
+import { MAX_SCRIPT_MEMORY_LIMIT_MB } from './max-script-memory-limit-mb.ts';
 import { MAX_SCRIPT_TIMEOUT_MS } from './max-script-timeout-ms.ts';
+import { MIN_SCRIPT_MEMORY_LIMIT_MB } from './min-script-memory-limit-mb.ts';
 import type { ScriptConfig } from './script-config.ts';
 import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
 import { isAgentStepConfig } from '../agent-step-config/is-agent-step-config.ts';
@@ -151,6 +153,7 @@ const JAVASCRIPT_SCRIPT_CONFIG_KEYS: Readonly<Record<keyof JavaScriptScriptConfi
   runtime: true,
   timeoutMs: true,
   cwd: true,
+  memoryLimitMb: true,
 };
 
 const EXPRESSION_SCRIPT_NODE_CONFIG_KEYS: Readonly<Record<keyof ExpressionScriptNodeConfig, true>> = {
@@ -166,6 +169,7 @@ const JAVASCRIPT_SCRIPT_NODE_CONFIG_KEYS: Readonly<Record<keyof JavaScriptScript
   runtime: true,
   timeoutMs: true,
   cwd: true,
+  memoryLimitMb: true,
   onUnhandledError: true,
 };
 
@@ -210,6 +214,15 @@ function isScriptTimeoutMs(value: unknown): value is number | null {
 }
 
 /**
+ * A JavaScript szkript memória korlátja (SPEC-014 5.3): `null` az alapérték,
+ * egyébként egész, `MIN_SCRIPT_MEMORY_LIMIT_MB` és `MAX_SCRIPT_MEMORY_LIMIT_MB`
+ * között (mindkét határ megengedett; a határok forrása a research Q-9).
+ */
+function isScriptMemoryLimitMb(value: unknown): value is number | null {
+  return value === null || (isInt(value) && value >= MIN_SCRIPT_MEMORY_LIMIT_MB && value <= MAX_SCRIPT_MEMORY_LIMIT_MB);
+}
+
+/**
  * A user 1. döntése (SPEC-004 8.3): a node config `onUnhandledError` mezője.
  */
 function isUnhandledErrorPolicy(value: unknown): value is UnhandledErrorPolicy {
@@ -250,7 +263,8 @@ function isScriptConfig(
       return (
         isRecordWithKnownKeys(value, javascriptKeys) &&
         isScriptTimeoutMs(value['timeoutMs']) &&
-        (value['cwd'] === null || isString(value['cwd']))
+        (value['cwd'] === null || isString(value['cwd'])) &&
+        isScriptMemoryLimitMb(value['memoryLimitMb'])
       );
     }
     default: {

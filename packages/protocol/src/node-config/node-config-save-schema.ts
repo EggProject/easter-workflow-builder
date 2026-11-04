@@ -3,10 +3,15 @@ import { BLANK_FIELD_MESSAGE } from './blank-field-message.ts';
 import { findBlankTextFields } from './find-blank-text-fields.ts';
 import { findInvalidChoiceOptions } from './find-invalid-choice-options.ts';
 import { findIntegerFieldsAbove } from './find-integer-fields-above.ts';
+import { findIntegerFieldsOutsideRange } from './find-integer-fields-outside-range.ts';
 import { findInvalidMcpServerReferenceEnvironmentNames } from './find-invalid-mcp-server-reference-environment-names.ts';
 import { findNonPositiveIntegerFields } from './find-non-positive-integer-fields.ts';
 import { findUnsupportedAgentDefinitionFields } from './find-unsupported-agent-definition-fields.ts';
-import { MAX_SCRIPT_TIMEOUT_MS } from './javascript-script-config.ts';
+import {
+  MAX_SCRIPT_MEMORY_LIMIT_MB,
+  MAX_SCRIPT_TIMEOUT_MS,
+  MIN_SCRIPT_MEMORY_LIMIT_MB,
+} from './javascript-script-config.ts';
 import { NodeConfigSchema, type NodeConfig } from './node-config.ts';
 import { REQUIRED_TEXT_FIELD_PATHS } from './required-text-field-paths.ts';
 
@@ -22,6 +27,12 @@ const NOT_POSITIVE_INTEGER_MESSAGE = 'A mező értéke nem pozitív egész szám
  * hibaüzenete (SPEC-014 5.3).
  */
 const SCRIPT_TIMEOUT_TOO_LARGE_MESSAGE = `A mező értéke legfeljebb ${String(MAX_SCRIPT_TIMEOUT_MS)} lehet.`;
+
+/**
+ * A JavaScript szkript `memoryLimitMb` mezője tartományán kívüli érték
+ * hibaüzenete (SPEC-014 5.3): a tört is ide tartozik, a mező egész MB.
+ */
+const SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE = `A mező értéke ${String(MIN_SCRIPT_MEMORY_LIMIT_MB)} és ${String(MAX_SCRIPT_MEMORY_LIMIT_MB)} közötti egész szám lehet.`;
 
 /**
  * A szerver oldali env változó név hibaüzenete (SPEC-009 6.1, T-012-27), a
@@ -131,6 +142,41 @@ function addScriptTimeoutTooLargeIssues(config: NodeConfig, context: CustomIssue
   }
 }
 
+/**
+ * A JavaScript szkript `memoryLimitMb` mezőjének útvonala (SPEC-014 5.3): a
+ * `script` node-on és a `join` `settings` alobjektumán, a `SCRIPT_TIMEOUT_FIELD_PATHS`
+ * mintájára. A tartomány a `db` `isNodeConfig` guardjának szabályát duplikálja.
+ */
+const SCRIPT_MEMORY_LIMIT_FIELD_PATHS = {
+  start: [],
+  agent_step: [],
+  branch: [],
+  fan_out: [],
+  join: ['settings.memoryLimitMb'],
+  loop: [],
+  human_approval: [],
+  error_handler: [],
+  sub_workflow: [],
+  script: ['memoryLimitMb'],
+} as const satisfies Readonly<Record<NodeConfig['type'], readonly string[]>>;
+
+/**
+ * A JavaScript szkript tartományon kívüli `memoryLimitMb` értékének felvétele a mező útvonalára (SPEC-014 5.3).
+ */
+function addScriptMemoryLimitOutOfRangeIssues(config: NodeConfig, context: CustomIssueSink): void {
+  const paths: readonly string[] = SCRIPT_MEMORY_LIMIT_FIELD_PATHS[config.type];
+  for (const path of paths) {
+    for (const fieldPath of findIntegerFieldsOutsideRange(
+      config,
+      path,
+      MIN_SCRIPT_MEMORY_LIMIT_MB,
+      MAX_SCRIPT_MEMORY_LIMIT_MB,
+    )) {
+      context.addIssue({ code: 'custom', path: [...fieldPath], message: SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE });
+    }
+  }
+}
+
 function requiredTextFieldPathsOf(config: NodeConfig): readonly string[] {
   if (config.type !== 'join') {
     return REQUIRED_TEXT_FIELD_PATHS[config.type];
@@ -166,7 +212,9 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  * 4. a `loop` `maxIterations`, az `error_handler` `maxAttempts` mezője és a
  *    `backoffMs` minden eleme pozitív egész (user döntés 2026-10-17, O-37); a
  *    JavaScript szkript `timeoutMs` mezője is pozitív egész, és legfeljebb
- *    `MAX_SCRIPT_TIMEOUT_MS` (SPEC-014 5.3);
+ *    `MAX_SCRIPT_TIMEOUT_MS`, a `memoryLimitMb` mezője pedig `null` vagy
+ *    `MIN_SCRIPT_MEMORY_LIMIT_MB` és `MAX_SCRIPT_MEMORY_LIMIT_MB` közötti egész
+ *    (SPEC-014 5.3);
  * 5. a lépés `mcpServerReferences` hivatkozásainak `envBindings` értéke és nem
  *    `null` `authEnvName` mezője env változó név alakú (SPEC-009 6.1,
  *    T-012-27); az agent definíciók azonos mezőjét a motor indításkori
@@ -239,6 +287,7 @@ export const NodeConfigSaveSchema = NodeConfigSchema.superRefine(
       }
     }
     addScriptTimeoutTooLargeIssues(config, context);
+    addScriptMemoryLimitOutOfRangeIssues(config, context);
     addInvalidChoiceOptionIssues(config, context);
     const agentStep = agentStepPathOf(config);
     if (agentStep !== undefined) {
