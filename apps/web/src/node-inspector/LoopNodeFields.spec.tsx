@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- a `LoopNodeConfig.onUnhandledError` a dróton ténylegesen `null` értéket hordoz (SPEC-005). */
 import type { LoopNodeConfig } from '@easter-workflow-builder/protocol';
 import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
-import { act } from 'react';
+import { act, useState, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoopNodeFields } from './LoopNodeFields.tsx';
@@ -59,7 +59,7 @@ describe('LoopNodeFields', () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ continueExpression: 'i < 10' }));
   });
 
-  it('érvénytelen bevitelre a natív number input üresre vált, ez 0 értéket ad (mért viselkedés)', () => {
+  it('érvénytelen bevitelre a natív number input üresre vált, ez NaN értéket ad (nem 0-t)', () => {
     const onChange = vi.fn<OnChange>();
     act(() => {
       root.render(<LoopNodeFields config={CONFIG} onChange={onChange} />);
@@ -75,7 +75,37 @@ describe('LoopNodeFields', () => {
     if (lastCall === undefined) {
       throw new Error('a teszt nem talált onChange hívást');
     }
-    expect(lastCall[0].maxIterations).toBe(0);
+    expect(lastCall[0].maxIterations).toBeNaN();
+  });
+
+  it('REGRESSZIÓ: a kiürített maxIterations mező üres marad, és a config NaN értéket kap, nem 0-t', () => {
+    let latest = CONFIG;
+    function Host(): ReactElement {
+      const [config, setConfig] = useState(CONFIG);
+      return (
+        <LoopNodeFields
+          config={config}
+          onChange={(next) => {
+            latest = next;
+            setConfig(next);
+          }}
+        />
+      );
+    }
+    act(() => {
+      root.render(<Host />);
+    });
+    const maxIterationsInput = container.querySelector('input');
+    if (maxIterationsInput === null) {
+      throw new Error('a teszt nem találta a maxIterations mezőt');
+    }
+
+    act(() => {
+      typeInto(maxIterationsInput, '');
+    });
+
+    expect(latest.maxIterations).toBeNaN();
+    expect(maxIterationsInput.value).toBe('');
   });
 
   it('a `maxIterations` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {
