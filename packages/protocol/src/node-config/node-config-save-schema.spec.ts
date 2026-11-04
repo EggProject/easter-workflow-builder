@@ -43,7 +43,7 @@ interface RequiredFieldCase {
 }
 
 /**
- * A SPEC-008 5.4 táblázatának tizenhat mezője, mezőnként egy egyébként
+ * A SPEC-008 5.4 táblázatának tizenöt mezője (a `valueKind` kikerült, SPEC-016 5.2), mezőnként egy egyébként
  * érvényes konfiggal, amiben csak a vizsgált mező szövege változik.
  */
 const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
@@ -52,7 +52,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
     path: ['inputFields', 0, 'name'],
     build: (text) => ({
       type: 'start',
-      inputFields: [{ name: text, label: 'Téma', valueKind: 'string', required: true }],
+      inputFields: [{ name: text, label: 'Téma', valueKind: 'text', required: true }],
       onUnhandledError: 'fail_run',
     }),
   },
@@ -61,16 +61,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
     path: ['inputFields', 0, 'label'],
     build: (text) => ({
       type: 'start',
-      inputFields: [{ name: 'topic', label: text, valueKind: 'string', required: true }],
-      onUnhandledError: 'fail_run',
-    }),
-  },
-  {
-    field: 'start inputFields[].valueKind',
-    path: ['inputFields', 0, 'valueKind'],
-    build: (text) => ({
-      type: 'start',
-      inputFields: [{ name: 'topic', label: 'Téma', valueKind: text, required: true }],
+      inputFields: [{ name: 'topic', label: text, valueKind: 'text', required: true }],
       onUnhandledError: 'fail_run',
     }),
   },
@@ -209,8 +200,8 @@ function storedNodeWith(config: unknown): Readonly<Record<string, unknown>> {
 }
 
 describe('NodeConfigSaveSchema: a kötelező szöveg mezők (SPEC-008 5.4, O-21)', () => {
-  it('a tizenhat mező mindegyike szerepel az esetek között', () => {
-    expect(REQUIRED_FIELD_CASES).toHaveLength(16);
+  it('a tizenöt mező mindegyike szerepel az esetek között', () => {
+    expect(REQUIRED_FIELD_CASES).toHaveLength(15);
   });
 
   for (const { field, path, build } of REQUIRED_FIELD_CASES) {
@@ -324,7 +315,7 @@ const SAVABLE_CONFIG_BY_VARIANT: readonly {
 }[] = [
   {
     variant: 'start',
-    config: { type: 'start', inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }] },
+    config: { type: 'start', inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }] },
   },
   { variant: 'agent_step', config: { ...VALID_AGENT_STEP_SETTINGS, type: 'agent_step' } },
   {

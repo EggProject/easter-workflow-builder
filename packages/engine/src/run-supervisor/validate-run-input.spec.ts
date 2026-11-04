@@ -9,7 +9,7 @@ function startConfig(fields: readonly { readonly name: string; readonly required
     inputFields: fields.map((field) => ({
       name: field.name,
       label: field.name,
-      valueKind: 'string',
+      valueKind: 'text',
       required: field.required,
     })),
     onUnhandledError: 'fail_run',

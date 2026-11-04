@@ -426,7 +426,7 @@ function edgeOf(
 function startNode(id: string, required: readonly string[] = []): WorkflowNodeInput {
   return nodeOf(id, {
     type: 'start',
-    inputFields: required.map((name) => ({ name, label: name, valueKind: 'string', required: true })),
+    inputFields: required.map((name) => ({ name, label: name, valueKind: 'text', required: true })),
     onUnhandledError: 'fail_run',
   });
 }

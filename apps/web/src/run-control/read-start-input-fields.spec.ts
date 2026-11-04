@@ -1,5 +1,5 @@
 /* eslint-disable unicorn/no-null -- a szintetikus drótszintű fixture-ök nullázható mezői a dróton ténylegesen `null` értéket hordoznak (SPEC-005 protokoll alak) */
-import type { WorkflowNodeInput } from '@easter-workflow-builder/protocol';
+import type { StartInputField, WorkflowNodeInput } from '@easter-workflow-builder/protocol';
 import { describe, expect, it } from 'vitest';
 import { readStartInputFields } from './read-start-input-fields.ts';
 
@@ -17,7 +17,7 @@ const BRANCH_NODE = node('n-branch', {
 
 describe('readStartInputFields', () => {
   it('a start csomópont inputFields listáját adja vissza', () => {
-    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }];
+    const fields: readonly StartInputField[] = [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }];
     const nodes = [BRANCH_NODE, node('n-start', { type: 'start', inputFields: fields, onUnhandledError: null })];
 
     expect(readStartInputFields(nodes)).toEqual(fields);

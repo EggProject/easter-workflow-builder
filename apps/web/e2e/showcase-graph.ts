@@ -37,7 +37,7 @@ import { makeRunEventRecord, replayFrames, sdkResultRecord } from './transcript-
 
 const START_CONFIG: NodeConfig = {
   type: 'start',
-  inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }],
+  inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }],
   onUnhandledError: null,
 };
 

@@ -7,8 +7,8 @@ import {
   REQUIRED_START_FIELD_MESSAGE,
 } from './start-run-values.ts';
 
-const REQUIRED_FIELD: StartInputField = { name: 'topic', label: 'Téma', valueKind: 'string', required: true };
-const OPTIONAL_FIELD: StartInputField = { name: 'note', label: 'Megjegyzés', valueKind: 'string', required: false };
+const REQUIRED_FIELD: StartInputField = { name: 'topic', label: 'Téma', valueKind: 'text', required: true };
+const OPTIONAL_FIELD: StartInputField = { name: 'note', label: 'Megjegyzés', valueKind: 'text', required: false };
 
 describe('buildInitialStartRunValues', () => {
   it('minden mezőt üres szöveggel nyit', () => {

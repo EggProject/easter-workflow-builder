@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StartRunModal } from './StartRunModal.tsx';
 import { REQUIRED_START_FIELD_MESSAGE } from './start-run-values.ts';
 
-const REQUIRED_FIELD: StartInputField = { name: 'topic', label: 'Téma', valueKind: 'string', required: true };
-const OPTIONAL_FIELD: StartInputField = { name: 'note', label: 'Megjegyzés', valueKind: 'string', required: false };
+const REQUIRED_FIELD: StartInputField = { name: 'topic', label: 'Téma', valueKind: 'text', required: true };
+const OPTIONAL_FIELD: StartInputField = { name: 'note', label: 'Megjegyzés', valueKind: 'text', required: false };
 
 function typeInto(input: HTMLInputElement, value: string): void {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');

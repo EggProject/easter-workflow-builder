@@ -1436,7 +1436,7 @@ describe('GraphEditorScreen', () => {
 
   it('NEM ÜRES inputFields lista esetén a modális nyílik meg, kérés nélkül', async () => {
     const log: StartRunLog = { postBodies: [] };
-    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }];
+    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }];
     await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, fields));
 
     act(() => {
@@ -1452,7 +1452,7 @@ describe('GraphEditorScreen', () => {
 
   it('a modális "Mégse" gombja bezárja a modálist, indítás nélkül', async () => {
     const log: StartRunLog = { postBodies: [] };
-    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }];
+    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }];
     await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, fields));
 
     act(() => {
@@ -1474,7 +1474,7 @@ describe('GraphEditorScreen', () => {
 
   it('a modális beküldése a start mezők értékeit küldi el, és a futás nézetre navigál', async () => {
     const log: StartRunLog = { postBodies: [] };
-    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }];
+    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }];
     await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, fields));
 
     act(() => {
@@ -1548,7 +1548,7 @@ describe('GraphEditorScreen', () => {
 
   it('modálissal indított futás hibája a modálisban látszik, a láblécben nem', async () => {
     const log: StartRunLog = { postBodies: [] };
-    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'string', required: false }];
+    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'text', required: false }];
     await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, fields, 500));
 
     act(() => {

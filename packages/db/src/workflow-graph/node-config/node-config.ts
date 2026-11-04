@@ -1,5 +1,6 @@
 import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
 import type { ScriptConfig } from './script-config.ts';
+import type { StartInputValueKind } from './start-input-value-kind.ts';
 
 /**
  * A `workflow_node.config` oszlop tartalma, node típusonként (SPEC-003 4.3
@@ -16,16 +17,27 @@ import type { ScriptConfig } from './script-config.ts';
 export type UnhandledErrorPolicy = 'fail_run' | 'fail_branch';
 
 /**
- * A `start` node egy bemeneti mezője. A `valueKind` értékkészletét a SPEC-003
- * nem sorolja fel, ezért itt szabad szöveg marad; a felsorolás rögzítése külön
- * termékdöntés.
+ * A `start` node egy bemeneti mezője (SPEC-016 5.1, 5.3): a `valueKind` szerinti
+ * diszkriminált unió. A `choice` ágon kötelező az `options` lista (nem üres,
+ * minden eleme nem üres szöveg, az elemek egyediek; az `isNodeConfig` guard
+ * ellenőrzi), a többi ágon a mező nem létezik.
  */
-export interface StartInputField {
+export interface StartPlainInputField {
   readonly name: string;
   readonly label: string;
-  readonly valueKind: string;
+  readonly valueKind: Exclude<StartInputValueKind, 'choice'>;
   readonly required: boolean;
 }
+
+export interface StartChoiceInputField {
+  readonly name: string;
+  readonly label: string;
+  readonly valueKind: 'choice';
+  readonly options: readonly string[];
+  readonly required: boolean;
+}
+
+export type StartInputField = StartPlainInputField | StartChoiceInputField;
 
 export interface StartNodeConfig {
   readonly type: 'start';

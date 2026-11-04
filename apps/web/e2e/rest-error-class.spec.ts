@@ -25,7 +25,7 @@ const START_WITHOUT_FIELDS: NodeConfig = { type: 'start', inputFields: [], onUnh
 
 const START_WITH_FIELDS: NodeConfig = {
   type: 'start',
-  inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }],
+  inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }],
   onUnhandledError: 'fail_run',
 };
 

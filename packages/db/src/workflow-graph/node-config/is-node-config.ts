@@ -21,14 +21,17 @@ import type {
   LoopNodeConfig,
   NodeConfig,
   ScriptNodeConfig,
+  StartChoiceInputField,
   StartInputField,
   StartNodeConfig,
+  StartPlainInputField,
   SubWorkflowNodeConfig,
   UnhandledErrorPolicy,
 } from './node-config.ts';
 import type { ScriptConfig } from './script-config.ts';
 import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
 import { isAgentStepConfig } from '../agent-step-config/is-agent-step-config.ts';
+import { isStartInputValueKind } from './is-start-input-value-kind.ts';
 import { isNodeType } from '../node-type/is-node-type.ts';
 
 type UnknownRecord = Readonly<Record<string, unknown>>;
@@ -43,10 +46,18 @@ const START_NODE_CONFIG_KEYS: Readonly<Record<keyof StartNodeConfig, true>> = {
   onUnhandledError: true,
 };
 
-const START_INPUT_FIELD_KEYS: Readonly<Record<keyof StartInputField, true>> = {
+const START_PLAIN_INPUT_FIELD_KEYS: Readonly<Record<keyof StartPlainInputField, true>> = {
   name: true,
   label: true,
   valueKind: true,
+  required: true,
+};
+
+const START_CHOICE_INPUT_FIELD_KEYS: Readonly<Record<keyof StartChoiceInputField, true>> = {
+  name: true,
+  label: true,
+  valueKind: true,
+  options: true,
   required: true,
 };
 
@@ -197,14 +208,45 @@ function isScriptConfig(value: unknown, knownKeys: Readonly<Record<keyof ScriptC
   return isRecordWithKnownKeys(value, knownKeys) && isString(value.source) && value.runtime === 'expression';
 }
 
-function isStartInputField(value: unknown): value is StartInputField {
+/**
+ * A `choice` opciói (SPEC-016 5.3): nem üres lista, minden elem nem üres
+ * (`trim()` után sem) szöveg, az elemek egyediek. Írás és olvasás úton egyaránt
+ * fut, mert a `valueKind` zárt felsorolása is minden úton szigorú (SPEC-016
+ * 5.2, O-2); a `protocol` mentési sémája szándékosan duplikálja.
+ */
+function isChoiceOptions(value: unknown): value is readonly string[] {
   return (
-    isRecordWithKnownKeys(value, START_INPUT_FIELD_KEYS) &&
-    isString(value.name) &&
-    isString(value.label) &&
-    isString(value.valueKind) &&
-    isBoolean(value.required)
+    isStringArray(value) &&
+    value.length > 0 &&
+    value.every((option) => option.trim() !== '') &&
+    new Set(value).size === value.length
   );
+}
+
+/**
+ * A két ág közös mezői: a `name`, a `label` és a `required`.
+ */
+function hasStartInputFieldBase(value: Readonly<Partial<Record<'name' | 'label' | 'required', unknown>>>): boolean {
+  return isString(value.name) && isString(value.label) && isBoolean(value.required);
+}
+
+/**
+ * A bemeneti mező a `valueKind` szerinti diszkriminált unió (SPEC-016 5.3): a
+ * `choice` ág zárt kulcslistája az `options` mezőt is tartalmazza, a többi ágé
+ * nem, tehát `options` egy másik ágon ismeretlen kulcsként bukik.
+ */
+function isStartInputField(value: unknown): value is StartInputField {
+  if (!isRecord(value) || !isStartInputValueKind(value['valueKind'])) {
+    return false;
+  }
+  if (value['valueKind'] === 'choice') {
+    return (
+      isRecordWithKnownKeys(value, START_CHOICE_INPUT_FIELD_KEYS) &&
+      hasStartInputFieldBase(value) &&
+      isChoiceOptions(value.options)
+    );
+  }
+  return isRecordWithKnownKeys(value, START_PLAIN_INPUT_FIELD_KEYS) && hasStartInputFieldBase(value);
 }
 
 function isStartConfig(value: UnknownRecord): boolean {

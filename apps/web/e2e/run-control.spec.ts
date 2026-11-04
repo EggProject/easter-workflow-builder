@@ -37,8 +37,8 @@ const START_WITHOUT_FIELDS: NodeConfig = { type: 'start', inputFields: [], onUnh
 const START_WITH_FIELDS: NodeConfig = {
   type: 'start',
   inputFields: [
-    { name: 'topic', label: 'Téma', valueKind: 'string', required: true },
-    { name: 'note', label: 'Megjegyzés', valueKind: 'string', required: false },
+    { name: 'topic', label: 'Téma', valueKind: 'text', required: true },
+    { name: 'note', label: 'Megjegyzés', valueKind: 'text', required: false },
   ],
   onUnhandledError: null,
 };

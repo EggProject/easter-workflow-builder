@@ -106,7 +106,7 @@ const VALID_AGENT_STEP_SETTINGS = {
 const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
   {
     type: 'start',
-    inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }],
+    inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }],
     onUnhandledError: null,
   },
   { ...VALID_AGENT_STEP_SETTINGS, type: 'agent_step', onUnhandledError: 'fail_run' },
@@ -190,7 +190,7 @@ describe('a protokoll és a db kötelező szöveg mező táblája kétirányban 
 const BASE_CONFIG_BY_VARIANT: Readonly<Record<string, unknown>> = {
   start: {
     type: 'start',
-    inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }],
+    inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }],
     onUnhandledError: 'fail_run',
   },
   agent_step: { ...VALID_AGENT_STEP_SETTINGS, type: 'agent_step', onUnhandledError: 'fail_run' },
@@ -297,8 +297,8 @@ function replaceWithConfig(database: DatabaseContext, workflowId: string, candid
 }
 
 describe('a kötelező szöveg mezők mezőnként a protokoll mentési sémáján és a db replaceGraph hívásán is ugyanúgy döntenek', () => {
-  it('a tábla mind a tizenhat mezőt felsorolja', () => {
-    expect(REQUIRED_FIELD_CASES).toHaveLength(16);
+  it('a tábla mind a tizenöt mezőt felsorolja', () => {
+    expect(REQUIRED_FIELD_CASES).toHaveLength(15);
   });
 
   for (const { variant, path } of REQUIRED_FIELD_CASES) {
@@ -516,7 +516,7 @@ const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
     label: 'start bemeneti mező required nélkül',
     config: {
       type: 'start',
-      inputFields: [{ name: 'a', label: 'b', valueKind: 'string' }],
+      inputFields: [{ name: 'a', label: 'b', valueKind: 'text' }],
       onUnhandledError: 'fail_run',
     },
     accepted: false,
@@ -602,7 +602,7 @@ const UNKNOWN_KEY_CASES: readonly { readonly label: string; readonly config: unk
     label: 'start bemeneti mezője',
     config: {
       type: 'start',
-      inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true, [UNKNOWN_KEY]: true }],
+      inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true, [UNKNOWN_KEY]: true }],
       onUnhandledError: 'fail_run',
     },
   },
