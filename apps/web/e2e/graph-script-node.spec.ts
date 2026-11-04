@@ -162,6 +162,21 @@ test('a runtime választó CEL kifejezésen áll és három JavaScript mező nin
   await expect(memory).toHaveAttribute('placeholder', 'Üresen a rendszermemória, legfeljebb 2048 MB');
 });
 
+test('a már kiválasztott JavaScript runtime újraválasztása nem törli a kitöltött JavaScript mezőket', async ({
+  page,
+}) => {
+  const panel = await openScriptPanel(page, []);
+  await switchToJavaScript(page, panel);
+  const timeout = panel.getByLabel('Időkorlát (másodperc)');
+  await timeout.fill('5');
+  await expect(timeout).toHaveValue('5');
+
+  const runtime = panel.getByRole('combobox', { name: 'Futásidő (runtime)' });
+  await chooseSelectOption(page, runtime, 'JavaScript');
+  await expectSelectedLabel(runtime, 'JavaScript');
+  await expect(timeout).toHaveValue('5');
+});
+
 test('az időkorlát másodpercben beírva ezredmásodpercként kerül a mentés PUT törzsébe, a munkakönyvtár és a memória korláttal együtt; a CEL-re visszaváltás eldobja a JavaScript mezőket', async ({
   page,
 }) => {
