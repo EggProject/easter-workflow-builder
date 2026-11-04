@@ -53,30 +53,29 @@ function sessionFields(
 }
 
 /**
- * A skill mezők (SPEC-009 5.1, 5.3): a `skills: null` lépésen a `skills`
- * opció nem megy ki (O-40 (a)), és a `plugins` is csak akkor, ha egy agent
- * definíció hivatkozik skillre, mert az al-agent a skillt csak a lépés szintű
- * `plugins` úton éri el (M-147 A3). Nem `null` lépésen a `plugins` a skill
- * könyvtár gyökerére mutat, a `skills` pedig `<plugin>:<név>` alakú lista
- * (`qualifySkillNames`; research `2026-10-28-spec-009-blokkolo-meresek.md` 2.
- * és 5. szekció).
+ * A skill mezők (SPEC-009 5.1, 5.3, O-47): a `skills: null` lépésen sem a
+ * `skills`, sem a `plugins` opció nem megy ki (O-40 (a)), tehát a feltöltött
+ * skillek a fő szálnak és az al-agentnek sem érhetők el; az agent definíció
+ * skill hivatkozása `null` lépés mellett a futás indításakor
+ * `agent_skill_not_in_step` (`resolveOutgoingAgents`). Nem `null` lépésen a
+ * `plugins` a skill könyvtár gyökerére mutat, a `skills` pedig `<plugin>:<név>`
+ * alakú lista (`qualifySkillNames`; research
+ * `2026-10-28-spec-009-blokkolo-meresek.md` 2. és 5. szekció); a gyökeret a
+ * szerver a kimenő lista másolatára szűkíti (`sdk-query-hardening`, M-150).
  */
 function skillFields(
   skills: AgentStepConfig['skills'],
   library: SkillLibrarySnapshot,
-  hasAgentSkillReferences: boolean,
 ):
   | Record<string, never>
-  | { readonly plugins: NonNullable<AgentStepOptions['plugins']> }
   | {
       readonly plugins: NonNullable<AgentStepOptions['plugins']>;
       readonly skills: NonNullable<AgentStepOptions['skills']>;
     } {
-  const plugins = [{ type: 'local', path: library.rootDirectory }] as const;
   if (skills === null) {
-    return hasAgentSkillReferences ? { plugins } : {};
+    return {};
   }
-  return { plugins, skills: qualifySkillNames(skills, library) };
+  return { plugins: [{ type: 'local', path: library.rootDirectory }], skills: qualifySkillNames(skills, library) };
 }
 
 /**
@@ -179,7 +178,7 @@ export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentS
     ...(config.maxTurns !== null && { maxTurns: config.maxTurns }),
     ...(config.maxBudgetUsd !== null && { maxBudgetUsd: config.maxBudgetUsd }),
     ...(config.systemPrompt !== null && { systemPrompt: config.systemPrompt }),
-    ...skillFields(config.skills, input.skillLibrary, input.agents.hasSkillReferences),
+    ...skillFields(config.skills, input.skillLibrary),
     ...(Object.keys(input.mcpServers).length > 0 && { mcpServers: input.mcpServers }),
     ...(config.cwd !== null && { cwd: config.cwd }),
     ...(config.sandbox !== null && { sandbox: config.sandbox }),

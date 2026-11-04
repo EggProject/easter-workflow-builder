@@ -75,6 +75,14 @@ describe('protocolErrorClassMessage', () => {
     ['skill_archive_entry_size_mismatch', 'A csomag egyik bejegyzése sérült.'],
     ['skill_archive_entry_encrypted', 'A csomag titkosított bejegyzést tartalmaz.'],
     ['skill_archive_compression_unsupported', 'A csomag nem támogatott tömörítést használ.'],
+    [
+      'agent_skill_not_in_step',
+      'Egy agent definíció olyan skillre hivatkozik, ami nincs a lépés kiválasztott skilljei között.',
+    ],
+    [
+      'agent_mcp_server_override_conflict',
+      'Egy agent definíció olyan MCP szervert ír felül, amit a lépés is használ, ezért a felülírás nem érvényesülne.',
+    ],
     ['skill_archive_path_too_long', 'A csomag egyik bejegyzésének neve vagy útvonala túl hosszú.'],
   ];
 

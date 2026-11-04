@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { EngineErrorKind } from './engine-error-kind.ts';
 import { formatEngineErrorMessage } from './format-engine-error-message.ts';
 
-// Az `engine-error-kind.ts` mind a ötven értéke, ugyanabban a
+// Az `engine-error-kind.ts` mind az ötvenhárom értéke, ugyanabban a
 // sorrendben. Az `EngineErrorKind[]` annotáció fordítási idejű állítás is: ha
 // az unió bővül vagy szűkül, ez a lista nem maradhat érintetlenül.
 const allEngineErrorKinds: readonly EngineErrorKind[] = [
@@ -51,6 +51,8 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
   'skill_not_found',
   'mcp_server_not_found',
   'mcp_server_connection_failed',
+  'agent_skill_not_in_step',
+  'agent_mcp_server_override_conflict',
   'missing_mcp_server_env',
   'unknown_concurrency_slot',
   'run_execution_failed',
@@ -60,7 +62,7 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
 ];
 
 describe('formatEngineErrorMessage', () => {
-  it('mind a ötven hibaosztályra a "detail (kind)." alakot adja', () => {
+  it('mind az ötvenhárom hibaosztályra a "detail (kind)." alakot adja', () => {
     for (const kind of allEngineErrorKinds) {
       expect(formatEngineErrorMessage(kind, 'A lépés nem futtatható')).toBe(`A lépés nem futtatható (${kind}).`);
     }

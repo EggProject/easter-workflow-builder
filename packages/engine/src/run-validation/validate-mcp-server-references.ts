@@ -15,9 +15,11 @@ import type { ExecutableNodeConfig } from './executable-node-config.ts';
  * `missing_mcp_server_env`, O-18); az érvénytelen alakú agent definíció
  * `malformed_node_config` (`resolveOutgoingAgents`). Ugyanazt a feloldást
  * futtatja, mint a lépés (`runAgentStep`), és az eredményt eldobja: az
- * értékek csak a kimenő `Options`-ba kerülhetnek. A `skillLibrary` csak az
- * agent definíciók `skills` minősítéséhez kell, amit ez az ellenőrzés szintén
- * eldob.
+ * értékek csak a kimenő `Options`-ba kerülhetnek. Ugyanez a feloldás utasítja
+ * el a lépés kiválasztott skilljein kívüli agent definíció skillt
+ * (`agent_skill_not_in_step`, O-47) és a lépés szerverével azonos nevű agent
+ * MCP felülírást (`agent_mcp_server_override_conflict`, O-48); a
+ * `skillLibrary` ehhez (az `'all'` kifejtése) és a minősítéshez kell.
  *
  * A SPEC-004 4.8 3. lépésében fut, a `validateSkillReferences` után, tehát
  * egyetlen adatbázis sort sem ír; az első hibánál megáll.
@@ -42,7 +44,7 @@ export function validateMcpServerReferences(
     if (resolved.kind === 'error') {
       return { kind: 'error', message: resolved.message };
     }
-    const agents = resolveOutgoingAgents(nodeId, agentStep.agents, skillLibrary, definitions, processEnvironment);
+    const agents = resolveOutgoingAgents(nodeId, agentStep, skillLibrary, definitions, processEnvironment);
     if (agents.kind === 'error') {
       return { kind: 'error', message: agents.message };
     }

@@ -1,7 +1,17 @@
 /* eslint-disable unicorn/no-null -- az SDK `extraArgs` mezőjében a `null` az érték nélküli kapcsoló (`sdk.d.ts` `extraArgs`) */
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { SdkQueryFunction, SdkQueryHandle } from '@easter-workflow-builder/agent';
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
 import { createHardenedSdkQuery } from './create-hardened-sdk-query.ts';
@@ -107,5 +117,107 @@ describe('createHardenedSdkQuery', () => {
     ).toThrow('indulási hiba');
     expect(seenPath).not.toBe('');
     expect(existsSync(path.dirname(seenPath))).toBe(false);
+  });
+});
+
+describe('createHardenedSdkQuery: a plugins gyökér a lépés kiválasztott skilljeinek másolata (SPEC-009 O-47, M-150)', () => {
+  const created: string[] = [];
+  afterEach(() => {
+    for (const directory of created.splice(0)) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  function library(names: readonly string[]): string {
+    const root = path.join(mkdtempSync(path.join(tmpdir(), 'skill-konyvtar-')), 'skills');
+    created.push(path.dirname(root));
+    for (const name of names) {
+      mkdirSync(path.join(root, 'skills', name, 'reszek'), { recursive: true });
+      writeFileSync(path.join(root, 'skills', name, 'SKILL.md'), `---\ndescription: ${name}\n---\n`);
+      writeFileSync(path.join(root, 'skills', name, 'reszek', 'a.md'), name);
+    }
+    return root;
+  }
+
+  function pluginPathOf(options: Readonly<Record<string, unknown>> | undefined): string {
+    const plugins = options?.['plugins'];
+    const first: unknown = Array.isArray(plugins) ? plugins[0] : undefined;
+    return isRecord(first) && isString(first['path']) ? first['path'] : '';
+  }
+
+  it('csak a kiválasztott skillek kerülnek a gyökérbe, azonos plugin névvel, a folyam végén törlődik', async () => {
+    const root = library(['alfa', 'beta']);
+    let stagedSkills: readonly string[] = [];
+    let stagedBody = '';
+    const captured: Captured[] = [];
+    const inner = fakeQuery(['a'], captured);
+    const handle = createHardenedSdkQuery((request) => {
+      const staged = pluginPathOf(request.options);
+      stagedSkills = readdirSync(path.join(staged, 'skills'));
+      stagedBody = readFileSync(path.join(staged, 'skills', 'beta', 'reszek', 'a.md'), 'utf8');
+      return inner(request);
+    })({ prompt: 'p', options: { plugins: [{ type: 'local', path: root }], skills: ['skills:beta'] } });
+
+    const staged = pluginPathOf(captured[0]?.options);
+    expect(path.basename(staged)).toBe('skills');
+    expect(staged).not.toBe(root);
+    expect(stagedSkills).toStrictEqual(['beta']);
+    expect(stagedBody).toBe('beta');
+    expect(captured[0]?.options['skills']).toStrictEqual(['skills:beta']);
+    expect(captured[0]?.configPath).toBeUndefined();
+
+    expect(await drain(handle)).toStrictEqual(['a']);
+    expect(existsSync(staged)).toBe(false);
+    expect(readdirSync(path.join(root, 'skills')).toSorted()).toStrictEqual(['alfa', 'beta']);
+  });
+
+  it('az üres skills lista üres skills mappájú gyökeret ad (M-150 C3)', () => {
+    const root = library(['alfa']);
+    let stagedSkills: readonly string[] = ['x'];
+    createHardenedSdkQuery(({ options }) => {
+      stagedSkills = readdirSync(path.join(pluginPathOf(options), 'skills'));
+      return fakeQuery([], [])({ prompt: 'p', options });
+    })({ prompt: 'p', options: { plugins: [{ type: 'local', path: root }], skills: [] } });
+
+    expect(stagedSkills).toStrictEqual([]);
+  });
+
+  it('a skill gyökér és az MCP config ugyanabban az ideiglenes könyvtárban áll', () => {
+    const root = library(['alfa']);
+    const captured: Captured[] = [];
+    createHardenedSdkQuery(fakeQuery([], captured))({
+      prompt: 'p',
+      options: { plugins: [{ type: 'local', path: root }], skills: ['skills:alfa'], mcpServers: { docs: HTTP_SERVER } },
+    });
+
+    expect(path.dirname(pluginPathOf(captured[0]?.options))).toBe(path.dirname(captured[0]?.configPath ?? ''));
+  });
+
+  it('a hiányzó skill mappa másolási hibája a könyvtárat törli és továbbmegy, a query() nem fut', () => {
+    const root = library([]);
+    // A teszt saját, üres szülő könyvtárban ellenőrzi, hogy az ideiglenes könyvtár nem marad meg; hogy
+    // az `os.tmpdir()` a futás közben átírt `TMPDIR` változót követi, az első állítás igazolja.
+    const parent = mkdtempSync(path.join(tmpdir(), 'hardened-tmp-'));
+    created.push(parent);
+    const previous = process.env['TMPDIR'];
+    process.env['TMPDIR'] = parent;
+    let called = false;
+    try {
+      expect(tmpdir()).toBe(parent);
+      expect(() =>
+        createHardenedSdkQuery(() => {
+          called = true;
+          return fakeQuery([], [])({ prompt: 'p', options: {} });
+        })({ prompt: 'p', options: { plugins: [{ type: 'local', path: root }], skills: ['skills:nincs'] } }),
+      ).toThrow(/ENOENT/u);
+    } finally {
+      if (previous === undefined) {
+        delete process.env['TMPDIR'];
+      } else {
+        process.env['TMPDIR'] = previous;
+      }
+    }
+    expect(called).toBe(false);
+    expect(readdirSync(parent)).toStrictEqual([]);
   });
 });

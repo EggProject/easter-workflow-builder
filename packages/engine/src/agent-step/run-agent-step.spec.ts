@@ -761,7 +761,7 @@ describe('runAgentStep', () => {
     database.close();
   });
 
-  it('az agent definíciók skill és MCP hivatkozásai a kimenő agents mezőben oldódnak fel, a plugins a lépés null skills mezője mellett is kimegy (M-147)', async () => {
+  it('az agent definíciók skill és MCP hivatkozásai a kimenő agents mezőben oldódnak fel, a lépés kiválasztott skilljével (M-147, O-47)', async () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRun(database);
     okOrThrow(
@@ -785,6 +785,7 @@ describe('runAgentStep', () => {
       },
     });
     const config = agentStepConfig({
+      skills: ['alfa'],
       agents: {
         segito: {
           description: 'Segítő',
@@ -817,7 +818,7 @@ describe('runAgentStep', () => {
       },
     });
     expect(captured.request?.options['plugins']).toStrictEqual([{ type: 'local', path: '/skill-konyvtar' }]);
-    expect(Object.hasOwn(captured.request?.options ?? {}, 'skills')).toBe(false);
+    expect(captured.request?.options['skills']).toStrictEqual(['skill-konyvtar:alfa']);
     const events = okOrThrow(database.events.readEventsForStep(stepRunId, 100));
     expect(JSON.stringify(events)).not.toContain('agent-titok');
 
@@ -840,6 +841,39 @@ describe('runAgentStep', () => {
     expect(failure).toStrictEqual({
       kind: 'malformed_node_config',
       message: 'A(z) a csomópont "segito" agent definíciója érvénytelen alakú (malformed_node_config).',
+    });
+    expect(captured.request).toBeUndefined();
+
+    database.close();
+  });
+
+  it('a null skills lépésen az agent definíció skillje agent_skill_not_in_step, futtatás nélkül (O-47)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const captured = newCapture();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+      skillLibrary: {
+        readSkillLibrary: () => ({
+          rootDirectory: '/skill-konyvtar',
+          pluginName: 'skill-konyvtar',
+          skillNames: ['alfa'],
+        }),
+      },
+    });
+    const config = agentStepConfig({
+      skills: null,
+      agents: { segito: { description: 'Segítő', prompt: 'Segíts.', skills: ['alfa'] } },
+    });
+
+    const request = requestOf({ runId, stepRunId, config });
+    const failure = failedOutcomeOf(okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry)));
+
+    expect(failure).toStrictEqual({
+      kind: 'agent_skill_not_in_step',
+      message:
+        'A(z) a csomópont "segito" agent definíciója a(z) "alfa" skillre hivatkozik, ami nincs a lépés kiválasztott skilljei között (agent_skill_not_in_step).',
     });
     expect(captured.request).toBeUndefined();
 

@@ -79,6 +79,8 @@ const ENGINE_VALIDATION_ERROR_CLASSES = [
   // O-46: a lépés futása közben keletkezik, a futás eseményein megy ki; a szótár
   // tagjaként a motor többi osztályával azonos kódra képződik.
   'mcp_server_connection_failed',
+  'agent_skill_not_in_step',
+  'agent_mcp_server_override_conflict',
 ] satisfies readonly EngineErrorKind[];
 
 /**

@@ -61,6 +61,11 @@ export const ProtocolErrorClassSchema = z.enum([
   // SPEC-009 6.4 (O-46, user döntés 2026-10-28): egy hivatkozott MCP szerver
   // nem csatlakozott, a lépés megnevezett hibával áll meg
   'mcp_server_connection_failed',
+  // SPEC-009 O-47 és O-48 (2026-11-04): az agent definíció a lépés kiválasztott
+  // skilljein kívüli skillre hivatkozik, illetve a lépés szerverével azonos
+  // nevű MCP felülírást ad; a futás indítása megnevezett hibával utasítja el
+  'agent_skill_not_in_step',
+  'agent_mcp_server_override_conflict',
   // SPEC-005 4.2 18. végpont: a jóváhagyás már el van döntve
   'already_decided',
   // SPEC-009 5.4: a skill feltöltés elutasítási okai (O-41)

@@ -46,7 +46,7 @@ function decisions(overrides: Partial<AgentStepCapabilityDecisions> = {}): Agent
 
 const isolated: SessionBinding = { mode: 'isolated' };
 
-const NO_AGENTS: OutgoingAgents = { definitions: {}, hasSkillReferences: false };
+const NO_AGENTS: OutgoingAgents = { definitions: {} };
 
 const LIBRARY: SkillLibrarySnapshot = {
   rootDirectory: '/var/skillek',
@@ -163,7 +163,7 @@ describe('buildAgentStepOptions', () => {
       environmentBlock: {},
       mcpServers: {},
       // Az `agents` a `resolveOutgoingAgents` kész kimenete, a config rekordja nem bemenet.
-      agents: { definitions: { elemzo: {} }, hasSkillReferences: false },
+      agents: { definitions: { elemzo: {} } },
       sessionBinding: isolated,
       skillLibrary: LIBRARY,
       builtinSkillsEnabled: true,
@@ -310,20 +310,20 @@ describe('buildAgentStepOptions', () => {
       expect(options.skills).toStrictEqual([]);
     });
 
-    it('null skills mellett a plugins kimegy, ha egy agent definíció skillre hivatkozik, a skills mező nem (M-147 A3)', () => {
-      const definitions = { segito: { description: 'd', prompt: 'p', skills: ['skillek:alfa'] } };
+    it('null skills mellett sem a plugins, sem a skills nem megy ki, agent definíció mellett sem (O-47)', () => {
+      const definitions = { segito: { description: 'd', prompt: 'p' } };
       const options = buildAgentStepOptions({
         config: agentStepConfig({ skills: null }),
         decisions: decisions(),
         environmentBlock: {},
         mcpServers: {},
-        agents: { definitions, hasSkillReferences: true },
+        agents: { definitions },
         sessionBinding: isolated,
         skillLibrary: LIBRARY,
         builtinSkillsEnabled: true,
       });
 
-      expect(options.plugins).toStrictEqual([{ type: 'local', path: '/var/skillek' }]);
+      expect(Object.hasOwn(options, 'plugins')).toBe(false);
       expect(Object.hasOwn(options, 'skills')).toBe(false);
       expect(options.agents).toBe(definitions);
     });

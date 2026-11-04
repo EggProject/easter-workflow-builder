@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { EngineErrorKind } from './engine-error-kind.ts';
 import { isEngineErrorKind } from './is-engine-error-kind.ts';
 
-// Az `engine-error-kind.ts` mind az ötvenegy értéke, ugyanabban a
+// Az `engine-error-kind.ts` mind az ötvenhárom értéke, ugyanabban a
 // sorrendben. Az `EngineErrorKind[]` annotáció fordítási idejű állítás is: ha
 // az unió bővül vagy szűkül, ez a lista nem maradhat érintetlenül.
 const allEngineErrorKinds: readonly EngineErrorKind[] = [
@@ -51,6 +51,8 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
   'skill_not_found',
   'mcp_server_not_found',
   'mcp_server_connection_failed',
+  'agent_skill_not_in_step',
+  'agent_mcp_server_override_conflict',
   'missing_mcp_server_env',
   'unknown_concurrency_slot',
   'run_execution_failed',
@@ -60,9 +62,9 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
 ];
 
 describe('isEngineErrorKind', () => {
-  it('mind az ötvenegy ágra igazat ad', () => {
+  it('mind az ötvenhárom ágra igazat ad', () => {
     expect(allEngineErrorKinds.every((kind) => isEngineErrorKind(kind))).toBe(true);
-    expect(allEngineErrorKinds).toHaveLength(51);
+    expect(allEngineErrorKinds).toHaveLength(53);
   });
 
   it('hamisat ad ismeretlen szövegre', () => {

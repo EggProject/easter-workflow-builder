@@ -160,4 +160,30 @@ describe('validateMcpServerReferences', () => {
       });
     });
   });
+
+  it('a lépés szerverével azonos nevű agent felülírás a futás indításakor agent_mcp_server_override_conflict (O-48)', () => {
+    const agents = { segito: { description: 'd', prompt: 'p', mcpServerReferences: { docs: NO_OVERRIDE } } };
+    const configs = new Map<string, ExecutableNodeConfig>([
+      ['a', { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig({ docs: NO_OVERRIDE }, agents) }],
+    ]);
+
+    expect(validateMcpServerReferences(configs, [DOCS], environmentOf({ DOCS_AUTH: 'x' }), LIBRARY)).toStrictEqual({
+      kind: 'error',
+      message:
+        'A(z) a csomópont "segito" agent definíciója a(z) "docs" MCP szervert felülírja, de a lépés is ezt a szervert hivatkozza (agent_mcp_server_override_conflict).',
+    });
+  });
+
+  it('a null skills lépésen az agent definíció skillje a futás indításakor agent_skill_not_in_step (O-47)', () => {
+    const agents = { segito: { description: 'd', prompt: 'p', skills: ['alfa'] } };
+    const configs = new Map<string, ExecutableNodeConfig>([
+      ['a', { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig(undefined, agents) }],
+    ]);
+
+    expect(validateMcpServerReferences(configs, [], environmentOf({}), LIBRARY)).toStrictEqual({
+      kind: 'error',
+      message:
+        'A(z) a csomópont "segito" agent definíciója a(z) "alfa" skillre hivatkozik, ami nincs a lépés kiválasztott skilljei között (agent_skill_not_in_step).',
+    });
+  });
 });

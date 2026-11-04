@@ -17,9 +17,24 @@ export type OutgoingAgentsResolution =
   | { readonly kind: 'ok'; readonly value: OutgoingAgents }
   | {
       readonly kind: 'error';
-      readonly errorKind: 'malformed_node_config' | Extract<McpServerResolution, { kind: 'error' }>['errorKind'];
+      readonly errorKind:
+        | 'malformed_node_config'
+        | 'agent_skill_not_in_step'
+        | 'agent_mcp_server_override_conflict'
+        | Extract<McpServerResolution, { kind: 'error' }>['errorKind'];
       readonly message: string;
     };
+
+/**
+ * Egy tárolt `skills` mező puszta nevei: a `null` üres, az `'all'` a skill
+ * könyvtár aktuális nevei (a `qualifySkillNames` szabálya, minősítés nélkül).
+ */
+function skillNames(skills: AgentStepConfig['skills'], library: SkillLibrarySnapshot): readonly string[] {
+  if (skills === null) {
+    return [];
+  }
+  return skills === 'all' ? library.skillNames : skills;
+}
 
 /**
  * A lépés `agents` rekordjának kimenő alakja (SPEC-009 5.2, 6.2, M-147,
@@ -40,20 +55,29 @@ export type OutgoingAgentsResolution =
  * - a `memory` mező nem megy ki (O-53), minden más mező változatlan, a
  *   `mcpServerReferences` kulcs nem megy ki.
  *
+ * A definíció csak a lépés kiválasztott skilljei közül kaphat (SPEC-009 O-47, koordinátor döntés
+ * 2026-11-04 a user "Mód + jelölő lista" és "Nem, izolált futás" döntéséből): a lépés `skills`
+ * mezőjén kívüli név (a `null` lépésen bármely név) `agent_skill_not_in_step`, mert az al-agent a
+ * `plugins` gyökér minden skilljét látja (M-147 A4, A5), és a gyökér ezért a lépés listájára szűkül
+ * (az `apps/server` `sdk-query-hardening` témája; M-150). A lépés által is hivatkozott szerver nevű
+ * MCP felülírás `agent_mcp_server_override_conflict` (O-48, user döntés 2026-11-04), mert azonos
+ * névnél a lépés konfigurációja szolgálná ki a hívást (M-147 B6).
+ *
  * Érvénytelen alakú definícióra (`parseAgentDefinition`) `malformed_node_config`,
  * a csomópont és az agent nevével. A futás indítása (`validateMcpServerReferences`)
  * és a lépés (`runAgentStep`) ugyanezt futtatja.
  */
 export function resolveOutgoingAgents(
   nodeId: string,
-  agents: AgentStepConfig['agents'],
+  config: AgentStepConfig,
   library: SkillLibrarySnapshot,
   definitions: readonly McpServerDefinitionRecord[],
   processEnvironment: ProcessEnvironmentPort,
 ): OutgoingAgentsResolution {
   const outgoing: (readonly [string, Readonly<Record<string, unknown>>])[] = [];
-  let hasSkillReferences = false;
-  for (const [agentName, value] of Object.entries(agents)) {
+  const stepSkills = new Set(skillNames(config.skills, library));
+  const stepServerNames = new Set(Object.keys(config.mcpServerReferences ?? {}));
+  for (const [agentName, value] of Object.entries(config.agents)) {
     const subject = `A(z) ${nodeId} csomópont "${agentName}" agent definíciója`;
     const parsed = parseAgentDefinition(value);
     if (parsed === undefined) {
@@ -61,6 +85,28 @@ export function resolveOutgoingAgents(
         kind: 'error',
         errorKind: 'malformed_node_config',
         message: formatEngineErrorMessage('malformed_node_config', `${subject} érvénytelen alakú`),
+      };
+    }
+    const outsideSkill = skillNames(parsed.skills, library).find((name) => !stepSkills.has(name));
+    if (outsideSkill !== undefined) {
+      return {
+        kind: 'error',
+        errorKind: 'agent_skill_not_in_step',
+        message: formatEngineErrorMessage(
+          'agent_skill_not_in_step',
+          `${subject} a(z) "${outsideSkill}" skillre hivatkozik, ami nincs a lépés kiválasztott skilljei között`,
+        ),
+      };
+    }
+    const conflictingServer = Object.keys(parsed.mcpServerReferences ?? {}).find((name) => stepServerNames.has(name));
+    if (conflictingServer !== undefined) {
+      return {
+        kind: 'error',
+        errorKind: 'agent_mcp_server_override_conflict',
+        message: formatEngineErrorMessage(
+          'agent_mcp_server_override_conflict',
+          `${subject} a(z) "${conflictingServer}" MCP szervert felülírja, de a lépés is ezt a szervert hivatkozza`,
+        ),
       };
     }
     const servers = resolveMcpServers(subject, parsed.mcpServerReferences, definitions, processEnvironment);
@@ -78,7 +124,6 @@ export function resolveOutgoingAgents(
     const legacyValue = parsed.rest['mcpServers'];
     const legacyNames: readonly unknown[] = Array.isArray(legacyValue) ? legacyValue.filter(isString) : [];
     const outgoingServers = [...legacyNames, ...serverEntries];
-    hasSkillReferences ||= parsed.skills !== null;
     outgoing.push([
       agentName,
       {
@@ -88,5 +133,5 @@ export function resolveOutgoingAgents(
       },
     ]);
   }
-  return { kind: 'ok', value: { definitions: Object.fromEntries(outgoing), hasSkillReferences } };
+  return { kind: 'ok', value: { definitions: Object.fromEntries(outgoing) } };
 }

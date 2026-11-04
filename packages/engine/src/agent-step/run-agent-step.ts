@@ -303,7 +303,7 @@ export async function runAgentStep(
   const skillLibrary = dependencies.skillLibrary.readSkillLibrary();
   const agents = resolveOutgoingAgents(
     request.instance.nodeId,
-    request.config.agents,
+    request.config,
     skillLibrary,
     mcpServerDefinitions.value,
     dependencies.processEnvironment,

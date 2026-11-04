@@ -46,6 +46,10 @@ const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>
   skill_not_found: 'Egy lépés olyan skillre hivatkozik, ami nincs a skill könyvtárban.',
   mcp_server_not_found: 'Egy lépés olyan MCP szerverre hivatkozik, ami nincs a Beállítások MCP szerver listájában.',
   mcp_server_connection_failed: 'Egy lépés MCP szervere nem csatlakozott, ezért a lépés leállt.',
+  agent_skill_not_in_step:
+    'Egy agent definíció olyan skillre hivatkozik, ami nincs a lépés kiválasztott skilljei között.',
+  agent_mcp_server_override_conflict:
+    'Egy agent definíció olyan MCP szervert ír felül, amit a lépés is használ, ezért a felülírás nem érvényesülne.',
   missing_mcp_server_env: 'Egy lépés MCP szerveréhez rendelt szerver oldali env változó nincs beállítva.',
   already_decided: 'Ezt a jóváhagyást már eldöntötték.',
   // SPEC-009 5.4 tábla: a skill feltöltés elutasítási okai (O-41, user döntés 2026-10-28).
