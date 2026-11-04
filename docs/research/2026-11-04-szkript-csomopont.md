@@ -399,3 +399,67 @@ került be), és a T-015-2 próbáihoz telepített `quickjs-emscripten-core` 0.3
 - A `run` eredménye nem kivétel, hanem háromágú unió: `succeeded` (JSON kimenet), `failed` (a három futásidejű osztály
   egyike), `aborted` (a motor külső jele, SPEC-014 5.8: a lépés `cancelled` állapotban zár). A `null` alapértékeket
   (`timeoutMs`, `cwd`, `memoryLimitMb`) a futtató oldja fel, mert a rendszermemória (`os.totalmem()`) csak ott ismert.
+
+## 8. T-015-6: a JavaScript futtató az `apps/server` oldalon
+
+Lépés: PLAN-015 T-015-6 (2026-11-04), a `9410629` fejen. Helye: `apps/server/src/script-runner/`. A futtató a motor
+`ScriptRunnerPort` típusát `satisfies`-szal teljesíti (`quickjs-script-runner.ts`), az `engine-assembly` bekötése a
+T-015-5. Forrás: a telepített `quickjs-emscripten-core` 0.32.0 `dist/index.d.ts` (a sorszámok onnan) és a
+`dist/chunk-V2S4ZYJR.mjs` (minifikált, a függvény nevével hivatkozva), a `@jitl/quickjs-wasmfile-release-sync` 0.32.0
+`dist/emscripten-module.mjs`, és a unit tesztek valódi QuickJS-sel.
+
+### 8.1 Döntések
+
+1. **Függőség.** `quickjs-emscripten-core` és `@jitl/quickjs-wasmfile-release-sync`, pontosan `0.32.0`, az
+   `apps/server` `dependencies` mezőjében (a két forrás a toolchain research táblájában már áll, 3. szekció).
+2. **Friss modul minden híváshoz**, a fordításhoz is (`load-quickjs-module.ts`): `new WebAssembly.Memory({ initial:
+256, maximum: memoryLimitMb * 16 })`, a `null` korlát `Math.min(Math.floor(os.totalmem() / 2 ** 20), 2048)` (6.
+   szekció, Q-5, Q-9). A fordítás a `null` alapértéket kapja. `setMemoryLimit` nincs (Q-4).
+3. **A futás kontextus átadása.** A gazda a hét név objektumát `JSON.stringify`-jal szöveggé alakítja; az `undefined`
+   értékű nevet a `JSON.stringify` kihagyja, tehát a hiányzó név a sandboxban nem létezik (`typeof` `undefined`, és
+   `"item" in globalThis` hamis). A sandbox egy előkészítő függvénye (`PRELUDE_SOURCE`) a szöveget `JSON.parse`-szal
+   értelmezi és a neveket a globális objektumra teszi; a `JSON` és az `Object.keys` a szkript előtt rögzül, és a
+   visszaadott függvény a kimenet `JSON.stringify` hívása. Globális nevet az előkészítő nem hagy hátra: a teszt szerint
+   a kulcslista pontosan a Q-8 61 neve plusz a jelen lévő kontextus nevek.
+4. **Az eredmény olvasása.** A sorrend `resolvePromise`, majd egy `executePendingJobs()`: a `resolvePromise` a
+   QuickJS ígéretre `then` visszahívást köt (`chunk-V2S4ZYJR.mjs` `resolvePromise`), és a visszahívás maga is függő
+   feladat, tehát a fordított sorrendben egy második `executePendingJobs` kellene. A `resolvePromise` a sandbox
+   globális `Promise` nevét olvassa (`this.getProp(this.global, "Promise")`); a szkript ezt felülírhatja, de csak a
+   saját lépését rontja el, a gazdát nem (a T-015-12 szökési kísérleteinek tétele).
+5. **Kettős időkorlát.** (1) `setInterruptHandler(shouldInterruptAfterDeadline(határidő))`, egy jelzővel: ha a
+   kezelő megszakított, a lépés bármely sandbox hibája `script_timed_out`. (2) `waitForSettlement`: saját, a végén
+   törölt `setTimeout` a határidőre, a kérés jelének figyelőjével versenyeztetve. Nem `AbortSignal.timeout`, mert az
+   `unref` (Q-2) és nem törölhető. A határidő a hívás kezdetétől számít, a modul betöltése is beleszámít.
+6. **Mért ágak** (a tesztek, 100 ms alatti határidővel): a szinkron `while (true) {}` után a kiértékelés ígérete
+   `InternalError: interrupted` hibával elutasított, és a `resolvePromise` visszahívása lefut (az (1) ág); a
+   `for (;;) { await null; }` és a soha fel nem oldott `await new Promise(() => {})` után az ígéret függő marad, a (2)
+   ág zár. A Q-2 gazda ígéretre várás esete gazda függvény nélkül, a soha fel nem oldott sandbox ígérettel
+   reprodukálható; a gazda függvény ígéretének (`deferred`) lebontása a T-015-7 tétele.
+7. **Hibák és üzenetek.** A sandbox hibájának szövege a QuickJS `dump` eredményéből a `name` és a `message`
+   (`index.d.ts` 1566. sor, `any`, `unknown`-ként guarddal olvasva), a `stack` nem kerül bele; nem `Error` értékre
+   rögzített mondat. A gazdára kijutó kivételből csak a típusneve (`describeErrorType`), az üzenete nem. A `failed` ág
+   üzenete kisbetűs mondatrész hibaosztály nélkül (a CEL kiértékelő mintája, `describe-cel-error.ts`); a motor a
+   T-015-5-ben a saját mondatába fűzi és a `formatEngineErrorMessage` adja hozzá az osztályt. A `compile` `Outcome`
+   üzenete teljes mondat, a végén `(script_compile_failed)`.
+8. **A sandbox mély rekurziójának hibája** `InternalError: stack overflow`, nem `RangeError` (mérve a unit tesztben,
+   `setMaxStackSize(131072)` mellett); elkapható. A mély `JSON.stringify` (1e5 mélység) a kimenet szerializálásakor a
+   gazdán `RangeError` (Q-6), `script_evaluation_failed`, és a következő lépés friss modulon hibátlanul fut. A mély
+   forrás elemzés (`"(".repeat(1e5)`) a fordításban is a gazdára jut: `script_compile_failed`.
+9. **Lebontás** (`dispose-quietly.ts`): minden handle pontosan egyszer kerül a listába, a lebontás sorrendje
+   handle-ök, kontextus, runtime, a hibája elkapott. A tesztekben a gazdára kijutó `RangeError` esetén kívül minden
+   lebontás tiszta volt.
+10. **A `DisposableResult` szűkítése** `result.error !== undefined` alakkal (`index.d.ts` 795 ... 813. sor: a
+    `DisposableSuccess` `error?: undefined`).
+
+### 8.2 Nyitva marad
+
+- **A lebontási assert a konzolra ír.** A `JS_FreeRuntime` assertje után az Emscripten modul az `Aborted(...)` sort a
+  `console.error`-ra írja (`emscripten-module.mjs`: `D=console.error.bind(console)`, felülírható a `printErr`
+  mezővel). A `newVariant` `emscriptenModule` opciójának típusa (`EmscriptenModuleLoaderOptions`,
+  `@jitl/quickjs-ffi-types` 0.32.0) a `printErr` mezőt nem tartalmazza, tehát `as` nélkül nem adható át. A szerverben
+  ez a gazdára kijutó hiba után egy stderr sor, a lépés eredményét nem változtatja; a teljes Vitest kimenetében egy
+  sor. Nem javítottam.
+- **A `cwd` mezőt a futtató még nem olvassa:** a `files` gazda függvény a T-015-7.
+- **Időtartam (mérve, a T-015-6 kapu futásának teljes Vitest menetében, 8412 teszt).** A `run-script.spec.ts` 24
+  tesztje együtt 526 ms; a leghosszabb egyedi teszt a gazdára kijutó `RangeError` esete, 114 ms, a három időkorlát
+  teszt 51 ... 52 ms (50 ms-os határidővel). Az 5000 ms-os korláttól messze van, időzített bomba nincs.
