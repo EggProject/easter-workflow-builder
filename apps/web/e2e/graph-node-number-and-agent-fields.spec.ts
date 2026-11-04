@@ -298,6 +298,36 @@ test('REGRESSZIÓ: a kiürített error_handler maxAttempts mező üres marad (ne
   });
 });
 
+test('REGRESSZIÓ: a kiürített loop maxIterations mező üres marad (nem 0), a mentés PUT nélkül marad és a mező alatt jelez', async ({
+  page,
+}) => {
+  const putBodies: unknown[] = [];
+  await openEditor(page, graphWith(READY_AGENT_STEP_CONFIG), putBodies);
+  const panel = await openPanel(page, 'n3', 'Ciklus beállításai');
+  const maxIterations = panel.getByRole('spinbutton', { name: 'Max. iterációk száma' });
+  await expect(maxIterations).toHaveValue('3');
+
+  await maxIterations.fill('');
+  await expect(maxIterations).toHaveValue('');
+  await maxIterations.blur();
+  await expect(maxIterations).toHaveValue('');
+
+  await saveButton(page).click();
+  // A `NaN` a szám séma típus hibája, az üzenete a zod saját szövege, ezért itt csak a jelenléte számít.
+  await expect(maxIterations).toHaveAttribute('aria-invalid', 'true');
+  await expect(maxIterations).toHaveAccessibleDescription(/\S/u);
+  await expect(page.getByText(validationMessage(['nodes.2.config.maxIterations']), { exact: true })).toBeVisible();
+  expect(putBodies).toHaveLength(0);
+
+  await maxIterations.fill('4');
+  await expectNoFieldError(maxIterations);
+  await saveButton(page).click();
+  await expect(page.getByText('Gráf mentve')).toBeVisible();
+  expect(parseSavedGraph(putBodies[0]).nodes.find((node) => node.id === 'n3')?.config).toMatchObject({
+    maxIterations: 4,
+  });
+});
+
 test('a nem pozitív egész szám mentési kísérlet nélkül csak az érintett (elhagyott) mező alatt jelez (69. kritérium)', async ({
   page,
 }) => {
