@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                                                                                                                   |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | jóváhagyott: a 7.1 szekció O-1 ... O-6 termékkérdése mind lezárva (user döntés 2026-11-04)                                                                                                                                                                        |
+| Státusz  | végrehajtva (PLAN-015 T-015-3 ... T-015-10, 2026-11-04); a 7.1 szekció O-1 ... O-6 termékkérdése mind lezárva (user döntés 2026-11-04), a 7.2 T-5 kimondott korláttal nyitva                                                                                      |
 | Dátum    | 2026-11-03, átvezetve 2026-11-04                                                                                                                                                                                                                                  |
 | Előzmény | [`SPEC-003`](SPEC-003-domain-perzisztencia.md) 4.3, [`SPEC-004`](SPEC-004-vegrehajto-motor.md) 4.7, 5. szekció 10. sora, [`SPEC-008`](SPEC-008-graf-szerkeszto-es-futas-nezet.md) 5.1, O-43, [`SPEC-010`](SPEC-010-sablon-es-kifejezes-nyelv.md) 7. és 8. szekció |
 | Bemenet  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md) 2., 3., 8. és 9. szekció; a hiányleltár H-13 tétele                                                                                                |
@@ -15,7 +15,7 @@
 
 A user döntése (SPEC-009 14.6 O-23, 2026-10-26): a szkript csomópont végrehajtása "saját spec, később"; a
 mai korlát (a futás elutasítja, a felület tiltja) addig érvényes (user döntés 2026-10-21, "Rövid szöveg",
-"Letiltás okkal"). Ez a spec azt írja le, mi kell a végrehajtáshoz.
+"Letiltás okkal"); a PLAN-015 T-015-5 és T-015-10 óta megszűnt. Ez a spec azt írja le, mi kell a végrehajtáshoz.
 
 **A user döntései (2026-11-04), szó szerint:**
 
@@ -55,6 +55,8 @@ mai korlát (a futás elutasítja, a felület tiltja) addig érvényes (user dö
 | `apps/web` | a kártya rövid figyelmeztetése, a panel `role="alert"` mondata, a "Futás indítása" gomb tiltása okkal                                                 | `apps/web/src/node-inspector/ScriptNodeFields.tsx:24-45`; `apps/web/src/graph-editor/GraphEditorScreen.tsx:252, 737, 821`                         |
 | CEL        | hét név a környezetben, köztük a `joinInputs`; a `branch` a befecskendezett `expressionEvaluator` porton értékel ki                                   | `packages/workflow-language/src/cel-expression/run-context-variable-names.ts:7-15`; `packages/engine/src/node-executor/execute-branch.ts:125-131` |
 | `engine`   | az agent lépés `cwd` és `additionalDirectories` mezője a fájl hozzáférés meglévő mintája                                                              | `packages/db/src/workflow-graph/agent-step-config/agent-step-config.ts:73-74`                                                                     |
+
+A 2. szekció táblázata a spec írásakori (`bbed64c`) állapotot rögzíti, a végrehajtás (PLAN-015) előtt.
 
 A `runtime: 'expression'` jelentése mostantól kimondva: a CEL kifejezés nyelv (SPEC-010). Az érték neve nem
 változik, mert a pillanatkép és a sodródás védelem már erre áll, és a változtatás nem adna információt.
@@ -184,10 +186,12 @@ szülő könyvtár `fs.realpath` alakját ellenőrzi, és az új fájlt `wx` jel
 linkre is hibát ad. A `list` a bejegyzések nevét adja. A hibaüzenet a szkript saját útvonalát és a Node hibakódot
 mondja (`a fájl művelet nem sikerült (ENOENT): a.txt`), a gazda abszolút gyökerét nem (research 9.1 7. pont).
 
-**Időkorlát.** A határidő a lépés indulásától számít, `timeoutMs` vagy 60 000 ms. Két ága van, mert az
+**Időkorlát.** A határidő a lépés indulásától számít (a modul betöltése is beleszámít), `timeoutMs` vagy 60 000 ms. Két ága van, mert az
 interrupt kezelő a gazda ígéretre várakozás alatt nem fut (J-6): (1) CPU kötött kódra
-`setInterruptHandler(shouldInterruptAfterDeadline(...))`; (2) a gazda oldalon egy, a határidőre beállított
-`AbortSignal.timeout` megszakítja a folyamatban lévő gazda hívásokat és a teljes kiértékelés várakozását. Bármelyik
+`setInterruptHandler(shouldInterruptAfterDeadline(...))`; (2) a gazda oldalon egy saját, a lépés
+végén törölt `setTimeout` a határidőre (`waitForSettlement`), a kérés jelével versenyeztetve; nem `AbortSignal.timeout`,
+mert annak időzítője `unref` (research Q-2) és nem törölhető. A folyamatban lévő hálózati kérés a lépés jelén szakad meg
+(a határidő után a lépés vége, külső megszakításkor a kérés jele; research 9.1 2. pont). Bármelyik
 ág lejár, a lépés `script_timed_out` osztállyal bukik, és a runtime felszabadul.
 
 **Memória.** A user döntése (2026-11-04), szó szerint: "friss motor lepesenkent es lehessen beallitani, de default
@@ -250,23 +254,32 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
 - A `validateImplementedNodeTypes` a `script` node-ot és a `join` `script` módot többé nem utasítja el; az
   `unimplemented_node_type` osztály más típusra ma nem keletkezik, tehát a guard ága és a hibaosztály a 100
   százalékos lefedettség miatt törlendő, vagy kimondott okkal megtartandó (a halott ág tilalma,
-  `.claude/CLAUDE.md` 5. szekció). A PLAN-015 T-015-4 dönti el a kód olvasásával.
+  `.claude/CLAUDE.md` 5. szekció). A PLAN-015 T-015-4 döntése: törlés (research 7.1), végrehajtva a T-015-5 lépésben (motor, `protocol` szótár,
+  `apps/server` validációs osztály lista, kliens mondat).
 - A diszpécser új `script` ága és a `join` beágyazott `switch`-ének `script` ága egy közös végrehajtót hív,
   ami a `runtime` szerint kimerítő `switch`-csel választ a két port között.
 - A futás indításának ellenőrzése a JavaScript `source` fordítását a `scriptRunner` port fordító műveletén
   futtatja (`script_compile_failed`), a CEL `source` a meglévő nyelvi mező ellenőrzésen megy.
-- A `fail_run` és a megszakítás a futó szkript lépést a határidő `AbortSignal`-jának megfelelő jellel állítja
-  le; a lépés `cancelled` állapotban zár, ugyanúgy, mint a sorból kivett testvér.
+- A `fail_run` és a megszakítás a futó szkript lépést a motor `stopSignal` jelén át állítja le
+  (`ScriptRunRequest.signal`); a futtató `aborted` eredménye után a lépés `cancelled` állapotban zár (szabályos
+  leállásnál `interrupted`), ugyanúgy, mint a sorból kivett testvér. **Mért korlát (research 9.3):** a külső
+  megszakítás CPU kötött kód alatt nem ér célba. A QuickJS a gazda szálán, szinkron fut, tehát a szinkron ciklus
+  alatt az eseményhurok áll, és a jelet megszakító kód (HTTP kezelő, időzítő, a `fail_run` ága) el sem indulhat; a
+  lépés a határidőn áll meg (`script_timed_out`). Ez az 5.4 "Párhuzamosság" pontjában kimondott korlát
+  következménye. Az interrupt kezelő a jelre nem figyel: mérve nem hatna, és az ága a 100 százalékos lefedettség
+  mellett sosem futna. Gazda ígéretre várakozás alatt (hálózat, fájl) a jel azonnal célba ér: a lépés `aborted`, a
+  később érkező gazda eredmény nem indít szkript kódot (research 9.1 2. pont). A CPU kötött szakasz külső
+  megszakítása más szálon futó QuickJS-sel volna lehetséges (7.2 T-5).
 
 ### 5.9 Felület
 
 - A kártya figyelmeztetése (O-43), a panel `role="alert"` mondata és a "Futás indítása" gomb tiltása okkal
-  megszűnik.
+  megszűnt (PLAN-015 T-015-10).
 - A `runtime` választó a meglévő `SelectField` ("CEL kifejezés", "JavaScript"), a `source` mező a meglévő
   `TextAreaField` (design system `.textarea`, `.claude/CLAUDE.md` 11. szekció). JavaScript esetén megjelenik az
   időkorlát mező (`TextField` `type="number"`, másodpercben, mert a döntés is másodpercben szól (O-4); a tárolt
-  érték ezredmásodperc, a mező értékének ezerszerese), üresen az alapérték (`null`). A felületen ma nincs
-  `timeoutMs` mező, tehát nincs követendő minta. JavaScript esetén a "Munkakönyvtár (cwd)" `TextField` is
+  érték ezredmásodperc, a mező értékének ezerszerese), üresen az alapérték (`null`). A mezők megvalósítása: `ScriptConfigFields`, `timeout-seconds-field-value.ts`
+  (PLAN-015 T-015-10). JavaScript esetén a "Munkakönyvtár (cwd)" `TextField` is
   megjelenik (az agent lépés mintájára), üresen `null`. JavaScript esetén a "Memória korlát (MB)" `TextField`
   `type="number"` is megjelenik, üresen `null` (alapérték: a rendszermemória, legfeljebb 2048 MB); a 16 ... 2048
   tartományon kívüli érték a mentéskor a mező alatti hibát ad.
@@ -291,7 +304,7 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
    a sandboxból (nincs `process`). A szerző saját figyelmeztetése szerint egy hitelesített gazda `fetch`
    kiadása a sandbox értelmét veszi el (J-4).
 5. **Szolgáltatás kiesés.** A CPU kötött szkript a határidőig az eseményhurkot foglalja (5.4), a nagyobb
-   `timeoutMs` ezt arányosan növeli. A memória alapértéke a rendszermemória (legfeljebb 2048 MB) lépésenként: több
+   `timeoutMs` ezt arányosan növeli, és a külső megszakítás sem állítja meg (5.8). A memória alapértéke a rendszermemória (legfeljebb 2048 MB) lépésenként: több
    párhuzamos szkript lépés együtt a gép memóriáját meghaladó foglalást kísérelhet meg (a user döntése az alapértékről,
    kimondott kockázat).
 
@@ -323,18 +336,19 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
 
 ### 7.2 Technikai, nyitva
 
-| #   | Kérdés                                                                           | Mi a viselkedés addig                                                                                                                                                                                                                                                                                                                                                                                 | Mi zárná le                                                                                                 |
-| --- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| T-1 | A QuickJS memória korlát értéke                                                  | **lezárva**: a 128 MB-os `setMemoryLimit` helyett lépésenként friss modul saját `WebAssembly.Memory` maximummal, csomópontonként beállítva, alapból a rendszermemória, legfeljebb 2048 MB (user döntés 2026-11-04, 5.4 "Memória")                                                                                                                                                                     |                                                                                                             |
-| T-2 | Az interrupt kezelő gazda ígéretre várakozás alatt (S-7, J-6)                    | **lezárva** (mérés, `../research/2026-11-04-szkript-csomopont.md` Q-1 ... Q-3, 5. szekció): a várakozás alatt a kezelő nem fut, a gazda oldali `AbortSignal` ág kell; a CPU kötött kód és a mikrofeladat lánc a határidőn megáll; a tiszta lebontáshoz minden handle (a függő `deferred` is) felszabadítandó, és a megszakított `then` lánc után a `dispose` assertet adhat, ezért a hibája elkapandó |                                                                                                             |
-| T-3 | A WebAssembly modul szintű memória plafon és a mély rekurzió hatása (J-8)        | **lezárva** (mérés: research Q-4 ... Q-6, Q-9; user döntés 2026-11-04, research 6. szekció): memória az 5.4 "Memória" pontja szerint (friss modul lépésenként, beállítható, alapból a rendszermemória, legfeljebb a 2048 MB-os modul plafon); stack `setMaxStackSize(131072)` ("Közepes, kb. 740 szint"), a gazdára kijutó `RangeError` a lépés `script_evaluation_failed` hibája, a modul eldobva    |                                                                                                             |
-| T-4 | A pinelt bellard QuickJS változat érintett-e a quickjs-ng 2026-os hibáiban (J-8) | **mérve, kimondott korláttal nyitva** (`../research/2026-11-04-szkript-csomopont.md` 4. szekció): a pin (`f1139494`, 2025-12-22) legalább két, az ng advisory-kkal azonos függvényt érintő hibát tartalmaz, amit a bellard repó a pin után javított, és újabb `quickjs-emscripten` kiadás nincs; hogy a hiba a lineáris memórián belül marad-e, nem ellenőrzött (5.10 1.)                             | egy újabb pint hozó `quickjs-emscripten` kiadás, vagy a lineáris memórián belül maradás forrásolt igazolása |
+| #   | Kérdés                                                                                 | Mi a viselkedés addig                                                                                                                                                                                                                                                                                                                                                                                 | Mi zárná le                                                                                                          |
+| --- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| T-1 | A QuickJS memória korlát értéke                                                        | **lezárva**: a 128 MB-os `setMemoryLimit` helyett lépésenként friss modul saját `WebAssembly.Memory` maximummal, csomópontonként beállítva, alapból a rendszermemória, legfeljebb 2048 MB (user döntés 2026-11-04, 5.4 "Memória")                                                                                                                                                                     |                                                                                                                      |
+| T-2 | Az interrupt kezelő gazda ígéretre várakozás alatt (S-7, J-6)                          | **lezárva** (mérés, `../research/2026-11-04-szkript-csomopont.md` Q-1 ... Q-3, 5. szekció): a várakozás alatt a kezelő nem fut, a gazda oldali `AbortSignal` ág kell; a CPU kötött kód és a mikrofeladat lánc a határidőn megáll; a tiszta lebontáshoz minden handle (a függő `deferred` is) felszabadítandó, és a megszakított `then` lánc után a `dispose` assertet adhat, ezért a hibája elkapandó |                                                                                                                      |
+| T-3 | A WebAssembly modul szintű memória plafon és a mély rekurzió hatása (J-8)              | **lezárva** (mérés: research Q-4 ... Q-6, Q-9; user döntés 2026-11-04, research 6. szekció): memória az 5.4 "Memória" pontja szerint (friss modul lépésenként, beállítható, alapból a rendszermemória, legfeljebb a 2048 MB-os modul plafon); stack `setMaxStackSize(131072)` ("Közepes, kb. 740 szint"), a gazdára kijutó `RangeError` a lépés `script_evaluation_failed` hibája, a modul eldobva    |                                                                                                                      |
+| T-4 | A pinelt bellard QuickJS változat érintett-e a quickjs-ng 2026-os hibáiban (J-8)       | **mérve, kimondott korláttal nyitva** (`../research/2026-11-04-szkript-csomopont.md` 4. szekció): a pin (`f1139494`, 2025-12-22) legalább két, az ng advisory-kkal azonos függvényt érintő hibát tartalmaz, amit a bellard repó a pin után javított, és újabb `quickjs-emscripten` kiadás nincs; hogy a hiba a lineáris memórián belül marad-e, nem ellenőrzött (5.10 1.)                             | egy újabb pint hozó `quickjs-emscripten` kiadás, vagy a lineáris memórián belül maradás forrásolt igazolása          |
+| T-5 | A külső megszakítás (`fail_run`, felhasználói megszakítás) CPU kötött JavaScript alatt | **mérve, kimondott korláttal nyitva** (research 9.3): a megszakítás a ciklus alatt nem ér célba, a lépés a határidőn áll meg (`script_timed_out`), gazda ígéretre várakozás alatt azonnal megszakad (5.8)                                                                                                                                                                                             | termék és architektúra döntés a QuickJS más szálra (például `worker_threads`) helyezéséről, vagy a korlát elfogadása |
 
 ## 8. Elfogadási kritériumok
 
 1. A `script` node és a `join` `script` mód mindkét nyelven futtatható, a futás indítása nem ad
    `unimplemented_node_type` hibát; az `unimplemented_node_type` sorsa (törlés vagy megtartás) kimondva és
-   tesztelve.
+   tesztelve (törlés, 5.8).
 2. A szkript a futás kontextus hét nevét a SPEC-010 7.3 leképezéssel látja; a `join` `script` módban a
    `joinInputs` a `merge` móddal azonos lista.
 3. A szkript eredménye a lépés kimenete, a SPEC-010 7.4 normalizálással; a nem JSON JavaScript kimenet

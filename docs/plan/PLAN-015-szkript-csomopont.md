@@ -1,12 +1,12 @@
 # PLAN-015: A szkript csomópont végrehajtásának terve
 
-|         |                                                                                                                                        |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz | indítható: a SPEC-014 O-1 ... O-6 és a T-3 (memória, stack) mind lezárva (user döntés 2026-11-04), a lépések nem várnak termékdöntésre |
-| Dátum   | 2026-11-03, átvezetve 2026-11-04                                                                                                       |
-| Spec    | [`../spec/SPEC-014-szkript-csomopont.md`](../spec/SPEC-014-szkript-csomopont.md)                                                       |
-| Forrás  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md)                         |
-| Branch  | `feat/spec-014-szkript-csomopont`                                                                                                      |
+|         |                                                                                                                                                                                                                                      |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Státusz | végrehajtva (T-015-1 ... T-015-11); a T-015-12 (adverzariális átvizsgálás) és a T-015-13 (merge kapu) a PR előtti lépés: a SPEC-014 O-1 ... O-6 és a T-3 mind lezárva (user döntés 2026-11-04), a 7.2 T-5 kimondott korláttal nyitva |
+| Dátum   | 2026-11-03, átvezetve 2026-11-04                                                                                                                                                                                                     |
+| Spec    | [`../spec/SPEC-014-szkript-csomopont.md`](../spec/SPEC-014-szkript-csomopont.md)                                                                                                                                                     |
+| Forrás  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md)                                                                                                                       |
+| Branch  | `feat/spec-014-szkript-csomopont`                                                                                                                                                                                                    |
 
 A lépések a SPEC-014 8. szekciójának kritérium számára hivatkoznak (`ACn`). Végrehajtási sorrend a három
 terv között: PLAN-017, PLAN-016, PLAN-015 (a research 9. szekciója); ez a terv a harmadik, mert mindhárom a
@@ -75,7 +75,8 @@ Becsült lépésszám: 14.
 - A `quickjs-emscripten` 1.0 alatti, a README szerint "expect occasional breaking API changes" (J-1): a verzió
   pontosan pinelve, a frissítés előtt a T-015-2 próbái regresszióként futnak.
 - A CEL és a JavaScript CPU kötött szkriptje a szervert blokkolja (SPEC-010 O-2, SPEC-014 5.4): kimondott,
-  elfogadott korlát.
+  elfogadott korlát. A külső megszakítás (`fail_run`, felhasználói megszakítás) CPU kötött JavaScript alatt nem ér
+  célba, a lépés a határidőn áll meg (mérve, research 9.3; SPEC-014 5.8, 7.2 T-5).
 - A memória alapértéke a rendszermemória (legfeljebb 2048 MB) lépésenként (user döntés 2026-11-04): több párhuzamos
   szkript lépés együtt a gép memóriáját meghaladó foglalást kísérelhet meg; kimondott kockázat (SPEC-014 5.10 5. pont).
 - Az O-5 és az O-6 user döntése megvan (2026-11-04): a fájl hozzáférés gyökere a JavaScript ág `cwd` mezője,

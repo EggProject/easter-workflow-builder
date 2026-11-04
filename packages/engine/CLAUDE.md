@@ -754,7 +754,7 @@ feltételes szétterítés mintával, mint a token összesítésnél (`...(execu
 
 - **A `ports` paraméter típusa `EngineDependencies`, nem egy új, `NodeExecutorPorts`-ból
   származtatott bővítés.** Az `agent-node-lifecycle.ts` a `runAgentStep`-et hívja, ami a teljes
-  kilenc portot várja (`EngineDependencies`). Egy `NodeExecutorPorts & { agentQueryRunner,
+  portlistát várja (`EngineDependencies`, a T-005-21 idején kilenc port). Egy `NodeExecutorPorts & { agentQueryRunner,
 processEnvironment }` alakú bővítés a `runAgentStep` hívásához úgyis fel kellene vegye a
   kilencedik, `providerDescriptorLookup` mezőt is - ez a téma viszont nem keres leírót (a hívó,
   a jövőbeli `run-supervisor`, már feloldva adja át), tehát egy ilyen bővítés szó szerint ugyanazt
