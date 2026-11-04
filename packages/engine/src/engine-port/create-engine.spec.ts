@@ -1,6 +1,11 @@
 /* eslint-disable unicorn/no-null -- a node configok, a `WorkflowEdgeInput` és a `Fact<T | null>` nullázható mezői (SPEC-003 4.3, 4.7, SPEC-000 5.) a tárolt/mért alakban valódi `null` értéket hordoznak, a teszt fixture ezt másolja */
 import { describe, expect, it } from 'vitest';
-import { INSTALLED_AGENT_SDK_VERSION, type AgentQuery, type AgentQueryRunner } from '@easter-workflow-builder/agent';
+import {
+  INSTALLED_AGENT_SDK_VERSION,
+  type AgentQuery,
+  type AgentQueryRunner,
+  compileStructuredOutputSchema,
+} from '@easter-workflow-builder/agent';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type {
   AgentStepConfig,
@@ -23,6 +28,16 @@ import { runStartupRecovery } from '../startup-recovery/run-startup-recovery.ts'
 import { createEngine } from './create-engine.ts';
 import type { EngineDependencies } from './engine-dependencies.ts';
 import type { EventPublisherPort } from './event-publisher-port.ts';
+import type { StructuredOutputSchemaCompilerPort } from './structured-output-schema-compiler-port.ts';
+
+function ignoreLogLine(): void {
+  // szándékosan üres: a teszt nem a fordító naplóját vizsgálja
+}
+
+const SCHEMA_COMPILER: StructuredOutputSchemaCompilerPort = {
+  compile: (schema) =>
+    compileStructuredOutputSchema(schema, { info: ignoreLogLine, warn: ignoreLogLine, error: ignoreLogLine }),
+};
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -433,6 +448,7 @@ function openHarness(options: HarnessOptions = {}): Harness {
       },
     },
     processEnvironment: options.processEnvironment ?? { read: () => null, readAll: () => ({}) },
+    structuredOutputSchemaCompiler: SCHEMA_COMPILER,
     skillLibrary: options.skillLibrary ?? {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },

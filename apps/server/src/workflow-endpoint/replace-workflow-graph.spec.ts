@@ -8,6 +8,7 @@ import {
   type WorkflowNodeInput,
 } from '@easter-workflow-builder/db';
 import { createReplaceWorkflowGraphHandler } from './replace-workflow-graph.ts';
+import { TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER } from '../engine-assembly/test-structured-output-schema-compiler.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -55,7 +56,7 @@ describe('createReplaceWorkflowGraphHandler', () => {
       database.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null }),
     );
 
-    const handler = createReplaceWorkflowGraphHandler(database);
+    const handler = createReplaceWorkflowGraphHandler(database, TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER);
     const result = await handler({
       parameters: { workflowId: created.id },
       query: new URLSearchParams(),
@@ -73,7 +74,7 @@ describe('createReplaceWorkflowGraphHandler', () => {
   });
 
   it('sémának nem megfelelő törzsre invalid_request hibát ad', async () => {
-    const handler = createReplaceWorkflowGraphHandler(openMemoryDatabase());
+    const handler = createReplaceWorkflowGraphHandler(openMemoryDatabase(), TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER);
     const result = await handler({
       parameters: { workflowId: 'akármi' },
       query: new URLSearchParams(),
@@ -84,7 +85,7 @@ describe('createReplaceWorkflowGraphHandler', () => {
   });
 
   it('ismeretlen workflowId-ra not_found hibát ad', async () => {
-    const handler = createReplaceWorkflowGraphHandler(openMemoryDatabase());
+    const handler = createReplaceWorkflowGraphHandler(openMemoryDatabase(), TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER);
     const result = await handler({
       parameters: { workflowId: 'nincs-ilyen' },
       query: new URLSearchParams(),
@@ -104,7 +105,7 @@ describe('createReplaceWorkflowGraphHandler', () => {
       database.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null }),
     );
 
-    const handler = createReplaceWorkflowGraphHandler(database);
+    const handler = createReplaceWorkflowGraphHandler(database, TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER);
     const result = await handler({
       parameters: { workflowId: created.id },
       query: new URLSearchParams(),
@@ -159,7 +160,10 @@ describe('createReplaceWorkflowGraphHandler', () => {
       onUnhandledError: 'fail_run',
     };
 
-    const result = await createReplaceWorkflowGraphHandler(database)({
+    const result = await createReplaceWorkflowGraphHandler(
+      database,
+      TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+    )({
       parameters: { workflowId: created.id },
       query: new URLSearchParams(),
       body: {
@@ -183,7 +187,10 @@ describe('createReplaceWorkflowGraphHandler', () => {
         database.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null }),
       );
 
-      const result = await createReplaceWorkflowGraphHandler(database)({
+      const result = await createReplaceWorkflowGraphHandler(
+        database,
+        TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+      )({
         parameters: { workflowId: created.id },
         query: new URLSearchParams(),
         body: {
@@ -231,7 +238,10 @@ describe('createReplaceWorkflowGraphHandler', () => {
         database.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null }),
       );
 
-      const result = await createReplaceWorkflowGraphHandler(database)({
+      const result = await createReplaceWorkflowGraphHandler(
+        database,
+        TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+      )({
         parameters: { workflowId: created.id },
         query: new URLSearchParams(),
         body: {
@@ -286,7 +296,7 @@ describe('createReplaceWorkflowGraphHandler', () => {
       database.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null }),
     );
 
-    const handler = createReplaceWorkflowGraphHandler(database);
+    const handler = createReplaceWorkflowGraphHandler(database, TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER);
     const result = await handler({
       parameters: { workflowId: created.id },
       query: new URLSearchParams(),
@@ -309,7 +319,7 @@ describe('createReplaceWorkflowGraphHandler', () => {
   });
 
   it('hiányzó workflowId paraméterre is not_found hibát ad, nem dob kivételt', async () => {
-    const handler = createReplaceWorkflowGraphHandler(openMemoryDatabase());
+    const handler = createReplaceWorkflowGraphHandler(openMemoryDatabase(), TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER);
     const result = await handler({ parameters: {}, query: new URLSearchParams(), body: { nodes: [], edges: [] } });
     expect(result.kind).toBe('error');
   });
@@ -338,7 +348,7 @@ describe('createReplaceWorkflowGraphHandler', () => {
       },
     };
 
-    const handler = createReplaceWorkflowGraphHandler(racyDatabase);
+    const handler = createReplaceWorkflowGraphHandler(racyDatabase, TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER);
     const result = await handler({
       parameters: { workflowId: created.id },
       query: new URLSearchParams(),

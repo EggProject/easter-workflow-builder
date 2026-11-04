@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { checkStructuredOutput } from './check-structured-output.ts';
 import { compileStructuredOutputSchema } from './compile-structured-output-schema.ts';
+import type { StructuredOutputSchemaLogger } from './structured-output-schema-logger.ts';
 import type { StructuredOutputValidator } from './structured-output-validator.ts';
 
+function ignoreLogLine(): void {
+  // szándékosan üres: a teszt nem a fordító naplóját vizsgálja
+}
+
+const SILENT_LOGGER: StructuredOutputSchemaLogger = { info: ignoreLogLine, warn: ignoreLogLine, error: ignoreLogLine };
+
 function compile(schema: unknown): StructuredOutputValidator {
-  const outcome = compileStructuredOutputSchema(schema);
+  const outcome = compileStructuredOutputSchema(schema, SILENT_LOGGER);
   if (outcome.kind === 'error') {
     throw new Error(outcome.message);
   }

@@ -35,6 +35,7 @@ import { createStreamRegistry } from '../stream-registry/create-stream-registry.
 import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
 import { createHttpServer } from '../http-server/create-http-server.ts';
 import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
+import { TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER } from '../engine-assembly/test-structured-output-schema-compiler.ts';
 
 /**
  * SPEC-010 12.3, 16. szekció 48 ... 50. kritérium (PLAN-010 T-010-16):
@@ -154,6 +155,7 @@ async function startServer(agentQueryRunner: AgentQueryRunner): Promise<RunningS
     database,
     agentQueryRunner,
     providerDescriptorLookup: buildProviderDescriptorLookup(),
+    structuredOutputSchemaCompiler: TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
     expressionEvaluator: createCelExpressionEvaluator(),
     templateRenderer: createMustacheTemplateRenderer(),
     eventPublisher: createRealEventPublisher(streamRegistry, clock),
@@ -163,7 +165,13 @@ async function startServer(agentQueryRunner: AgentQueryRunner): Promise<RunningS
     skillLibrary: createSkillLibraryReader(TEST_SKILL_LIBRARY.rootDirectory),
   });
   const server = createHttpServer({
-    handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
+    handlers: buildRouteHandlers(
+      database,
+      engine,
+      streamRegistry,
+      TEST_SKILL_LIBRARY,
+      TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+    ),
     devOrigin: undefined,
     streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
     logger: createServerLogger({ secretValues: [] }, collectingSink().sink),

@@ -4,6 +4,7 @@ import {
   type ReplaceGraphRequest,
 } from '@easter-workflow-builder/protocol';
 import type { DatabaseContext, WorkflowNodeInput } from '@easter-workflow-builder/db';
+import type { StructuredOutputSchemaCompilerPort } from '@easter-workflow-builder/engine';
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { RouteHandler, RouteHandlerResult } from '../route-dispatch/route-handler.ts';
 import { findInvalidStructuredOutputSchemas } from './find-invalid-structured-output-schemas.ts';
@@ -60,7 +61,10 @@ function handleReplaceWorkflowGraph(
  * `not_found`-ra), ezért a kezelő előbb `getWorkflow`-val ellenőriz, a spec
  * által elvárt `not_found` hibaágért.
  */
-export function createReplaceWorkflowGraphHandler(database: DatabaseContext): RouteHandler {
+export function createReplaceWorkflowGraphHandler(
+  database: DatabaseContext,
+  structuredOutputSchemaCompiler: StructuredOutputSchemaCompilerPort,
+): RouteHandler {
   return (context) => {
     const parsedBody = ReplaceGraphRequestSchema.safeParse(context.body);
     if (!parsedBody.success) {
@@ -70,7 +74,7 @@ export function createReplaceWorkflowGraphHandler(database: DatabaseContext): Ro
     // A strukturált kimenet sémája a mentéskor is lefordul (SPEC-015 5.7): a nem
     // fordítható séma mezőútja ugyanabban az `invalid_request` alakban megy ki,
     // mint a törzs séma hibája, írás nélkül.
-    const invalidSchemas = findInvalidStructuredOutputSchemas(parsedBody.data.nodes);
+    const invalidSchemas = findInvalidStructuredOutputSchemas(parsedBody.data.nodes, structuredOutputSchemaCompiler);
     if (invalidSchemas.length > 0) {
       return Promise.resolve({
         kind: 'error',

@@ -1,3 +1,4 @@
+import type { StructuredOutputValidator } from '@easter-workflow-builder/agent';
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
 import type { ProviderCapabilityDescriptor } from '@easter-workflow-builder/provider-capability';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
@@ -35,6 +36,10 @@ import type { SessionSourceNodes } from './session-source-nodes.ts';
  *   `run-context` téma állít össze.
  * - `graph`, `sessionSourceNodes`, `sessionInstances`: a session kötés
  *   feloldásának bemenetei (6.3, 6.4).
+ * - `structuredOutputValidator`: a futás indításakor lefordított strukturált
+ *   kimenet ellenőrző (SPEC-015 5.4); pontosan akkor megadva, ha a lépés
+ *   strukturált kimenetet vár. A lépés nem fordít újra: a kimenetét az
+ *   indításkor lefordított ellenőrző vizsgálja.
  */
 export interface AgentStepRequest {
   readonly runId: string;
@@ -47,4 +52,5 @@ export interface AgentStepRequest {
   readonly graph: ExecutableGraph;
   readonly sessionSourceNodes: SessionSourceNodes;
   readonly sessionInstances: readonly SessionBearingInstance[];
+  readonly structuredOutputValidator: StructuredOutputValidator | undefined;
 }

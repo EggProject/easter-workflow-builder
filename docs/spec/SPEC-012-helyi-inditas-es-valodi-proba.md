@@ -237,7 +237,7 @@ jelzést kapott).
 
 | Változó                                | Alapérték               | Forrás (research 10.)                                                                                                                                                                                                                                | Hol áll a kódban                                                 |
 | -------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `EASTER_SERVER_PORT`                   | `3001`                  | user termékdöntés 2026-09-05 (`.claude/CLAUDE.md` 11., SPEC-008 3.)                                                                                                                                                                                  | `apps/server/src/server-config/`, új `default-server-config.ts`  |
+| `EASTER_SERVER_PORT`                   | `3001`                  | user termékdöntés 2026-09-05 (`.claude/CLAUDE.md` 11., SPEC-008 3.); a `0` érték 2026-11-04 óta megengedett: az operációs rendszer választ portot, a szerver a lekötött portot a stdout első sorában jelenti (5.1)                                   | `apps/server/src/server-config/`, új `default-server-config.ts`  |
 | `EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS` | `15000`                 | WHATWG HTML 9.2.7 "every 15 seconds or so"; axum `KeepAlive` és `sse-starlette` alapértéke 15 másodperc (10.1)                                                                                                                                       | ugyanott                                                         |
 | `VITE_API_ORIGIN`                      | `http://localhost:5173` | Vite `server.host` `'localhost'` és `server.port` `5173` alapértéke, user port döntés (10.3)                                                                                                                                                         | `apps/web/src/frontend-config/`, új `default-frontend-config.ts` |
 | `VITE_STREAM_ORIGIN`                   | `http://127.0.0.1:3001` | a szerver `127.0.0.1` bind címe (`continue-startup-with-database.ts:74`) és a user port döntés (10.2, 10.4)                                                                                                                                          | ugyanott                                                         |
@@ -348,7 +348,11 @@ bizonyíték előállító eszköz a repóba tartozik).
   (`minimax` vagy `claude-subscription`), `node --env-file-if-exists=.env` alatt, a gyökérből.
 - **Saját szerver (O-13):** a próba saját szervert indít (gyermek folyamat, `apps/server/src/main.ts`),
   **ideiglenes adatbázissal és napló útvonallal** (az `EASTER_DB_FILE` és az `EASTER_LOG_DIRECTORY` egy
-  ideiglenes könyvtárra mutat, a futás végén törlődik), szabad porton. A user adatbázisa érintetlen, a
+  ideiglenes könyvtárra mutat, a futás végén törlődik), `EASTER_SERVER_PORT=0` értékkel: a portot az operációs
+  rendszer a kötéskor választja (Node `server.listen(0)`), és a szerver a lekötött portot a stdout első sorában
+  jelenti (`EASTER_PROBE_PORT=<port>`, `apps/server/src/startup-sequence/probe-port-report.ts`). Átvezetve
+  2026-11-04: a korábbi előre választott szabad port és a kötés közti ablakot a
+  `docs/research/2026-11-04-proba-port-verseny.md` mérte. A user adatbázisa érintetlen, a
   próba megismételhető. A gyermek folyamat környezete a próba folyamaté (3.1 "teljes környezet"); a napló
   rotáció értékei a 4.2 alapértékekből jönnek, a próba csak az `EASTER_DB_FILE` és az `EASTER_LOG_DIRECTORY`
   értékét írja felül (a user `.data/` mappája érintetlen).

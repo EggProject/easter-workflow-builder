@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import net from 'node:net';
@@ -25,7 +25,10 @@ import { createStreamRegistry } from '../stream-registry/create-stream-registry.
 import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
 import { createHttpServer } from '../http-server/create-http-server.ts';
 import { continueStartupWithDatabase } from './continue-startup-with-database.ts';
+import { PROBE_PORT_REPORT_PREFIX } from './probe-port-report.ts';
+import { readListeningPort } from './read-listening-port.ts';
 import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
+import { TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER } from '../engine-assembly/test-structured-output-schema-compiler.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -65,23 +68,30 @@ function baseConfig(port: number): ServerConfig {
   };
 }
 
-function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = net.createServer();
-    probe.listen(0, '127.0.0.1', () => {
-      const address = probe.address();
-      if (address !== null && typeof address === 'object') {
-        const port = address.port;
-        probe.close(() => {
-          resolve(port);
-        });
-        return;
-      }
-      probe.close(() => {
-        reject(new Error('nem sikerült szabad portot találni'));
-      });
-    });
+/**
+ * A szerver stdout jelentéseinek gyűjtése (`probe-port-report.ts`): a 0 portra
+ * kötött szerver a ténylegesen lekötött portot itt jelenti.
+ */
+function captureStandardOutput(): { readonly written: string[]; readonly restore: () => void } {
+  const written: string[] = [];
+  const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array) => {
+    written.push(String(chunk));
+    return true;
   });
+  return {
+    written,
+    restore: () => {
+      spy.mockRestore();
+    },
+  };
+}
+
+function reportedPort(written: readonly string[]): number {
+  const line = written.find((chunk) => chunk.startsWith(PROBE_PORT_REPORT_PREFIX));
+  if (line === undefined) {
+    throw new Error('a szerver nem jelentette a portját');
+  }
+  return Number(line.slice(PROBE_PORT_REPORT_PREFIX.length));
 }
 
 describe('continueStartupWithDatabase', () => {
@@ -91,15 +101,27 @@ describe('continueStartupWithDatabase', () => {
     process.exitCode = undefined;
   });
 
-  it('sikeres indulásra figyel a megadott porton, 0 kilépési kóddal', async () => {
+  it('0 portra az operációs rendszer választ portot: a lekötött portot a stdout első sorában jelenti és naplózza, ott kiszolgál, 0 kilépési kóddal (SPEC-012 5.1)', async () => {
     const database = openMemoryDatabase();
     const { sink, lines } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
-    const port = await findFreePort();
+    const output = captureStandardOutput();
 
-    await continueStartupWithDatabase(database, baseConfig(port), logger);
+    try {
+      await continueStartupWithDatabase(database, baseConfig(0), logger);
+    } finally {
+      output.restore();
+    }
 
-    expect(lines.some((line) => line.includes('A szerver elindult'))).toBe(true);
+    const port = reportedPort(output.written);
+    expect(output.written[0]).toBe(`${PROBE_PORT_REPORT_PREFIX}${String(port)}\n`);
+    expect(port).toBeGreaterThan(0);
+    expect(lines.some((line) => line.includes('A szerver elindult') && line.includes(`"port":${String(port)}`))).toBe(
+      true,
+    );
+    const response = await fetch(`http://127.0.0.1:${String(port)}/api/providers`);
+    expect(response.status).toBe(200);
+    await response.arrayBuffer();
     expect(process.exitCode).toBeUndefined();
   });
 
@@ -111,11 +133,7 @@ describe('continueStartupWithDatabase', () => {
     const { sink, lines } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
 
-    await continueStartupWithDatabase(
-      database,
-      { ...baseConfig(await findFreePort()), skillLibraryDirectory: root },
-      logger,
-    );
+    await continueStartupWithDatabase(database, { ...baseConfig(0), skillLibraryDirectory: root }, logger);
 
     expect(lines.some((line) => line.includes('A szerver elindult'))).toBe(true);
     expect(existsSync(path.join(root, '.staging-maradek'))).toBe(false);
@@ -142,13 +160,15 @@ describe('continueStartupWithDatabase', () => {
   });
 
   it('foglalt porton fatal naplóz, zárja az adatbázist, és 1-re állítja a kilépési kódot', async () => {
-    const port = await findFreePort();
+    // A foglaló szerver az operációs rendszertől kap portot és végig tartja,
+    // tehát a foglalt port nem szabadulhat fel a próba előtt.
     const occupier = net.createServer();
     await new Promise<void>((resolve) => {
-      occupier.listen(port, '127.0.0.1', () => {
+      occupier.listen(0, '127.0.0.1', () => {
         resolve();
       });
     });
+    const port = readListeningPort(occupier);
 
     const database = openMemoryDatabase();
     const { sink, lines } = collectingSink();
@@ -192,6 +212,7 @@ describe('continueStartupWithDatabase', () => {
       database,
       agentQueryRunner: fakeAgentQueryRunner,
       providerDescriptorLookup: buildProviderDescriptorLookup(),
+      structuredOutputSchemaCompiler: TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
       expressionEvaluator: createCelExpressionEvaluator(),
       templateRenderer: createMustacheTemplateRenderer(),
       eventPublisher: createRealEventPublisher(streamRegistry, clock),
@@ -203,7 +224,13 @@ describe('continueStartupWithDatabase', () => {
 
     const { sink } = collectingSink();
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
+      handlers: buildRouteHandlers(
+        database,
+        engine,
+        streamRegistry,
+        TEST_SKILL_LIBRARY,
+        TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+      ),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
       logger: createServerLogger({ secretValues: [] }, sink),

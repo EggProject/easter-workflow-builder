@@ -59,20 +59,34 @@ function readStringOrDefault(environment: EnvironmentReader, name: string, defau
   return raw.trim();
 }
 
-function readPositiveIntegerOrDefault(
+/**
+ * A hiányzó (nincs beállítva, vagy üres) env változó az alapértéket adja; a
+ * megadott érték egész szám legalább `minimum` értékkel, különben
+ * `invalid_env_variable`.
+ */
+function readIntegerOrDefault(
   environment: EnvironmentReader,
   name: string,
   defaultValue: number,
+  minimum: number,
 ): Outcome<number> {
   const raw = environment[name];
   if (raw === undefined || raw.trim().length === 0) {
     return { kind: 'ok', value: defaultValue };
   }
   const parsed = Number(raw.trim());
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+  if (!Number.isSafeInteger(parsed) || parsed < minimum) {
     return { kind: 'error', message: invalidVariableMessage(name) };
   }
   return { kind: 'ok', value: parsed };
+}
+
+function readPositiveIntegerOrDefault(
+  environment: EnvironmentReader,
+  name: string,
+  defaultValue: number,
+): Outcome<number> {
+  return readIntegerOrDefault(environment, name, defaultValue, 1);
 }
 
 /**
@@ -95,7 +109,10 @@ function readRotationFrequency(environment: EnvironmentReader, name: string): nu
  * pont): a kódban áll, itt nem szerepel.
  */
 export function readServerConfig(environment: EnvironmentReader): Outcome<ServerConfig> {
-  const port = readPositiveIntegerOrDefault(environment, ENV_SERVER_PORT, DEFAULT_SERVER_CONFIG.port);
+  // A `0` megengedett: az operációs rendszer a kötéskor választ portot (Node
+  // `server.listen(0)`), és a szerver a lekötött portot a stdout első sorában
+  // jelenti (`startup-sequence/probe-port-report.ts`, SPEC-012 5.1).
+  const port = readIntegerOrDefault(environment, ENV_SERVER_PORT, DEFAULT_SERVER_CONFIG.port, 0);
   if (port.kind === 'error') {
     return port;
   }

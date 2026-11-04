@@ -268,6 +268,36 @@ for (const { field, nodeId, panelName, role, label, input, path, savedConfig } o
   });
 }
 
+test('REGRESSZIÓ: a kiürített error_handler maxAttempts mező üres marad (nem 0), a mentés PUT nélkül marad és a mező alatt jelez', async ({
+  page,
+}) => {
+  const putBodies: unknown[] = [];
+  await openEditor(page, graphWith(READY_AGENT_STEP_CONFIG), putBodies);
+  const panel = await openPanel(page, 'n4', 'Hibakezelő beállításai');
+  const maxAttempts = panel.getByRole('spinbutton', { name: 'Max. próbálkozások száma' });
+  await expect(maxAttempts).toHaveValue('3');
+
+  await maxAttempts.fill('');
+  await expect(maxAttempts).toHaveValue('');
+  await maxAttempts.blur();
+  await expect(maxAttempts).toHaveValue('');
+
+  await saveButton(page).click();
+  // A `NaN` a szám séma típus hibája, az üzenete a zod saját szövege, ezért itt csak a jelenléte számít.
+  await expect(maxAttempts).toHaveAttribute('aria-invalid', 'true');
+  await expect(maxAttempts).toHaveAccessibleDescription(/\S/u);
+  await expect(page.getByText(validationMessage(['nodes.3.config.maxAttempts']), { exact: true })).toBeVisible();
+  expect(putBodies).toHaveLength(0);
+
+  await maxAttempts.fill('4');
+  await expectNoFieldError(maxAttempts);
+  await saveButton(page).click();
+  await expect(page.getByText('Gráf mentve')).toBeVisible();
+  expect(parseSavedGraph(putBodies[0]).nodes.find((node) => node.id === 'n4')?.config).toMatchObject({
+    maxAttempts: 4,
+  });
+});
+
 test('a nem pozitív egész szám mentési kísérlet nélkül csak az érintett (elhagyott) mező alatt jelez (69. kritérium)', async ({
   page,
 }) => {

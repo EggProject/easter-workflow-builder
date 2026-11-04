@@ -1,3 +1,4 @@
+import type { StructuredOutputValidator } from '@easter-workflow-builder/agent';
 import type { ErrorHandlerNodeConfig } from '@easter-workflow-builder/db';
 import type { ProviderCapabilityDescriptor } from '@easter-workflow-builder/provider-capability';
 import type { SessionBearingInstance } from '../agent-step/session-bearing-instance.ts';
@@ -30,6 +31,10 @@ import type { NodeExecutionInstance } from './node-executor-instance.ts';
  * - `descriptor`: a **feloldott** provider leíró (11.1, 11.2).
  * - `sessionSourceNodes`, `sessionInstances`: a session kötés bemenetei
  *   (6.3, 6.4).
+ * - `structuredOutputValidator`: a futás indításakor lefordított strukturált
+ *   kimenet ellenőrző (SPEC-015 5.4), pontosan akkor megadva, ha a node
+ *   strukturált kimenetet vár; az `agent_step` és a `join` `ai_synthesis`
+ *   olvassa.
  */
 interface ExecuteNodeCommonFields {
   readonly instance: NodeExecutionInstance;
@@ -42,6 +47,7 @@ interface ExecuteNodeCommonFields {
   readonly descriptor: ProviderCapabilityDescriptor<string, string>;
   readonly sessionSourceNodes: SessionSourceNodes;
   readonly sessionInstances: readonly SessionBearingInstance[];
+  readonly structuredOutputValidator: StructuredOutputValidator | undefined;
 }
 
 /**

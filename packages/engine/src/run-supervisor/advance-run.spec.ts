@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-null -- a node configok, a `SnapshotEdge` és a `Fact<T | null>` nullázható mezői (SPEC-003 4.3, 5.1, SPEC-000 5.) valódi `null` értéket hordoznak */
 import { describe, expect, it } from 'vitest';
-import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
+import { type AgentQueryRunner, compileStructuredOutputSchema } from '@easter-workflow-builder/agent';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type {
   DatabaseContext,
@@ -35,6 +35,16 @@ import type { ActiveRunHandle } from './active-run-registry.ts';
 import { advanceRun } from './advance-run.ts';
 import { buildNodePlans } from './build-node-plans.ts';
 import type { NodePlan, RunExecution } from './run-execution.ts';
+import type { StructuredOutputSchemaCompilerPort } from '../engine-port/structured-output-schema-compiler-port.ts';
+
+function ignoreLogLine(): void {
+  // szándékosan üres: a teszt nem a fordító naplóját vizsgálja
+}
+
+const SCHEMA_COMPILER: StructuredOutputSchemaCompilerPort = {
+  compile: (schema) =>
+    compileStructuredOutputSchema(schema, { info: ignoreLogLine, warn: ignoreLogLine, error: ignoreLogLine }),
+};
 
 const INSTALLED = '0.0.0-teszt';
 
@@ -498,6 +508,7 @@ function openFixture(options: FixtureOptions = {}): Fixture {
     clock,
     idGenerator: { nextId: notCalled },
     processEnvironment: { read: () => null, readAll: () => ({}) },
+    structuredOutputSchemaCompiler: SCHEMA_COMPILER,
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },
@@ -523,6 +534,7 @@ function openFixture(options: FixtureOptions = {}): Fixture {
       options.loopBackEdgeIds === undefined ? validated : { ...validated, loopBackEdgeIds: options.loopBackEdgeIds },
     nodePlans: options.nodePlans ?? plans,
     sessionSourceNodes: collectSessionSourceNodes(validated.nodeConfigsById),
+    structuredOutputValidators: new Map(),
     runInput: {},
     scheduler,
     executedInstances: [],

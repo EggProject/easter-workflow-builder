@@ -1,29 +1,39 @@
-import { compileStructuredOutputSchema } from '@easter-workflow-builder/agent';
+import type { StructuredOutputValidator } from '@easter-workflow-builder/agent';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
+import type { StructuredOutputSchemaCompilerPort } from '../engine-port/structured-output-schema-compiler-port.ts';
 import { agentStepConfigOf } from './agent-step-config-of.ts';
 import type { ExecutableNodeConfig } from './executable-node-config.ts';
 
 /**
  * A futás indítási ellenőrzése a strukturált kimenetet váró lépések sémájára
  * (SPEC-015 5.4): minden `agent_step` és `join` `ai_synthesis` alobjektum
- * sémája lefordul az agent csomag fordítójával (az Ajv a meta-sémára is
- * ellenőriz, a draft-07-nél újabb `$schema` érvénytelen), különben
- * `invalid_structured_output_schema` hiba a csomópont nevével. Ugyanez a
- * fordító dönt a gráf mentésekor is (5.7).
+ * sémája lefordul a `structuredOutputSchemaCompiler` porton (az Ajv a
+ * meta-sémára is ellenőriz, a draft-07-nél újabb `$schema` érvénytelen),
+ * különben `invalid_structured_output_schema` hiba a csomópont nevével.
+ * Ugyanez a fordító dönt a gráf mentésekor is (5.7).
+ *
+ * Az eredmény a lefordított ellenőrzők térképe csomópont azonosító szerint,
+ * pontosan a strukturált kimenetet váró csomópontokra: a futás ezt adja át a
+ * lépésnek, tehát a lépés kimenetét az itt lefordított ellenőrző vizsgálja,
+ * újrafordítás nélkül.
  *
  * Indok: az SDK az érvénytelen sémát a lépés elején utasítaná el (K-3), a
  * futás többi lépése addigra már lefutott volna. A SPEC-004 4.8 3. lépésében
  * fut, a `validateRun` után, tehát egyetlen adatbázis sort sem ír; az első
  * hibánál megáll.
  */
-export function validateStructuredOutputSchemas(configsById: ReadonlyMap<string, ExecutableNodeConfig>): Outcome<void> {
+export function validateStructuredOutputSchemas(
+  configsById: ReadonlyMap<string, ExecutableNodeConfig>,
+  compiler: StructuredOutputSchemaCompilerPort,
+): Outcome<ReadonlyMap<string, StructuredOutputValidator>> {
+  const validators = new Map<string, StructuredOutputValidator>();
   for (const [nodeId, config] of configsById) {
     const structuredOutput = agentStepConfigOf(config)?.structuredOutput;
     if (structuredOutput === undefined || structuredOutput === null) {
       continue;
     }
-    const compiled = compileStructuredOutputSchema(structuredOutput.schema);
+    const compiled = compiler.compile(structuredOutput.schema);
     if (compiled.kind === 'error') {
       return {
         kind: 'error',
@@ -33,6 +43,7 @@ export function validateStructuredOutputSchemas(configsById: ReadonlyMap<string,
         ),
       };
     }
+    validators.set(nodeId, compiled.value);
   }
-  return { kind: 'ok', value: undefined };
+  return { kind: 'ok', value: validators };
 }

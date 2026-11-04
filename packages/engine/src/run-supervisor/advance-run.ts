@@ -474,6 +474,7 @@ function buildRequest(
     descriptor: plan.descriptor,
     sessionSourceNodes: execution.sessionSourceNodes,
     sessionInstances: execution.sessionInstances,
+    structuredOutputValidator: execution.structuredOutputValidators.get(instance.nodeId),
   };
 
   const config = plan.config;

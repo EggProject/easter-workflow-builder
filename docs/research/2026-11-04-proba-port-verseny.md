@@ -54,7 +54,7 @@ Regressziós teszt: a `run-probe.spec.ts` "a portot a szerver maga köti le és 
 `runProbe` mellett `Expected "0", Received "39355"` hibával bukik. A `start-probe-server.spec.ts` a jelentés
 útját, a hibás első sort, a megszakítást és a kiosztott port ágát fedi.
 
-## 6. Ami nyitva marad
+## 6. Ami nyitva maradt (lezárva, 7. szekció)
 
 - A valódi `src/main.ts` csak pozitív portot fogad (`readServerConfig`, `readPositiveIntegerOrDefault`), ezért a
   valódi próba (`real-provider-probe.ts`, `assigned-port` ág) továbbra is előre választ portot, tehát ott az
@@ -63,3 +63,16 @@ Regressziós teszt: a `run-probe.spec.ts` "a portot a szerver maga köti le és 
 - Ugyanez a minta (szabad port kérése, bezárás, majd kötés) áll az `apps/server/src/startup-sequence/`
   `run-startup-sequence.spec.ts` és `continue-startup-with-database.spec.ts` tesztjeiben is, ugyanazon okból
   (a `runStartupSequence` csak pozitív portot fogad). Ott billegést nem mértünk.
+
+## 7. Lezárás (2026-11-04, `fix/sema-format-es-utomunka`)
+
+A 6. szekció mindkét pontja lezárva, ugyanazzal a megoldással, mint az 5. szekció: a valódi szerver
+(`apps/server/src/main.ts`) elfogadja az `EASTER_SERVER_PORT=0` értéket (`readServerConfig`, a port alsó
+határa `0`), a kötés után a lekötött portot a stdout első sorában jelenti
+(`src/startup-sequence/probe-port-report.ts`, a Node `server.address().port` értéke a `listening` után,
+<https://nodejs.org/api/net.html#serveraddress>), és a valódi próba (`real-provider-probe.ts`) ezt a jelentést
+olvassa. A `start-probe-server.ts` `assigned-port` ága és a `find-free-port.ts` megszűnt. A
+`run-startup-sequence.spec.ts` és a `continue-startup-with-database.spec.ts` sem választ előre portot: `0` portot
+kér és a jelentett portot olvassa, a foglalt port tesztje pedig a foglaló szerver saját, végig tartott portját
+használja. Saját ellenőrzés: a `src/main.ts` `EASTER_SERVER_PORT=0` mellett ideiglenes adatbázissal elindult, az
+első stdout sora `EASTER_PROBE_PORT=<port>` volt, és a jelentett porton a `GET /api/providers` `200` választ adott.

@@ -24,11 +24,11 @@ A `query-runner/` hat típus-only fájljához nincs `.spec.ts` (SPEC-002 6.3 pon
 futásidejű sort tartalmazó fájl a `create-agent-query-runner.ts`, aminek a `.spec.ts` párja
 mellette áll.
 
-Az `sdk-message-shape/` négy típus-only fájlja (`sdk-system-init-message.ts`,
-`sdk-result-subtype.ts`, `sdk-result-message.ts`, `structured-output-validator.ts`) mellé nem
-tartozik `.spec.ts` (SPEC-002 6.3 pont); a másik nyolc fájl futtatható sort tartalmaz (négy
-typeguard, a `hasStructuredOutput` segédfüggvény, a séma fordító, az ellenőrző és az eltérés
-leírása), mindegyik a `.spec.ts` párjával együtt.
+Az `sdk-message-shape/` öt típus-only fájlja (`sdk-system-init-message.ts`,
+`sdk-result-subtype.ts`, `sdk-result-message.ts`, `structured-output-validator.ts`,
+`structured-output-schema-logger.ts`) mellé nem tartozik `.spec.ts` (SPEC-002 6.3 pont); a másik kilenc fájl
+futtatható sort tartalmaz (négy typeguard, a `hasStructuredOutput` segédfüggvény, a séma fordító, az Ajv
+naplózó illesztője, az ellenőrző és az eltérés leírása), mindegyik a `.spec.ts` párjával együtt.
 
 Az `sdk-version/` egyetlen fájlja egy konstans, a `.spec.ts` párja pedig **regressziós teszt**: a
 konstans értékét a csomag `package.json` fájljában pinelt SDK verzióhoz méri, tehát egy frissítés,
@@ -40,8 +40,8 @@ fájlját (mérés: a csomag `exports` mezője hat bejegyzést sorol, `./package
 
 Az `agent` a `core`, a `logger` és a `provider-registry` csomagtól függhet (SPEC-002 4.
 szekció), L4 réteg. A `package.json` ma a `core`, a `logger`, a `provider-registry` és a
-`typeguards` workspace csomagot listázza, plusz külső függőségként az Agent SDK-t és az Ajv-t
-(SPEC-015 5.2; a verzió forrása a toolchain research fájl). A `typeguards` (L0) felvétele az `sdk-message-shape/` téma typeguardjaihoz kellett
+`typeguards` workspace csomagot listázza, plusz külső függőségként az Agent SDK-t, az Ajv-t és az
+`ajv-formats`-ot (SPEC-015 5.2; a verziók forrása a toolchain research fájl). A `typeguards` (L0) felvétele az `sdk-message-shape/` téma typeguardjaihoz kellett
 (`isRecord`, `isString`); ugyanez a minta a `packages/db` csomagban is áll, ami szintén nem
 szerepelt a SPEC-002 4. szekció "cél csomagtérkép" pillanatképében, mégis felvette a `typeguards`
 függőséget, mert a "kötelező a meglévő typeguardot használni, nem újraírni" szabály (gyökér
@@ -61,11 +61,15 @@ szűkítést a motor végzi.
 bemenete is így fogadja és maga normalizál, tehát a motor egyetlen sora sem függ az SDK
 típusdefiníciójától.
 
-**A strukturált kimenet sémáját az Ajv draft-07 alap osztálya ellenőrzi, opció eltérés nélkül.**
-Egyetlen opció áll explicit értéken, az `allErrors: false` (SPEC-015 5.2, K-8); minden más az Ajv
-alapértéke, tehát strict mód: a séma ismeretlen kulcsszava és az ismeretlen `format` érték (például
-`email`, mert az `ajv-formats` nincs bekötve) fordítási hiba. Az `$async: true` séma hibaág, mert az
-ellenőrzője ígéretet adna. A fordítás hívásonként új Ajv példánnyal fut.
+**A strukturált kimenet sémáját az Ajv draft-07 alap osztálya ellenőrzi.** Két opció áll explicit
+értéken: az `allErrors: false` (SPEC-015 5.2, K-8) és a `logger`, ami a fordító üzeneteit a hívó naplózójába
+írja (`create-ajv-logger.ts`, a konzol helyett); minden más az Ajv alapértéke, tehát strict mód. A `format`
+kulcsszó ellenőrzött: az `ajv-formats` alapértelmezett hívása a teljes (`full`) formátum listát veszi fel (user
+döntés 2026-11-04, SPEC-015 5.2); a listában nem szereplő `format` név és a séma ismeretlen kulcsszava
+fordítási hiba. Az `$async: true` séma hibaág, mert az ellenőrzője ígéretet adna. A fordítás hívásonként új Ajv
+példánnyal fut. A naplózó típusa szerkezeti (`StructuredOutputSchemaLogger`), nem a `logger` csomag
+`ServerLogger`-e, mert annak importja a `pino` típusdeklarációit is behúzná (a `packages/logger` `tsconfig.json`
+`skipLibCheck` indoka).
 
 ## Kapcsolódó dokumentumok
 

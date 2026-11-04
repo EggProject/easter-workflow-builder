@@ -1,3 +1,4 @@
+import type { StructuredOutputValidator } from '@easter-workflow-builder/agent';
 import type { Outcome } from '@easter-workflow-builder/core';
 import type {
   CancelRunTreeResult,
@@ -43,6 +44,7 @@ interface PreparedRun {
   readonly snapshot: BuildSnapshotDocumentInput;
   readonly validated: ValidatedRun;
   readonly nodePlans: ReadonlyMap<string, NodePlan>;
+  readonly structuredOutputValidators: ReadonlyMap<string, StructuredOutputValidator>;
 }
 
 /**
@@ -178,8 +180,12 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
     }
 
     // 3. (a strukturált kimenet sémáinak fordítása, SPEC-015 5.4): tiszta
-    //    számítás, port nélkül; ugyanaz a fordító dönt a gráf mentésekor (5.7).
-    const structuredOutputSchemas = validateStructuredOutputSchemas(validated.value.nodeConfigsById);
+    //    a `structuredOutputSchemaCompiler` porton, amit a szerver a gráf mentésének
+    //    ellenőrzéséhez is ad (5.7). A lefordított ellenőrzőket a lépés kapja meg.
+    const structuredOutputSchemas = validateStructuredOutputSchemas(
+      validated.value.nodeConfigsById,
+      ports.structuredOutputSchemaCompiler,
+    );
     if (structuredOutputSchemas.kind === 'error') {
       return structuredOutputSchemas;
     }
@@ -234,6 +240,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
       snapshot: { ...snapshotInput, providerByNodeId: validated.value.effectiveProviderByNodeId },
       validated: validated.value,
       nodePlans: nodePlans.value,
+      structuredOutputValidators: structuredOutputSchemas.value,
     });
   }
 
@@ -285,6 +292,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
       topology: prepared.validated,
       nodePlans: prepared.nodePlans,
       sessionSourceNodes: collectSessionSourceNodes(prepared.validated.nodeConfigsById),
+      structuredOutputValidators: prepared.structuredOutputValidators,
       runInput: request.input,
       scheduler: enqueueStartInstance(createSchedulerState(), prepared.validated.startNodeId),
       executedInstances: [],
