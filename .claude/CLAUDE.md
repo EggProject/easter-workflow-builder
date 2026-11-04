@@ -143,7 +143,9 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   osztályával bővült (user döntés 2026-10-25, SPEC-010 9.6). **A SPEC-009 osztályaival bővül**
   (user döntés 2026-10-28, SPEC-009 5.4 és 6.4, O-41 és O-43; végrehajtás: PLAN-012 T-012-8,
   T-012-9, T-012-11, T-012-24): a motor oldali `skill_not_found`, `mcp_server_not_found` és
-  `missing_mcp_server_env` a részhalmaz szabály alá esik; a skill feltöltés tizenöt elutasítási
+  `missing_mcp_server_env` (2026-11-04 óta az `agent_skill_not_in_step` és az
+  `agent_mcp_server_override_conflict` is, SPEC-009 O-47, O-48) a részhalmaz szabály alá esik; a skill
+  feltöltés tizenhat (2026-11-04 óta a `skill_archive_path_too_long` osztállyal, O-50) elutasítási
   osztálya (a SPEC-009 5.4 táblája) viszont **szerver oldali** (`apps/server` `skill-endpoint`, egyetlen
   `as const` táblában), nem `EngineErrorKind` tag, ezért az `already_decided` mintájára a típusszintű
   `Exclude` ág és a futásidejű lista ezzel a táblával bővül. A feltöltési osztályok kódja
