@@ -553,7 +553,7 @@ test('a "Nincs megadva" választás a PATCH törzsében null providerId, az ör�
 
 // A "Beépített skillek" háromállású választó (SPEC-009 O-44, user döntés 2026-11-04): a workflow
 // tárolt értéke kiválasztva áll, a választás a `PATCH` törzsébe kerül, az örökölt választás `null`.
-test('a beépített skillek választása a PATCH törzsébe kerül, az örökölt választás null értékkel (SPEC-009 O-44)', async ({
+test('a beépített skillek választása a PATCH törzsébe kerül, az örökölt választás null értékkel, az Elérhetők true értékkel (SPEC-009 O-44)', async ({
   page,
 }) => {
   const calls = await installEditMocks(page, { workflow: { ...ALFA, builtinSkillsEnabled: true } });
@@ -572,6 +572,12 @@ test('a beépített skillek választása a PATCH törzsébe kerül, az örököl
   await secondDialog.getByRole('button', { name: 'Mentés' }).click();
   await expect(secondDialog).toBeHidden();
 
+  const thirdDialog = await openEditModal(page, /Alfa workflow/);
+  const thirdSelect = thirdDialog.getByRole('combobox', { name: 'Beépített skillek' });
+  await chooseSelectOption(page, thirdSelect, 'Elérhetők');
+  await thirdDialog.getByRole('button', { name: 'Mentés' }).click();
+  await expect(thirdDialog).toBeHidden();
+
   expect(calls.updates.map((update) => update.body)).toEqual([
     {
       name: 'Alfa workflow',
@@ -584,6 +590,12 @@ test('a beépített skillek választása a PATCH törzsébe kerül, az örököl
       description: 'Az első teszt workflow',
       providerId: 'claude-subscription',
       builtinSkillsEnabled: null,
+    },
+    {
+      name: 'Alfa workflow',
+      description: 'Az első teszt workflow',
+      providerId: 'claude-subscription',
+      builtinSkillsEnabled: true,
     },
   ]);
 });
