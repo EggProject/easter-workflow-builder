@@ -591,6 +591,40 @@ describe('createWorkflowRunRepository', () => {
 
       sqlite.close();
     });
+
+    it('invalid_graph_snapshot_hash hibaágat ad, ha a tárolt graph_snapshot_hash nem 64 karakteres kisbetűs hexadecimális szöveg (korrupt adat)', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      const document = minimalDocument('w1', 'Korrupt4');
+      // Az idegen kulcs bekapcsolt marad, ezért a rossz alakú lenyomathoz is
+      // tartozik `graph_snapshot` sor: a `graph_snapshot.hash` oszlopon nincs `CHECK`.
+      const corruptHash = computeSnapshotHash(okOrThrow(canonicalizeSnapshotDocument(document))).toUpperCase();
+      database
+        .insert(graphSnapshotTable)
+        .values({ hash: corruptHash, documentVersion: 1, document, firstCapturedAtMs: new Date(0) })
+        .run();
+      database
+        .insert(workflowRunTable)
+        .values({
+          id: 'corrupt-run-4',
+          workflowId: 'w1',
+          status: 'pending',
+          input: {},
+          providerId: 'minimax',
+          rootRunId: 'corrupt-run-4',
+          depth: 0,
+          workflowAncestry: ['w1'],
+          graphSnapshotHash: corruptHash,
+          persistedStreamDeltas: false,
+          createdAtMs: new Date(0),
+        })
+        .run();
+
+      expect(errorOrThrow(repository.getRun('corrupt-run-4'))).toContain('invalid_graph_snapshot_hash');
+      expect(errorOrThrow(repository.listRuns())).toContain('invalid_graph_snapshot_hash');
+
+      sqlite.close();
+    });
   });
 
   describe('állapotváltók (compare and set)', () => {
