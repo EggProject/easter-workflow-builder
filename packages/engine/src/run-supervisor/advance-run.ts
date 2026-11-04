@@ -550,8 +550,13 @@ function startReadyInstances(
  * doksijában leírt sorrendben. Az első hibaágat adja vissza: a jóváhagyás
  * sorok írásáét, különben a gyerek futások lezárásáét.
  */
-async function stopFailedRun(runId: string, dependencies: NodeExecutorDependencies): Promise<Outcome<unknown>> {
+async function stopFailedRun(
+  execution: RunExecution,
+  dependencies: NodeExecutorDependencies,
+): Promise<Outcome<unknown>> {
+  const { runId } = execution;
   const runIds = new Set([runId]);
+  execution.stopController.abort();
   dependencies.concurrencyGate.denyWaitingForRunIds(runIds);
   dependencies.approvalRegistry.cancelWaitingForRunIds(runIds);
   const approvalsClosed = closeWaitingApprovalStepRuns(runIds, 'cancelled', dependencies.ports.database);
@@ -570,7 +575,14 @@ async function stopFailedRun(runId: string, dependencies: NodeExecutorDependenci
  * **`fail_run` és külső leállítás után nem indul új lépés**, és a `fail_run`
  * a MÁR elindított testvér lépéseket is leállítja (8.3 táblázat: "a motor
  * megszakítja a többi futó lépést, minden nem terminális lépést lezár").
- * Ugyanaz a három primitíva, ugyanabban a sorrendben, amit a külső
+ * **Elsőként a futás leállításának jele szakad meg**
+ * (`RunExecution.stopController`, user döntés 2026-11-04): a testvér ágon
+ * backoffra váró `error_handler` a várakozás kivárása nélkül, `interrupted`
+ * kimenettel tér vissza, újabb kísérletet nem ütemez, és a `running` sorát a
+ * `finishRun` zárja `cancelled` állapotba (`cancelStoppedStepRuns`, SPEC-004
+ * 8.2 3. pont).
+ *
+ * Utána ugyanaz a három primitíva, ugyanabban a sorrendben, amit a külső
  * megszakítás is használ (`run-interrupt/stop-and-await-run-tree.ts` 2 ... 4.
  * pont): a szabályozó sorában álló testvérek kivétele
  * (`ConcurrencyGate.denyWaitingForRunIds`), a döntésre váró jóváhagyások
@@ -642,7 +654,7 @@ async function runSchedulingLoop(
   for (;;) {
     if (!hasInterruptedSiblings && execution.failRunRequested) {
       hasInterruptedSiblings = true;
-      stopped = await stopFailedRun(execution.runId, dependencies);
+      stopped = await stopFailedRun(execution, dependencies);
     }
     if (!execution.failRunRequested && !execution.stopRequested) {
       const started = startReadyInstances(execution, dependencies, inFlight);
@@ -666,9 +678,10 @@ async function runSchedulingLoop(
 
 /**
  * A `fail_run` záró lépése a futás sorának írása előtt (SPEC-004 8.3:
- * "minden nem terminális lépést lezár"): a futás minden `pending` lépés sora
- * `cancelled` állapotba megy (SPEC-003 7.2, `pending -> cancelled`, "a futás
- * megszakadt, mielőtt a lépés elindult").
+ * "minden nem terminális lépést lezár"): a futás minden `pending` és
+ * `running` lépés sora `cancelled` állapotba megy (SPEC-003 7.2, `pending ->
+ * cancelled`, "a futás megszakadt, mielőtt a lépés elindult", és `running ->
+ * cancelled`, "megszakítás").
  *
  * Ilyen sort a szabályozó sorából kivett testvér lépés
  * (`agent-node-lifecycle.ts`) hagy maga után, `interrupted` eredménnyel. A
@@ -678,9 +691,10 @@ async function runSchedulingLoop(
  * előtt helyet kapott testvér sora is lehet még `pending`, és a korai
  * lezárása a `markStepRunning`-ot buktatná. A `waiting_approval`
  * sor itt már nem létezik, azt a hurok a várakozás lezárásával egy időben
- * zárja (`runSchedulingLoop`). `running` sor itt nem lehet: a hurok ekkorra
- * minden elindított példányt megvárt, és a futó agent lépés a saját
- * végrehajtóján zár. Ugyanaz a végállapot, amit a külső megszakítás
+ * zárja (`runSchedulingLoop`). `running` sort egyedül a backoff várakozásában
+ * megszakított `error_handler` hagy (`execute-error-handler.ts`, `interrupted`
+ * kimenet, sor írás nélkül): a hurok ekkorra minden elindított példányt
+ * megvárt, és a futó agent lépés a saját végrehajtóján zár. Ugyanaz a végállapot, amit a külső megszakítás
  * `cancelRunTree` tranzakciója ír ugyanezekre a sorokra (9. szekció 5.
  * pont); lépés eseményt az sem ír.
  */
@@ -690,7 +704,7 @@ function cancelStoppedStepRuns(runId: string, database: DatabaseContext): Outcom
     return steps;
   }
   for (const step of steps.value) {
-    if (step.status !== 'pending') {
+    if (step.status !== 'pending' && step.status !== 'running') {
       continue;
     }
     const cancelled = database.stepRuns.markStepCancelled(step.id);

@@ -83,8 +83,10 @@ export interface PendingFailure {
  *   ettől kezdve nem indít új lépést, és a futás `failed` állapotban zár.
  * - `stopRequested`: KÜLSŐ leállítás (`ActiveRunHandle.requestStop`). A hurok
  *   nem indít új lépést, és a záró állapot írását a leállítást kérőre hagyja.
- * - `stopController`: a külső leállítás jele; a `requestStop` megszakítja, és
- *   a jelén szakad meg az `error_handler` backoff várakozása (8.2 3. pont).
+ * - `stopController`: a futás leállításának jele; a `requestStop` és a
+ *   `fail_run` leállítási menete (`advance-run.ts` `stopFailedRun`) szakítja
+ *   meg, és a jelén szakad meg az `error_handler` backoff várakozása (8.2 3.
+ *   pont). A `stopRequested` jelzőt a `fail_run` nem állítja.
  */
 export interface RunExecution {
   readonly runId: string;
