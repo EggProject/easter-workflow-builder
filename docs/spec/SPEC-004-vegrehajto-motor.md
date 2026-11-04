@@ -107,17 +107,20 @@ Engine {
 
 A motor kilenc portot kap. Egyik sem opcionális, és egyiknek sincs a motorban szállított implementációja. Ez a paraméterezhetőség szerkezeti alapja: a motor tesztje ugyanezeken a portokon át kap hamis viselkedést, tehát **soha nem hív valós API-t** (14. szekció).
 
-| Port                       | Szerződés                                                                                         | Ki adja éles futásban                                              |
-| -------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `database`                 | a `DatabaseContext`, ahogy a `db` barrel exportálja                                               | `apps/server`, az `openDatabase` eredménye                         |
-| `agentQueryRunner`         | `run(request): AgentQuery`, ahol az `AgentQuery` egy `AsyncIterable<unknown>` plusz `interrupt()` | `@easter-workflow-builder/agent`                                   |
-| `providerDescriptorLookup` | `(providerId) => ProviderCapabilityDescriptor<string, string>`                                    | `apps/server`, a `provider-registry` fölött                        |
-| `expressionEvaluator`      | `evaluate(expression, context): Outcome<unknown>` és `compile(expression): Outcome<void>`         | `apps/server`, a CEL implementációval (O-1 lezárva, SPEC-010)      |
-| `templateRenderer`         | `render(template, context): Outcome<string>` és `compile(template): Outcome<void>`                | `apps/server`, a Mustache implementációval (O-1 lezárva, SPEC-010) |
-| `eventPublisher`           | `publish(event): void`, az élő WebSocket folyam kimenete                                          | `apps/server`                                                      |
-| `clock`                    | `nowMs(): number` és `sleep(ms, signal): Promise<void>`                                           | `apps/server`                                                      |
-| `idGenerator`              | `nextId(): string`                                                                                | `apps/server`                                                      |
-| `processEnvironment`       | `read(name): string \| null`, kizárólag olvasás                                                   | `apps/server`                                                      |
+| Port                             | Szerződés                                                                                                            | Ki adja éles futásban                                                   |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `database`                       | a `DatabaseContext`, ahogy a `db` barrel exportálja                                                                  | `apps/server`, az `openDatabase` eredménye                              |
+| `agentQueryRunner`               | `run(request): AgentQuery`, ahol az `AgentQuery` egy `AsyncIterable<unknown>` plusz `interrupt()`                    | `@easter-workflow-builder/agent`                                        |
+| `providerDescriptorLookup`       | `(providerId) => ProviderCapabilityDescriptor<string, string>`                                                       | `apps/server`, a `provider-registry` fölött                             |
+| `expressionEvaluator`            | `evaluate(expression, context): Outcome<unknown>` és `compile(expression): Outcome<void>`                            | `apps/server`, a CEL implementációval (O-1 lezárva, SPEC-010)           |
+| `templateRenderer`               | `render(template, context): Outcome<string>` és `compile(template): Outcome<void>`                                   | `apps/server`, a Mustache implementációval (O-1 lezárva, SPEC-010)      |
+| `eventPublisher`                 | `publish(event): void`, az élő WebSocket folyam kimenete                                                             | `apps/server`                                                           |
+| `clock`                          | `nowMs(): number` és `sleep(ms, signal): Promise<void>`                                                              | `apps/server`                                                           |
+| `idGenerator`                    | `nextId(): string`                                                                                                   | `apps/server`                                                           |
+| `processEnvironment`             | `read(name): string \| null`, kizárólag olvasás                                                                      | `apps/server`                                                           |
+| `structuredOutputSchemaCompiler` | `compile(schema): Outcome<StructuredOutputValidator>`, a strukturált kimenet sémájának fordítója (SPEC-015 5.3, 5.4) | `apps/server`, az `agent` csomag fordítójával és a szerver naplózójával |
+
+A táblázat utolsó sora 2026-11-04 óta áll (SPEC-015 5.3): a fordító a figyelmeztetéseit a szerver naplózójába írja, a motor naplózót nem ismer. A táblázat a SPEC-009 `skillLibrary` portját nem sorolja; a portok teljes, mérvadó listája a `packages/engine/src/engine-port/engine-dependencies.ts` `EngineDependencies` típusa.
 
 **Miért port a `clock` és az `idGenerator`.** Az ütemező determinisztikus tesztelhetősége ezen áll: a backoff várakozás, a jóváhagyás időkorlátja és minden időbélyeg a `clock` porton megy át, tehát a teszt valós idő nélkül léptet. Az azonosítók a `step_run` sorokban jelennek meg, tehát a teszt elvárása csak akkor stabil, ha a generátor is befecskendezett.
 

@@ -3,7 +3,7 @@
 |          |                                                                                                                                                                                                     |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Státusz  | jóváhagyott: a 7.1 szekció O-1 ... O-3 termékkérdése lezárva (user döntés 2026-11-04); a technikai döntések forrásból lezárva (5. szekció)                                                          |
-| Dátum    | 2026-11-03, átvezetve 2026-11-04                                                                                                                                                                    |
+| Dátum    | 2026-11-03, átvezetve 2026-11-04 (a `format` kulcsszó, a fordító naplózója és a lefordított ellenőrző átadása: 5.2, 5.3, 5.4)                                                                       |
 | Előzmény | [`SPEC-003`](SPEC-003-domain-perzisztencia.md) 4.6, [`SPEC-004`](SPEC-004-vegrehajto-motor.md) 5.2 és 17. szekció 21. kritérium, [`SPEC-013`](SPEC-013-flash-es-haiku.md) 3.2 (a Flash leíró mezői) |
 | Bemenet  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md) 2. és 4. szekció; a hiányleltár H-17 tétele                                          |
 | Kimenet  | a strukturált kimenetet váró lépés csak akkor `succeeded`, ha a kimenet a beállított sémára illeszkedik; a SPEC-004 21. kritériuma teljesül                                                         |
@@ -88,21 +88,40 @@ kimenetet a sémára ellenőrzi. Indok: a gyártó saját példája és az API d
 
 A verzió a PLAN-016 F0 lépésében élő registry lekérdezésből, két forrásból, a
 `docs/research/2026-08-26-toolchain.md` fájlba vezetve pinelődik (`.claude/CLAUDE.md` 4. szekció 4. pont).
-Opciók: `allErrors: false` (K-8), `$data` nincs bekapcsolva (alapból kikapcsolt, K-8), minden más az Ajv
-alapértékén marad (nincs dokumentált okunk eltérni).
+Opciók: `allErrors: false` (K-8), `$data` nincs bekapcsolva (alapból kikapcsolt, K-8), `logger` a szerver
+naplózója (5.3), minden más az Ajv alapértékén marad (nincs dokumentált okunk eltérni).
+
+**A `format` kulcsszó ellenőrzött (user döntés 2026-11-04, "Ellenőrizzük").** Az Ajv alap osztálya formátumot
+nem ismer, és strict módban minden `format` kulcsszót tartalmazó sémát elutasít (`unknown format "email" ignored
+in schema`, a telepített `ajv/lib/vocabularies/format/format.ts` `unknownFormat` ága). A fordító ezért az
+`ajv-formats` csomag alapértelmezett hívásával (`addFormats(ajv)`) veszi fel a teljes (`full`) módú formátum
+listát (`date`, `time`, `date-time`, `duration`, `uri`, `email`, `hostname`, `ipv4`, `ipv6`, `uuid`, `regex` és
+társaik, a telepített `ajv-formats/src/formats.ts` `fullFormats` táblája), tehát az ilyen kulcsszó a kimeneten
+ténylegesen ellenőrzött. A listában nem szereplő `format` név változatlanul fordítási hiba (strict mód), tehát
+mentéskor és indításkor elutasít. A verzió a toolchain research fájlban, két forrással.
 
 ### 5.3 A kód helye
 
 Az ellenőrző függvény az `agent` csomag `sdk-message-shape` témájába kerül, a `hasStructuredOutput` mellé,
-mert a motor ma is onnan importálja a result alakjának kérdéseit (`run-agent-step.ts:2`). Új motor port nem
-kell: az Ajv tiszta számítás, nem I/O, tehát a SPEC-004 3.2 portlistája (adatbázis, SDK, óra, azonosító,
-környezet, kiadó, a két nyelvi port) nem bővül. Az `agent` csomag `package.json` függősége bővül az Ajv-vel;
-a réteg térkép nem változik, mert külső csomag.
+mert a motor ma is onnan importálja a result alakjának kérdéseit (`run-agent-step.ts:2`). Az `agent` csomag
+`package.json` függősége bővül az Ajv-vel és az `ajv-formats`-szal; a réteg térkép nem változik, mert külső
+csomag.
+
+**A fordító naplózója, és ezért egy motor port (átvezetve 2026-11-04).** Az Ajv a strict mód figyelmeztetéseit
+(alapból a `strictTypes` és a `strictTuples` `"log"` módja) a `logger` opción át írja, alapból a konzolra
+(`ajv/lib/core.ts` `getLogger`, `ajv/lib/compile/util.ts` `checkStrictMode`). A fordító ezért a naplózót
+paraméterként kapja (`compileStructuredOutputSchema(schema, logger)`), és az Ajv három metódusát az azonos nevű
+pino szintre képezi (`log` az `info`-ra, SPEC-006 7.2). A motor naplózót nem ismer, ezért a fordítást a
+`structuredOutputSchemaCompiler` porton kapja (a SPEC-004 3.2 portlistája ezzel bővül); a szerver ugyanazt a
+fordítót (`createStructuredOutputSchemaCompiler(logger)`) adja a motornak és a gráf mentésének ellenőrzéséhez.
 
 ### 5.4 A séma saját érvényessége
 
 - **A futás indításakor** a motor minden strukturált kimenetet váró lépés sémáját lefordítja (az Ajv a
-  meta-sémára is ellenőriz, K-7). Érvénytelen séma esetén a futás nem indul, új osztály:
+  meta-sémára is ellenőriz, K-7), és a lefordított ellenőrzőt a futás végrehajtási állapota csomópontonként
+  megőrzi; a lépés ezt kapja meg (`AgentStepRequest.structuredOutputValidator`), és a kimenetét ezzel
+  ellenőrzi, újrafordítás nélkül (átvezetve 2026-11-04: a lépésen belüli újrafordítás hibaága a termékúton
+  sosem futott, mert minden futás, az újraindítás és az al-workflow is, az indítás ellenőrzésén megy át). Érvénytelen séma esetén a futás nem indul, új osztály:
   `invalid_structured_output_schema`, a `ProtocolErrorClass` szótárba és a kliens magyar mondatai közé is
   felvéve, a meglévő sodródás védelemmel. Ez megelőzi, hogy az SDK a lépés elején álljon le (K-3), miközben
   a futás többi lépése már lefutott.

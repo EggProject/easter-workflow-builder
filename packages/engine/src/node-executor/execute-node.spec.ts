@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-null -- a node configok, a `CreateStepRunInput` és a `Fact<T | null>` nullázható mezői (SPEC-003 4.3, 9.2, SPEC-000 5.) a tárolt/mért alakban valódi `null` értéket hordoznak, nem helyőrző `undefined`-et */
 import { describe, expect, it } from 'vitest';
-import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
+import { type AgentQueryRunner, compileStructuredOutputSchema } from '@easter-workflow-builder/agent';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type { AgentStepConfig, DatabaseContext, StepRunRecord } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
@@ -18,6 +18,16 @@ import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutionResult } from './node-executor-result.ts';
 import type { ExecuteNodeRequest } from './execute-node-request.ts';
 import type { NodeExecutorDependencies } from './node-executor-dependencies.ts';
+import type { StructuredOutputSchemaCompilerPort } from '../engine-port/structured-output-schema-compiler-port.ts';
+
+function ignoreLogLine(): void {
+  // szándékosan üres: a teszt nem a fordító naplóját vizsgálja
+}
+
+const SCHEMA_COMPILER: StructuredOutputSchemaCompilerPort = {
+  compile: (schema) =>
+    compileStructuredOutputSchema(schema, { info: ignoreLogLine, warn: ignoreLogLine, error: ignoreLogLine }),
+};
 
 type PlainNodeConfig = ExecuteNodeRequest extends infer TRequest
   ? TRequest extends { readonly kind: 'node'; readonly config: infer TConfig }
@@ -138,6 +148,7 @@ function enginePorts(database: DatabaseContext, published: unknown[], runner: Ag
     },
     idGenerator: { nextId: notCalled },
     processEnvironment: { read: () => null, readAll: () => ({}) },
+    structuredOutputSchemaCompiler: SCHEMA_COMPILER,
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },
@@ -336,6 +347,7 @@ function plainRequest(runId: string, nodeId: string, config: PlainNodeConfig): E
     descriptor: descriptor(),
     sessionSourceNodes: { sourceNodeIds: new Set(), continuedNodeIds: new Set() },
     sessionInstances: [],
+    structuredOutputValidator: undefined,
   };
 }
 

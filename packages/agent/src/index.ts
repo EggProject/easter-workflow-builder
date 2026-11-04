@@ -32,6 +32,7 @@ export { hasStructuredOutput } from './sdk-message-shape/has-structured-output.t
 // fordítója és a lefordított ellenőrző futtatása. A fordítót a futás indítása
 // és a gráf mentése is hívja, az ellenőrzőt a lépés zárása.
 export type { StructuredOutputValidator } from './sdk-message-shape/structured-output-validator.ts';
+export type { StructuredOutputSchemaLogger } from './sdk-message-shape/structured-output-schema-logger.ts';
 export { compileStructuredOutputSchema } from './sdk-message-shape/compile-structured-output-schema.ts';
 export { checkStructuredOutput } from './sdk-message-shape/check-structured-output.ts';
 

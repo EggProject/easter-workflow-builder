@@ -1,3 +1,4 @@
+import type { StructuredOutputValidator } from '@easter-workflow-builder/agent';
 import type { UnhandledErrorPolicy } from '@easter-workflow-builder/db';
 import type { ProviderCapabilityDescriptor, ProviderId } from '@easter-workflow-builder/provider-capability';
 import type { SessionBearingInstance } from '../agent-step/session-bearing-instance.ts';
@@ -69,6 +70,10 @@ export interface PendingFailure {
  * megfontolás, mint a `concurrency-gate` esetén, csak ott a megosztás, itt a
  * hurok ciklikus természete indokolja (`packages/engine/CLAUDE.md`).
  *
+ * - `structuredOutputValidators`: a futás indításakor lefordított strukturált
+ *   kimenet ellenőrzők csomópont azonosító szerint, pontosan a strukturált
+ *   kimenetet váró csomópontokra (SPEC-015 5.4,
+ *   `validate-structured-output-schemas.ts`); a lépés ezt kapja meg.
  * - `executedInstances`: a lefutott példányok, **időrendben**; a `steps`
  *   hivatkozás feloldás (6.2) és a `join` bemenetek (5.6) forrása.
  * - `sessionInstances`: azoknak a lefutott példányoknak a szűrése, amiknek a
@@ -93,6 +98,7 @@ export interface RunExecution {
   readonly topology: RunTopology;
   readonly nodePlans: ReadonlyMap<string, NodePlan>;
   readonly sessionSourceNodes: SessionSourceNodes;
+  readonly structuredOutputValidators: ReadonlyMap<string, StructuredOutputValidator>;
   readonly runInput: unknown;
   scheduler: SchedulerState;
   readonly executedInstances: ExecutedStepInstance[];

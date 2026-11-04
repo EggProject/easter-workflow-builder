@@ -2,29 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import net from 'node:net';
 import process from 'node:process';
 import type { EnvironmentReader } from '@easter-workflow-builder/core';
 import { runStartupSequence } from './run-startup-sequence.ts';
-
-function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = net.createServer();
-    probe.listen(0, '127.0.0.1', () => {
-      const address = probe.address();
-      if (address !== null && typeof address === 'object') {
-        const port = address.port;
-        probe.close(() => {
-          resolve(port);
-        });
-        return;
-      }
-      probe.close(() => {
-        reject(new Error('nem sikerült szabad portot találni'));
-      });
-    });
-  });
-}
+import { PROBE_PORT_REPORT_PREFIX } from './probe-port-report.ts';
 
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => {
@@ -99,10 +80,8 @@ describe('runStartupSequence', () => {
     const blockingFile = fs.mkdtempSync(path.join(os.tmpdir(), 'easter-server-blocker-'));
     const blockingFilePath = path.join(blockingFile, 'nem-konyvtar');
     fs.writeFileSync(blockingFilePath, 'ez egy fájl, nem könyvtár');
-    const unusablePort = await findFreePort();
-
     const environment: EnvironmentReader = {
-      ...baseEnvironment(unusablePort, logDirectory),
+      ...baseEnvironment(0, logDirectory),
       EASTER_DB_FILE: path.join(blockingFilePath, 'sub', 'db.sqlite'),
     };
 
@@ -113,11 +92,22 @@ describe('runStartupSequence', () => {
 
   it('valós, memóriabeli adatbázissal elindul, egy REST végpontot kiszolgál, majd SIGTERM-re szabályosan leáll', async () => {
     const logDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'easter-server-log-'));
-    const port = await findFreePort();
-    const environment: EnvironmentReader = { ...baseEnvironment(port, logDirectory), EASTER_LOG_LEVEL: 'debug' };
-
-    await runStartupSequence(environment, process.cwd());
+    const environment: EnvironmentReader = { ...baseEnvironment(0, logDirectory), EASTER_LOG_LEVEL: 'debug' };
+    const written: string[] = [];
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array) => {
+      written.push(String(chunk));
+      return true;
+    });
+    try {
+      await runStartupSequence(environment, process.cwd());
+    } finally {
+      writeSpy.mockRestore();
+    }
     expect(process.exitCode).toBeUndefined();
+    // A 0 portot az operációs rendszer a kötéskor osztja ki; a szerver a stdoutra jelenti (SPEC-012 5.1).
+    const report = written.find((chunk) => chunk.startsWith(PROBE_PORT_REPORT_PREFIX)) ?? '';
+    const port = Number(report.slice(PROBE_PORT_REPORT_PREFIX.length));
+    expect(port).toBeGreaterThan(0);
 
     const response = await fetch(`http://127.0.0.1:${String(port)}/api/workflows?limit=10`);
     expect(response.status).toBe(200);

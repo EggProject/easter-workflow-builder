@@ -32,6 +32,7 @@ import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
 import { createHttpServer } from '../http-server/create-http-server.ts';
 import { buildTestZipArchive } from '../skill-endpoint/build-test-zip-archive.ts';
 import { testZipFileEntry } from '../skill-endpoint/test-zip-file-entry.ts';
+import { TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER } from '../engine-assembly/test-structured-output-schema-compiler.ts';
 
 /**
  * SPEC-009 12. szekció 19. és 22. kritérium (PLAN-012 T-012-13): végponttól
@@ -181,7 +182,13 @@ async function startProbe(directory: string, skillRoot: string): Promise<Probe> 
     agentQueryRunner: recordingAgentQueryRunner(requests),
   });
   const server = createHttpServer({
-    handlers: buildRouteHandlers(database, engine, streamRegistry, skillLibrary),
+    handlers: buildRouteHandlers(
+      database,
+      engine,
+      streamRegistry,
+      skillLibrary,
+      TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+    ),
     devOrigin: undefined,
     streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
     logger,

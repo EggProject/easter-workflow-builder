@@ -6,6 +6,7 @@ import type { ServerLogger } from '@easter-workflow-builder/logger';
 import { buildEngineDependencies } from '../engine-assembly/build-engine-dependencies.ts';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
 import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
+import { createStructuredOutputSchemaCompiler } from '../engine-assembly/create-structured-output-schema-compiler.ts';
 import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
 import { createHttpServer } from '../http-server/create-http-server.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
@@ -13,6 +14,8 @@ import { registerShutdownSignalHandlers } from '../shutdown-sequence/register-sh
 import type { ServerConfig } from '../server-config/server-config.ts';
 import { removeStagingLeftovers } from '../skill-endpoint/remove-staging-leftovers.ts';
 import type { SkillLibrary } from '../skill-endpoint/skill-library.ts';
+import { formatProbePortReport } from './probe-port-report.ts';
+import { readListeningPort } from './read-listening-port.ts';
 
 /**
  * A szerver indulási sorrendjének 4 ... 7. lépése (SPEC-006 4.1, 4.2, 4.3):
@@ -69,7 +72,13 @@ export async function continueStartupWithDatabase(
 
   // 6. HTTP szerver összeállítása és a jelkezelők felvétele.
   const server = createHttpServer({
-    handlers: buildRouteHandlers(database, engine, streamRegistry, skillLibrary),
+    handlers: buildRouteHandlers(
+      database,
+      engine,
+      streamRegistry,
+      skillLibrary,
+      createStructuredOutputSchemaCompiler(logger),
+    ),
     devOrigin: config.devOrigin,
     streamDependencies: {
       database,
@@ -90,8 +99,13 @@ export async function continueStartupWithDatabase(
       process.exitCode = 1;
       resolve();
     });
+    // A `config.port` `0` is lehet: ilyenkor az operációs rendszer a kötéskor
+    // választ portot. A lekötött port a stdout első sorába kerül (SPEC-012 5.1,
+    // `probe-port-report.ts`), a hívó ebből tudja meg, melyik porton fogadunk.
     server.listen(config.port, '127.0.0.1', () => {
-      logger.info({ port: config.port }, 'A szerver elindult, kapcsolatot fogad.');
+      const port = readListeningPort(server);
+      process.stdout.write(formatProbePortReport(port));
+      logger.info({ port }, 'A szerver elindult, kapcsolatot fogad.');
       resolve();
     });
   });

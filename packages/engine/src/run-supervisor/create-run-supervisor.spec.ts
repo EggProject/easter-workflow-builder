@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- a node configok, a `WorkflowEdgeInput` és a `Fact<T | null>` nullázható mezői (SPEC-003 4.3, 4.7, SPEC-000 5.) a tárolt/mért alakban valódi `null` értéket hordoznak */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
+import { type AgentQueryRunner, compileStructuredOutputSchema } from '@easter-workflow-builder/agent';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type {
   AgentStepConfig,
@@ -34,6 +34,16 @@ import { interruptRun } from '../run-interrupt/interrupt-run.ts';
 import type { ActiveRunHandle } from './active-run-registry.ts';
 import { createRunSupervisor } from './create-run-supervisor.ts';
 import type { RunSupervisor } from './run-supervisor.ts';
+import type { StructuredOutputSchemaCompilerPort } from '../engine-port/structured-output-schema-compiler-port.ts';
+
+function ignoreLogLine(): void {
+  // szándékosan üres: a teszt nem a fordító naplóját vizsgálja
+}
+
+const SCHEMA_COMPILER: StructuredOutputSchemaCompilerPort = {
+  compile: (schema) =>
+    compileStructuredOutputSchema(schema, { info: ignoreLogLine, warn: ignoreLogLine, error: ignoreLogLine }),
+};
 
 const INSTALLED = '0.0.0-teszt';
 
@@ -360,6 +370,7 @@ function openHarness(options: HarnessOptions = {}): Harness {
       },
     },
     processEnvironment: { read: () => null, readAll: () => ({}) },
+    structuredOutputSchemaCompiler: SCHEMA_COMPILER,
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },
@@ -719,6 +730,34 @@ describe('createRunSupervisor', () => {
       });
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
       expect(harness.published).toStrictEqual([]);
+    });
+
+    it('az indításkor lefordított ellenőrző jut a lépéshez: a sémára nem illeszkedő kimenettel a lépés structured_output_schema_mismatch (SPEC-015 5.4, AC1)', async () => {
+      const harness = openHarness();
+      const workflowId = createWorkflow(
+        harness.database,
+        'sema-elteres',
+        [
+          startNode('start'),
+          nodeOf('a1', {
+            type: 'agent_step',
+            onUnhandledError: 'fail_run',
+            ...agentStepConfig('sikeres'),
+            structuredOutput: {
+              strategy: 'sdk_output_format',
+              schema: { type: 'object', properties: { osszeg: { type: 'string' } }, required: ['osszeg'] },
+            },
+          }),
+        ],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      const runId = await runToEnd(harness, workflowId);
+
+      expect(statusOf(harness.database, runId)).toBe('failed');
+      expect(stepRunsOf(harness.database, runId).find((row) => row.nodeId === 'a1')?.errorKind).toBe(
+        'structured_output_schema_mismatch',
+      );
     });
 
     it('hiányzó kötelező bemenet esetén nem jön létre workflow_run sor', () => {

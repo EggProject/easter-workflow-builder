@@ -19,7 +19,6 @@ import type { ProbeServerCommand } from './start-probe-server.ts';
  */
 
 const STUB_COMMAND: ProbeServerCommand = {
-  kind: 'reports-port',
   executable: process.execPath,
   args: [fileURLToPath(new URL('stub-agent-server.ts', import.meta.url))],
 };
@@ -158,7 +157,6 @@ describe('runProbe a hamis ágenses szerver ellen', () => {
       runProbe({
         providerId: 'minimax',
         serverCommand: {
-          kind: 'reports-port',
           executable: process.execPath,
           args: ['-e', `console.error('${FAKE_SECRET}'); process.exit(3)`],
         },

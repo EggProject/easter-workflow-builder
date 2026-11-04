@@ -8,6 +8,7 @@ export type { AgentQueryRunner } from './engine-port/agent-query-runner-port.ts'
 export type { ProviderDescriptorLookupPort } from './engine-port/provider-descriptor-lookup-port.ts';
 export type { ExpressionEvaluatorPort } from './engine-port/expression-evaluator-port.ts';
 export type { TemplateRendererPort } from './engine-port/template-renderer-port.ts';
+export type { StructuredOutputSchemaCompilerPort } from './engine-port/structured-output-schema-compiler-port.ts';
 export type { EventPublisherPort } from './engine-port/event-publisher-port.ts';
 export type { ClockPort } from './engine-port/clock-port.ts';
 export type { IdGeneratorPort } from './engine-port/id-generator-port.ts';

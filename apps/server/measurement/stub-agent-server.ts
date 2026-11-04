@@ -3,9 +3,9 @@
 // `:memory:` helyett fájl adatbázis a commitolt migrációkkal), KIZÁRÓLAG az
 // `agentQueryRunner` port hamis: a commitolt fixture üzenetsorát adja. Valódi
 // provider hívás nincs. A `run-probe.spec.ts` ezt indítja a valódi
-// `src/main.ts` helyett; a környezet és a leállítás ugyanaz (`EASTER_SERVER_PORT`,
-// `EASTER_DB_FILE`, `SIGTERM`), de a próba itt `0` portot kér, és a szerver a
-// ténylegesen lekötött portot a stdout első sorában jelenti.
+// `src/main.ts` helyett; a környezet, a leállítás és a port jelentése ugyanaz
+// (`EASTER_SERVER_PORT=0`, `EASTER_DB_FILE`, `SIGTERM`, a lekötött port a stdout
+// első sorában, `src/startup-sequence/probe-port-report.ts`).
 //
 // A `STUB_AGENT_REQUEST_FILE` útvonalra a hamis ágens a kapott kérés
 // ellenőrizhető részét írja (prompt, `maxTurns`, `model`, `effort`,
@@ -25,6 +25,7 @@ import {
 import { buildProviderDescriptorLookup } from '../src/engine-assembly/build-provider-descriptor-lookup.ts';
 import { createProcessEnvironmentReader } from '../src/engine-assembly/create-process-environment-reader.ts';
 import { createSkillLibraryReader } from '../src/engine-assembly/create-skill-library-reader.ts';
+import { createStructuredOutputSchemaCompiler } from '../src/engine-assembly/create-structured-output-schema-compiler.ts';
 import { createRandomUuidIdGenerator } from '../src/engine-assembly/create-random-uuid-id-generator.ts';
 import { createRealEventPublisher } from '../src/engine-assembly/create-real-event-publisher.ts';
 import { createSystemClock } from '../src/engine-assembly/create-system-clock.ts';
@@ -33,7 +34,7 @@ import { buildRouteHandlers } from '../src/route-registry/build-route-handlers.t
 import { TEST_SKILL_LIBRARY } from '../src/skill-endpoint/test-skill-library.ts';
 import { registerShutdownSignalHandlers } from '../src/shutdown-sequence/register-shutdown-signal-handlers.ts';
 import { createStreamRegistry } from '../src/stream-registry/create-stream-registry.ts';
-import { formatProbePortReport } from './probe-port-report.ts';
+import { formatProbePortReport } from '../src/startup-sequence/probe-port-report.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -122,6 +123,7 @@ const clock = createSystemClock();
 const idGenerator = createRandomUuidIdGenerator();
 const streamRegistry = createStreamRegistry(idGenerator);
 const logger = createServerLogger({ secretValues: [] }, { write: writeToStandardError });
+const structuredOutputSchemaCompiler = createStructuredOutputSchemaCompiler(logger);
 const engine = createEngine({
   database,
   agentQueryRunner: buildStubAgentQueryRunner(
@@ -136,9 +138,10 @@ const engine = createEngine({
   idGenerator,
   processEnvironment: createProcessEnvironmentReader(),
   skillLibrary: createSkillLibraryReader(skillLibrary.rootDirectory),
+  structuredOutputSchemaCompiler,
 });
 const server = createHttpServer({
-  handlers: buildRouteHandlers(database, engine, streamRegistry, skillLibrary),
+  handlers: buildRouteHandlers(database, engine, streamRegistry, skillLibrary, structuredOutputSchemaCompiler),
   devOrigin: undefined,
   streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
   logger,
@@ -146,7 +149,7 @@ const server = createHttpServer({
 });
 registerShutdownSignalHandlers({ server, engine, database, logger, streamRegistry });
 // A próba `0` portot kér: a portot az operációs rendszer itt, a kötéskor osztja
-// ki, és a szerver a stdout első sorában jelenti (`probe-port-report.ts`).
+// ki, és a szerver a stdout első sorában jelenti (`src/startup-sequence/probe-port-report.ts`).
 server.listen(port, '127.0.0.1', () => {
   const address = server.address();
   if (address !== null && typeof address !== 'string') {
