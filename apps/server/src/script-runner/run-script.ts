@@ -243,8 +243,20 @@ function timedOut(step: SandboxStep): ScriptRunResult {
   };
 }
 
+/**
+ * A `resolvePromise` gazda ígérete elutasíthat: a könyvtár a futás idejű
+ * `Promise.resolve` és `then` értéket hívja, és a `then` hibáját a gazda
+ * ígéret végrehajtójában dobja (`quickjs-emscripten-core` 0.32.0
+ * `resolvePromise`), tehát a szkript a saját `Promise`-ának felülírásával
+ * elutasítást válthat ki. Az elutasítás a lépés hibája; kezeletlenül a Node
+ * alapból leállítaná a szerver folyamatot (PLAN-015 T-015-12).
+ */
 async function evaluatedCompletion(promise: Promise<VmCallResult<QuickJSHandle>>): Promise<SandboxCompletion> {
-  return { kind: 'evaluated', result: await promise };
+  try {
+    return { kind: 'evaluated', result: await promise };
+  } catch (error) {
+    return { kind: 'host_crashed', error };
+  }
 }
 
 function hostFailure(error: unknown): ScriptRunResult {

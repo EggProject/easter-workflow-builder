@@ -249,6 +249,25 @@ describe('runScript', () => {
     });
   });
 
+  describe('a sandbox Promise felülírása (T-015-12)', () => {
+    // A könyvtár `resolvePromise` hívása a futás idejű `Promise.resolve` és `then` értéket hívja
+    // (quickjs-emscripten-core 0.32.0); a szkript felülírása a gazda ígéretét elutasítja. A javítás
+    // előtt ez kezeletlen elutasítás volt a gazdán (a Node alapból leállítja tőle a folyamatot).
+    it.each([
+      ['Promise.prototype.then', 'Promise.prototype.then = function () { throw new Error("x"); }; return 1;'],
+      [
+        'a globális Promise',
+        'globalThis.Promise = { resolve() { return { then() { throw new Error("y"); } }; } }; return 1;',
+      ],
+    ])('a(z) %s felülírása azonnal script_evaluation_failed, kezeletlen elutasítás nélkül', async (_name, source) => {
+      await expect(runScript(request(source))).resolves.toStrictEqual({
+        kind: 'failed',
+        errorKind: 'script_evaluation_failed',
+        message: 'a szkript futása a gazda oldalon megszakadt (QuickJSUnwrapError)',
+      });
+    });
+  });
+
   describe('időkorlát és megszakítás', () => {
     it('a CPU kötött végtelen ciklust az interrupt kezelő állítja meg', async () => {
       await expect(runScript(request('while (true) {}', { timeoutMs: 50 }))).resolves.toStrictEqual({
