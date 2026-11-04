@@ -1,6 +1,8 @@
 /* eslint-disable unicorn/no-null -- az `AgentStepConfig` nullázható mezői (SPEC-003 4.3) a tárolt alakban valódi `null` értéket hordoznak */
 import { describe, expect, it } from 'vitest';
+import { compileStructuredOutputSchema } from '@easter-workflow-builder/agent';
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
+import type { StructuredOutputSchemaCompilerPort } from '../engine-port/structured-output-schema-compiler-port.ts';
 import type { ExecutableNodeConfig } from './executable-node-config.ts';
 import { validateStructuredOutputSchemas } from './validate-structured-output-schemas.ts';
 
@@ -51,6 +53,15 @@ function configsOf(
   return new Map<string, ExecutableNodeConfig>(entries);
 }
 
+function ignoreLogLine(): void {
+  // szándékosan üres: a teszt nem a fordító naplóját vizsgálja
+}
+
+const COMPILER: StructuredOutputSchemaCompilerPort = {
+  compile: (schema) =>
+    compileStructuredOutputSchema(schema, { info: ignoreLogLine, warn: ignoreLogLine, error: ignoreLogLine }),
+};
+
 const NEWER_DRAFT = 'https://json-schema.org/draft/2020-12/schema';
 
 describe('validateStructuredOutputSchemas', () => {
@@ -62,7 +73,12 @@ describe('validateStructuredOutputSchemas', () => {
       ['osszefesules', { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' }],
     ]);
 
-    expect(validateStructuredOutputSchemas(configs)).toStrictEqual({ kind: 'ok', value: undefined });
+    const outcome = validateStructuredOutputSchemas(configs, COMPILER);
+
+    // Pontosan a strukturált kimenetet váró két csomópont kap lefordított ellenőrzőt.
+    expect(outcome.kind === 'ok' && outcome.value.keys().toArray()).toStrictEqual(['van', 'szintezis']);
+    expect(outcome.kind === 'ok' && outcome.value.get('van')?.({ a: 1 })).toBe(true);
+    expect(outcome.kind === 'ok' && outcome.value.get('van')?.({})).toBe(false);
   });
 
   it('az agent_step érvénytelen sémája invalid_structured_output_schema, a csomópont nevével', () => {
@@ -71,7 +87,7 @@ describe('validateStructuredOutputSchemas', () => {
       ['rossz', agentNode(withSchema({ type: 'strin' }))],
     ]);
 
-    const outcome = validateStructuredOutputSchemas(configs);
+    const outcome = validateStructuredOutputSchemas(configs, COMPILER);
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' && outcome.message).toMatch(
@@ -82,7 +98,7 @@ describe('validateStructuredOutputSchemas', () => {
   it('a join ai_synthesis draft-07-nél újabb sémája ugyanígy elbukik (SPEC-015 5.6)', () => {
     const configs = configsOf([['szintezis', synthesisNode(withSchema({ $schema: NEWER_DRAFT }))]]);
 
-    expect(validateStructuredOutputSchemas(configs)).toStrictEqual({
+    expect(validateStructuredOutputSchemas(configs, COMPILER)).toStrictEqual({
       kind: 'error',
       message: `A(z) szintezis csomópont strukturált kimenet sémája nem fordítható: A strukturált kimenet sémája érvénytelen: no schema with key or ref "${NEWER_DRAFT}" (invalid_structured_output_schema).`,
     });

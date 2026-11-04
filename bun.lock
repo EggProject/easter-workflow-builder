@@ -82,6 +82,7 @@
         "@easter-workflow-builder/provider-registry": "workspace:*",
         "@easter-workflow-builder/typeguards": "workspace:*",
         "ajv": "8.20.0",
+        "ajv-formats": "3.0.1",
       },
       "devDependencies": {
         "@types/node": "catalog:",

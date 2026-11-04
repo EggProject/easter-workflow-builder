@@ -14,6 +14,7 @@ import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { createCreateWorkflowHandler } from './create-workflow.ts';
 import { createReplaceWorkflowGraphHandler } from './replace-workflow-graph.ts';
+import { TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER } from '../engine-assembly/test-structured-output-schema-compiler.ts';
 
 /**
  * A mérés eszköze (SPEC-005/006 hibaválasz lépés, 2026-09-27, "Feladat" 1-2.
@@ -111,7 +112,7 @@ function buildHandlers(database: DatabaseContext): RouteHandlers {
   return {
     ...base,
     createWorkflow: createCreateWorkflowHandler(database),
-    replaceWorkflowGraph: createReplaceWorkflowGraphHandler(database),
+    replaceWorkflowGraph: createReplaceWorkflowGraphHandler(database, TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER),
   };
 }
 

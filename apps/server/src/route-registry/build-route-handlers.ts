@@ -1,5 +1,5 @@
 import type { DatabaseContext } from '@easter-workflow-builder/db';
-import type { Engine } from '@easter-workflow-builder/engine';
+import type { Engine, StructuredOutputSchemaCompilerPort } from '@easter-workflow-builder/engine';
 import type { RouteHandlers } from '../route-dispatch/route-handlers.ts';
 import type { StreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { createReplaceStreamSubscriptionsHandler } from '../stream-registry/create-replace-stream-subscriptions-handler.ts';
@@ -46,13 +46,16 @@ import { createListServerEnvironmentNamesHandler } from '../server-environment-e
  * nyers ZIP törzsű végpont nem bináris kezelője) fordítási hibát ad, nem
  * futásidejű "nincs kezelő" ágat. A `skillLibrary` a skill könyvtár gyökere és
  * a feltöltés korlátai (SPEC-009 5.1, 5.4 6. pont); a feltöltés és a törlés
- * ugyanazon a név záron osztozik (PLAN-012 T-012-27).
+ * ugyanazon a név záron osztozik (PLAN-012 T-012-27). A
+ * `structuredOutputSchemaCompiler` a gráf mentésének séma ellenőrzése, ugyanaz
+ * a fordító, amit a motor kap (SPEC-015 5.7).
  */
 export function buildRouteHandlers(
   database: DatabaseContext,
   engine: Engine,
   streamRegistry: StreamRegistry,
   skillLibrary: SkillLibrary,
+  structuredOutputSchemaCompiler: StructuredOutputSchemaCompilerPort,
 ): RouteHandlers {
   const skillNameLock = createSkillNameLock();
   return {
@@ -64,7 +67,7 @@ export function buildRouteHandlers(
     deleteWorkflow: createDeleteWorkflowHandler(database),
     summarizeWorkflowDeletion: createSummarizeWorkflowDeletionHandler(database),
     readWorkflowGraph: createReadWorkflowGraphHandler(database),
-    replaceWorkflowGraph: createReplaceWorkflowGraphHandler(database),
+    replaceWorkflowGraph: createReplaceWorkflowGraphHandler(database, structuredOutputSchemaCompiler),
 
     // B. Futás (8 végpont)
     startRun: createStartRunHandler(engine),

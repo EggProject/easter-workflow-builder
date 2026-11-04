@@ -1,3 +1,4 @@
+import type { StructuredOutputValidator } from '@easter-workflow-builder/agent';
 import type { AgentStepConfig, NodeType } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { ProviderCapabilityDescriptor } from '@easter-workflow-builder/provider-capability';
@@ -52,6 +53,7 @@ export interface AgentNodeLifecycleInput {
   readonly graph: ExecutableGraph;
   readonly sessionSourceNodes: SessionSourceNodes;
   readonly sessionInstances: readonly SessionBearingInstance[];
+  readonly structuredOutputValidator: StructuredOutputValidator | undefined;
 }
 
 /**
@@ -126,7 +128,17 @@ async function runAfterSlotGranted(
   ports: EngineDependencies,
   agentQueryRegistry: AgentQueryRegistry,
 ): Promise<Outcome<NodeExecutionOutcome>> {
-  const { instance, nodeType, config, descriptor, runContext, graph, sessionSourceNodes, sessionInstances } = input;
+  const {
+    instance,
+    nodeType,
+    config,
+    descriptor,
+    runContext,
+    graph,
+    sessionSourceNodes,
+    sessionInstances,
+    structuredOutputValidator,
+  } = input;
   const nodeId = instance.instance.nodeId;
   const { runId, providerId } = instance;
 
@@ -186,6 +198,7 @@ async function runAfterSlotGranted(
     graph,
     sessionSourceNodes,
     sessionInstances,
+    structuredOutputValidator,
   };
 
   const executed = await runAgentStep(request, ports, agentQueryRegistry);

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type { DatabaseContext, NodeConfig, WorkflowEdgeInput, WorkflowNodeInput } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
-import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
+import { type AgentQueryRunner, compileStructuredOutputSchema } from '@easter-workflow-builder/agent';
 import type {
   Fact,
   ModelDescriptor,
@@ -17,6 +17,16 @@ import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.
 import { createRunSupervisor } from '../run-supervisor/create-run-supervisor.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
 import { runStartupRecovery } from './run-startup-recovery.ts';
+import type { StructuredOutputSchemaCompilerPort } from '../engine-port/structured-output-schema-compiler-port.ts';
+
+function ignoreLogLine(): void {
+  // szándékosan üres: a teszt nem a fordító naplóját vizsgálja
+}
+
+const SCHEMA_COMPILER: StructuredOutputSchemaCompilerPort = {
+  compile: (schema) =>
+    compileStructuredOutputSchema(schema, { info: ignoreLogLine, warn: ignoreLogLine, error: ignoreLogLine }),
+};
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -166,6 +176,7 @@ function createTrivialSupervisor(database: DatabaseContext): RunSupervisor {
     clock: { nowMs: () => 0, sleep: () => Promise.resolve() },
     idGenerator: { nextId: () => 'id-1' },
     processEnvironment: { read: () => null, readAll: () => ({}) },
+    structuredOutputSchemaCompiler: SCHEMA_COMPILER,
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },

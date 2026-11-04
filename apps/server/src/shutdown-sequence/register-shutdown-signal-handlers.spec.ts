@@ -13,6 +13,7 @@ import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { registerShutdownSignalHandlers } from './register-shutdown-signal-handlers.ts';
 import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
+import { TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER } from '../engine-assembly/test-structured-output-schema-compiler.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -80,7 +81,13 @@ describe('registerShutdownSignalHandlers', () => {
     );
     const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
+      handlers: buildRouteHandlers(
+        database,
+        engine,
+        streamRegistry,
+        TEST_SKILL_LIBRARY,
+        TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+      ),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,
@@ -104,7 +111,13 @@ describe('registerShutdownSignalHandlers', () => {
     );
     const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
+      handlers: buildRouteHandlers(
+        database,
+        engine,
+        streamRegistry,
+        TEST_SKILL_LIBRARY,
+        TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+      ),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,
@@ -128,7 +141,13 @@ describe('registerShutdownSignalHandlers', () => {
     );
     const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
-      handlers: buildRouteHandlers(database, engine, streamRegistry, TEST_SKILL_LIBRARY),
+      handlers: buildRouteHandlers(
+        database,
+        engine,
+        streamRegistry,
+        TEST_SKILL_LIBRARY,
+        TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+      ),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,

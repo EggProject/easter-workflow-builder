@@ -58,3 +58,12 @@ a sikeres mentés üríti).
    (mai állapot); (b) a `ProtocolErrorBody` elhagyható, strukturált mezőútja (SPEC-005 8.1 módosítás).
 3. **Az Ajv strict figyelmeztetései.** (a) marad a `console`; (b) kikapcsolás (`logger: false`); (c) a
    projekt naplózójába vezetés.
+
+## Utómunka (2026-11-04, `fix/sema-format-es-utomunka`)
+
+- **B-2 lezárva** (user döntés 2026-11-04, "Ellenőrizzük"): a `format` kulcsszó az `ajv-formats` teljes listájával
+  ellenőrzött, mentéskor, indításkor és a lépés kimenetén ugyanaz a fordító dönt (SPEC-015 5.2).
+- **B-4 első fele lezárva**: a lépés szintű sémafordítás megszűnt, a lépés az indításkor lefordított ellenőrzőt
+  kapja (SPEC-015 5.4, `AgentStepRequest.structuredOutputValidator`), tehát nincs termékúton sosem futó hibaág.
+  A második fele (a hiba nélküli eltérés leírása) változatlan.
+- Az Ajv strict figyelmeztetései a szerver naplójába kerülnek (SPEC-015 5.3, SPEC-006 7.2).

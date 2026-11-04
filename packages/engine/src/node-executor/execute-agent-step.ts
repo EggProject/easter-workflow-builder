@@ -1,3 +1,4 @@
+import type { StructuredOutputValidator } from '@easter-workflow-builder/agent';
 import type { ProviderCapabilityDescriptor } from '@easter-workflow-builder/provider-capability';
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { SessionBearingInstance } from '../agent-step/session-bearing-instance.ts';
@@ -30,6 +31,7 @@ export interface ExecuteAgentStepInput {
   readonly graph: ExecutableGraph;
   readonly sessionSourceNodes: SessionSourceNodes;
   readonly sessionInstances: readonly SessionBearingInstance[];
+  readonly structuredOutputValidator: StructuredOutputValidator | undefined;
 }
 
 /**
@@ -58,6 +60,7 @@ export function executeAgentStep(
       graph: input.graph,
       sessionSourceNodes: input.sessionSourceNodes,
       sessionInstances: input.sessionInstances,
+      structuredOutputValidator: input.structuredOutputValidator,
     },
     ports,
     gate,

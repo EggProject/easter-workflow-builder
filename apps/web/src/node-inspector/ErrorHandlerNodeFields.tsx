@@ -16,6 +16,13 @@ export interface ErrorHandlerNodeFieldsProperties {
  * `handledErrorKinds` (SPEC-008 5.1). A `maxAttempts` kötelező, szállított
  * alapérték nélkül, ugyanúgy, mint a `loop` `maxIterations` mezője.
  *
+ * A `maxAttempts` a mező `valueAsNumber` értékét kapja, ami üres mezőre `NaN`
+ * (HTML Living Standard, `valueAsNumber`): a kiürített mező így üres marad (a
+ * `String(NaN)` értéket a szám mező üresre tisztítja, mint a felvett node
+ * kezdő `NaN` értékénél), és a mentés a mező alatt jelez. A korábbi
+ * `Number(value)` az üres szövegből `0`-t adott, ami a mezőben `0`-ként jelent
+ * meg.
+ *
  * CSOPORTOSÍTÁS: nincs összecsukható panel. A három mező EGYÜTT maga az
  * újrapróbálkozási szabály, vagyis a node teljes tartalma - itt nincs
  * "haladó" réteg, amit el lehetne rejteni.
@@ -35,7 +42,7 @@ export function ErrorHandlerNodeFields(properties: Readonly<ErrorHandlerNodeFiel
         value={String(config.maxAttempts)}
         error={maxAttemptsError}
         onChange={(event: ChangeEvent<HTMLInputElement>) => {
-          onChange({ ...config, maxAttempts: Number(event.target.value) });
+          onChange({ ...config, maxAttempts: event.target.valueAsNumber });
         }}
       />
       <LineListTextAreaField

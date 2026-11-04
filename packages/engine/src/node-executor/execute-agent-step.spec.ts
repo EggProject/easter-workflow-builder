@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- az `AgentStepConfig`, a `CreateStepRunInput` és a `Fact<T | null>` nullázható mezői (SPEC-003 4.4, 9.2, SPEC-000 5.) a tárolt/mért alakban valódi `null` értéket hordoznak, nem helyőrző `undefined`-et */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
+import { type AgentQueryRunner, compileStructuredOutputSchema } from '@easter-workflow-builder/agent';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { isRecord } from '@easter-workflow-builder/typeguards';
 import type {
@@ -26,6 +26,16 @@ import { MAX_STORED_OUTPUT_LENGTH } from './max-stored-output-length.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutionResult } from './node-executor-result.ts';
+import type { StructuredOutputSchemaCompilerPort } from '../engine-port/structured-output-schema-compiler-port.ts';
+
+function ignoreLogLine(): void {
+  // szándékosan üres: a teszt nem a fordító naplóját vizsgálja
+}
+
+const SCHEMA_COMPILER: StructuredOutputSchemaCompilerPort = {
+  compile: (schema) =>
+    compileStructuredOutputSchema(schema, { info: ignoreLogLine, warn: ignoreLogLine, error: ignoreLogLine }),
+};
 
 type AgentStepNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'agent_step' }>;
 
@@ -284,6 +294,7 @@ function dependenciesOf(
     })(),
     idGenerator: { nextId: notCalled },
     processEnvironment: { read: () => null, readAll: () => ({}) },
+    structuredOutputSchemaCompiler: SCHEMA_COMPILER,
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },
@@ -334,6 +345,7 @@ describe('executeAgentStep', () => {
           graph,
           sessionSourceNodes: { sourceNodeIds: new Set(['a']), continuedNodeIds: new Set() },
           sessionInstances: [],
+          structuredOutputValidator: undefined,
         },
         dependencies,
         gate,
@@ -377,6 +389,7 @@ describe('executeAgentStep', () => {
           graph,
           sessionSourceNodes: { sourceNodeIds: new Set(['a']), continuedNodeIds: new Set() },
           sessionInstances: [],
+          structuredOutputValidator: undefined,
         },
         dependencies,
         gate,
@@ -415,6 +428,7 @@ describe('executeAgentStep', () => {
           graph,
           sessionSourceNodes: { sourceNodeIds: new Set(['a']), continuedNodeIds: new Set() },
           sessionInstances: [],
+          structuredOutputValidator: undefined,
         },
         dependencies,
         gate,

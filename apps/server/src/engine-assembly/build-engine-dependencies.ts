@@ -11,10 +11,11 @@ import { createRealEventPublisher } from './create-real-event-publisher.ts';
 import { createRandomUuidIdGenerator } from './create-random-uuid-id-generator.ts';
 import { createProcessEnvironmentReader } from './create-process-environment-reader.ts';
 import { createSkillLibraryReader } from './create-skill-library-reader.ts';
+import { createStructuredOutputSchemaCompiler } from './create-structured-output-schema-compiler.ts';
 import { reportUnexpectedLanguageError } from './report-unexpected-language-error.ts';
 
 /**
- * A motor tíz kötelező portjának összeállítása a szerver indulásakor
+ * A motor tizenegy kötelező portjának összeállítása a szerver indulásakor
  * (SPEC-004 3.1, 3.2, `EngineDependencies`). A `database` és a `clock` a
  * hívó (`continue-startup-with-database.ts`) által átadott, MÁR LÉTEZŐ
  * példány - a `clock`-ot azért kapja kívülről, nem itt építi fel, mert
@@ -32,6 +33,10 @@ import { reportUnexpectedLanguageError } from './report-unexpected-language-erro
  *
  * A `skillLibrary` port a skill könyvtár abszolút gyökerét kapja (SPEC-009
  * 5.1), ugyanazt, amit a skill végpontok kezelnek.
+ *
+ * A `structuredOutputSchemaCompiler` a strukturált kimenet sémájának fordítója
+ * a `logger`-rel (SPEC-015 5.4), ugyanaz a függvény, amit a gráf mentésének
+ * ellenőrzése kap (`createStructuredOutputSchemaCompiler`).
  */
 export function buildEngineDependencies(
   database: DatabaseContext,
@@ -63,5 +68,6 @@ export function buildEngineDependencies(
     idGenerator: createRandomUuidIdGenerator(),
     processEnvironment: createProcessEnvironmentReader(),
     skillLibrary: createSkillLibraryReader(skillLibraryRootDirectory),
+    structuredOutputSchemaCompiler: createStructuredOutputSchemaCompiler(logger),
   };
 }

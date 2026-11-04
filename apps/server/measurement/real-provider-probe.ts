@@ -25,7 +25,6 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { isProviderId } from '@easter-workflow-builder/provider-capability';
 import { collectSecretEnvironmentValues } from '../src/startup-sequence/collect-secret-environment-values.ts';
-import { findFreePort } from './find-free-port.ts';
 import { maskSecrets } from './mask-secrets.ts';
 import { runProbe } from './run-probe.ts';
 
@@ -48,10 +47,8 @@ if (isProviderId(providerArgument)) {
       ...(modelArgument !== undefined && { modelId: modelArgument }),
       isSkillAndMcpMode: restArguments.includes(SKILL_MCP_FLAG),
       serverCommand: {
-        kind: 'assigned-port',
         executable: process.execPath,
         args: [fileURLToPath(new URL('../src/main.ts', import.meta.url))],
-        port: await findFreePort(),
       },
       environment: process.env,
       secretValues,

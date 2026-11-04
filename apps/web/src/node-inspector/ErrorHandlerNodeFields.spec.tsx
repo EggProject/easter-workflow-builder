@@ -23,6 +23,30 @@ const CONFIG: ErrorHandlerNodeConfig = {
   onUnhandledError: null,
 };
 
+/**
+ * A mezők állapotot tartó gazdával: a visszaadott függvény a legutóbbi
+ * `onChange` configot adja.
+ */
+function renderStatefulFields(root: Root, initial: ErrorHandlerNodeConfig): () => ErrorHandlerNodeConfig {
+  let latest = initial;
+  function Host(): ReactElement {
+    const [config, setConfig] = useState(latest);
+    return (
+      <ErrorHandlerNodeFields
+        config={config}
+        onChange={(next) => {
+          latest = next;
+          setConfig(next);
+        }}
+      />
+    );
+  }
+  act(() => {
+    root.render(<Host />);
+  });
+  return () => latest;
+}
+
 describe('ErrorHandlerNodeFields', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -72,22 +96,7 @@ describe('ErrorHandlerNodeFields', () => {
   });
 
   it('gépelés közben a két lista mezőben az Enter megmarad, a configba a bontott lista kerül', () => {
-    let latest: ErrorHandlerNodeConfig = { ...CONFIG, backoffMs: [], handledErrorKinds: [] };
-    function Host(): ReactElement {
-      const [config, setConfig] = useState(latest);
-      return (
-        <ErrorHandlerNodeFields
-          config={config}
-          onChange={(next) => {
-            latest = next;
-            setConfig(next);
-          }}
-        />
-      );
-    }
-    act(() => {
-      root.render(<Host />);
-    });
+    const latest = renderStatefulFields(root, { ...CONFIG, backoffMs: [], handledErrorKinds: [] });
     const [backoffTextarea, handledKindsTextarea] = [...container.querySelectorAll('textarea')];
     if (backoffTextarea === undefined || handledKindsTextarea === undefined) {
       throw new Error('a teszt nem találta a lista mezőket');
@@ -105,8 +114,23 @@ describe('ErrorHandlerNodeFields', () => {
       });
       expect(handledKindsTextarea.value).toBe(partial);
     }
-    expect(latest.backoffMs).toEqual([100, 200]);
-    expect(latest.handledErrorKinds).toEqual(['timeout', 'network_error']);
+    expect(latest().backoffMs).toEqual([100, 200]);
+    expect(latest().handledErrorKinds).toEqual(['timeout', 'network_error']);
+  });
+
+  it('REGRESSZIÓ: a kiürített maxAttempts mező üres marad, és a config NaN értéket kap, nem 0-t', () => {
+    const latest = renderStatefulFields(root, CONFIG);
+    const maxAttemptsInput = container.querySelector('input');
+    if (maxAttemptsInput === null) {
+      throw new Error('a teszt nem találta a maxAttempts mezőt');
+    }
+
+    act(() => {
+      typeInto(maxAttemptsInput, '');
+    });
+
+    expect(latest().maxAttempts).toBeNaN();
+    expect(maxAttemptsInput.value).toBe('');
   });
 
   it('a `maxAttempts` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {

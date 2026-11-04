@@ -41,6 +41,7 @@ verzió-döntéseinek forrása. Ha frissítesz egy csomagot, ide is vezesd át.
 | `ajv`                                 | 8.20.0                     | **pinelve**, JSON Schema ellenőrzés, SPEC-015, lent                       |
 | `quickjs-emscripten-core`             | 0.32.0                     | **pinelve**, JavaScript szkript futtató, SPEC-014, lent                   |
 | `@jitl/quickjs-wasmfile-release-sync` | 0.32.0                     | **pinelve**, a QuickJS alap (bellard, szinkron) változata, SPEC-014, lent |
+| `ajv-formats`                         | 3.0.1                      | **pinelve**, a `format` kulcsszó, SPEC-015, lent                          |
 
 ## `drizzle-kit` és `@types/better-sqlite3` verzió, 2026-08-27 (T-003-2, SPEC-003)
 
@@ -304,6 +305,18 @@ egyetlen függőségük a `@jitl/quickjs-ffi-types` `0.32.0`. A teljes `quickjs-
 szakasza szerinti legkisebb felállás áll, mert a SPEC-014 5.2 csak az alap, szinkron változatot használja. A
 változat a bellard QuickJS `2025-09-13+f1139494` pillanatképét hozza (a változat README-je); a verzió 1.0 alatti, a
 frissítés előtt a T-015-2 próbái regresszióként futnak (`docs/research/2026-11-04-szkript-csomopont/futtat.sh`).
+
+**`ajv-formats`, 2026-11-04 (user döntés: a `format` kulcsszó ellenőrzött, SPEC-015 5.2).** Élő lekérdezés
+`curl`-lel, két független forrással:
+
+| Csomag        | Verzió  | Forrás 1                                                                  | Forrás 2                                                                |
+| ------------- | ------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `ajv-formats` | `3.0.1` | `https://registry.npmjs.org/ajv-formats` (`dist-tags.latest`, 2024-03-30) | `https://data.jsdelivr.com/v1/packages/npm/ajv-formats` (`tags.latest`) |
+
+**Pontos verzióval** a `packages/agent` `package.json` fájljában áll. A registry szerint egyetlen függősége az
+`ajv` (`^8.0.0`, opcionális peer), saját típusdeklarációval szállít. A GitHub "latest" release a `v2.1.1`
+(2021-08-14), a `3.0.x` vonalnak nincs GitHub release bejegyzése, ezért a második forrás a jsDelivr. A repóban
+tranzitívan már jelen volt ugyanez a verzió (a `@modelcontextprotocol/sdk` függősége a `bun.lock` szerint).
 
 ## GitHub Actions verziók
 

@@ -7,6 +7,7 @@ import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uu
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 import { buildRouteHandlers } from './build-route-handlers.ts';
+import { TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER } from '../engine-assembly/test-structured-output-schema-compiler.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -41,6 +42,7 @@ function buildHandlers(database: DatabaseContext) {
     buildFakeEngine(),
     createStreamRegistry(createRandomUuidIdGenerator()),
     TEST_SKILL_LIBRARY,
+    TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
   );
 }
 

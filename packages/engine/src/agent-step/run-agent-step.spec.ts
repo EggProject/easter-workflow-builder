@@ -1,7 +1,11 @@
 /* eslint-disable unicorn/no-null -- a `SnapshotEdge`, a `SnapshotWorkflow.description`, a `CreateStepRunInput` és az `AgentStepConfig` nullázható mezői a tárolt alakban `null` értéket hordoznak (SPEC-003 4.3, 4.4, 5.1, 9.2), nem helyőrző `undefined`-et */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentQueryRequest, AgentQueryRunner } from '@easter-workflow-builder/agent';
+import {
+  type AgentQueryRequest,
+  type AgentQueryRunner,
+  compileStructuredOutputSchema,
+} from '@easter-workflow-builder/agent';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type {
   AgentStepConfig,
@@ -24,6 +28,31 @@ import type { AgentStepCapabilityDecisions } from './agent-step-capability-decis
 import type { AgentStepExecution } from './agent-step-execution.ts';
 import type { AgentStepRequest } from './agent-step-request.ts';
 import { runAgentStep } from './run-agent-step.ts';
+import type { StructuredOutputSchemaCompilerPort } from '../engine-port/structured-output-schema-compiler-port.ts';
+
+function ignoreLogLine(): void {
+  // szándékosan üres: a teszt nem a fordító naplóját vizsgálja
+}
+
+const SCHEMA_COMPILER: StructuredOutputSchemaCompilerPort = {
+  compile: (schema) =>
+    compileStructuredOutputSchema(schema, { info: ignoreLogLine, warn: ignoreLogLine, error: ignoreLogLine }),
+};
+
+/**
+ * A strukturált kimenetet váró lépés kérésének két mezője: a config sémája és a
+ * futás indításakor (itt a teszt által) lefordított ellenőrző (SPEC-015 5.4).
+ */
+function structuredOutputParts(schema: unknown): Pick<AgentStepRequest, 'config' | 'structuredOutputValidator'> {
+  const compiled = SCHEMA_COMPILER.compile(schema);
+  if (compiled.kind === 'error') {
+    throw new Error(compiled.message);
+  }
+  return {
+    config: agentStepConfig({ structuredOutput: { strategy: 'sdk_output_format', schema } }),
+    structuredOutputValidator: compiled.value,
+  };
+}
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -266,6 +295,7 @@ function dependenciesOf(parts: DependencyParts): EngineDependencies {
     clock: { nowMs: () => 0, sleep: notCalled },
     idGenerator: { nextId: notCalled },
     processEnvironment: parts.processEnvironment ?? { read: () => null, readAll: () => ({}) },
+    structuredOutputSchemaCompiler: SCHEMA_COMPILER,
     skillLibrary: parts.skillLibrary ?? {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },
@@ -292,6 +322,7 @@ function requestOf(overrides: Partial<AgentStepRequest> = {}): AgentStepRequest 
     graph,
     sessionSourceNodes: { sourceNodeIds: new Set(['s', 'a']), continuedNodeIds: new Set(['a']) },
     sessionInstances: [],
+    structuredOutputValidator: undefined,
     ...overrides,
   };
 }
@@ -321,7 +352,7 @@ describe('runAgentStep', () => {
     const request = requestOf({
       runId,
       stepRunId,
-      config: agentStepConfig({ structuredOutput: { strategy: 'sdk_output_format', schema: {} } }),
+      ...structuredOutputParts({}),
     });
     const dependencies = dependenciesOf({
       database,
@@ -419,7 +450,7 @@ describe('runAgentStep', () => {
     const request = requestOf({
       runId,
       stepRunId,
-      config: agentStepConfig({ structuredOutput: { strategy: 'sdk_output_format', schema: {} } }),
+      ...structuredOutputParts({}),
     });
     const dependencies = dependenciesOf({
       database,
@@ -440,12 +471,7 @@ describe('runAgentStep', () => {
     const request = requestOf({
       runId,
       stepRunId,
-      config: agentStepConfig({
-        structuredOutput: {
-          strategy: 'sdk_output_format',
-          schema: { type: 'object', properties: { osszeg: { type: 'number' } }, required: ['osszeg'] },
-        },
-      }),
+      ...structuredOutputParts({ type: 'object', properties: { osszeg: { type: 'number' } }, required: ['osszeg'] }),
     });
     const dependencies = dependenciesOf({
       database,
@@ -465,12 +491,7 @@ describe('runAgentStep', () => {
     const request = requestOf({
       runId,
       stepRunId,
-      config: agentStepConfig({
-        structuredOutput: {
-          strategy: 'sdk_output_format',
-          schema: { type: 'object', properties: { osszeg: { type: 'string' } }, required: ['osszeg'] },
-        },
-      }),
+      ...structuredOutputParts({ type: 'object', properties: { osszeg: { type: 'string' } }, required: ['osszeg'] }),
     });
     const dependencies = dependenciesOf({
       database,
@@ -494,34 +515,24 @@ describe('runAgentStep', () => {
     database.close();
   });
 
-  it('a nem fordítható séma invalid_structured_output_schema, futtatás nélkül (SPEC-015 5.4)', async () => {
+  it('a lépés nem fordít újra: a kimenetet a kapott (az indításkor lefordított) ellenőrző vizsgálja (SPEC-015 5.4)', async () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRun(database);
-    const captured = newCapture();
+    // A config sémája illeszkedne a kimenetre, a kapott ellenőrző nem: a döntést az ellenőrző hozza.
     const request = requestOf({
       runId,
       stepRunId,
-      config: agentStepConfig({
-        structuredOutput: {
-          strategy: 'sdk_output_format',
-          schema: { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object' },
-        },
-      }),
+      config: agentStepConfig({ structuredOutput: { strategy: 'sdk_output_format', schema: {} } }),
+      structuredOutputValidator: structuredOutputParts({ type: 'string' }).structuredOutputValidator,
     });
     const dependencies = dependenciesOf({
       database,
-      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), newCapture()),
     });
 
     const execution = okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry));
 
-    expect(failedOutcomeOf(execution)).toStrictEqual({
-      kind: 'invalid_structured_output_schema',
-      message:
-        'A(z) a csomópont strukturált kimenet sémája nem fordítható: A strukturált kimenet sémája érvénytelen: no schema with key or ref "https://json-schema.org/draft/2020-12/schema" (invalid_structured_output_schema).',
-    });
-    expect(captured.request).toBeUndefined();
-    expect(execution.tokens).toBeUndefined();
+    expect(failedOutcomeOf(execution).kind).toBe('structured_output_schema_mismatch');
 
     database.close();
   });

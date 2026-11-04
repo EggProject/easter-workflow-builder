@@ -20,6 +20,7 @@ import { createSkillNameLock, type SkillNameLock } from './skill-name-lock.ts';
 import { createUploadSkillHandler } from './upload-skill.ts';
 import { testZipDirectoryEntry } from './test-zip-directory-entry.ts';
 import { testZipFileEntry } from './test-zip-file-entry.ts';
+import { TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER } from '../engine-assembly/test-structured-output-schema-compiler.ts';
 
 const MANIFEST = '---\nname: pdf-tools\ndescription: PDF fájlok kezelése\n---\n# PDF\n';
 const UNIX_MODE_FACTOR = 0x1_00_00;
@@ -59,10 +60,13 @@ beforeEach(async () => {
   const database: DatabaseContext = okOrThrow(openDatabase(':memory:'));
   const registry = createStreamRegistry(createRandomUuidIdGenerator());
   const httpServer = createHttpServer({
-    handlers: buildRouteHandlers(database, buildFakeEngine(), registry, {
-      ...TEST_SKILL_LIBRARY,
-      rootDirectory: server.root,
-    }),
+    handlers: buildRouteHandlers(
+      database,
+      buildFakeEngine(),
+      registry,
+      { ...TEST_SKILL_LIBRARY, rootDirectory: server.root },
+      TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
+    ),
     devOrigin: undefined,
     streamDependencies: { database, registry, clock: createSystemClock(), keepAliveIntervalMs: 60_000 },
     logger: createServerLogger({ secretValues: [] }, { write: discardLogLine }),

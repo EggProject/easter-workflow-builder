@@ -151,8 +151,16 @@ describe('readServerConfig', () => {
     },
   );
 
+  it('a port 0 értéke elfogadott (az operációs rendszer választ portot), a negatív és a nem egész érvénytelen', () => {
+    const zero = readServerConfig({ ...VALID_ENVIRONMENT, [ENV_SERVER_PORT]: '0' });
+    expect(zero.kind === 'ok' && zero.value.port).toBe(0);
+    for (const invalid of ['-1', 'abc', '1.5']) {
+      const outcome = readServerConfig({ ...VALID_ENVIRONMENT, [ENV_SERVER_PORT]: invalid });
+      expect(outcome.kind === 'error' && outcome.message).toContain('invalid_env_variable');
+    }
+  });
+
   it.each([
-    ENV_SERVER_PORT,
     ENV_STREAM_KEEP_ALIVE_INTERVAL_MS,
     ENV_LOG_RETAINED_FILE_COUNT,
     ENV_SKILL_MAX_ARCHIVE_BYTES,

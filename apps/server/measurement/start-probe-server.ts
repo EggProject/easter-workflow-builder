@@ -2,27 +2,20 @@ import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import type { Readable } from 'node:stream';
 import { setImmediate } from 'node:timers/promises';
 import { maskSecrets } from './mask-secrets.ts';
-import { PROBE_PORT_REPORT_PREFIX } from './probe-port-report.ts';
+import { PROBE_PORT_REPORT_PREFIX } from '../src/startup-sequence/probe-port-report.ts';
 
 /**
- * A gyermek szerver indítása és a portjának forrása.
- *
- * - `reports-port`: a gyermek `EASTER_SERVER_PORT=0` értéket kap, maga köt az
- *   operációs rendszer által kiosztott portra, és a stdout első sorában
- *   jelenti (`probe-port-report.ts`). A hamis ágenses szerver ezt teszi.
- * - `assigned-port`: a hívó adja a portot. A valódi `src/main.ts` csak pozitív
- *   portot fogad (`readServerConfig`), ezért a valódi próba ezt használja; itt a
- *   szabad port választása és a gyermek kötése között ablak marad, amiben egy
- *   másik folyamat elveheti a portot.
+ * A gyermek szerver indítása: a gyermek `EASTER_SERVER_PORT=0` értéket kap,
+ * maga köt az operációs rendszer által kiosztott portra, és a stdout első
+ * sorában jelenti (`src/startup-sequence/probe-port-report.ts`). A valódi
+ * `src/main.ts` és a hamis ágenses szerver is ezt teszi (SPEC-012 5.1), tehát a
+ * port választása és a kötés között nincs ablak, amiben egy másik folyamat
+ * elvehetné a portot.
  */
-export type ProbeServerCommand =
-  | { readonly kind: 'reports-port'; readonly executable: string; readonly args: readonly string[] }
-  | {
-      readonly kind: 'assigned-port';
-      readonly executable: string;
-      readonly args: readonly string[];
-      readonly port: number;
-    };
+export interface ProbeServerCommand {
+  readonly executable: string;
+  readonly args: readonly string[];
+}
 
 export interface ProbeServer {
   readonly baseUrl: string;
@@ -39,8 +32,7 @@ type ProbeChild = ChildProcessByStdio<null, Readable, Readable>;
 /**
  * A próba saját szerver folyamata (SPEC-012 5.1, O-13): gyermek folyamat a
  * kapott környezettel, a stderr memóriában gyűlik (maszkolva kerül hibaüzenetbe,
- * lemezre nem kerül). A port a `command.kind` szerint a gyermek jelentéséből
- * vagy a hívótól jön. A függvény ezután a `GET /api/providers` `200` válaszára
+ * lemezre nem kerül). A port a gyermek jelentéséből jön. A függvény ezután a `GET /api/providers` `200` válaszára
  * vár; a lekérdezések között nincs kitalált várakozási idő, a kapcsolat
  * elutasítása gyors, a ciklus az eseményhurkot minden körben átengedi. Ha a
  * folyamat előbb kilép, hiba jön.
@@ -52,9 +44,8 @@ export async function startProbeServer(
   signal: AbortSignal,
 ): Promise<ProbeServer> {
   signal.throwIfAborted();
-  const requestedPort = command.kind === 'assigned-port' ? command.port : 0;
   const child = spawn(command.executable, [...command.args], {
-    env: { ...environment, EASTER_SERVER_PORT: String(requestedPort) },
+    env: { ...environment, EASTER_SERVER_PORT: '0' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const exitState: ExitState = { exited: false, description: '' };
@@ -82,7 +73,7 @@ export async function startProbeServer(
     );
 
   try {
-    const port = command.kind === 'assigned-port' ? command.port : await readReportedPort(child, exited, signal);
+    const port = await readReportedPort(child, exited, signal);
     signal.throwIfAborted();
     if (port === undefined) {
       throw exitedEarlyError();
