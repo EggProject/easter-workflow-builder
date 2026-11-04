@@ -919,16 +919,18 @@ mindkét úton azonos.
   `escapeKey`-jel kell hívnia a `resolveErrorRoute`-ot. Az `unhandled_error_kind` és az
   `insufficient_backoff_list` viszont a meglévő `failed` ágon megy, mert azokra a szokásos 8.1
   útvonal érvényes.
-- **A backoff várakozás a futás leállításának jelén szakad meg** (user döntés 2026-10-26). A
-  `ClockPort.sleep` jelét a futás `RunExecution.stopController` vezérlője adja
-  (`ExecuteErrorHandlerInput.stopSignal`), amit az `ActiveRunHandle.requestStop` megszakít, tehát a
-  felhasználói megszakítás és a szabályos leállás (a `stopAndAwaitRunTree` `requestStop` lépése)
-  a várakozás kivárása nélkül zár. A valódi óra megszakításkor elutasít, a hamis óra feloldódhat:
+- **A backoff várakozás a futás leállításának jelén szakad meg** (user döntések 2026-10-26 és
+  2026-11-04). A `ClockPort.sleep` jelét a futás `RunExecution.stopController` vezérlője adja
+  (`ExecuteErrorHandlerInput.stopSignal`), amit az `ActiveRunHandle.requestStop` és a `fail_run`
+  leállítási menete (`advance-run.ts` `stopFailedRun`, első lépésként) megszakít, tehát a
+  felhasználói megszakítás, a szabályos leállás (a `stopAndAwaitRunTree` `requestStop` lépése) és a
+  testvér ág `fail_run` bukása a várakozás kivárása nélkül, újrapróbálás nélkül zár. A valódi óra megszakításkor elutasít, a hamis óra feloldódhat:
   a végrehajtó mindkettőt a várakozás utáni `stopSignal.aborted` vizsgálattal kezeli, és
   `interrupted` kimenettel tér vissza, `step_run` állapotváltás és esemény nélkül (a kezelő
   `running` sorát a leállítást kérő fél zárja, ugyanúgy, mint a `human_approval` és az agent lépés
-  esetén). **Megnevezett hiány marad:** a futás saját `fail_run` bukása a jelet nem állítja, tehát
-  a testvér ágon álló `error_handler` backoff várakozása ott a természetes végéig tart. Védelem: a
+  esetén; a `fail_run` bukásnál a `finishRun` `cancelStoppedStepRuns` lépése, `cancelled`
+  állapotba). A `fail_run` a `stopRequested` jelzőt nem állítja, tehát a futás záró írása a
+  `fail_run` menetén marad. Védelem: a
   `create-engine.spec.ts` "error_handler várakozása" csoportja és az `execute-error-handler.spec.ts`
   megszakítás tesztjei.
 
