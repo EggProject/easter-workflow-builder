@@ -171,3 +171,53 @@ test('a séma szerkesztése után a szerver elutasítása a mező alatt már nem
   await expect(agentSchema).not.toHaveAttribute('aria-invalid', 'true');
   await expect(page.locator('.node-inspector').getByText(SCHEMA_ERROR)).toBeAttached({ attached: false });
 });
+
+test('a strukturált kimenet kikapcsolása után az elutasítás a Lépés és az Összefésülés mezőjén sem áll', async ({
+  page,
+}) => {
+  await mockEditor(page);
+  await page.goto('/editor?workflowId=w-sema');
+
+  await page.getByRole('button', { name: /^Mentés/ }).click();
+  await expect(page.getByText('A mentés sikertelen')).toBeVisible();
+
+  for (const nodeId of ['n-agent', 'n-join']) {
+    const schemaField = await openSchemaField(page, nodeId);
+    await expect(schemaField).toHaveAttribute('aria-invalid', 'true');
+    await page.locator('.node-inspector').getByText('Strukturált kimenet felülírás megadva').click();
+    await expect(schemaField).toBeAttached({ attached: false });
+    await expect(page.locator('.node-inspector').getByText(SCHEMA_ERROR)).toBeAttached({ attached: false });
+  }
+});
+
+test('a séma mezőre nem illeszkedő csomópontra mutató szerver mezőút egyik panelen sem ad séma hibát', async ({
+  page,
+}) => {
+  await mockIdleStream(page);
+  await installApiMocks(page, [
+    mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(GRAPH))),
+    mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
+    mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
+    mockRoute('replaceWorkflowGraph', async (route) =>
+      route.fulfill(
+        jsonBody(
+          {
+            code: 'invalid_request',
+            message:
+              'A kérés törzse érvénytelen, hibás mező(k): nodes.0.config.structuredOutput.schema, nodes.0.config.settings.structuredOutput.schema, nodes.1.config.settings.structuredOutput.schema, nodes.2.config.structuredOutput.schema (invalid_request).',
+          } satisfies ProtocolErrorBody,
+          400,
+        ),
+      ),
+    ),
+  ]);
+  await page.goto('/editor?workflowId=w-sema');
+
+  await page.getByRole('button', { name: /^Mentés/ }).click();
+  await expect(page.getByText('A mentés sikertelen')).toBeVisible();
+
+  const agentSchema = await openSchemaField(page, 'n-agent');
+  await expect(agentSchema).not.toHaveAttribute('aria-invalid', 'true');
+  const joinSchema = await openSchemaField(page, 'n-join');
+  await expect(joinSchema).not.toHaveAttribute('aria-invalid', 'true');
+});
