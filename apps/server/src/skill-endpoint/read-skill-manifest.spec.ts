@@ -62,7 +62,11 @@ describe('readSkillManifest', () => {
     });
   });
 
-  it('a nem szöveges name is eltérés', () => {
-    expect(errorClassOf('---\nname: 7\ndescription: x\n---\n')).toBe('skill_name_mismatch');
+  it.each([
+    ['szám', '---\nname: 7\ndescription: x\n---\n'],
+    ['null', '---\nname: null\ndescription: x\n---\n'],
+    ['lista', '---\nname: [pdf-tools]\ndescription: x\n---\n'],
+  ])('a nem szöveg name (%s) a fejléc hibája: skill_manifest_invalid (O-51)', (_label, content) => {
+    expect(errorClassOf(content)).toBe('skill_manifest_invalid');
   });
 });

@@ -1,7 +1,7 @@
 // E2E a Beállítások "Skill könyvtár" kártyájára valós Chromiumban (PLAN-012
 // T-012-25, SPEC-009 3.1 4. pont, 5.1, 5.4, 12. szekció AC10, AC11, O-9 ...
 // O-16, O-41): a lista, a ZIP feltöltés nyers bájtokkal, a felülírás és a
-// törlés megerősítő modálisa, az üres állapot és a tizenöt feltöltési
+// törlés megerősítő modálisa, az üres állapot és a tizenhat feltöltési
 // hibaosztály magyar mondata. A feltöltés `PUT` kérésének törzsét és
 // `Content-Type` fejlécét `page.route()` mock rögzíti; a REST hívások mind
 // mockoltak (`.claude/CLAUDE.md` 11. szekció).
@@ -381,9 +381,10 @@ const UPLOAD_ERROR_SENTENCES = [
   ['skill_archive_entry_size_mismatch', 'A csomag egyik bejegyzése sérült.'],
   ['skill_archive_entry_encrypted', 'A csomag titkosított bejegyzést tartalmaz.'],
   ['skill_archive_compression_unsupported', 'A csomag nem támogatott tömörítést használ.'],
+  ['skill_archive_path_too_long', 'A csomag egyik bejegyzésének neve vagy útvonala túl hosszú.'],
 ] as const satisfies readonly (readonly [NonNullable<ProtocolErrorBody['errorClass']>, string])[];
 
-test('mind a tizenöt feltöltési hibaosztály a saját magyar mondatával áll az Alert blokkban (O-41, AC11)', async ({
+test('mind a tizenhat feltöltési hibaosztály a saját magyar mondatával áll az Alert blokkban (O-41, AC11)', async ({
   page,
 }) => {
   await openSettings(page);

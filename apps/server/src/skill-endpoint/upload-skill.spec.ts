@@ -262,10 +262,17 @@ const REJECTIONS: readonly (readonly [SkillUploadErrorClass, string, () => Buffe
     'pdf-tools',
     () => buildTestZipArchive([manifestEntry(), testZipFileEntry('a.bz2', 'x', { compressionMethod: 12 })]),
   ],
+  [
+    'skill_archive_path_too_long',
+    'pdf-tools',
+    // A 300 karakteres bejegyzés név a fájlrendszeren `ENAMETOOLONG` (O-50; az `extract-skill-archive.spec.ts`
+    // 3. találat tesztjeivel azonos hossz).
+    () => buildTestZipArchive([manifestEntry(), testZipFileEntry(`${'h'.repeat(300)}.md`, 'x')]),
+  ],
 ];
 
 describe('PUT /api/skills/:name: minden elutasítás a saját hibaosztályával, 422 unprocessable (AC11, O-41)', () => {
-  it('a táblázat a tizenöt osztály mindegyikét pontosan egyszer fedi', async () => {
+  it('a táblázat a tizenhat osztály mindegyikét pontosan egyszer fedi', async () => {
     const { SKILL_UPLOAD_ERROR_CLASSES } = await import('./skill-upload-error-class.ts');
     expect(new Set(REJECTIONS.map(([errorClass]) => errorClass))).toStrictEqual(new Set(SKILL_UPLOAD_ERROR_CLASSES));
     expect(REJECTIONS).toHaveLength(SKILL_UPLOAD_ERROR_CLASSES.length);

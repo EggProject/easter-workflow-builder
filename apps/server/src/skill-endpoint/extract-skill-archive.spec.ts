@@ -263,16 +263,16 @@ describe('extractSkillArchive: az adverzariális átvizsgálás ZIP találatai (
     expect(await rejectionOf([manifestEntry(), composed, decomposed])).toBe('skill_archive_path_collision');
   });
 
-  it('3. a túl hosszú nevű könyvtár bejegyzés nem kezeletlen kivétel, hanem skill_archive_unreadable (O-50 addig)', async () => {
+  it('3. a túl hosszú nevű könyvtár bejegyzés nem kezeletlen kivétel, hanem skill_archive_path_too_long (O-50)', async () => {
     const longDirectory = testZipDirectoryEntry(`${'k'.repeat(LONG_SEGMENT_LENGTH)}/`);
-    expect(await rejectionOf([manifestEntry(), longDirectory])).toBe('skill_archive_unreadable');
+    expect(await rejectionOf([manifestEntry(), longDirectory])).toBe('skill_archive_path_too_long');
   });
 
-  it('3. a túl hosszú nevű fájl és a túl hosszú nevű szülő könyvtár skill_archive_unreadable (O-50 addig)', async () => {
+  it('3. a túl hosszú nevű fájl és a túl hosszú nevű szülő könyvtár skill_archive_path_too_long (O-50)', async () => {
     const longFile = testZipFileEntry(`${'f'.repeat(LONG_SEGMENT_LENGTH)}.md`, 'x');
     const longParent = testZipFileEntry(`${'s'.repeat(LONG_SEGMENT_LENGTH)}/a.md`, 'x');
-    expect(await rejectionOf([manifestEntry(), longFile])).toBe('skill_archive_unreadable');
-    expect(await rejectionOf([manifestEntry(), longParent])).toBe('skill_archive_unreadable');
+    expect(await rejectionOf([manifestEntry(), longFile])).toBe('skill_archive_path_too_long');
+    expect(await rejectionOf([manifestEntry(), longParent])).toBe('skill_archive_path_too_long');
   });
 
   // A futtató nem root felhasználó (a `chmod` root alatt nem tiltana).

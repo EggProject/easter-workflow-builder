@@ -71,6 +71,11 @@ export function readSkillManifest(content: string, skillName: string): Outcome<S
   }
 
   const name = frontmatter['name'];
+  // O-51 (koordinátor döntés 2026-11-04 a user O-41 "Pontos okot" döntéséből): a nem szöveg
+  // `name` a fejléc hibája, nem név eltérés.
+  if (name !== undefined && !isString(name)) {
+    return skillUploadFailure('skill_manifest_invalid', 'A SKILL.md name mezője nem szöveg');
+  }
   if (name !== undefined && name !== skillName) {
     return skillUploadFailure(
       'skill_name_mismatch',

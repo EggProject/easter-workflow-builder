@@ -3,7 +3,7 @@ import { classifyFileSystemWriteError } from './classify-file-system-write-error
 
 describe('classifyFileSystemWriteError', () => {
   it.each([
-    ['ENAMETOOLONG', 'skill_archive_unreadable'],
+    ['ENAMETOOLONG', 'skill_archive_path_too_long'],
     ['EEXIST', 'skill_archive_path_collision'],
     ['ENOTDIR', 'skill_archive_path_collision'],
     ['EISDIR', 'skill_archive_path_collision'],

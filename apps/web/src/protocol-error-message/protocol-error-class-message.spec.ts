@@ -75,6 +75,7 @@ describe('protocolErrorClassMessage', () => {
     ['skill_archive_entry_size_mismatch', 'A csomag egyik bejegyzése sérült.'],
     ['skill_archive_entry_encrypted', 'A csomag titkosított bejegyzést tartalmaz.'],
     ['skill_archive_compression_unsupported', 'A csomag nem támogatott tömörítést használ.'],
+    ['skill_archive_path_too_long', 'A csomag egyik bejegyzésének neve vagy útvonala túl hosszú.'],
   ];
 
   it.each(cases)('a(z) "%s" hibaosztályhoz a saját magyar mondatát rendeli', (errorClass, expected) => {

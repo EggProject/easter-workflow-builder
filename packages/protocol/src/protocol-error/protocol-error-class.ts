@@ -9,7 +9,7 @@ import { z } from 'zod';
  * plusz a SPEC-010 9.2 sablon és kifejezés fordítási ellenőrzése és a
  * SPEC-009 5.1 skill hivatkozás ellenőrzése),
  * plusz a jóváhagyás `already_decided` ága (`packages/db`
- * `human-approval-repository.ts`), plusz a skill feltöltés tizenöt szerver
+ * `human-approval-repository.ts`), plusz a skill feltöltés tizenhat szerver
  * oldali elutasítási osztálya (SPEC-009 5.4, O-41, user döntés 2026-10-28;
  * az `apps/server` `skill-endpoint` témájának `SKILL_UPLOAD_ERROR_CLASSES`
  * táblája). A felsorolás a
@@ -79,6 +79,8 @@ export const ProtocolErrorClassSchema = z.enum([
   'skill_archive_entry_size_mismatch',
   'skill_archive_entry_encrypted',
   'skill_archive_compression_unsupported',
+  // SPEC-009 O-50 (2026-11-04): túl hosszú bejegyzés név vagy túl mély útvonal (ENAMETOOLONG)
+  'skill_archive_path_too_long',
 ]);
 
 export type ProtocolErrorClass = z.infer<typeof ProtocolErrorClassSchema>;

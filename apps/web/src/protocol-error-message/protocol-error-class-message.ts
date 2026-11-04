@@ -64,6 +64,7 @@ const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>
   skill_archive_entry_size_mismatch: 'A csomag egyik bejegyzése sérült.',
   skill_archive_entry_encrypted: 'A csomag titkosított bejegyzést tartalmaz.',
   skill_archive_compression_unsupported: 'A csomag nem támogatott tömörítést használ.',
+  skill_archive_path_too_long: 'A csomag egyik bejegyzésének neve vagy útvonala túl hosszú.',
 };
 
 export function protocolErrorClassMessage(errorClass: ProtocolErrorClass): string {

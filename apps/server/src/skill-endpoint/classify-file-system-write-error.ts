@@ -5,8 +5,9 @@ import type { SkillUploadErrorClass } from './skill-upload-error-class.ts';
  * tartalma okoz (PLAN-012 T-012-27, ZIP 3. találat), a SPEC-009 5.4 tábla
  * osztályára képezve:
  *
- * - `ENAMETOOLONG`: túl hosszú bejegyzés név vagy túl mély útvonal. Az osztálya
- *   nyitott termékdöntés (SPEC-009 14.9 O-50); addig a `skill_archive_unreadable`.
+ * - `ENAMETOOLONG`: túl hosszú bejegyzés név vagy túl mély útvonal, saját
+ *   osztállyal (`skill_archive_path_too_long`, SPEC-009 O-50, koordinátor döntés
+ *   2026-11-04 a user O-41 "Pontos okot" döntéséből).
  * - `EEXIST`, `ENOTDIR`, `EISDIR`: két bejegyzés a fájlrendszeren ugyanarra a
  *   helyre esik, de a nevük a saját ütközés ellenőrzésen (`findPathCollision`)
  *   átment, mert a fájlrendszer másként hasonlít össze (például egy, a
@@ -16,7 +17,7 @@ import type { SkillUploadErrorClass } from './skill-upload-error-class.ts';
  * kliensé: `undefined`, és a hívó továbbdobja a szerver belső hiba útjára.
  */
 const CLIENT_CAUSED_CODES: ReadonlyMap<string, SkillUploadErrorClass> = new Map([
-  ['ENAMETOOLONG', 'skill_archive_unreadable'],
+  ['ENAMETOOLONG', 'skill_archive_path_too_long'],
   ['EEXIST', 'skill_archive_path_collision'],
   ['ENOTDIR', 'skill_archive_path_collision'],
   ['EISDIR', 'skill_archive_path_collision'],

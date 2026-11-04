@@ -40,7 +40,7 @@ interface PendingOverwrite {
  * (`.claude/CLAUDE.md` 11. szekció): érvénytelen név, vagy hiányzó fájl az
  * első beküldési kísérlet után; érvénytelen értékre a `PUT` nem megy ki. Azonos
  * nevű skill feltöltése a felülírás megerősítő modálisán át megy (O-16). A
- * szerver elutasítása (az 5.4 tizenöt hibaosztálya, magyar mondattal) danger
+ * szerver elutasítása (az 5.4 tizenhat hibaosztálya, magyar mondattal) danger
  * `Alert` az űrlap alatt; siker után az űrlap kiürül. A feltöltő szövegei
  * magyarok; a folyamatjelző, a "feltöltve" és a "sikertelen" felirat sosem
  * jelenik meg (a `fetch` nem ad feltöltési haladást, a sor státuszt nem

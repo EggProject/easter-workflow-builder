@@ -85,7 +85,7 @@ const ENGINE_VALIDATION_ERROR_CLASSES = [
  * Az `unprocessable` kódra képződő hibaosztályok (SPEC-005 8.3 táblázat 3.,
  * 5. és 7. sora): a tárolt/küldött gráf dokumentum feldolgozhatatlan hibái
  * (`packages/db`), a motor validációs hibaosztályai, és a skill feltöltés
- * tizenöt elutasítási oka (SPEC-009 5.4, O-41).
+ * tizenhat elutasítási oka (SPEC-009 5.4, O-41).
  */
 const UNPROCESSABLE_ERROR_CLASSES: ReadonlySet<string> = new Set([
   'malformed_graph_document',

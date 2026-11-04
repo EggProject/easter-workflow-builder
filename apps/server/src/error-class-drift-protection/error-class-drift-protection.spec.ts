@@ -23,7 +23,7 @@ import { SKILL_UPLOAD_ERROR_CLASSES, type SkillUploadErrorClass } from '../skill
  * eldöntött" tesztje: az a `db` saját üzenetéből ellenőrzi, hogy a törzs
  * `errorClass` mezője `already_decided`.
  *
- * **A skill feltöltés tizenöt osztálya (SPEC-009 5.4, O-41)** szintén szerver
+ * **A skill feltöltés tizenhat osztálya (SPEC-009 5.4, O-41)** szintén szerver
  * oldali, nem motor osztály: a `skill-endpoint` téma egyetlen `as const`
  * táblában (`SKILL_UPLOAD_ERROR_CLASSES`) deklarálja, és a típusszintű ág erre
  * a táblára hivatkozik, így a szótár és a tábla mindkét irányban egyezik.
