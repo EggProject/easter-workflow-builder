@@ -6,7 +6,7 @@
 | Dátum   | 2026-11-03, átvezetve 2026-11-04                                                                                     |
 | Spec    | [`../spec/SPEC-015-strukturalt-kimenet-sema-ellenorzes.md`](../spec/SPEC-015-strukturalt-kimenet-sema-ellenorzes.md) |
 | Forrás  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md)       |
-| Branch  | `feat/spec-015-strukturalt-kimenet-sema`                                                                             |
+| Branch  | `feat/spec-015-strukturalt-kimenet`                                                                                  |
 
 A lépések a SPEC-015 8. szekciójának kritérium számára hivatkoznak (`ACn`). Végrehajtási sorrend a három
 terv között: PLAN-017, PLAN-016, PLAN-015 (a research 9. szekciója); ez a terv a második, a PLAN-017 merge után
@@ -14,12 +14,12 @@ indul, mert mindhárom a `ProtocolErrorClass` szótárt bővíti.
 
 ## 1. Előfeltételek
 
-| Feltétel            | Elvárt érték                                                 | Ellenőrzés                        |
-| ------------------- | ------------------------------------------------------------ | --------------------------------- |
-| SPEC-015 döntései   | O-1 ... O-3 lezárva, átvezetve a specbe (megvan)             | a SPEC-015 7.1 szekciója          |
-| Előző terv          | a PLAN-017 mergelve a `main`-re                              | `git log origin/main`             |
-| Feature branch      | `feat/spec-015-strukturalt-kimenet-sema`, a friss `main`-ről | `git rev-parse --abbrev-ref HEAD` |
-| A kiinduló fej zöld | a kilenc kapu                                                | a T-016-1 kimenete                |
+| Feltétel            | Elvárt érték                                            | Ellenőrzés                        |
+| ------------------- | ------------------------------------------------------- | --------------------------------- |
+| SPEC-015 döntései   | O-1 ... O-3 lezárva, átvezetve a specbe (megvan)        | a SPEC-015 7.1 szekciója          |
+| Előző terv          | a PLAN-017 mergelve a `main`-re                         | `git log origin/main`             |
+| Feature branch      | `feat/spec-015-strukturalt-kimenet`, a friss `main`-ről | `git rev-parse --abbrev-ref HEAD` |
+| A kiinduló fej zöld | a kilenc kapu                                           | a T-016-1 kimenete                |
 
 ## 2. Kapuk
 

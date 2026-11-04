@@ -17,6 +17,12 @@ export interface RouteFailure {
   readonly kind: 'error';
   readonly message: string;
   readonly isTransient: boolean;
+  /**
+   * Az `invalid_request` protokoll hiba törzsének mezőútjai
+   * (`readInvalidRequestFieldPaths`); csak a protokoll hibaágon áll. A felület
+   * nem jeleníti meg, csak a mezőt keresi meg vele (SPEC-015 5.7).
+   */
+  readonly invalidFieldPaths?: readonly string[];
 }
 
 /**

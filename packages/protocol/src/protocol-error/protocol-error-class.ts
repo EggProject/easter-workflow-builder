@@ -40,6 +40,11 @@ export const ProtocolErrorClassSchema = z.enum([
   'missing_required_input',
   // SPEC-016 5.5: egy jelen lévő bemeneti mező értéke nem a beállított típusú
   'invalid_input_type',
+  // SPEC-015 5.4 és 5.5: a lépés strukturált kimenet sémája nem fordítható (a
+  // futás indítása elutasítja), illetve a kimenet nem illeszkedik a sémára (a
+  // lépés futása közben keletkezik, a futás eseményein megy ki)
+  'invalid_structured_output_schema',
+  'structured_output_schema_mismatch',
   // SPEC-004 11.1: a provider feloldás
   'no_default_provider',
   // SPEC-010 9.2 és 9.3: a sablon és a kifejezés mezők fordítása (user döntés 2026-10-25)

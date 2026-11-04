@@ -153,7 +153,9 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   `as const` táblában), nem `EngineErrorKind` tag, ezért az `already_decided` mintájára a típusszintű
   `Exclude` ág és a futásidejű lista ezzel a táblával bővül. A feltöltési osztályok kódja
   `unprocessable` (a SPEC-005 8.3 "a tárolt vagy a küldött dokumentum nem dolgozható fel" sorának
-  mintája); a mentés mezőútja (SPEC-005 8.5) továbbra sem kap strukturált mezőt.
+  mintája); a mentés mezőútja (SPEC-005 8.5) továbbra sem kap strukturált mezőt. A SPEC-015
+  `invalid_structured_output_schema` és `structured_output_schema_mismatch` osztálya motor osztály, a
+  részhalmaz szabály alá esik (SPEC-015 5.4, 5.5, AC5).
 - **A `protocol` a `db` írás oldali "kötelező szöveg mező" szabályát is duplikálhatja, ugyanezzel a
   védelemmel.** A kötelező (nem nullázható, a beállítás panelen szerkesztett) szöveg mezők listája a
   `protocol` mentési sémájában és a `db` `replaceGraph` ellenőrzésében is áll, mindkét oldalon
@@ -860,8 +862,17 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   mezőjében adja, a kliens ehhez saját magyar mondatot rendel (2026-10-25 óta a futás indításának
   sablon és kifejezés hibájára is, SPEC-010 9.6; a user 2026-10-28-i döntése szerint a skill feltöltés
   elutasítási okaira, a hiányzó skillre, a hiányzó MCP definícióra és a hiányzó MCP env változóra is,
-  SPEC-009 5.4 és 6.4), és a `message` szövegét nem elemzi;
-  hiányzó mezőnél a kód mondata marad, a mentés mezőútja nem kap mondatot. Az
+  SPEC-009 5.4 és 6.4), és a `message` szövegét nem elemzi (az egyetlen kivétel a strukturált kimenet
+  sémájának mezőútja, lent);
+  hiányzó mezőnél a kód mondata marad, a mentés mezőútja nem kap mondatot. **Egyetlen, szűkített
+  kivétel: a strukturált kimenet sémája** (SPEC-015 5.7, user döntés 2026-11-04, "Mentéskor és
+  indításkor"): a szerver a mentéskor a sémát az `agent` fordítójával ellenőrzi, a nem fordítható
+  séma mezőútja (`nodes.<index>.config.structuredOutput.schema`, a `join` alobjektumán
+  `...settings.structuredOutput.schema`) az `invalid_request` törzsben áll, és a kliens ezt a mezőutat
+  a protokoll `readInvalidRequestFieldPaths` függvényével (a `zodErrorToProtocolErrorBody` párja)
+  a séma mező alatti saját mondatára képezi le; a szerver szövege és a mezőút a felületre nem jut,
+  minden más mezőút változatlanul mondat nélkül marad. Védelem: `structured-output-schema-save.spec.ts`
+  (e2e), `read-invalid-request-field-paths.spec.ts`, `GraphEditorScreen.spec.tsx`. Az
   akciósáv magassága 1440x600-on a kérdés szövegét levágja, a szöveg a törzsben görgethető
   (SPEC-008 14.1 O-17, user döntés 2026-09-26: elfogadva). Védelem:
   `apps/web/src/greppable-invariants/` (18), a `perform-route-request.spec.ts`, a

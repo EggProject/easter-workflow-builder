@@ -182,6 +182,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -205,6 +206,7 @@ describe('NodeInspector', () => {
             onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
+            rejectedSchemaFieldPaths={[]}
           />,
         );
       });
@@ -252,6 +254,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -282,6 +285,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -305,6 +309,7 @@ describe('NodeInspector', () => {
             onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
+            rejectedSchemaFieldPaths={[]}
           />,
         );
       });
@@ -332,6 +337,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -355,6 +361,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -383,6 +390,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -407,6 +415,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -435,6 +444,7 @@ describe('NodeInspector', () => {
             onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
+            rejectedSchemaFieldPaths={[]}
           />,
         );
       });
@@ -474,6 +484,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -495,6 +506,7 @@ describe('NodeInspector', () => {
             onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
+            rejectedSchemaFieldPaths={[]}
           />,
         );
       });
@@ -522,6 +534,7 @@ describe('NodeInspector', () => {
           onFieldBlur={onFieldBlur}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -554,6 +567,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -590,6 +604,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -621,6 +636,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -652,6 +668,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -696,6 +713,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -728,6 +746,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -784,6 +803,7 @@ describe('NodeInspector', () => {
             onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted
+            rejectedSchemaFieldPaths={[]}
           />,
         );
       });
@@ -820,6 +840,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -843,6 +864,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -899,6 +921,7 @@ describe('NodeInspector', () => {
             onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted
+            rejectedSchemaFieldPaths={[]}
           />,
         );
       });
@@ -945,6 +968,7 @@ describe('NodeInspector', () => {
             onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted
+            rejectedSchemaFieldPaths={[]}
           />,
         );
       });
@@ -983,6 +1007,7 @@ describe('NodeInspector', () => {
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -1168,6 +1193,7 @@ describe('NodeInspector: a sablon és kifejezés mezők fordítási hibája (SPE
           onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={isSaveAttempted}
+          rejectedSchemaFieldPaths={[]}
         />,
       );
     });
@@ -1282,5 +1308,104 @@ describe('NodeInspector: a sablon és kifejezés mezők fordítási hibája (SPE
       true,
     );
     expectErrorUnder(fieldControl('Feltétel kifejezés'), 'A mező nem lehet üres.');
+  });
+});
+
+describe('NodeInspector: a szerver által elutasított strukturált kimenet séma (SPEC-015 5.7, AC3)', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  const schemaSettings = {
+    ...AGENT_STEP_SETTINGS,
+    structuredOutput: { strategy: 'sdk_output_format' as const, schema: { type: 'strin' } },
+  };
+
+  const SCHEMA_CASES = [
+    {
+      kind: 'agent_step',
+      fieldPath: 'structuredOutput.schema',
+      node: {
+        id: 'n-agent-sema',
+        type: 'agent_step',
+        label: 'Lépés',
+        positionX: 0,
+        positionY: 0,
+        config: { ...schemaSettings, type: 'agent_step', onUnhandledError: 'fail_run' },
+      },
+    },
+    {
+      kind: 'join ai_synthesis',
+      fieldPath: 'settings.structuredOutput.schema',
+      node: {
+        id: 'n-join-sema',
+        type: 'join',
+        label: 'Összefésülés',
+        positionX: 0,
+        positionY: 0,
+        config: { type: 'join', mode: 'ai_synthesis', onUnhandledError: 'fail_run', settings: schemaSettings },
+      },
+    },
+  ] satisfies readonly { readonly kind: string; readonly fieldPath: string; readonly node: WorkflowNodeInput }[];
+
+  function renderInspector(node: WorkflowNodeInput, rejectedSchemaFieldPaths: readonly string[]): void {
+    act(() => {
+      root.render(
+        <NodeInspector
+          node={node}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted
+          rejectedSchemaFieldPaths={rejectedSchemaFieldPaths}
+        />,
+      );
+    });
+  }
+
+  function schemaControl(): HTMLTextAreaElement {
+    const field = [...container.querySelectorAll('.field')].find(
+      (candidate) => candidate.querySelector('.field__label')?.textContent === 'Kimenet séma (nyers JSON)',
+    );
+    const control = field?.querySelector('textarea');
+    if (control === null || control === undefined) {
+      throw new Error('a teszt nem találta a séma mezőt');
+    }
+    return control;
+  }
+
+  it.each(SCHEMA_CASES)(
+    '$kind: az elutasított séma mezője alatt a hiba mondata áll, aria kötéssel',
+    ({ node, fieldPath }) => {
+      renderInspector(node, [fieldPath]);
+      const control = schemaControl();
+
+      expect(control.getAttribute('aria-invalid')).toBe('true');
+      const errorElement = container.querySelector(`#${control.getAttribute('aria-describedby') ?? ''}`);
+      expect(errorElement?.textContent).toBe(
+        'A séma érvénytelen: nem draft-07 szerinti JSON Schema, ismeretlen kulcsszót vagy formátumot tartalmaz, vagy draft-07-nél újabb $schema értéket deklarál.',
+      );
+      expect(errorElement?.getAttribute('role')).toBe('alert');
+    },
+  );
+
+  it.each(SCHEMA_CASES)('$kind: elutasítás nélkül a séma mező nem jelez', ({ node }) => {
+    renderInspector(node, []);
+
+    expect(schemaControl().getAttribute('aria-invalid')).toBeNull();
   });
 });

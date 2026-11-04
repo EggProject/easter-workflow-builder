@@ -172,6 +172,31 @@ test('a futás indításának invalid_input_type hibája a modálisban a saját 
   await expectNoInternalText(page, 'invalid_input_type');
 });
 
+// A strukturált kimenet sémáját a motor a futás indításakor fordítja le
+// (SPEC-015 5.4): a nem fordítható séma a futást adat írás nélkül elutasítja.
+test('a futás indításának invalid_structured_output_schema hibája a lábléc danger Alert blokkjában a saját mondatával áll', async ({
+  page,
+}) => {
+  await mockEditor(
+    page,
+    START_WITHOUT_FIELDS,
+    {
+      code: 'unprocessable',
+      message: internalMessage('invalid_structured_output_schema'),
+      errorClass: 'invalid_structured_output_schema',
+    } satisfies ProtocolErrorBody,
+    422,
+  );
+  await page.goto(EDITOR_URL);
+
+  await page.getByRole('button', { name: 'Futás indítása', exact: true }).click();
+
+  const alert = page.locator('.page-footer').getByRole('alert');
+  await expect(alert).toHaveText('Egy lépés strukturált kimenet sémája érvénytelen, ezért a futás nem indítható.');
+  await expect(alert).toHaveClass(/\balert--danger\b/);
+  await expectNoInternalText(page, 'invalid_structured_output_schema');
+});
+
 // A `malformed_node_config` hibaosztályt a szerver a futás indításakor adja (a
 // motor validációja); a `PUT .../graph` végponton a mentési séma előbb
 // utasít el `invalid_request` kóddal (SPEC-008 5.4, O-37), tehát a mentés

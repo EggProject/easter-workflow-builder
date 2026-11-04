@@ -173,6 +173,15 @@ eleve így írja le ("a vezérelt vászon, a mentés és a betöltés, a piszkos
 külön, tizenegyedik SPEC-008 téma. Az `app-shell.tsx` `'graphEditor'` ága a `GraphEditorScreen`-t
 rendereli, a többi képernyő mintáját követve.
 
+**A strukturált kimenet sémájának szerver oldali elutasítása a mező alatt jelez (SPEC-015 5.7).** A
+mentés `invalid_request` válaszának mezőútjait a `rest-client` a protokoll
+`readInvalidRequestFieldPaths` függvényével adja át (`RouteFailure.invalidFieldPaths`); a
+`graph-editor` téma ebből csak a séma két mezőútját veszi (`findRejectedStructuredOutputSchemas`), és
+a beállítás panel a `structuredOutput.schema` (a `join` alobjektumán `settings.structuredOutput.schema`)
+mező alatt saját mondatot mutat, amíg a séma értéke (hivatkozás szerint) nem változik. Ez a
+`.claude/CLAUDE.md` 11. szekció "a mentés mezőútja nem kap mondatot" szabályának szűkített
+kiegészítése, egyetlen mezőre; a szerver szövege és a mezőút a felületre nem jut.
+
 **A `run-graph` és a `run-view` téma a futás nézet alapja (T-009-20, T-009-21).** A vászon
 ugyanazt az EGYETLEN egyedi node komponenst regisztrálja, mint a szerkesztő, de csak olvasható:
 a `nodesDraggable`, a `nodesConnectable` és az `elementsSelectable` prop mind hamis; a pásztázás

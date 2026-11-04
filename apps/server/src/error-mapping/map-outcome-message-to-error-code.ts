@@ -64,6 +64,11 @@ const ENGINE_VALIDATION_ERROR_CLASSES = [
   'insufficient_backoff_list',
   'missing_required_input',
   'invalid_input_type',
+  // SPEC-015 5.4: a futás indítása elutasítja a nem fordítható sémát; az 5.5
+  // eltérése a lépés futása közben keletkezik, a futás eseményein megy ki, a
+  // szótár tagjaként a motor többi osztályával azonos kódra képződik.
+  'invalid_structured_output_schema',
+  'structured_output_schema_mismatch',
   'structured_output_strategy_unsupported',
   'insufficient_max_turns',
   'forced_tool_choice_silently_dropped',

@@ -116,6 +116,7 @@ describe('performRouteRequest', () => {
       kind: 'error',
       message: 'A keresett elem nem létezik, esetleg időközben törölték.',
       isTransient: false,
+      invalidFieldPaths: [],
     });
   });
 
@@ -142,6 +143,7 @@ describe('performRouteRequest', () => {
       kind: 'error',
       message: 'Az elem állapota most nem engedi a műveletet.',
       isTransient: false,
+      invalidFieldPaths: [],
     });
     const message = outcome.kind === 'error' ? outcome.message : '';
     expect(message).not.toContain('.:');
@@ -181,12 +183,40 @@ describe('performRouteRequest', () => {
         signal: undefined,
       });
 
-      expect(outcome).toEqual({ kind: 'error', message: expected, isTransient: false });
+      expect(outcome).toEqual({ kind: 'error', message: expected, isTransient: false, invalidFieldPaths: [] });
       const message = outcome.kind === 'error' ? outcome.message : '';
       expect(message).not.toContain('run-7f3a');
       expect(message).not.toContain(errorClass);
     },
   );
+
+  it('invalid_request hibára a törzs mezőútjait is átadja, a megjelenő mondat a kód mondata marad (SPEC-015 5.7)', async () => {
+    const outcome = await performRouteRequest({
+      routeId: 'replaceWorkflowGraph',
+      parameters: { workflowId: 'wf-1' },
+      query: undefined,
+      hasBody: true,
+      body: { nodes: [], edges: [] },
+      responseSchema: demoValueSchema,
+      fetchFunction: () =>
+        Promise.resolve(
+          jsonResponse(400, {
+            code: 'invalid_request',
+            message:
+              'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.structuredOutput.schema (invalid_request).',
+          }),
+        ),
+      apiOrigin: API_ORIGIN,
+      signal: undefined,
+    });
+
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: protocolErrorMessage('invalid_request'),
+      isTransient: false,
+      invalidFieldPaths: ['nodes.1.config.structuredOutput.schema'],
+    });
+  });
 
   // A szótáron kívüli `errorClass` a szerződés megsértése: a kliens és a
   // szerver egy repóban, egyszerre élesedik (SPEC-005 8.5), tehát ez csak
@@ -297,6 +327,7 @@ describe('performRouteRequest', () => {
       kind: 'error',
       message: 'A keresett elem nem létezik, esetleg időközben törölték.',
       isTransient: true,
+      invalidFieldPaths: [],
     });
   });
 

@@ -17,6 +17,7 @@ import { FieldErrorsContext } from './field-errors-context.ts';
 import { fieldErrorsFromZodError } from './field-errors-from-zod-error.ts';
 import { findBlankAgentDefinitionFields } from './find-blank-agent-definition-fields.ts';
 import { findLanguageFieldIssues } from './find-language-field-issues.ts';
+import { STRUCTURED_OUTPUT_SCHEMA_REJECTED_MESSAGE } from './structured-output-schema-rejected-message.ts';
 import './node-inspector.css';
 
 export interface NodeInspectorProperties {
@@ -58,6 +59,13 @@ export interface NodeInspectorProperties {
    * `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 13. szekció).
    */
   readonly isSaveAttempted: boolean;
+  /**
+   * A csomópont azon strukturált kimenet séma mezőútjai (`config`-on belül),
+   * amiket a szerver a legutóbbi mentéskor elutasított, és a séma azóta nem
+   * változott (SPEC-015 5.7). A panel ezek alatt a mező alatti hibát mutatja.
+   * Kötelező, ugyanazon okból, mint az `isSaveAttempted`.
+   */
+  readonly rejectedSchemaFieldPaths: readonly string[];
 }
 
 /**
@@ -150,7 +158,16 @@ function renderConfigFields(
  * szerinti komponens szignatúrája ne hízzon egy csak áttovábbított proppal.
  */
 export function NodeInspector(properties: Readonly<NodeInspectorProperties>): ReactElement {
-  const { node, onChange, onClose, onDelete, onFieldBlur, inheritedProviderDescription, isSaveAttempted } = properties;
+  const {
+    node,
+    onChange,
+    onClose,
+    onDelete,
+    onFieldBlur,
+    inheritedProviderDescription,
+    isSaveAttempted,
+    rejectedSchemaFieldPaths,
+  } = properties;
   const catalogEntry = GRAPH_NODE_CATALOG[node.type];
   // A mezőnkénti hiba a mentési sémán áll (SPEC-008 5.4, O-21): ugyanaz a
   // szabály jelez a mező alatt, ami a mentés előtti ellenőrzést és a szerver
@@ -164,9 +181,15 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
     ...(parsedConfig.success ? [] : parsedConfig.error.issues),
     ...findBlankAgentDefinitionFields(node.config),
   ];
+  // Végül a szerver által mentéskor elutasított séma (SPEC-015 5.7): a kliens a
+  // sémát nem fordítja, a hibát a szerver válaszának mezőútja adja.
   const issues = [
     ...schemaIssues,
     ...findLanguageFieldIssues(node.config, fieldErrorsFromZodError({ issues: schemaIssues })),
+    ...rejectedSchemaFieldPaths.map((path) => ({
+      path: path.split('.'),
+      message: STRUCTURED_OUTPUT_SCHEMA_REJECTED_MESSAGE,
+    })),
   ];
   const fieldErrors = issues.length === 0 ? NO_FIELD_ERRORS : fieldErrorsFromZodError({ issues });
 

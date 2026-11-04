@@ -40,6 +40,11 @@ export type EngineErrorKind =
   // 5.2: az `agent_step` életciklusa
   | 'agent_result_not_success'
   | 'missing_structured_output'
+  // SPEC-015 5.5: a `structured_output` nem illeszkedik a lépés sémájára
+  | 'structured_output_schema_mismatch'
+  // SPEC-015 5.4: a lépés strukturált kimenet sémája nem fordítható (érvénytelen,
+  // vagy draft-07-nél újabb `$schema`); a futás indítása ezzel utasítja el
+  | 'invalid_structured_output_schema'
   | 'provider_call_failed'
   // 6.3: a session modell
   | 'no_resumable_session'

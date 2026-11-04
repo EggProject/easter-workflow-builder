@@ -403,6 +403,44 @@ describe('executeJoinAiSynthesis', () => {
     database.close();
   });
 
+  it('a join ai_synthesis módja a sémára nem illeszkedő kimenetre ugyanúgy structured_output_schema_mismatch (SPEC-015 5.6, AC4)', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const { gate } = recordingGate();
+    const dependencies = dependenciesOf(database, fakeRunner(fixtureMessages('sikeres')));
+    const joinInputs = ['egyetlen ág kimenete'];
+
+    const outcome = settledOrThrow(
+      await executeJoinAiSynthesis(
+        {
+          instance: instanceOf(runId),
+          config: joinAiSynthesisConfig({
+            structuredOutput: {
+              strategy: 'sdk_output_format',
+              schema: { type: 'object', properties: { osszeg: { type: 'string' } }, required: ['osszeg'] },
+            },
+          }),
+          descriptor: descriptor(),
+          runContext: baseRunContext(joinInputs),
+          graph,
+          sessionSourceNodes: { sourceNodeIds: new Set(['j']), continuedNodeIds: new Set() },
+          sessionInstances: [],
+          joinInputs,
+        },
+        dependencies,
+        gate,
+        createAgentQueryRegistry(),
+      ),
+    );
+
+    expect(outcome.kind === 'failed' ? outcome.errorKind : outcome.kind).toBe('structured_output_schema_mismatch');
+    const stepRun = okOrThrow(database.stepRuns.getStepRun(outcome.stepRun.id));
+    expect(stepRun.status).toBe('failed');
+    expect(stepRun.output).toBeNull();
+
+    database.close();
+  });
+
   it('a lifecycle saját Outcome hibaágát változtatás nélkül adja tovább, join_resolved írása nélkül', async () => {
     const database = openMemoryDatabase();
     const { gate } = recordingGate();

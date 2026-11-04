@@ -85,6 +85,9 @@ import { useBeforeUnloadPrompt } from './use-before-unload-prompt.ts';
 import { useIsFooterCompact } from './use-is-footer-compact.ts';
 import { useUndoRedoShortcut } from './use-undo-redo-shortcut.ts';
 import { validateGraphForSave } from './validate-graph-for-save.ts';
+import { findRejectedStructuredOutputSchemas } from './find-rejected-structured-output-schemas.ts';
+import { rejectedSchemaFieldPathsOf } from './rejected-schema-field-paths-of.ts';
+import type { RejectedStructuredOutputSchema } from './rejected-structured-output-schema.ts';
 
 export interface GraphEditorScreenProperties {
   readonly apiOrigin: string;
@@ -414,6 +417,10 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   // is fut a mezőnkénti hibákhoz - a szerver oldali (hálózati/500) hiba nem
   // mezőszintű, ahhoz nincs mit kiírni a panelen.
   const [isSaveAttempted, setIsSaveAttempted] = useState(false);
+  // A strukturált kimenet sémái, amiket a szerver a legutóbbi mentéskor
+  // elutasított (SPEC-015 5.7): a beállítás panel a séma mező alatt jelez,
+  // amíg a séma nem változik; a sikeres mentés üríti.
+  const [rejectedSchemas, setRejectedSchemas] = useState<readonly RejectedStructuredOutputSchema[]>([]);
   // Az automatikus elrendezések számlálója: a vászon ennek megváltozására
   // illeszti újra a nézetet (`GraphEditorCanvas.autoLayoutRevision`). Azért
   // külön számláló, és nem a `currentNodes` figyelése, mert a nézet
@@ -680,6 +687,7 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
       return;
     }
     setValidationMessage(undefined);
+    const savedNodes = currentNodes;
     void saveState.run(async () => {
       const outcome = await requestRoute({
         routeId: 'replaceWorkflowGraph',
@@ -700,8 +708,17 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
           edges: outcome.value.edges.map((edge) => workflowEdgeToEdgeInput(edge)),
         };
         setHistory((current) => startGraphEditHistory(current.document, savedDocument));
+        setRejectedSchemas([]);
         pushToast({ variant: 'success', title: 'Gráf mentve', message: resolvedWorkflowId });
       } else {
+        // A szerver a strukturált kimenet sémáját is ellenőrzi (SPEC-015 5.7): az
+        // elutasított séma a mező alatt jelez, mintha a mentés ellenőrzése bukott
+        // volna el, ezért a panel minden hibás mezője látszik.
+        const rejected = findRejectedStructuredOutputSchemas(outcome.invalidFieldPaths ?? [], savedNodes);
+        setRejectedSchemas(rejected);
+        if (rejected.length > 0) {
+          setIsSaveAttempted(true);
+        }
         pushToast({ variant: 'danger', title: 'A mentés sikertelen', message: outcome.message });
       }
       return outcome;
@@ -820,6 +837,7 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
                           onFieldBlur={handleFieldBlur}
                           inheritedProviderDescription={inheritedProviderDescription}
                           isSaveAttempted={isSaveAttempted}
+                          rejectedSchemaFieldPaths={rejectedSchemaFieldPathsOf(rejectedSchemas, selectedNode)}
                         />
                       </McpServerLibraryContext.Provider>
                     </SkillLibraryContext.Provider>

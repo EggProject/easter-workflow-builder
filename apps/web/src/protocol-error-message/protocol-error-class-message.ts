@@ -31,6 +31,9 @@ const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>
     'Egy Hibakezelő csomópont várakozási listája rövidebb, mint amit a próbálkozások száma megkövetel.',
   missing_required_input: 'A futás egy kötelező bemeneti mezője hiányzik.',
   invalid_input_type: 'A futás bemenetének egy mezője nem a beállított típusú.',
+  invalid_structured_output_schema: 'Egy lépés strukturált kimenet sémája érvénytelen, ezért a futás nem indítható.',
+  structured_output_schema_mismatch:
+    'Egy lépés kimenete nem illeszkedett a strukturált kimenet sémájára, ezért a lépés leállt.',
   no_default_provider: 'Nincs alapértelmezett provider beállítva, válassz egyet a Beállítások képernyőn.',
   structured_output_strategy_unsupported:
     'Egy lépés strukturált kimenet stratégiáját a választott provider nem támogatja.',

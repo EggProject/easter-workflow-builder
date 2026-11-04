@@ -13,8 +13,8 @@ export type { ZipBodyRouteId } from './http-route/is-zip-body-route-id.ts';
 export { isZipBodyRouteId } from './http-route/is-zip-body-route-id.ts';
 
 // protocol-error: a ProtocolErrorCode szótár, a ProtocolErrorClass szótár, a
-// ProtocolErrorBody séma, a HTTP státusz leképezés, és a Zod hiba lista fordítása a boríték
-// alakra.
+// ProtocolErrorBody séma, a HTTP státusz leképezés, a Zod hiba lista fordítása a boríték
+// alakra és annak mezőlistás visszafejtése.
 export type { ProtocolErrorCode } from './protocol-error/protocol-error-code.ts';
 export { ProtocolErrorCodeSchema } from './protocol-error/protocol-error-code.ts';
 export type { ProtocolErrorClass } from './protocol-error/protocol-error-class.ts';
@@ -23,6 +23,7 @@ export type { ProtocolErrorBody } from './protocol-error/protocol-error-body.ts'
 export { ProtocolErrorBodySchema } from './protocol-error/protocol-error-body.ts';
 export { httpStatusForErrorCode } from './protocol-error/http-status-for-error-code.ts';
 export { zodErrorToProtocolErrorBody } from './protocol-error/zod-error-to-protocol-error-body.ts';
+export { readInvalidRequestFieldPaths } from './protocol-error/read-invalid-request-field-paths.ts';
 
 // workflow: a node típus felsorolás, a workflow rekord, a gráf dokumentum, a létrehozás,
 // a módosítás, a teljes gráf csere és a törlés kérés és válasz alakja.

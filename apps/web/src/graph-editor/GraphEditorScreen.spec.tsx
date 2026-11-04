@@ -1034,6 +1034,63 @@ describe('GraphEditorScreen', () => {
     expect(container.textContent).toContain('Mentetlen változtatások');
   });
 
+  it('a szerver által elutasított séma a Lépés panelén a séma mező alatt jelez, a sikeres mentés üríti (SPEC-015 5.7, AC3)', async () => {
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    const succeeding = createFetchFunction(log);
+    let putCount = 0;
+    const fetchFunction: FetchFunction = (input, init) => {
+      if (init.method === 'PUT') {
+        putCount += 1;
+        if (putCount === 1) {
+          return Promise.resolve(
+            Response.json(
+              {
+                code: 'invalid_request',
+                message:
+                  'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.structuredOutput.schema (invalid_request).',
+              },
+              { status: 400 },
+            ),
+          );
+        }
+      }
+      return succeeding(input, init);
+    };
+    await renderScreen('?workflowId=wf-1', fetchFunction);
+
+    const schemaNode: WorkflowNodeInput = {
+      ...AGENT_NODE,
+      config:
+        AGENT_NODE.config.type === 'agent_step'
+          ? { ...AGENT_NODE.config, structuredOutput: { strategy: 'sdk_output_format', schema: { type: 'strin' } } }
+          : AGENT_NODE.config,
+    };
+    act(() => {
+      lastCanvasProperties().onGraphChange([START_NODE, schemaNode], []);
+    });
+    openAgentPanel();
+
+    function schemaControl(): HTMLTextAreaElement | null | undefined {
+      return [...container.querySelectorAll('.field')]
+        .find((field) => field.querySelector('.field__label')?.textContent === 'Kimenet séma (nyers JSON)')
+        ?.querySelector('textarea');
+    }
+    expect(schemaControl()?.getAttribute('aria-invalid')).toBeNull();
+
+    await clickSave(container);
+
+    expect(container.querySelector('.toast__title')?.textContent).toBe('A mentés sikertelen');
+    expect(schemaControl()?.getAttribute('aria-invalid')).toBe('true');
+    expect(container.querySelector(':scope .node-inspector .field__error')?.textContent).toContain(
+      'A séma érvénytelen',
+    );
+
+    await clickSave(container);
+
+    expect(log.putBodies).toHaveLength(1);
+    expect(schemaControl()?.getAttribute('aria-invalid')).toBeNull();
+  });
+
   // ============================================================
   // A FUTÁS INDÍTÁSA (T-009-23, SPEC-008 6.5, AC28).
   // ============================================================
