@@ -319,20 +319,20 @@ const PROBE_NODES: readonly WorkflowNodeInput[] = [
       maxTurns: null,
       maxBudgetUsd: null,
       systemPrompt: null,
-      // Az agent definíció a lépés mezőivel azonos alakú skill és MCP hivatkozást hordoz (M-147).
+      // Az agent definíció a lépés mezőivel azonos alakú skill és MCP hivatkozást hordoz (M-147); a
+      // felülírt szervert a lépés nem hivatkozza, mert az azonos nevű felülírás indítási hiba (O-48).
       agents: {
         segito: {
           description: 'Próba al-agent.',
           prompt: 'Segíts.',
           skills: ['alfa'],
-          mcpServerReferences: { 'web-api': { envBindings: {}, authEnvName: null } },
+          mcpServerReferences: { 'web-api': { envBindings: {}, authEnvName: 'EASTER_VEGPONT_HTTP_FELULIRT' } },
         },
       },
       skills: ['alfa'],
       mcpServers: {},
       mcpServerReferences: {
         'fajl-eszkozok': { envBindings: {}, authEnvName: null },
-        'web-api': { envBindings: {}, authEnvName: 'EASTER_VEGPONT_HTTP_FELULIRT' },
       },
       cwd: null,
       additionalDirectories: [],
@@ -445,7 +445,6 @@ describe('végponttól végpontig próba: skill, MCP és izoláció a kimenő Op
         args: ['fajl-szerver.mjs', '--csak-olvas'],
         env: { FAJL_TOKEN: STDIO_SECRET },
       },
-      'web-api': { type: 'http', url: 'http://127.0.0.1:1/mcp', headers: { Authorization: HTTP_OVERRIDE_SECRET } },
     });
     expect(options['agents']).toStrictEqual({
       segito: {
@@ -454,7 +453,11 @@ describe('végponttól végpontig próba: skill, MCP és izoláció a kimenő Op
         skills: [`${PLUGIN_NAME}:alfa`],
         mcpServers: [
           {
-            'web-api': { type: 'http', url: 'http://127.0.0.1:1/mcp', headers: { Authorization: HTTP_DEFAULT_SECRET } },
+            'web-api': {
+              type: 'http',
+              url: 'http://127.0.0.1:1/mcp',
+              headers: { Authorization: HTTP_OVERRIDE_SECRET },
+            },
           },
         ],
       },
