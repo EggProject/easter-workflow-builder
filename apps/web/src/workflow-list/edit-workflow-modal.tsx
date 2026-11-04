@@ -7,6 +7,7 @@ import {
 } from '@easter-workflow-builder/protocol';
 import { Alert, Button, Modal, TextField } from '@easter-workflow-builder/ui';
 import { useEffect, useMemo, useState, type ChangeEvent, type ReactElement, type SubmitEvent } from 'react';
+import { BuiltinSkillsSelect } from '../builtin-skills-select/BuiltinSkillsSelect.tsx';
 import { createProviderConnectionTester } from '../provider-select/create-provider-connection-tester.ts';
 import { describeRequiredEnvironment } from '../provider-select/describe-required-environment.ts';
 import { ProviderSelect } from '../provider-select/ProviderSelect.tsx';
@@ -29,7 +30,9 @@ export interface EditWorkflowModalProperties {
  * módosítása. A provider választó a `ProviderSelect` a "Kapcsolat teszt"
  * gombbal, a létrehozó modális mintáját követve; az "Nincs megadva" opció az
  * "örökölt" választás, amit a `PATCH` törzse `providerId: null` értékkel
- * küld (AC8). A `workflow` mező jelenléte nyitja a modálist (nincs külön
+ * küld (AC8). A "Beépített skillek" háromállású választó a workflow szintű
+ * felülírás (SPEC-009 O-44): az örökölt választást a törzs
+ * `builtinSkillsEnabled: null` értékkel küldi. A `workflow` mező jelenléte nyitja a modálist (nincs külön
  * `open` prop, mert a tartalom a kiválasztott sortól függ).
  */
 export function EditWorkflowModal(properties: Readonly<EditWorkflowModalProperties>): ReactElement {
@@ -38,6 +41,8 @@ export function EditWorkflowModal(properties: Readonly<EditWorkflowModalProperti
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [providerId, setProviderId] = useState('');
+  // eslint-disable-next-line unicorn/no-null -- a `null` az öröklés (SPEC-009 O-44)
+  const [builtinSkillsEnabled, setBuiltinSkillsEnabled] = useState<boolean | null>(null);
   const providersState = useRequestState<readonly ProviderSummary[]>();
   const submitState = useRequestState<WorkflowSummary>();
 
@@ -48,6 +53,7 @@ export function EditWorkflowModal(properties: Readonly<EditWorkflowModalProperti
     setName(workflow.name);
     setDescription(workflow.description ?? '');
     setProviderId(workflow.providerId ?? '');
+    setBuiltinSkillsEnabled(workflow.builtinSkillsEnabled);
     submitState.reset();
     void providersState.run(() =>
       requestRouteWithoutBody({
@@ -88,6 +94,7 @@ export function EditWorkflowModal(properties: Readonly<EditWorkflowModalProperti
                 description: description.trim() === '' ? null : description,
                 // eslint-disable-next-line unicorn/no-null -- lásd fent.
                 providerId: providerId === '' ? null : providerId,
+                builtinSkillsEnabled,
               },
               responseSchema: WorkflowSummarySchema,
               fetchFunction,
@@ -163,6 +170,13 @@ export function EditWorkflowModal(properties: Readonly<EditWorkflowModalProperti
           // kizárólag a nevet írja ki: a mondatot a `describeRequiredEnvironment` adja.
           <p>{describeRequiredEnvironment(selectedProvider.requiredEnvNames)}</p>
         )}
+        <BuiltinSkillsSelect
+          size="md"
+          label="Beépített skillek"
+          inheritedOptionLabel="Örökölt (globális beállítás)"
+          value={builtinSkillsEnabled}
+          onChange={setBuiltinSkillsEnabled}
+        />
       </form>
       {/* A REST hiba a design system `danger` `Alert` blokkja, a `<form>`
           elemen kívül, a modális törzs közvetlen gyerekeként, hogy a forrás

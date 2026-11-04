@@ -48,13 +48,19 @@ export function createCreateWorkflowHandler(database: DatabaseContext): RouteHan
       return Promise.resolve({ kind: 'error', message: zodErrorToProtocolErrorBody(parsedBody.error).message });
     }
 
-    const { name, description, providerId } = parsedBody.data;
+    const { name, description, providerId, builtinSkillsEnabled } = parsedBody.data;
     if (providerId !== null && !isProviderId(providerId)) {
       return Promise.resolve({ kind: 'error', message: invalidProviderIdMessage(providerId) });
     }
 
     const created = database.transaction((): Outcome<WorkflowRecord> => {
-      const workflow = database.workflows.createWorkflow({ name, description, providerId });
+      const workflow = database.workflows.createWorkflow({
+        name,
+        description,
+        providerId,
+        // eslint-disable-next-line unicorn/no-null -- az elhagyott mező a `null` jelentése, a globális beállítás öröklése (SPEC-009 O-44)
+        builtinSkillsEnabled: builtinSkillsEnabled ?? null,
+      });
       if (workflow.kind === 'error') {
         return workflow;
       }

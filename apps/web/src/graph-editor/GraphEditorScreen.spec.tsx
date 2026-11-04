@@ -119,6 +119,7 @@ const WORKFLOW_DETAIL = {
   name: 'Teszt',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 0,
   updatedAtMs: 0,
 };

@@ -159,6 +159,7 @@ const WORKFLOW: WorkflowDetail = {
   name: 'Régi workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };

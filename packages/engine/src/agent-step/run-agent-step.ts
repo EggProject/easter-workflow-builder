@@ -18,6 +18,7 @@ import type { AgentStepRequest } from './agent-step-request.ts';
 import type { AgentStreamMessage } from './agent-stream-message.ts';
 import { buildAgentStepOptions } from './build-agent-step-options.ts';
 import { readResultTelemetry } from './read-result-telemetry.ts';
+import { areBuiltinSkillsEnabled } from './are-builtin-skills-enabled.ts';
 import { resolveSessionBinding } from './resolve-session-binding.ts';
 import type { SessionBinding } from './session-binding.ts';
 
@@ -323,10 +324,19 @@ export async function runAgentStep(
     return preStreamFailure('no_resumable_session', sessionBinding.message);
   }
 
-  // A beépített skillek kapcsolója (SPEC-009 O-44) a lépés indulásakor érvényes értékkel hat.
+  // A beépített skillek kapcsolója (SPEC-009 O-44) a lépés indulásakor érvényes értékkel hat: a
+  // lépés, a futás workflow sora és a globális beállítás közül a legalacsonyabb megadott szint nyer.
   const settings = dependencies.database.settings.readSettings();
   if (settings.kind === 'error') {
     return settings;
+  }
+  const run = dependencies.database.runs.getRun(request.runId);
+  if (run.kind === 'error') {
+    return run;
+  }
+  const workflow = dependencies.database.workflows.getWorkflow(run.value.workflowId);
+  if (workflow.kind === 'error') {
+    return workflow;
   }
 
   const query = dependencies.agentQueryRunner.run({
@@ -339,7 +349,11 @@ export async function runAgentStep(
       agents: agents.value,
       sessionBinding: sessionBinding.value,
       skillLibrary,
-      builtinSkillsEnabled: settings.value.builtinSkillsEnabled,
+      builtinSkillsEnabled: areBuiltinSkillsEnabled(
+        request.config.builtinSkillsEnabled,
+        workflow.value.builtinSkillsEnabled,
+        settings.value.builtinSkillsEnabled,
+      ),
     }),
   });
   if (query.kind === 'error') {

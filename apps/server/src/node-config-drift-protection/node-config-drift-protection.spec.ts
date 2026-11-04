@@ -837,3 +837,34 @@ describe('a lépés mcpServerReferences mezője kétirányban és futásidőben 
     expect(isNodeConfig(config)).toBe(false);
   });
 });
+
+/**
+ * A lépés beépített skill felülírásának sodródás elleni védelme (SPEC-009
+ * O-44, user döntés 2026-11-04). A típusszintű ág a `NodeConfig` egyenlősége
+ * (`db` `?:`, `protocol` `.exactOptional()`); a futásidejű ág a mező nélküli
+ * régi alakot és a három értéket mindkét oldalon átengedi, a nem logikai
+ * értéket mindkét oldalon elutasítja.
+ */
+describe('a lépés builtinSkillsEnabled mezője futásidőben is egyezik (SPEC-009 O-44)', () => {
+  it.each([
+    ['a mező nélküli régi alak', SAVABLE_AGENT_STEP],
+    ['igaz', { ...SAVABLE_AGENT_STEP, builtinSkillsEnabled: true }],
+    ['hamis', { ...SAVABLE_AGENT_STEP, builtinSkillsEnabled: false }],
+    ['null', { ...SAVABLE_AGENT_STEP, builtinSkillsEnabled: null }],
+  ])('mindkét oldalon átmegy: %s', (_label, config) => {
+    expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
+    expect(isNodeConfig(config)).toBe(true);
+  });
+
+  it.each([
+    ['undefined érték', undefined],
+    ['szöveg', 'true'],
+    ['szám', 0],
+  ])('mindkét oldalon elbukik: %s', (_label, builtinSkillsEnabled) => {
+    const config = { ...SAVABLE_AGENT_STEP, builtinSkillsEnabled };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(false);
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
+    expect(isNodeConfig(config)).toBe(false);
+  });
+});

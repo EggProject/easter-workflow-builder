@@ -349,6 +349,7 @@ const SHOWCASE_WORKFLOW: WorkflowDetail = {
   name: 'Bemutató workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };

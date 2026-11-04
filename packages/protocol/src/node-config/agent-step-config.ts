@@ -68,6 +68,8 @@ export const AgentStepConfigSchema = z
     systemPrompt: z.union([z.string(), PresetSystemPromptSchema]).nullable(),
     agents: z.record(z.string(), z.unknown()).readonly(),
     skills: z.union([SkillsListSchema, z.literal('all')]).nullable(),
+    // Elhagyható (SPEC-009 O-44): a régi gráf és pillanatkép nem hordozza; a `db` `?:` mező párja.
+    builtinSkillsEnabled: z.boolean().nullable().exactOptional(),
     mcpServers: z.record(z.string(), StorableMcpServerSchema).readonly(),
     // Elhagyható (SPEC-009 6.2, O-42 (b)): a régi gráf és pillanatkép nem hordozza. Az
     // `exactOptional` a `db` oldali `?:` mező pontos párja (`exactOptionalPropertyTypes`).

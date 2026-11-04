@@ -350,6 +350,7 @@ describe('createWorkflowRepository', () => {
       expect(created.name).toBe('Első workflow');
       expect(created.description).toBe('Leírás');
       expect(created.providerId).toBe('minimax');
+      expect(created.builtinSkillsEnabled).toBeNull();
       expect(created.createdAtMs).toStrictEqual(created.updatedAtMs);
 
       const fetched = okOrThrow(repository.getWorkflow(created.id));
@@ -357,6 +358,26 @@ describe('createWorkflowRepository', () => {
 
       sqlite.close();
     });
+
+    it.each([true, false, null])(
+      'a beépített skill felülírás (%s) tárolódik és visszaolvasható (SPEC-009 O-44)',
+      (value) => {
+        const { sqlite, repository } = openRepository();
+
+        const created = okOrThrow(
+          repository.createWorkflow({
+            name: 'Skillek',
+            description: null,
+            providerId: null,
+            builtinSkillsEnabled: value,
+          }),
+        );
+        expect(created.builtinSkillsEnabled).toBe(value);
+        expect(okOrThrow(repository.getWorkflow(created.id)).builtinSkillsEnabled).toBe(value);
+
+        sqlite.close();
+      },
+    );
 
     it('a description és a providerId null maradhat', () => {
       const { sqlite, repository } = openRepository();
@@ -414,9 +435,11 @@ describe('createWorkflowRepository', () => {
           name: 'Új név',
           description: 'Új leírás',
           providerId: 'claude-subscription',
+          builtinSkillsEnabled: false,
         }),
       );
       expect(updated.id).toBe(created.id);
+      expect(updated.builtinSkillsEnabled).toBe(false);
       expect(updated.name).toBe('Új név');
       expect(updated.description).toBe('Új leírás');
       expect(updated.providerId).toBe('claude-subscription');
@@ -433,7 +456,12 @@ describe('createWorkflowRepository', () => {
       const { sqlite, repository } = openRepository();
 
       const message = errorOrThrow(
-        repository.updateWorkflow('nincs-ilyen', { name: 'X', description: null, providerId: null }),
+        repository.updateWorkflow('nincs-ilyen', {
+          name: 'X',
+          description: null,
+          providerId: null,
+          builtinSkillsEnabled: null,
+        }),
       );
       expect(message).toContain('not_found');
 
@@ -1051,6 +1079,7 @@ describe('createWorkflowRepository', () => {
           name: 'Átírt',
           description: 'másik leírás',
           providerId: 'claude-subscription',
+          builtinSkillsEnabled: true,
         }),
       );
       okOrThrow(repository.replaceGraph(workflow.id, [], []));

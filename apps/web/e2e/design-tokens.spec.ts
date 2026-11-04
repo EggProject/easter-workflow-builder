@@ -19,6 +19,8 @@ const ALFA: WorkflowSummary = {
   description: null,
   // eslint-disable-next-line unicorn/no-null -- lásd fent.
   providerId: null,
+  // eslint-disable-next-line unicorn/no-null -- a `null` az öröklés (SPEC-009 O-44)
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };

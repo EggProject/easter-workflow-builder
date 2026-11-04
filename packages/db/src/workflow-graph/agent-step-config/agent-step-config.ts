@@ -71,6 +71,11 @@ export interface AgentStepConfig {
   readonly agents: Readonly<Record<string, unknown>>;
   readonly skills: readonly string[] | 'all' | null;
   /**
+  A CLI beépített skilljeinek lépés szintű felülírása (SPEC-009 O-44): `null` esetén a workflow, majd a
+  globális beállítás dönt. Elhagyható: a régi gráf és pillanatkép nem hordozza, a hiánya a `null` jelentése.
+  */
+  readonly builtinSkillsEnabled?: boolean | null;
+  /**
   Régi, csak olvasható mező (SPEC-009 6.2, O-42): a motor nem képezi le, a mentés változatlanul visszaküldi.
   */
   readonly mcpServers: Readonly<Record<string, StorableMcpServer>>;

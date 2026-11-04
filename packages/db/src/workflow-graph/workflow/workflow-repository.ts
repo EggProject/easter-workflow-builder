@@ -25,6 +25,10 @@ export interface WorkflowRecord {
   readonly name: string;
   readonly description: string | null;
   readonly providerId: ProviderId | null;
+  /**
+  A beépített skillek workflow szintű felülírása (SPEC-009 O-44); `null` esetén a globális beállítás dönt.
+  */
+  readonly builtinSkillsEnabled: boolean | null;
   readonly createdAtMs: Date;
   readonly updatedAtMs: Date;
 }
@@ -33,12 +37,17 @@ export interface CreateWorkflowInput {
   readonly name: string;
   readonly description: string | null;
   readonly providerId: ProviderId | null;
+  /**
+  Elhagyható: a hiánya ugyanaz, mint a `null`, a globális beállítás öröklése (SPEC-009 O-44).
+  */
+  readonly builtinSkillsEnabled?: boolean | null;
 }
 
 export interface UpdateWorkflowInput {
   readonly name: string;
   readonly description: string | null;
   readonly providerId: ProviderId | null;
+  readonly builtinSkillsEnabled: boolean | null;
 }
 
 /**
@@ -151,6 +160,7 @@ function toWorkflowRecord(row: typeof workflowTable.$inferSelect): Outcome<Workf
       name: row.name,
       description: row.description,
       providerId,
+      builtinSkillsEnabled: row.builtinSkillsEnabled,
       createdAtMs: row.createdAtMs,
       updatedAtMs: row.updatedAtMs,
     },
@@ -173,6 +183,8 @@ export function createWorkflowRepository(
         name: input.name,
         description: input.description,
         providerId: input.providerId,
+        // eslint-disable-next-line unicorn/no-null -- a `builtin_skills_enabled` oszlop `NULL` értéke az öröklés (SPEC-009 O-44)
+        builtinSkillsEnabled: input.builtinSkillsEnabled ?? null,
         createdAtMs: now,
         updatedAtMs: now,
       };
@@ -190,7 +202,13 @@ export function createWorkflowRepository(
       const updatedAtMs = new Date();
       database
         .update(workflowTable)
-        .set({ name: patch.name, description: patch.description, providerId: patch.providerId, updatedAtMs })
+        .set({
+          name: patch.name,
+          description: patch.description,
+          providerId: patch.providerId,
+          builtinSkillsEnabled: patch.builtinSkillsEnabled,
+          updatedAtMs,
+        })
         .where(eq(workflowTable.id, workflowId))
         .run();
       return {
@@ -200,6 +218,7 @@ export function createWorkflowRepository(
           name: patch.name,
           description: patch.description,
           providerId: patch.providerId,
+          builtinSkillsEnabled: patch.builtinSkillsEnabled,
           createdAtMs: existing.createdAtMs,
           updatedAtMs,
         },

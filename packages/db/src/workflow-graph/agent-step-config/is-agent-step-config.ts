@@ -60,6 +60,7 @@ const AGENT_STEP_CONFIG_KEYS: Readonly<Record<keyof AgentStepConfig, true>> = {
   systemPrompt: true,
   agents: true,
   skills: true,
+  builtinSkillsEnabled: true,
   mcpServers: true,
   mcpServerReferences: true,
   cwd: true,
@@ -220,6 +221,15 @@ function hasValidMcpServerReferences(value: Readonly<Record<string, unknown>>): 
 }
 
 /**
+ * A lépés beépített skill felülírása (SPEC-009 O-44): elhagyható, tehát a
+ * kulcs hiánya érvényes (a régi gráf és pillanatkép így áll); ha a kulcs
+ * jelen van, az értéke logikai vagy `null`.
+ */
+function hasValidBuiltinSkillsEnabled(value: Readonly<Record<string, unknown>>): boolean {
+  return !Object.hasOwn(value, 'builtinSkillsEnabled') || isNullableBoolean(value['builtinSkillsEnabled']);
+}
+
+/**
  * Az `Options.sandbox` öt, forrásból levezethető alakú mezőjét ellenőrzi. A
  * másik öt mező alakja nyitott (lásd `sandbox-config.ts`), ezért azok értékét a
  * guard szándékosan nem szűkíti: tippelni tilos. A kulcsuk viszont ismert,
@@ -279,6 +289,7 @@ export function isAgentStepConfig(value: unknown): value is AgentStepConfig {
     isSystemPrompt(value.systemPrompt) &&
     isRecord(value.agents) &&
     isSkills(value.skills) &&
+    hasValidBuiltinSkillsEnabled(value) &&
     isMcpServerRecord(value.mcpServers) &&
     hasValidMcpServerReferences(value) &&
     isNullableString(value.cwd) &&

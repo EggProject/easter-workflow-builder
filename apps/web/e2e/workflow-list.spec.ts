@@ -20,6 +20,7 @@ const ALFA: WorkflowSummary = {
   name: 'Alfa workflow',
   description: 'Az első teszt workflow',
   providerId: 'claude-subscription',
+  builtinSkillsEnabled: null,
   createdAtMs: 1_735_689_600_000,
   updatedAtMs: 1_735_689_600_000,
 };
@@ -29,6 +30,7 @@ const BETA: WorkflowSummary = {
   name: 'Béta workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1_735_776_000_000,
   updatedAtMs: 1_735_776_000_000,
 };
@@ -83,6 +85,7 @@ test('új workflow létrehozása a modálison keresztül', async ({ page }) => {
           name: 'Gamma workflow',
           description: null,
           providerId: 'claude-subscription',
+          builtinSkillsEnabled: null,
           createdAtMs: 1,
           updatedAtMs: 1,
         }),
@@ -338,7 +341,12 @@ test('leírás nélküli workflow szerkesztésekor a leírás mező üresen indu
   await expect(dialog).toBeHidden();
   await expect
     .poll(() => updated.body)
-    .toEqual({ name: 'Béta workflow', description: 'Most már van leírás', providerId: null });
+    .toEqual({
+      name: 'Béta workflow',
+      description: 'Most már van leírás',
+      providerId: null,
+      builtinSkillsEnabled: null,
+    });
 });
 
 test('a leírás mező kiürítésével a szerkesztés törzse null leírást küld', async ({ page }) => {
@@ -364,7 +372,12 @@ test('a leírás mező kiürítésével a szerkesztés törzse null leírást k�
   await expect(dialog).toBeHidden();
   await expect
     .poll(() => updated.body)
-    .toEqual({ name: 'Alfa workflow', description: null, providerId: 'claude-subscription' });
+    .toEqual({
+      name: 'Alfa workflow',
+      description: null,
+      providerId: 'claude-subscription',
+      builtinSkillsEnabled: null,
+    });
 });
 
 test('a workflow tábla a Név oszlop szerint rendez, a Műveletek oszlop szerint nem', async ({ page }) => {
@@ -506,7 +519,12 @@ test('a szerkesztő modális a workflow providerét mutatja, a választás a PAT
   expect(calls.updates).toEqual([
     {
       pathname: '/api/workflows/w-alfa',
-      body: { name: 'Alfa workflow', description: 'Az első teszt workflow', providerId: 'minimax' },
+      body: {
+        name: 'Alfa workflow',
+        description: 'Az első teszt workflow',
+        providerId: 'minimax',
+        builtinSkillsEnabled: null,
+      },
     },
   ]);
   await expect(
@@ -529,7 +547,44 @@ test('a "Nincs megadva" választás a PATCH törzsében null providerId, az ör�
 
   await expect(dialog).toBeHidden();
   expect(calls.updates.map((update) => update.body)).toEqual([
-    { name: 'Alfa workflow', description: 'Az első teszt workflow', providerId: null },
+    { name: 'Alfa workflow', description: 'Az első teszt workflow', providerId: null, builtinSkillsEnabled: null },
+  ]);
+});
+
+// A "Beépített skillek" háromállású választó (SPEC-009 O-44, user döntés 2026-11-04): a workflow
+// tárolt értéke kiválasztva áll, a választás a `PATCH` törzsébe kerül, az örökölt választás `null`.
+test('a beépített skillek választása a PATCH törzsébe kerül, az örökölt választás null értékkel (SPEC-009 O-44)', async ({
+  page,
+}) => {
+  const calls = await installEditMocks(page, { workflow: { ...ALFA, builtinSkillsEnabled: true } });
+  const dialog = await openEditModal(page, /Alfa workflow/);
+  const builtinSkillsSelect = dialog.getByRole('combobox', { name: 'Beépített skillek' });
+  await expectSelectedLabel(builtinSkillsSelect, 'Elérhetők');
+
+  await chooseSelectOption(page, builtinSkillsSelect, 'Nem elérhetők');
+  await expectSelectedLabel(builtinSkillsSelect, 'Nem elérhetők');
+  await dialog.getByRole('button', { name: 'Mentés' }).click();
+  await expect(dialog).toBeHidden();
+
+  const secondDialog = await openEditModal(page, /Alfa workflow/);
+  const secondSelect = secondDialog.getByRole('combobox', { name: 'Beépített skillek' });
+  await chooseSelectOption(page, secondSelect, 'Örökölt (globális beállítás)');
+  await secondDialog.getByRole('button', { name: 'Mentés' }).click();
+  await expect(secondDialog).toBeHidden();
+
+  expect(calls.updates.map((update) => update.body)).toEqual([
+    {
+      name: 'Alfa workflow',
+      description: 'Az első teszt workflow',
+      providerId: 'claude-subscription',
+      builtinSkillsEnabled: false,
+    },
+    {
+      name: 'Alfa workflow',
+      description: 'Az első teszt workflow',
+      providerId: 'claude-subscription',
+      builtinSkillsEnabled: null,
+    },
   ]);
 });
 

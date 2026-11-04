@@ -13,6 +13,7 @@ const WORKFLOW: WorkflowSummary = {
   name: 'Alfa',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 0,
   updatedAtMs: 0,
 };

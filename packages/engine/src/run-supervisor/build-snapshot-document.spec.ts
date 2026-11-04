@@ -9,6 +9,7 @@ const WORKFLOW: WorkflowRecord = {
   name: 'Teszt workflow',
   description: 'leírás',
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: new Date(0),
   updatedAtMs: new Date(0),
 };

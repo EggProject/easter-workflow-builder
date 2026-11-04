@@ -188,6 +188,7 @@ const WORKFLOW: WorkflowDetail = {
   name: 'Node kártya teszt workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };

@@ -31,6 +31,7 @@ const WORKFLOW: WorkflowDetail = {
   name: 'Alfa workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };
@@ -345,4 +346,28 @@ test('üres könyvtárnál az üres állapot áll a jelölőnégyzetek helyén',
 
   await expect(region.getByText('Még nincs feltöltött skill.')).toBeVisible();
   await expect(region.getByRole('checkbox')).toHaveCount(0);
+});
+
+// A lépés "Beépített skillek" háromállású mezője (SPEC-009 O-44, user döntés 2026-11-04): a régi,
+// kulcs nélküli lépés örököltként áll, a választás a mentés PUT törzsébe kerül, az örökölt `null`.
+test('a lépés beépített skillek mezője a mentés PUT törzsébe a választott értéket írja, az örökölt null (SPEC-009 O-44)', async ({
+  page,
+}) => {
+  const putBodies: unknown[] = [];
+  const legacyConfig = agentStepConfig(null, {});
+  expect(Object.hasOwn(legacyConfig, 'builtinSkillsEnabled')).toBe(false);
+  await openEditor(page, graphWith(legacyConfig), putBodies);
+  const region = await openStepSkills(page);
+  const builtinSkillsSelect = region.getByRole('combobox', { name: 'Beépített skillek' });
+
+  await expect(builtinSkillsSelect).toHaveText('Örökölt (workflow vagy globális beállítás)');
+  await chooseSelectOption(page, builtinSkillsSelect, 'Nem elérhetők');
+  await saveButton(page).click();
+  await expect.poll(() => putBodies.length).toBe(1);
+  expect(savedConfig(putBodies, 0)).toMatchObject({ builtinSkillsEnabled: false });
+
+  await chooseSelectOption(page, builtinSkillsSelect, 'Örökölt (workflow vagy globális beállítás)');
+  await saveButton(page).click();
+  await expect.poll(() => putBodies.length).toBe(2);
+  expect(savedConfig(putBodies, 1)).toMatchObject({ builtinSkillsEnabled: null });
 });

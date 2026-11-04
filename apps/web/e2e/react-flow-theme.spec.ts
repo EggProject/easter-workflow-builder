@@ -53,6 +53,7 @@ const WORKFLOW: WorkflowDetail = {
   name: 'Téma workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };

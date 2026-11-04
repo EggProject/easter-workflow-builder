@@ -23,6 +23,7 @@ const WORKFLOW: WorkflowDetail = {
   name: 'Csontváz workflow',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };

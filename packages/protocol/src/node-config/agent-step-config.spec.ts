@@ -152,3 +152,24 @@ describe('AgentStepConfigSchema: mcpServerReferences (O-42)', () => {
     expect(parsed.success ? parsed.data : undefined).toStrictEqual(document);
   });
 });
+
+describe('AgentStepConfigSchema: builtinSkillsEnabled (SPEC-009 O-44)', () => {
+  it.each([true, false, null])('elfogadja a(z) %s értéket, változatlanul', (value) => {
+    const parsed = AgentStepConfigSchema.safeParse({ ...VALID_AGENT_STEP_CONFIG, builtinSkillsEnabled: value });
+    expect(parsed.success ? parsed.data.builtinSkillsEnabled : 'hiba').toBe(value);
+  });
+
+  it('a mező hiánya nem hiba, és a kimenetben sem jelenik meg', () => {
+    const parsed = AgentStepConfigSchema.safeParse(VALID_AGENT_STEP_CONFIG);
+    expect(parsed.success && Object.hasOwn(parsed.data, 'builtinSkillsEnabled')).toBe(false);
+  });
+
+  it.each([
+    ['undefined érték', undefined],
+    ['szöveg', 'true'],
+  ])('elutasítja: %s', (_label, value) => {
+    expect(AgentStepConfigSchema.safeParse({ ...VALID_AGENT_STEP_CONFIG, builtinSkillsEnabled: value }).success).toBe(
+      false,
+    );
+  });
+});

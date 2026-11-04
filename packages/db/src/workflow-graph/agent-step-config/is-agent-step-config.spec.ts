@@ -358,4 +358,24 @@ describe('isAgentStepConfig', () => {
       expect(isAgentStepConfig({ ...fullConfig, mcpServerReferences: value })).toBe(false);
     });
   });
+
+  // A lépés beépített skill felülírása (SPEC-009 O-44): elhagyható, a régi alak mező nélkül áll.
+  describe('builtinSkillsEnabled (O-44)', () => {
+    it('a mező nélküli régi config átmegy', () => {
+      expect(Object.hasOwn(fullConfig, 'builtinSkillsEnabled')).toBe(false);
+      expect(isAgentStepConfig(fullConfig)).toBe(true);
+    });
+
+    it.each([true, false, null])('a %s érték átmegy', (value) => {
+      expect(isAgentStepConfig({ ...fullConfig, builtinSkillsEnabled: value })).toBe(true);
+    });
+
+    it.each([
+      ['undefined értékű kulcs', undefined],
+      ['szöveg', 'true'],
+      ['szám', 1],
+    ])('elutasítja: %s', (_label, value) => {
+      expect(isAgentStepConfig({ ...fullConfig, builtinSkillsEnabled: value })).toBe(false);
+    });
+  });
 });

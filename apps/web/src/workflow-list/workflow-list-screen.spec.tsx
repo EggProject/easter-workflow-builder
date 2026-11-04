@@ -13,6 +13,7 @@ const WORKFLOW_ROW = {
   name: 'Alfa',
   description: 'leírás',
   providerId: 'minimax',
+  builtinSkillsEnabled: null,
   createdAtMs: 1_700_000_000_000,
   updatedAtMs: 1_700_000_000_000,
 };
@@ -22,6 +23,7 @@ const WORKFLOW_ROW_WITHOUT_METADATA = {
   name: 'Béta',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1_700_000_000_000,
   updatedAtMs: 1_700_000_000_000,
 };

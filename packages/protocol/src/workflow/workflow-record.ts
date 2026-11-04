@@ -10,7 +10,8 @@ import { z } from 'zod';
  * A `providerId` a `providerId | null` opaque szöveg: a `protocol` L1,
  * ugyanazon a rétegen áll, mint a `provider-capability`, tehát azt nem
  * importálhatja (SPEC-005 F-23), a provider azonosító a dróton egyszerű
- * szöveg.
+ * szöveg. A `builtinSkillsEnabled` a CLI beépített skilljeinek workflow
+ * szintű felülírása (SPEC-009 O-44): `null` esetén a globális beállítás dönt.
  */
 export const WorkflowSummarySchema = z
   .strictObject({
@@ -18,6 +19,7 @@ export const WorkflowSummarySchema = z
     name: z.string(),
     description: z.string().nullable(),
     providerId: z.string().nullable(),
+    builtinSkillsEnabled: z.boolean().nullable(),
     createdAtMs: z.number(),
     updatedAtMs: z.number(),
   })
@@ -31,6 +33,7 @@ export const WorkflowDetailSchema = z
     name: z.string(),
     description: z.string().nullable(),
     providerId: z.string().nullable(),
+    builtinSkillsEnabled: z.boolean().nullable(),
     createdAtMs: z.number(),
     updatedAtMs: z.number(),
   })
@@ -43,6 +46,8 @@ export const CreateWorkflowRequestSchema = z.strictObject({
   name: z.string(),
   description: z.string().nullable(),
   providerId: z.string().nullable(),
+  // Elhagyható: a hiánya a `null` jelentése, a globális beállítás öröklése (SPEC-009 O-44).
+  builtinSkillsEnabled: z.boolean().nullable().optional(),
 });
 
 export type CreateWorkflowRequest = z.infer<typeof CreateWorkflowRequestSchema>;
@@ -57,6 +62,7 @@ export const UpdateWorkflowRequestSchema = z.strictObject({
   name: z.string().optional(),
   description: z.string().nullable().optional(),
   providerId: z.string().nullable().optional(),
+  builtinSkillsEnabled: z.boolean().nullable().optional(),
 });
 
 export type UpdateWorkflowRequest = z.infer<typeof UpdateWorkflowRequestSchema>;

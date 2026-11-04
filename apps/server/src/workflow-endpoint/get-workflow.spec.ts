@@ -38,6 +38,7 @@ describe('createGetWorkflowHandler', () => {
           name: 'Teszt',
           description: null,
           providerId: null,
+          builtinSkillsEnabled: null,
           createdAtMs: created.createdAtMs.getTime(),
           updatedAtMs: created.updatedAtMs.getTime(),
         },

@@ -13,6 +13,7 @@ const WORKFLOW: WorkflowSummary = {
   name: 'Alfa',
   description: 'eredeti leírás',
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 0,
   updatedAtMs: 0,
 };
@@ -22,6 +23,7 @@ const WORKFLOW_WITHOUT_DESCRIPTION: WorkflowSummary = {
   name: 'Béta',
   description: null,
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 0,
   updatedAtMs: 0,
 };
@@ -109,12 +111,12 @@ function findSaveButton(container: HTMLElement): HTMLButtonElement | undefined {
   return [...container.querySelectorAll('button')].find((candidate) => candidate.textContent === 'Mentés');
 }
 
-function providerTrigger(container: HTMLElement): HTMLButtonElement {
+function selectTrigger(container: HTMLElement, fieldLabel: string): HTMLButtonElement {
   const button = [...container.querySelectorAll<HTMLButtonElement>('button.select')].find(
-    (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === 'Provider',
+    (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === fieldLabel,
   );
   if (button === undefined) {
-    throw new Error('a teszt nem találta a Provider választót');
+    throw new Error(`a teszt nem találta a(z) "${fieldLabel}" választót`);
   }
   return button;
 }
@@ -123,8 +125,8 @@ function providerTrigger(container: HTMLElement): HTMLButtonElement {
  * A panel `createPortal`-lal a `document.body`-ba kerül; a nyitott panel
  * opcióit a body-ban keressük (egyszerre egy panel lehet nyitva).
  */
-function chooseProvider(container: HTMLElement, optionLabel: string): void {
-  const trigger = providerTrigger(container);
+function chooseOption(container: HTMLElement, fieldLabel: string, optionLabel: string): void {
+  const trigger = selectTrigger(container, fieldLabel);
   clickOn(trigger);
   let option: Element | undefined;
   for (const candidate of document.body.querySelectorAll('[role="option"]')) {
@@ -206,7 +208,7 @@ describe('EditWorkflowModal', () => {
     const { fetchFunction } = createFetchFunction();
     await render(WORKFLOW, fetchFunction);
 
-    expect(providerTrigger(container).textContent).toBe('Nincs megadva');
+    expect(selectTrigger(container, 'Provider').textContent).toBe('Nincs megadva');
     const testButton = [...container.querySelectorAll('button')].find((candidate) =>
       candidate.textContent.includes('Kapcsolat teszt'),
     );
@@ -218,7 +220,7 @@ describe('EditWorkflowModal', () => {
     const { fetchFunction, connectionTests } = createFetchFunction();
     await render(WORKFLOW_WITH_PROVIDER, fetchFunction);
 
-    expect(providerTrigger(container).textContent).toBe('MiniMax');
+    expect(selectTrigger(container, 'Provider').textContent).toBe('MiniMax');
     expect(container.textContent).toContain('ANTHROPIC_BASE_URL');
     expect(container.textContent).toContain('ANTHROPIC_AUTH_TOKEN vagy ANTHROPIC_API_KEY');
     const testButton = [...container.querySelectorAll('button')].find((candidate) =>
@@ -238,7 +240,7 @@ describe('EditWorkflowModal', () => {
   it('a provider lista betöltése alatt a választó betöltés feliratot mutat, a betöltés hibája danger Alert', async () => {
     const pending = Promise.withResolvers<Response>();
     await render(WORKFLOW, () => pending.promise);
-    expect(providerTrigger(container).textContent).toBe('betöltés');
+    expect(selectTrigger(container, 'Provider').textContent).toBe('betöltés');
 
     await act(async () => {
       pending.reject(new Error('kapcsolat megszakadt'));
@@ -275,7 +277,9 @@ describe('EditWorkflowModal', () => {
       await Promise.resolve();
     });
 
-    expect(patchBodies).toEqual([{ name: 'Alfa módosítva', description: null, providerId: null }]);
+    expect(patchBodies).toEqual([
+      { name: 'Alfa módosítva', description: null, providerId: null, builtinSkillsEnabled: null },
+    ]);
     expect(editedWorkflow?.name).toBe('Alfa módosítva');
     expect(closeCallCount).toBe(1);
   });
@@ -284,26 +288,63 @@ describe('EditWorkflowModal', () => {
     const { fetchFunction, patchBodies } = createFetchFunction();
     await render(WORKFLOW, fetchFunction);
 
-    chooseProvider(container, 'Claude előfizetés');
+    chooseOption(container, 'Provider', 'Claude előfizetés');
     await act(async () => {
       submitForm(container);
       await Promise.resolve();
     });
 
-    expect(patchBodies).toEqual([{ name: 'Alfa', description: 'eredeti leírás', providerId: 'claude-subscription' }]);
+    expect(patchBodies).toEqual([
+      {
+        name: 'Alfa',
+        description: 'eredeti leírás',
+        providerId: 'claude-subscription',
+        builtinSkillsEnabled: null,
+      },
+    ]);
   });
 
   it('az "Nincs megadva" (örökölt) választás a meglévő providert nullára állítja a törzsben', async () => {
     const { fetchFunction, patchBodies } = createFetchFunction();
     await render(WORKFLOW_WITH_PROVIDER, fetchFunction);
 
-    chooseProvider(container, 'Nincs megadva');
+    chooseOption(container, 'Provider', 'Nincs megadva');
     await act(async () => {
       submitForm(container);
       await Promise.resolve();
     });
 
-    expect(patchBodies).toEqual([{ name: 'Alfa', description: 'eredeti leírás', providerId: null }]);
+    expect(patchBodies).toEqual([
+      { name: 'Alfa', description: 'eredeti leírás', providerId: null, builtinSkillsEnabled: null },
+    ]);
+  });
+
+  it.each([
+    [null, 'Nem elérhetők', false],
+    [false, 'Elérhetők', true],
+    [true, 'Örökölt (globális beállítás)', null],
+  ])(
+    'a beépített skillek %s értékéről a "%s" választás a törzsbe a(z) %s értéket teszi (SPEC-009 O-44)',
+    async (initial, optionLabel, expected) => {
+      const { fetchFunction, patchBodies } = createFetchFunction();
+      await render({ ...WORKFLOW, builtinSkillsEnabled: initial }, fetchFunction);
+
+      chooseOption(container, 'Beépített skillek', optionLabel);
+      await act(async () => {
+        submitForm(container);
+        await Promise.resolve();
+      });
+
+      expect(patchBodies).toEqual([
+        { name: 'Alfa', description: 'eredeti leírás', providerId: null, builtinSkillsEnabled: expected },
+      ]);
+    },
+  );
+
+  it('a workflow beépített skill felülírása nyitáskor kiválasztva áll', async () => {
+    const { fetchFunction } = createFetchFunction();
+    await render({ ...WORKFLOW, builtinSkillsEnabled: false }, fetchFunction);
+    expect(selectTrigger(container, 'Beépített skillek').textContent).toContain('Nem elérhetők');
   });
 
   it('hiba esetén a hibaüzenetet jeleníti meg, a modális nyitva marad', async () => {

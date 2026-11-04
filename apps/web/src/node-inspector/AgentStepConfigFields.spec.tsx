@@ -360,6 +360,25 @@ describe('AgentStepConfigFields', () => {
     );
   });
 
+  it('a beépített skillek mezője a hiányzó kulcsot örököltként mutatja, a választás a teljes konfigot frissíti (SPEC-009 O-44)', () => {
+    const onChange = vi.fn();
+    render(BASE_CONFIG, onChange);
+    expect(Object.hasOwn(BASE_CONFIG, 'builtinSkillsEnabled')).toBe(false);
+    expect(selectTrigger(container, 'Beépített skillek').textContent).toBe(
+      'Örökölt (workflow vagy globális beállítás)',
+    );
+    chooseOption(container, 'Beépített skillek', 'Nem elérhetők');
+    expect(onChange).toHaveBeenLastCalledWith({ ...BASE_CONFIG, builtinSkillsEnabled: false });
+  });
+
+  it('a beépített skillek tárolt értéke kiválasztva áll, az örökölt választás null értéket ír (SPEC-009 O-44)', () => {
+    const onChange = vi.fn();
+    render({ ...BASE_CONFIG, builtinSkillsEnabled: true }, onChange);
+    expect(selectTrigger(container, 'Beépített skillek').textContent).toBe('Elérhetők');
+    chooseOption(container, 'Beépített skillek', 'Örökölt (workflow vagy globális beállítás)');
+    expect(onChange).toHaveBeenLastCalledWith({ ...BASE_CONFIG, builtinSkillsEnabled: null });
+  });
+
   it('a `skills` mező a módválasztón szerkeszthető, és a teljes konfigot frissíti', () => {
     const onChange = vi.fn();
     render({ ...BASE_CONFIG, skills: ['a', 'b'] }, onChange);

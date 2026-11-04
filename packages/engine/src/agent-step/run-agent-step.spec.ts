@@ -115,9 +115,17 @@ function openMemoryDatabase(): DatabaseContext {
 // Valós `workflow`, `workflow_run` és `step_run` sor: a `run_event` idegen
 // kulcsai miatt kell, és a teszt így a commitolt migrációkkal felépült
 // adatbázis ellen fut (SPEC-004 14.4).
-function seedRun(database: DatabaseContext): { readonly runId: string; readonly stepRunId: string } {
+function seedRun(
+  database: DatabaseContext,
+  workflowBuiltinSkillsEnabled: boolean | null = null,
+): { readonly runId: string; readonly stepRunId: string } {
   const workflow = okOrThrow(
-    database.workflows.createWorkflow({ name: 'agent-step teszt', description: null, providerId: null }),
+    database.workflows.createWorkflow({
+      name: 'agent-step teszt',
+      description: null,
+      providerId: null,
+      builtinSkillsEnabled: workflowBuiltinSkillsEnabled,
+    }),
   );
   const snapshot = {
     version: 1,
@@ -638,6 +646,68 @@ describe('runAgentStep', () => {
     database.close();
   });
 
+  // A háromszintű feloldás (SPEC-009 O-44, user döntés 2026-11-04): lépés ?? workflow ?? globális.
+  it.each([
+    ['a lépés hamis értéke felülírja a globális igazat', false, null, true, '1'],
+    ['null lépés mellett a workflow hamis értéke kikapcsol', null, false, true, '1'],
+    ['a lépés igaz értéke felülírja a hamis workflow és globális értéket', true, false, false, undefined],
+  ] as const)(
+    'a beépített skillek háromszintű kapcsolója: %s',
+    async (_label, stepValue, workflowValue, globalValue, expected) => {
+      const database = openMemoryDatabase();
+      const { runId, stepRunId } = seedRun(database, workflowValue);
+      okOrThrow(database.settings.setBuiltinSkillsEnabled(globalValue));
+      const captured = newCapture();
+      const dependencies = dependenciesOf({
+        database,
+        agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+      });
+      const config = agentStepConfig({ builtinSkillsEnabled: stepValue });
+
+      okOrThrow(await runAgentStep(requestOf({ runId, stepRunId, config }), dependencies, agentQueryRegistry));
+
+      const outgoingEnvironment = captured.request?.options['env'];
+      expect(isRecord(outgoingEnvironment)).toBe(true);
+      expect(isRecord(outgoingEnvironment) ? outgoingEnvironment['CLAUDE_CODE_DISABLE_BUNDLED_SKILLS'] : 'nincs').toBe(
+        expected,
+      );
+      database.close();
+    },
+  );
+
+  it('a futás sorának olvasási hibája az Outcome hibaágán megy tovább, futtatás nélkül (SPEC-009 O-44)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const dependencies = dependenciesOf({
+      database: { ...database, runs: { ...database.runs, getRun: () => ({ kind: 'error', message: 'nincs futás' }) } },
+      agentQueryRunner: { run: notCalled },
+    });
+
+    expect(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry)).toStrictEqual({
+      kind: 'error',
+      message: 'nincs futás',
+    });
+    database.close();
+  });
+
+  it('a workflow sorának olvasási hibája az Outcome hibaágán megy tovább, futtatás nélkül (SPEC-009 O-44)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const dependencies = dependenciesOf({
+      database: {
+        ...database,
+        workflows: { ...database.workflows, getWorkflow: () => ({ kind: 'error', message: 'nincs workflow' }) },
+      },
+      agentQueryRunner: { run: notCalled },
+    });
+
+    expect(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry)).toStrictEqual({
+      kind: 'error',
+      message: 'nincs workflow',
+    });
+    database.close();
+  });
+
   it('a beállítás olvasásának adatbázis hibája az Outcome hibaágán megy tovább, futtatás nélkül', async () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRun(database);
@@ -1031,17 +1101,21 @@ describe('runAgentStep', () => {
 
   it('az esemény hozzáfűzés adatbázis hibája az Outcome hibaágán jelenik meg', async () => {
     const database = openMemoryDatabase();
-    const { stepRunId } = seedRun(database);
+    const { runId, stepRunId } = seedRun(database);
+    // A futás sora létezik (a lépés indulásakor a beépített skillek feloldása olvassa, SPEC-009
+    // O-44), ezért a hozzáfűzés hibáját a port adja.
     const dependencies = dependenciesOf({
-      database,
+      database: {
+        ...database,
+        events: {
+          ...database.events,
+          appendSdkEvent: () => ({ kind: 'error', message: 'a hozzáfűzés elbukott (not_found)' }),
+        },
+      },
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), newCapture()),
     });
 
-    const outcome = await runAgentStep(
-      requestOf({ runId: 'nincs-ilyen-futas', stepRunId }),
-      dependencies,
-      agentQueryRegistry,
-    );
+    const outcome = await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry);
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('not_found');

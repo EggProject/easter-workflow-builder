@@ -46,6 +46,24 @@ describe('createCreateWorkflowHandler', () => {
     expect(result.kind === 'ok' && result.value.body).toMatchObject({ name: 'Teszt', providerId: 'minimax' });
   });
 
+  it('a builtinSkillsEnabled elhagyva null (öröklés), megadva a válaszban és a tárolt soron is áll (SPEC-009 O-44)', async () => {
+    const database = openMemoryDatabase();
+    const handler = createCreateWorkflowHandler(database);
+    const create = async (body: Readonly<Record<string, unknown>>): Promise<unknown> => {
+      const result = await handler({ parameters: {}, query: new URLSearchParams(), body });
+      return result.kind === 'ok' ? result.value.body : result.message;
+    };
+
+    expect(await create(CREATE_REQUEST_BODY)).toMatchObject({ builtinSkillsEnabled: null });
+    expect(await create({ ...CREATE_REQUEST_BODY, builtinSkillsEnabled: false })).toMatchObject({
+      builtinSkillsEnabled: false,
+    });
+    const stored = okOrThrow(database.workflows.listWorkflows()).map((workflow) => workflow.builtinSkillsEnabled);
+    expect(stored).toHaveLength(2);
+    expect(stored).toContain(false);
+    expect(stored).toContain(null);
+  });
+
   it('null providerId-vel is elfogadja a kérést', async () => {
     const handler = createCreateWorkflowHandler(openMemoryDatabase());
     const result = await handler({

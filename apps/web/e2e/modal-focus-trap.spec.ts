@@ -17,6 +17,7 @@ const ALFA: WorkflowSummary = {
   name: 'Alfa workflow',
   description: 'leírás',
   providerId: null,
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };

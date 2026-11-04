@@ -9,6 +9,7 @@ import { useContext, type ChangeEvent, type ReactElement } from 'react';
 import { AgentsFieldEditor } from './AgentsFieldEditor.tsx';
 import { LEGACY_MCP_SERVERS_REASON } from './legacy-mcp-servers-reason.ts';
 import { McpServerReferencesField } from './McpServerReferencesField.tsx';
+import { BuiltinSkillsSelect } from '../builtin-skills-select/BuiltinSkillsSelect.tsx';
 import { ProviderSelect } from '../provider-select/ProviderSelect.tsx';
 import { ProviderOptionsContext } from './provider-options-context.ts';
 import { SandboxField } from './SandboxField.tsx';
@@ -71,7 +72,9 @@ export interface AgentStepConfigFieldsProperties {
  * - "Al-agentek (agents)" panel: saját, kulcsonkénti szerkesztő, ami
  *   nyitva sok helyet foglal, miközben a legtöbb lépésen üres.
  * - "Skillek" panel: a módválasztó és a könyvtár skilljeinek jelölőnégyzetei,
- *   alapesetben "nincs beállítva", tehát nem tartozik elöl.
+ *   alattuk a CLI beépített skilljeinek háromállású lépés szintű felülírása
+ *   (SPEC-009 O-44); alapesetben "nincs beállítva" és örökölt, tehát nem
+ *   tartozik elöl.
  * - "MCP szerverek" panel: a központi listából választott szerverek és a
  *   hozzárendelés felülírása, alatta a régi `mcpServers` mező csak
  *   olvashatóan; alapesetben üres, tehát nem tartozik elöl.
@@ -290,6 +293,19 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               setField('skills', nextValue);
             }}
           />
+          <div className="node-inspector__group">
+            <BuiltinSkillsSelect
+              size="sm"
+              label="Beépített skillek"
+              inheritedOptionLabel="Örökölt (workflow vagy globális beállítás)"
+              // A hiányzó kulcs a régi gráf alakja, jelentése a `null` (SPEC-009 O-44).
+              // eslint-disable-next-line unicorn/no-null -- a `null` az öröklés
+              value={config.builtinSkillsEnabled ?? null}
+              onChange={(nextValue) => {
+                setField('builtinSkillsEnabled', nextValue);
+              }}
+            />
+          </div>
         </AccordionItem>
 
         <AccordionItem title="MCP szerverek">

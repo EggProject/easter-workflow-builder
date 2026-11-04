@@ -37,6 +37,8 @@ const ALFA: WorkflowSummary = {
   name: 'Alfa workflow',
   description: 'leírás',
   providerId: 'claude-subscription',
+  // eslint-disable-next-line unicorn/no-null -- a `null` az öröklés (SPEC-009 O-44)
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };
@@ -80,6 +82,7 @@ const EDITOR_WORKFLOW: WorkflowDetail = {
   name: 'Alfa workflow',
   description: 'leírás',
   providerId: 'claude-subscription',
+  builtinSkillsEnabled: null,
   createdAtMs: 1,
   updatedAtMs: 1,
 };
