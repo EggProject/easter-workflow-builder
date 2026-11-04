@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                                                                                                                   |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | jóváhagyott: a 7.1 szekció O-1 ... O-4 termékkérdése lezárva (user döntés 2026-11-04); nyitva az O-5 és az O-6 (a fájl hozzáférés könyvtára, a hálózat címkészlete), ezek csak a T-015-7 lépést blokkolják                                                        |
+| Státusz  | jóváhagyott: a 7.1 szekció O-1 ... O-6 termékkérdése mind lezárva (user döntés 2026-11-04)                                                                                                                                                                        |
 | Dátum    | 2026-11-03, átvezetve 2026-11-04                                                                                                                                                                                                                                  |
 | Előzmény | [`SPEC-003`](SPEC-003-domain-perzisztencia.md) 4.3, [`SPEC-004`](SPEC-004-vegrehajto-motor.md) 4.7, 5. szekció 10. sora, [`SPEC-008`](SPEC-008-graf-szerkeszto-es-futas-nezet.md) 5.1, O-43, [`SPEC-010`](SPEC-010-sablon-es-kifejezes-nyelv.md) 7. és 8. szekció |
 | Bemenet  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md) 2., 3., 8. és 9. szekció; a hiányleltár H-13 tétele                                                                                                |
@@ -40,7 +40,9 @@ mai korlát (a futás elutasítja, a felület tiltja) addig érvényes (user dö
 
 - A CEL kiértékelési idő korlátját: a SPEC-010 O-2 user döntése ("most nincs korlát") érvényes, a 60
   másodperces korlát kizárólag a JavaScript útra szól.
-- Melyik könyvtárat érheti el a fájl hozzáférés, és a hálózat milyen címeket érhet el: termékkérdés (O-5, O-6).
+- A fájl hozzáférés könyvtárát és a hálózat címkészletét a user döntötte el (O-5: csomópontonként megadott
+  könyvtár, üresen a szerver munkakönyvtára; O-6: bármely cím, a helyi gépet is); a spec ezeket a döntéseket
+  vezeti át.
 - Új provider vagy agent képesség: a szkript nem AI lépés, provider hívás nincs.
 
 ## 2. Kiindulási állapot
@@ -119,9 +121,12 @@ gazda hívást is indíthat egyszerre (`Promise.all`).
 ### 5.3 Adat modell
 
 - `db`: a `ScriptConfig` diszkriminált unió lesz a `runtime` mezőn:
-  `{ runtime: 'expression'; source: string }` vagy `{ runtime: 'javascript'; source: string; timeoutMs: number | null }`.
-  A `null` jelentése az alapérték (60 000 ms), a `null` a meglévő konvenció a hiányra (az `undefined` nem éli túl
-  a JSON oszlopot, `agent-step-config.ts` `PresetSystemPrompt` doksija).
+  `{ runtime: 'expression'; source: string }` vagy
+  `{ runtime: 'javascript'; source: string; timeoutMs: number | null; cwd: string | null }`.
+  A `timeoutMs` `null` jelentése az alapérték (60 000 ms), a `null` a meglévő konvenció a hiányra (az `undefined`
+  nem éli túl a JSON oszlopot, `agent-step-config.ts` `PresetSystemPrompt` doksija).
+- A `cwd` a fájl hozzáférés gyökere (O-5), az agent lépés `cwd` mezőjének mintájára; a `null` a szerver folyamat
+  munkakönyvtára. A mező nem kötelező szöveg mező: üresen is menthető.
 - A `timeoutMs` pozitív egész, legfeljebb 2147483647 (J-16: a Node időzítő e fölött 1 ms-re állítana, tehát a
   korlát azonnal lejárna). A pozitív egész szabály a meglévő `isPositiveInteger` és a mentési séma duplikátuma
   szerint, a felső határral bővítve, mindkét oldalon, az `apps/server` `node-config-drift-protection`
@@ -151,10 +156,11 @@ törzset `async` függvénybe csomagolja, az ígéretet a `resolvePromise` úton
 ahol a `body` szöveg. A gazda a Node beépített `fetch`-ét hívja, a lépés határidejéhez kötött `AbortSignal`-lal.
 Kizárólag `http:` és `https:` séma (az OWASP SSRF lap szerint a nem HTTP sémák külön kockázatot hordoznak,
 J-15). Átirányítás követése nincs (`redirect: 'manual'`, J-15); a szkript a `status` és a `location` fejléc
-alapján maga dönt. A címkészlet termékkérdés (O-6).
+alapján maga dönt. Címszűrés nincs (O-6 user döntés): a szkript bármely címet elérhet, a helyi gépet is.
 
 **Fájl.** `files.readText(path)`, `files.writeText(path, text)`, `files.list(path)`, mindegyik ígéretet ad. A
-`path` relatív a hozzáférés gyökeréhez (O-5). A gazda a feloldott útvonalat `path.resolve` után a gyökér
+`path` relatív a hozzáférés gyökeréhez, ami a JavaScript ág `cwd` mezője, üresen a szerver folyamat
+munkakönyvtára (O-5 user döntés). A gazda a feloldott útvonalat `path.resolve` után a gyökér
 előtagjára ellenőrzi (a gyökér végén útvonal elválasztóval), majd `fs.realpath` után újra, hogy egy szimbolikus
 link ne vezessen ki (J-15); a gyökéren kívüli út `script_evaluation_failed` hibát ad a sandboxban. Ez a
 szintaktikai ellenőrzés nem véd az ellenőrzés és a használat közötti linkcsere ellen (TOCTOU, nem ellenőrzött
@@ -230,7 +236,8 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
   `TextAreaField` (design system `.textarea`, `.claude/CLAUDE.md` 11. szekció). JavaScript esetén megjelenik az
   időkorlát mező (`TextField` `type="number"`, másodpercben, mert a döntés is másodpercben szól (O-4); a tárolt
   érték ezredmásodperc, a mező értékének ezerszerese), üresen az alapérték (`null`). A felületen ma nincs
-  `timeoutMs` mező, tehát nincs követendő minta.
+  `timeoutMs` mező, tehát nincs követendő minta. JavaScript esetén a "Munkakönyvtár (cwd)" `TextField` is
+  megjelenik (az agent lépés mintájára), üresen `null`.
 - A mentési séma a `source` mezőt a kötelező szöveg mezők közé veszi fel (a meglévő `required-text-field-paths`
   tábla mindkét oldalon, a sodródás védelemmel), mert üres szkript nem futtatható. A hiba a mező alatt.
 - A futás nézet a szkript lépést a meglévő csomópont állapot jelvényekkel mutatja; új transcript sor típus
@@ -244,9 +251,10 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
    Ellensúly: a szkriptet a workflow készítő írja, az agent kimenet csak adatként (JSON) jut be, kódként nem.
 2. **A hálózat a szerver hálózati helyzetéből indul.** A szkript elérheti a helyi szolgáltatásokat, a saját
    szerverünket (`3001`) és belső címeket (SSRF, J-15). Egy agent kimenetéből (prompt injekció) összerakott URL
-   ezt kihasználhatja. A címkészlet az O-6 döntése.
+   ezt kihasználhatja. A címszűrés hiánya az O-6 user döntése, a kockázat kimondott és elfogadott.
 3. **A fájl hozzáférés írni is tud.** A gyökér alatt a szkript felülírhat bármit, és a szintaktikai ellenőrzés
-   nem véd a TOCTOU linkcsere ellen (5.4). A gyökér az O-5 döntése.
+   nem véd a TOCTOU linkcsere ellen (5.4). A gyökér az O-5 user döntése szerint csomópontonként megadott
+   (`cwd`), üresen a szerver munkakönyvtára; a kockázat kimondott és elfogadott.
 4. **Titok.** A gazda `fetch` nem ad hozzá hitelesítő fejlécet és sütit, és a környezeti változók nem érhetők el
    a sandboxból (nincs `process`). A szerző saját figyelmeztetése szerint egy hitelesített gazda `fetch`
    kiadása a sandbox értelmét veszi el (J-4).
@@ -270,14 +278,14 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
 
 ### 7.1 Termékdöntések (user)
 
-| #   | Kérdés                                        | Döntés vagy opciók                                                                                                                                                                                                                                                                                          | Mi a viselkedés addig                                    | Mi zárná le |
-| --- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----------- |
-| O-1 | Milyen nyelven írja a felhasználó a szkriptet | **lezárva** (user döntés 2026-11-04): "CEL + JavaScript", mindkettő választható                                                                                                                                                                                                                             |                                                          |             |
-| O-2 | Mit érhet el a szkript                        | **lezárva** (user döntés 2026-11-04): "Hálózatot vagy fájlt is", csak a JavaScript úton                                                                                                                                                                                                                     |                                                          |             |
-| O-3 | Kell-e a `join` `script` módja                | **lezárva** (user döntés 2026-11-04): "Igen, ugyanazzal a nyelvvel"                                                                                                                                                                                                                                         |                                                          |             |
-| O-4 | JavaScript időkorlát                          | **lezárva** (user döntés 2026-11-04): 60 másodperc alapérték, csomópontonként nagyobb megadható ("de meg lehessen adni nagyobb idokorlatot ...")                                                                                                                                                            |                                                          |             |
-| O-5 | Melyik könyvtárat érheti el a fájl hozzáférés | (a) csomópontonként megadott könyvtár, üresen a szerver munkakönyvtára, ugyanúgy, mint az agent lépés `cwd` mezője (ajánlott: a szkript az agent által írt fájlokat ellenőrizheti); (b) workflow-nként külön mappa a szerver adatkönyvtárában; (c) egy, a szerver indításakor env változóban megadott mappa | a `files` gazda függvény nem kerül a sandboxba (T-015-7) | user döntés |
-| O-6 | Milyen címeket érhet el a hálózat             | (a) bármely címet, a helyi gépet is (ajánlott: a szkriptet a user írja, és a helyi szolgáltatás ellenőrzése a fő eset; a kockázat az 5.10 2. pontja); (b) a helyi és belső címek tiltva (OWASP minimum lista, J-15)                                                                                         | a `fetch` gazda függvény nem kerül a sandboxba (T-015-7) | user döntés |
+| #   | Kérdés                                        | Döntés vagy opciók                                                                                                                               | Mi a viselkedés addig | Mi zárná le |
+| --- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------- | ----------- |
+| O-1 | Milyen nyelven írja a felhasználó a szkriptet | **lezárva** (user döntés 2026-11-04): "CEL + JavaScript", mindkettő választható                                                                  |                       |             |
+| O-2 | Mit érhet el a szkript                        | **lezárva** (user döntés 2026-11-04): "Hálózatot vagy fájlt is", csak a JavaScript úton                                                          |                       |             |
+| O-3 | Kell-e a `join` `script` módja                | **lezárva** (user döntés 2026-11-04): "Igen, ugyanazzal a nyelvvel"                                                                              |                       |             |
+| O-4 | JavaScript időkorlát                          | **lezárva** (user döntés 2026-11-04): 60 másodperc alapérték, csomópontonként nagyobb megadható ("de meg lehessen adni nagyobb idokorlatot ...") |                       |             |
+| O-5 | Melyik könyvtárat érheti el a fájl hozzáférés | **lezárva** (user döntés 2026-11-04): (a) csomópontonként megadott könyvtár, üresen a szerver munkakönyvtára ("Csópontonként megadott")          |                       |             |
+| O-6 | Milyen címeket érhet el a hálózat             | **lezárva** (user döntés 2026-11-04): (a) bármely cím, a helyi gépet is ("Bármit, a helyi gépet is")                                             |                       |             |
 
 ### 7.2 Technikai, nyitva
 
@@ -305,7 +313,7 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
    osztállyal bukik, CPU kötött és gazda ígéretre váró kódra is; a `timeoutMs` pozitív egész, legfeljebb
    2147483647, mindkét oldalon, a sodródás védelemmel.
 7. A memória korlát 128 MB, a túllépés a lépés hibája, a szerver folyamat fut tovább (unit teszt).
-8. A fájl és a hálózat gazda függvénye az O-5 és az O-6 döntése szerint működik; a gyökéren kívüli út és a
+8. A fájl és a hálózat gazda függvénye az O-5 és az O-6 user döntése szerint működik (a gyökér a `cwd`, címszűrés nincs); a gyökéren kívüli út és a
    szimbolikus link kivezetése elutasítva, átirányítás nincs követve, csak `http:` és `https:`.
 9. A szerkesztő tiltása és figyelmeztetése megszűnt; `runtime` választó, időkorlát mező; a `source` kötelező
    mező a mentéskor, a hiba a mező alatt; a sodródás védelem mindkét oldalon.

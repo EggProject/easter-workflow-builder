@@ -192,7 +192,9 @@ kérdésre). Hozzáférés: "Hálózatot vagy fájlt is", csak a JavaScript úto
 nyelvvel". Időkorlát: "de meg lehessen adni nagyobb idokorlatot mert peldaul automatizalt ellenorzes stb is futhat",
 tehát 60 másodperc alapérték, csomópontonként nagyobb megadható. Levezetve: a `ScriptConfig` `runtime` szerinti
 uniója, `timeoutMs` pozitív egész legfeljebb 2147483647; QuickJS alap változat, ígéret alapú gazda függvények,
-128 MB. Nyitva maradt termékkérdés: a fájl hozzáférés könyvtára (SPEC-014 O-5) és a hálózat címkészlete (O-6).
+128 MB. A két korábban nyitva maradt termékkérdést a user ugyanazon a napon lezárta: a fájl hozzáférés
+könyvtára (SPEC-014 O-5) "Csópontonként megadott", üresen a szerver munkakönyvtára, tehát a JavaScript ág `cwd`
+mezője; a hálózat címkészlete (O-6) "Bármit, a helyi gépet is", tehát címszűrés nincs.
 
 **SPEC-015.** Rossz alakú kimenet: "Hibával megáll". Hibás séma jelzése: "Mentéskor és indításkor". Séma korlát:
 "Nincs". Levezetve: a mentéskori ellenőrzés a szerver `PUT .../graph` kezelőjében, az `agent` csomag fordító
