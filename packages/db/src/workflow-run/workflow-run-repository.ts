@@ -6,6 +6,7 @@ import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { isStringArray } from '@easter-workflow-builder/typeguards';
 import { canonicalizeSnapshotDocument } from '../graph-snapshot/snapshot-hash/canonicalize-snapshot-document.ts';
 import { computeSnapshotHash } from '../graph-snapshot/snapshot-hash/compute-snapshot-hash.ts';
+import { isGraphSnapshotHash } from '../graph-snapshot/snapshot-hash/is-graph-snapshot-hash.ts';
 import { resolveSnapshotReuse } from '../graph-snapshot/stored-snapshot/resolve-snapshot-reuse.ts';
 import { readGraphSnapshot } from '../graph-snapshot/snapshot-document/read-graph-snapshot.ts';
 import { graphSnapshotTable } from '../graph-snapshot/stored-snapshot/graph-snapshot.ts';
@@ -131,7 +132,7 @@ function allowedFromStatuses(to: RunStatus): readonly RunStatus[] {
 
 /**
  * A nyers Drizzle sor típusos `WorkflowRunRecord`-dá alakítása, a `status`,
- * `provider_id` és `workflow_ancestry` oszlop typeguard alapú szűkítésével
+ * `provider_id`, `workflow_ancestry` és `graph_snapshot_hash` oszlop typeguard alapú szűkítésével
  * (SPEC-003 9.4 szekció): egyik oszlopon sincs DB szintű `CHECK`, tehát egy
  * korrupt sor lehetséges, és ezt itt kell kiszűrni, nem a hívónál.
  */
@@ -155,6 +156,12 @@ function toWorkflowRunRecord(row: typeof workflowRunTable.$inferSelect): Outcome
     return {
       kind: 'error',
       message: `A(z) "${row.id}" futás workflow_ancestry mezője nem szövegtömb (corrupt_workflow_ancestry).`,
+    };
+  }
+  if (!isGraphSnapshotHash(row.graphSnapshotHash)) {
+    return {
+      kind: 'error',
+      message: `A(z) "${row.id}" futás graph_snapshot_hash mezője érvénytelen: "${row.graphSnapshotHash}" (invalid_graph_snapshot_hash).`,
     };
   }
   return {
