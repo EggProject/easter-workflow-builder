@@ -305,9 +305,12 @@ mezőnként `{ text, number, checked }`, amiből a mező `valueKind` típusa a m
 (`start-run-values.ts`; a `number` mező a begépelt nyers szöveget a `text` helyen is tárolja, mert a
 beviteli elem a köztes alakot, `1.0`, csak azt mutathatja vissza, az érték mégis a `valueAsNumber`), a mező olvasatát a `read-start-run-field.ts`, a bemenetet és a hibákat egy
 bejárásban az `evaluate-start-run-values.ts` adja, a beviteli elemet a `StartRunField`.
-A szerkesztőben a `choice` opciók mezője (`StartInputOptionsField`) a begépelt nyers szöveget helyben
-tartja, és csak a configba bontja soronként (trim, üres sor elhagyása), különben az `Enter` és a sor végi
-szóköz a leütés pillanatában eltűnne; a helyi szöveg a kívülről jövő, más tartalmú listát követi.
+A szerkesztő minden soronkénti lista mezője (a `choice` opciók, az `agent_step` és az al-agent eszköz és
+könyvtár listái, az `error_handler` két listája, a `sub_workflow` `kulcs=érték` leképezése) a
+`LineListTextAreaField` elemen megy: a begépelt nyers szöveget helyben tartja, és csak a configba bontja,
+különben az `Enter`, a sor végi szóköz és a befejezetlen sor a leütés pillanatában eltűnne; a helyi szöveg
+a kívülről jövő, más tartalmú értéket követi. Új soronkénti lista mező is ezt használja, nem közvetlenül a
+`TextAreaField` elemet a bontó függvénnyel.
 
 **A "megszakítás folyamatban" állapotnak EGYETLEN forrása van.** Az állapot addig áll, amíg a
 megszakítás kérése folyamatban van, VAGY a kérés lefutott és a futás állapota még nem terminális

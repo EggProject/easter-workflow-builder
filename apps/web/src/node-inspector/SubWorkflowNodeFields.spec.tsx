@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- a `SubWorkflowNodeConfig.onUnhandledError` a dróton ténylegesen `null` értéket hordoz (SPEC-005). */
 import type { SubWorkflowNodeConfig } from '@easter-workflow-builder/protocol';
 import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
-import { act } from 'react';
+import { act, useState, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SubWorkflowNodeFields } from './SubWorkflowNodeFields.tsx';
@@ -61,6 +61,37 @@ describe('SubWorkflowNodeFields', () => {
       typeInto(mappingTextarea, 'c=d\ne=f');
     });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ inputMapping: { c: 'd', e: 'f' } }));
+  });
+
+  it('gépelés közben a leképezés mezőben a befejezetlen sor és az Enter megmarad, a configba a teljes sorok kerülnek', () => {
+    let latest: SubWorkflowNodeConfig = { ...CONFIG, inputMapping: {} };
+    function Host(): ReactElement {
+      const [config, setConfig] = useState(latest);
+      return (
+        <SubWorkflowNodeFields
+          config={config}
+          onChange={(next) => {
+            latest = next;
+            setConfig(next);
+          }}
+        />
+      );
+    }
+    act(() => {
+      root.render(<Host />);
+    });
+    const mappingTextarea = container.querySelector('textarea');
+    if (mappingTextarea === null) {
+      throw new Error('a teszt nem találta a leképezés mezőt');
+    }
+
+    for (const partial of ['t', 'topic', 'topic=hír', 'topic=hír\n', 'topic=hír\nnyelv=hu']) {
+      act(() => {
+        typeInto(mappingTextarea, partial);
+      });
+      expect(mappingTextarea.value).toBe(partial);
+    }
+    expect(latest.inputMapping).toEqual({ topic: 'hír', nyelv: 'hu' });
   });
 
   it('a `targetWorkflowId` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {

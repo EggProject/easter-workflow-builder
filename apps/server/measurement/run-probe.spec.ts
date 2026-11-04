@@ -7,6 +7,7 @@ import { isRecord } from '@easter-workflow-builder/typeguards';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { REDACTED } from './mask-secrets.ts';
 import { runProbe } from './run-probe.ts';
+import type { ProbeServerCommand } from './start-probe-server.ts';
 
 /**
  * A próba ellenőrzése valódi provider nélkül (PLAN-013 T-013-9): a gyermek
@@ -17,7 +18,8 @@ import { runProbe } from './run-probe.ts';
  * (user engedély) dolga, ez a fájl azt nem indítja.
  */
 
-const STUB_COMMAND = {
+const STUB_COMMAND: ProbeServerCommand = {
+  kind: 'reports-port',
   executable: process.execPath,
   args: [fileURLToPath(new URL('stub-agent-server.ts', import.meta.url))],
 };
@@ -116,6 +118,15 @@ describe('runProbe a hamis ágenses szerver ellen', () => {
     expect(readRequest()['model']).toBe('claude-sonnet-5');
   });
 
+  it('a portot a szerver maga köti le és jelenti, a próba nem választ előre portot (a billegő ECONNREFUSED gyökéroka)', async () => {
+    // Az előre választott, majd felszabadított port és a gyermek kötése között
+    // egy másik folyamat elvehette a portot: a próba ekkor egy idegen szerverrel
+    // beszélt, ami a futás közben leállt (ECONNREFUSED). A gyermek ezért `0`
+    // portot kap, és az operációs rendszer a kötéskor oszt portot.
+    await probe('minimax');
+    expect(readRequest()['requestedServerPort']).toBe('0');
+  });
+
   it('a szerver ideiglenes adatbázissal és napló útvonallal fut, ami a futás végén törlődik', async () => {
     await probe('minimax');
     const request = readRequest();
@@ -147,6 +158,7 @@ describe('runProbe a hamis ágenses szerver ellen', () => {
       runProbe({
         providerId: 'minimax',
         serverCommand: {
+          kind: 'reports-port',
           executable: process.execPath,
           args: ['-e', `console.error('${FAKE_SECRET}'); process.exit(3)`],
         },

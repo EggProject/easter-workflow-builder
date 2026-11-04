@@ -389,3 +389,7 @@ bukhatnak.
 **Nem javított, jelzett tétel.** Az `ErrorHandlerNodeFields.tsx` és az `AgentDefinitionEntryFields.tsx` ugyanazt a
 trim és üres sor elhagyás körös hibás mintát hordozza, mint a H2 előtti `StartNodeFields.tsx`. Ez a SPEC-016 előtti,
 más tárgyú kód, ezért nem része ennek a javításnak; felhasználói döntés kell hozzá.
+**Utólag javítva (2026-11-04, `fix/lista-mezo-enter-es-probe-teszt`):** a minta mindkét helyen, plusz az
+`AgentStepConfigFields.tsx` három listáján és a `SubWorkflowNodeFields.tsx` `kulcs=érték` leképezésén is
+állt (az utóbbin a `=` előtti, befejezetlen sor is eltűnt, tehát billentyűzetről egyáltalán nem volt
+gépelhető). Mind a `LineListTextAreaField` közös elemre került, a `StartInputOptionsField` ebbe olvadt.

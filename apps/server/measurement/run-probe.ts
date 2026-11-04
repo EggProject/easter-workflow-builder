@@ -14,7 +14,6 @@ import type { ProviderId } from '@easter-workflow-builder/provider-capability';
 import { buildTestZipArchive } from '../src/skill-endpoint/build-test-zip-archive.ts';
 import { testZipFileEntry } from '../src/skill-endpoint/test-zip-file-entry.ts';
 import { buildProbeGraph, type ProbeSkillAndMcp } from './build-probe-graph.ts';
-import { findFreePort } from './find-free-port.ts';
 import { openEventStream } from './open-event-stream.ts';
 import { parseOrThrow } from './parse-or-throw.ts';
 import type { ProbeSummary } from './probe-summary.ts';
@@ -35,7 +34,8 @@ export interface ProbeOptions {
   */
   readonly isSkillAndMcpMode?: boolean;
   /**
-  A gyermek szerver indítása (`node apps/server/src/main.ts`), a tesztben a hamis ágenses szerver.
+  A gyermek szerver indítása és a portjának forrása (`start-probe-server.ts`): a valódi próbában
+  `node apps/server/src/main.ts` kiosztott porttal, a tesztben a hamis ágenses szerver saját jelentett portjával.
   */
   readonly serverCommand: ProbeServerCommand;
   /**
@@ -91,7 +91,8 @@ function parseStepRuns(body: unknown): readonly StepRunRecord[] {
 
 /**
  * A valódi provider próba lépései (SPEC-012 5.1): saját szerver ideiglenes
- * adatbázissal és napló útvonallal, szabad porton; beállítás, workflow, gráf;
+ * adatbázissal és napló útvonallal, szabad porton (a port forrása a
+ * `serverCommand` ága); beállítás, workflow, gráf;
  * stream feliratkozás, futás indítás, várakozás a `run_finished` keretre;
  * összegzés. A `finally` ág mindig leállítja a szervert és törli az
  * ideiglenes könyvtárat (a megszakítás is ide ér). Az időkorlát hiánya
@@ -102,17 +103,14 @@ export async function runProbe(options: ProbeOptions): Promise<ProbeSummary> {
   const workDirectory = mkdtempSync(path.join(tmpdir(), 'easter-probe-'));
   let stopServer: (() => Promise<void>) | undefined;
   try {
-    const port = await findFreePort();
     const server = await startProbeServer(
       options.serverCommand,
       {
         ...options.environment,
-        EASTER_SERVER_PORT: String(port),
         EASTER_DB_FILE: path.join(workDirectory, 'proba.sqlite'),
         EASTER_LOG_DIRECTORY: path.join(workDirectory, 'logs', 'server'),
         EASTER_SKILL_LIBRARY_DIRECTORY: path.join(workDirectory, 'skills'),
       },
-      port,
       options.secretValues,
       signal,
     );

@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- a `ErrorHandlerNodeConfig.onUnhandledError` a dróton ténylegesen `null` értéket hordoz (SPEC-005). */
 import type { ErrorHandlerNodeConfig } from '@easter-workflow-builder/protocol';
 import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
-import { act } from 'react';
+import { act, useState, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorHandlerNodeFields } from './ErrorHandlerNodeFields.tsx';
@@ -69,6 +69,44 @@ describe('ErrorHandlerNodeFields', () => {
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ handledErrorKinds: ['timeout', 'network_error'] }),
     );
+  });
+
+  it('gépelés közben a két lista mezőben az Enter megmarad, a configba a bontott lista kerül', () => {
+    let latest: ErrorHandlerNodeConfig = { ...CONFIG, backoffMs: [], handledErrorKinds: [] };
+    function Host(): ReactElement {
+      const [config, setConfig] = useState(latest);
+      return (
+        <ErrorHandlerNodeFields
+          config={config}
+          onChange={(next) => {
+            latest = next;
+            setConfig(next);
+          }}
+        />
+      );
+    }
+    act(() => {
+      root.render(<Host />);
+    });
+    const [backoffTextarea, handledKindsTextarea] = [...container.querySelectorAll('textarea')];
+    if (backoffTextarea === undefined || handledKindsTextarea === undefined) {
+      throw new Error('a teszt nem találta a lista mezőket');
+    }
+
+    for (const partial of ['100', '100\n', '100\n200']) {
+      act(() => {
+        typeInto(backoffTextarea, partial);
+      });
+      expect(backoffTextarea.value).toBe(partial);
+    }
+    for (const partial of ['timeout', 'timeout\n', 'timeout\nnetwork_error']) {
+      act(() => {
+        typeInto(handledKindsTextarea, partial);
+      });
+      expect(handledKindsTextarea.value).toBe(partial);
+    }
+    expect(latest.backoffMs).toEqual([100, 200]);
+    expect(latest.handledErrorKinds).toEqual(['timeout', 'network_error']);
   });
 
   it('a `maxAttempts` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {

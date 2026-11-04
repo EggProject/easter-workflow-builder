@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- a teszt a `node-config` séma nullázható mezőit vizsgálja (SPEC-005 protokoll alak). */
 import type { AgentStepConfig } from '@easter-workflow-builder/protocol';
 import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
-import { act } from 'react';
+import { act, useState, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
@@ -326,6 +326,45 @@ describe('AgentStepConfigFields', () => {
       typeInto(textarea, '/a\n/b');
     });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ additionalDirectories: ['/a', '/b'] }));
+  });
+
+  it('gépelés közben a három lista mezőben az Enter megmarad, a configba a bontott lista kerül', () => {
+    let latest: AgentStepConfig = BASE_CONFIG;
+    function Host(): ReactElement {
+      const [config, setConfig] = useState(latest);
+      return (
+        <AgentStepConfigFields
+          fieldPathPrefix=""
+          config={config}
+          onChange={(next) => {
+            latest = next;
+            setConfig(next);
+          }}
+          inheritedProviderDescription="nincs"
+        />
+      );
+    }
+    act(() => {
+      root.render(<Host />);
+    });
+
+    for (const label of ['Engedélyezett eszközök', 'Tiltott eszközök', 'További engedélyezett könyvtárak']) {
+      const textarea = [...container.querySelectorAll('textarea')].find((candidate) =>
+        candidate.closest('label')?.textContent.includes(label),
+      );
+      if (textarea === undefined) {
+        throw new Error(`a teszt nem talált "${label}" mezőt`);
+      }
+      for (const partial of ['első', 'első\n', 'első\nmásodik']) {
+        act(() => {
+          typeInto(textarea, partial);
+        });
+        expect(textarea.value).toBe(partial);
+      }
+    }
+    expect(latest.allowedTools).toEqual(['első', 'második']);
+    expect(latest.disallowedTools).toEqual(['első', 'második']);
+    expect(latest.additionalDirectories).toEqual(['első', 'második']);
   });
 
   it('a sandbox mező bekapcsolása a teljes konfigot frissíti', () => {

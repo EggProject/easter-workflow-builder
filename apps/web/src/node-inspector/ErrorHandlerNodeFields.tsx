@@ -1,6 +1,7 @@
 import type { ErrorHandlerNodeConfig } from '@easter-workflow-builder/protocol';
-import { TextAreaField, TextField } from '@easter-workflow-builder/ui';
+import { TextField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
+import { LineListTextAreaField } from './LineListTextAreaField.tsx';
 import { fromNumberListFieldValue, toNumberListFieldValue } from './number-list-field-value.ts';
 import { fromStringListFieldValue, toStringListFieldValue } from './string-list-field-value.ts';
 import { useFieldError } from './use-field-error.ts';
@@ -37,22 +38,24 @@ export function ErrorHandlerNodeFields(properties: Readonly<ErrorHandlerNodeFiel
           onChange({ ...config, maxAttempts: Number(event.target.value) });
         }}
       />
-      <TextAreaField
-        size="sm"
+      <LineListTextAreaField
         label="Várakozás próbálkozásonként, ms (soronként egy szám)"
-        value={toNumberListFieldValue(config.backoffMs)}
+        value={config.backoffMs}
+        toText={toNumberListFieldValue}
+        fromText={fromNumberListFieldValue}
         error={backoffMsError}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-          onChange({ ...config, backoffMs: fromNumberListFieldValue(event.target.value) });
+        onChange={(backoffMs) => {
+          onChange({ ...config, backoffMs });
         }}
       />
-      <TextAreaField
-        size="sm"
+      <LineListTextAreaField
         label="Kezelt hibafajták (soronként egy)"
-        value={toStringListFieldValue(config.handledErrorKinds)}
+        value={config.handledErrorKinds}
+        toText={toStringListFieldValue}
+        fromText={fromStringListFieldValue}
         error={handledErrorKindsError}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-          onChange({ ...config, handledErrorKinds: fromStringListFieldValue(event.target.value) });
+        onChange={(handledErrorKinds) => {
+          onChange({ ...config, handledErrorKinds });
         }}
       />
     </>
