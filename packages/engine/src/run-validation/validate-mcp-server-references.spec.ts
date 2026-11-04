@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AgentStepConfig, McpServerDefinitionRecord } from '@easter-workflow-builder/db';
 import type { ProcessEnvironmentPort } from '../engine-port/process-environment-port.ts';
 import type { SkillLibrarySnapshot } from '../engine-port/skill-library-snapshot.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 import { validateMcpServerReferences } from './validate-mcp-server-references.ts';
 
 function agentStepConfig(
@@ -53,7 +53,7 @@ const OK = { kind: 'ok', value: undefined };
 
 describe('validateMcpServerReferences', () => {
   it('a régi mezőt hordozó, hivatkozás nélküli lépés és a nem agent node zöld', () => {
-    const configs = new Map<string, ExecutableNodeConfig>([
+    const configs = new Map<string, WellFormedNodeConfig>([
       ['regi', { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig(undefined) }],
       ['start', { type: 'start', inputFields: [], onUnhandledError: 'fail_run' }],
     ]);
@@ -62,7 +62,7 @@ describe('validateMcpServerReferences', () => {
   });
 
   it('a feloldható hivatkozás zöld', () => {
-    const configs = new Map<string, ExecutableNodeConfig>([
+    const configs = new Map<string, WellFormedNodeConfig>([
       ['a1', { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig({ docs: NO_OVERRIDE }) }],
     ]);
 
@@ -70,7 +70,7 @@ describe('validateMcpServerReferences', () => {
   });
 
   it('a join ai_synthesis lépés törölt definícióra mutató hivatkozására mcp_server_not_found hibát ad', () => {
-    const configs = new Map<string, ExecutableNodeConfig>([
+    const configs = new Map<string, WellFormedNodeConfig>([
       [
         'szintezis',
         {
@@ -90,7 +90,7 @@ describe('validateMcpServerReferences', () => {
   });
 
   it('a hiányzó szerver oldali változóra missing_mcp_server_env hibát ad', () => {
-    const configs = new Map<string, ExecutableNodeConfig>([
+    const configs = new Map<string, WellFormedNodeConfig>([
       ['a1', { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig({ docs: NO_OVERRIDE }) }],
     ]);
 
@@ -103,7 +103,7 @@ describe('validateMcpServerReferences', () => {
 
   describe('az agent definíciók MCP hivatkozásai (SPEC-009 6.2, M-147)', () => {
     it('a feloldható agent definíció hivatkozás zöld', () => {
-      const configs = new Map<string, ExecutableNodeConfig>([
+      const configs = new Map<string, WellFormedNodeConfig>([
         [
           'a1',
           {
@@ -122,7 +122,7 @@ describe('validateMcpServerReferences', () => {
     });
 
     it('a törölt definícióra mutató agent hivatkozás mcp_server_not_found, a csomópont és az agent nevével', () => {
-      const configs = new Map<string, ExecutableNodeConfig>([
+      const configs = new Map<string, WellFormedNodeConfig>([
         [
           'a1',
           {
@@ -143,7 +143,7 @@ describe('validateMcpServerReferences', () => {
     });
 
     it('az érvénytelen alakú agent definíció malformed_node_config', () => {
-      const configs = new Map<string, ExecutableNodeConfig>([
+      const configs = new Map<string, WellFormedNodeConfig>([
         [
           'a1',
           {
@@ -163,7 +163,7 @@ describe('validateMcpServerReferences', () => {
 
   it('a lépés szerverével azonos nevű agent felülírás a futás indításakor agent_mcp_server_override_conflict (O-48)', () => {
     const agents = { segito: { description: 'd', prompt: 'p', mcpServerReferences: { docs: NO_OVERRIDE } } };
-    const configs = new Map<string, ExecutableNodeConfig>([
+    const configs = new Map<string, WellFormedNodeConfig>([
       ['a', { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig({ docs: NO_OVERRIDE }, agents) }],
     ]);
 
@@ -176,7 +176,7 @@ describe('validateMcpServerReferences', () => {
 
   it('a null skills lépésen az agent definíció skillje a futás indításakor agent_skill_not_in_step (O-47)', () => {
     const agents = { segito: { description: 'd', prompt: 'p', skills: ['alfa'] } };
-    const configs = new Map<string, ExecutableNodeConfig>([
+    const configs = new Map<string, WellFormedNodeConfig>([
       ['a', { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig(undefined, agents) }],
     ]);
 

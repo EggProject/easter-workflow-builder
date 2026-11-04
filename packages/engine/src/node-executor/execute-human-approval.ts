@@ -2,7 +2,7 @@ import type { ApprovalDecision } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { RunContext } from '../run-context/run-context.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import type { ApprovalWaitRegistry } from './approval-wait-registry.ts';
 import { beginStepRun } from './begin-step-run.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
@@ -12,7 +12,7 @@ import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutionResult } from './node-executor-result.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
-type HumanApprovalNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'human_approval' }>;
+type HumanApprovalNodeConfig = Extract<WellFormedNodeConfig, { readonly type: 'human_approval' }>;
 
 /**
  * A `human_approval` node bemenete (SPEC-004 5. szekció 7. sora, 5.8

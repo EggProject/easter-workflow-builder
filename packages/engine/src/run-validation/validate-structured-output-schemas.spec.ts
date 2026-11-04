@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { compileStructuredOutputSchema } from '@easter-workflow-builder/agent';
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
 import type { StructuredOutputSchemaCompilerPort } from '../engine-port/structured-output-schema-compiler-port.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 import { validateStructuredOutputSchemas } from './validate-structured-output-schemas.ts';
 
 function agentStepConfig(structuredOutput: AgentStepConfig['structuredOutput']): AgentStepConfig {
@@ -34,11 +34,11 @@ function withSchema(schema: unknown): AgentStepConfig['structuredOutput'] {
   return { strategy: 'sdk_output_format', schema };
 }
 
-function agentNode(structuredOutput: AgentStepConfig['structuredOutput']): ExecutableNodeConfig {
+function agentNode(structuredOutput: AgentStepConfig['structuredOutput']): WellFormedNodeConfig {
   return { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig(structuredOutput) };
 }
 
-function synthesisNode(structuredOutput: AgentStepConfig['structuredOutput']): ExecutableNodeConfig {
+function synthesisNode(structuredOutput: AgentStepConfig['structuredOutput']): WellFormedNodeConfig {
   return {
     type: 'join',
     mode: 'ai_synthesis',
@@ -48,9 +48,9 @@ function synthesisNode(structuredOutput: AgentStepConfig['structuredOutput']): E
 }
 
 function configsOf(
-  entries: readonly (readonly [string, ExecutableNodeConfig])[],
-): ReadonlyMap<string, ExecutableNodeConfig> {
-  return new Map<string, ExecutableNodeConfig>(entries);
+  entries: readonly (readonly [string, WellFormedNodeConfig])[],
+): ReadonlyMap<string, WellFormedNodeConfig> {
+  return new Map<string, WellFormedNodeConfig>(entries);
 }
 
 function ignoreLogLine(): void {

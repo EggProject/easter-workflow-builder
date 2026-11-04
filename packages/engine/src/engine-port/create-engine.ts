@@ -87,8 +87,9 @@ async function drainConnectionTestStream(messages: AsyncIterable<unknown>): Prom
  * a minta, mint a `createConcurrencyGate`/`createApprovalWaitRegistry`/
  * `createRunSupervisor` saját lezárásban élő állapota.
  *
- * **A `startRun`/`decideApproval`/`suggestedConcurrencyLimit` mind SZINKRON
- * belső munkát végeznek.** A `db` csomag minden művelete szinkron
+ * **A `decideApproval`/`suggestedConcurrencyLimit` SZINKRON belső munkát
+ * végez**, a `startRun` egyetlen aszinkron pontja a JavaScript szkript
+ * források fordítása (SPEC-014 5.7, `create-run-supervisor.ts`). A `db` csomag minden művelete szinkron
  * (`better-sqlite3`), és a `ConcurrencyGate`/`ApprovalWaitRegistry` felülete
  * is szinkron visszahívásos (lásd a saját doksijukat); a `Promise` burkolást
  * kizárólag a SPEC-004 3.1 `Engine` szignatúrája kéri, mert a hívó
@@ -109,7 +110,7 @@ export function createEngine(dependencies: EngineDependencies): Engine {
   });
 
   function startRun(request: StartRunRequest): Promise<Outcome<StartedRun>> {
-    return Promise.resolve(runSupervisor.startRun(request));
+    return runSupervisor.startRun(request);
   }
 
   function interruptRun(runId: string): Promise<Outcome<InterruptSummary>> {

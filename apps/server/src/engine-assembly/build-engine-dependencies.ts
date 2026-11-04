@@ -4,6 +4,7 @@ import {
   createCelExpressionEvaluator,
   createMustacheTemplateRenderer,
 } from '@easter-workflow-builder/workflow-language';
+import { quickJsScriptRunner } from '../script-runner/quickjs-script-runner.ts';
 import type { StreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { buildAgentQueryRunner } from './build-agent-query-runner.ts';
 import { buildProviderDescriptorLookup } from './build-provider-descriptor-lookup.ts';
@@ -15,7 +16,7 @@ import { createStructuredOutputSchemaCompiler } from './create-structured-output
 import { reportUnexpectedLanguageError } from './report-unexpected-language-error.ts';
 
 /**
- * A motor tizenegy kötelező portjának összeállítása a szerver indulásakor
+ * A motor tizenkét kötelező portjának összeállítása a szerver indulásakor
  * (SPEC-004 3.1, 3.2, `EngineDependencies`). A `database` és a `clock` a
  * hívó (`continue-startup-with-database.ts`) által átadott, MÁR LÉTEZŐ
  * példány - a `clock`-ot azért kapja kívülről, nem itt építi fel, mert
@@ -37,6 +38,10 @@ import { reportUnexpectedLanguageError } from './report-unexpected-language-erro
  * A `structuredOutputSchemaCompiler` a strukturált kimenet sémájának fordítója
  * a `logger`-rel (SPEC-015 5.4), ugyanaz a függvény, amit a gráf mentésének
  * ellenőrzése kap (`createStructuredOutputSchemaCompiler`).
+ *
+ * A `scriptRunner` a JavaScript szkript futtató (SPEC-014 5.2, 5.4): a QuickJS
+ * WebAssembly alapú `quickJsScriptRunner`, ami minden fordítást és futtatást
+ * friss modulon végez, ezért állapot nélkül, egyetlen példányként köthető be.
  */
 export function buildEngineDependencies(
   database: DatabaseContext,
@@ -69,5 +74,6 @@ export function buildEngineDependencies(
     processEnvironment: createProcessEnvironmentReader(),
     skillLibrary: createSkillLibraryReader(skillLibraryRootDirectory),
     structuredOutputSchemaCompiler: createStructuredOutputSchemaCompiler(logger),
+    scriptRunner: quickJsScriptRunner,
   };
 }

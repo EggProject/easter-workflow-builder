@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { EngineErrorKind } from './engine-error-kind.ts';
 import { formatEngineErrorMessage } from './format-engine-error-message.ts';
 
-// Az `engine-error-kind.ts` mind a hatvan értéke, ugyanabban a
+// Az `engine-error-kind.ts` mind az ötvenkilenc értéke, ugyanabban a
 // sorrendben. Az `EngineErrorKind[]` annotáció fordítási idejű állítás is: ha
 // az unió bővül vagy szűkül, ez a lista nem maradhat érintetlenül.
 const allEngineErrorKinds: readonly EngineErrorKind[] = [
@@ -15,7 +15,6 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
   'invalid_start_node',
   'dangling_edge',
   'unreachable_node',
-  'unimplemented_node_type',
   'branch_key_unknown',
   'invalid_error_handler_edge',
   'malformed_node_config',
@@ -69,7 +68,7 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
 ];
 
 describe('formatEngineErrorMessage', () => {
-  it('mind a hatvan hibaosztályra a "detail (kind)." alakot adja', () => {
+  it('mind az ötvenkilenc hibaosztályra a "detail (kind)." alakot adja', () => {
     for (const kind of allEngineErrorKinds) {
       expect(formatEngineErrorMessage(kind, 'A lépés nem futtatható')).toBe(`A lépés nem futtatható (${kind}).`);
     }

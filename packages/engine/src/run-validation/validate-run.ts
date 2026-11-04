@@ -13,7 +13,6 @@ import { validateDefaultBranchKey } from './validate-default-branch-key.ts';
 import { validateEdgeEndpoints } from './validate-edge-endpoints.ts';
 import { validateErrorHandlerBackoff } from './validate-error-handler-backoff.ts';
 import { validateErrorHandlerEdges } from './validate-error-handler-edges.ts';
-import { validateImplementedNodeTypes } from './validate-implemented-node-types.ts';
 import { validateNodeConfigs } from './validate-node-configs.ts';
 import { validateNodeReachability } from './validate-node-reachability.ts';
 import { validateReservedBranchKeys } from './validate-reserved-branch-keys.ts';
@@ -69,10 +68,11 @@ function firstError(checks: readonly (() => Outcome<void>)[]): Outcome<void> {
  * 4. `validateScopeBalance` (4.5): előfeltétele az egyetlen start node és a
  *    körmentesség, ezért csak itt futhat; mellékterméke a fan-out/join
  *    párosítás.
- * 5. Config szint: előbb az érvényesség (`validateNodeConfigs`), utána a
- *    végrehajthatóság (`validateImplementedNodeTypes`), és csak az így
- *    szűkített unión a maradék hét config ellenőrzés. A hetedik a 4.7
- *    táblázaton kívüli `validateErrorHandlerBackoff` (8.2 3. pont).
+ * 5. Config szint: előbb az érvényesség (`validateNodeConfigs`), és csak az így
+ *    szűkített unión a maradék hat config ellenőrzés. A hatodik a 4.7
+ *    táblázaton kívüli `validateErrorHandlerBackoff` (8.2 3. pont). A `script`
+ *    node és a `join` `script` módja a SPEC-014 5.8 óta végrehajtható, a
+ *    korábbi végrehajthatósági szűkítés megszűnt.
  * 6. `resolveNodeProviders` (4.8 2. lépés): a feloldás node-onként.
  */
 export function validateRun(
@@ -110,11 +110,7 @@ export function validateRun(
     return nodeConfigs;
   }
 
-  const executableConfigs = validateImplementedNodeTypes(nodeConfigs.value);
-  if (executableConfigs.kind === 'error') {
-    return executableConfigs;
-  }
-  const nodeConfigsById = executableConfigs.value;
+  const nodeConfigsById = nodeConfigs.value;
 
   const semantics = firstError([
     () => validateUnhandledErrorPolicy(nodeConfigsById),

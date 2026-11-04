@@ -14,6 +14,7 @@ import type { NodeExecutorDependencies } from '../node-executor/node-executor-de
 import { resolveEffectiveProvider } from '../provider-resolution/resolve-effective-provider.ts';
 import { cancelActiveRunTree } from '../run-interrupt/cancel-active-run-tree.ts';
 import { validateLanguageFields } from '../run-validation/validate-language-fields.ts';
+import { validateScriptSources } from '../run-validation/validate-script-sources.ts';
 import { validateRun } from '../run-validation/validate-run.ts';
 import { validateSkillReferences } from '../run-validation/validate-skill-references.ts';
 import { validateStructuredOutputSchemas } from '../run-validation/validate-structured-output-schemas.ts';
@@ -68,6 +69,18 @@ interface InternalStartRunRequest extends StartRunRequest {
   readonly parentRunId?: string;
 }
 
+// A szabályos leállás alatti futás indítás elutasítása, írás nélkül (SPEC-004
+// 10.2 1. pont): a menet elején és a szkript fordítás után is ez fut.
+function shuttingDownError(workflowId: string): Outcome<never> {
+  return {
+    kind: 'error',
+    message: formatEngineErrorMessage(
+      'engine_shutting_down',
+      `A(z) "${workflowId}" workflow futása nem indul el, mert a motor szabályos leállása már elkezdődött`,
+    ),
+  };
+}
+
 /**
  * A futás életciklusának vezetője (SPEC-004 4.8, 4.4 ... 4.6, 8.4,
  * PLAN-005 T-005-25).
@@ -101,6 +114,10 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
    * A `stopAcceptingRuns` óta igaz (SPEC-004 10.2 1. pont).
    */
   let isAcceptingRuns = true;
+  // Függvényen át olvasva, mert a futás indításának `await` pontja után a
+  // változó értéke megváltozhatott; a közvetlen olvasást a fordító az első
+  // ellenőrzés szerint szűkítené.
+  const canStartRuns = (): boolean => isAcceptingRuns;
 
   const nodeExecutorDependencies: NodeExecutorDependencies = {
     ports,
@@ -114,18 +131,47 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
    * A SPEC-004 4.8 menet 1 ... 7. lépése, ebben a sorrendben. **Az 1 ... 5. lépés egyetlen adatot sem ír**: egy érvénytelen workflow soha nem hoz létre
    * `workflow_run` sort. A leállás kezdete után (`stopAcceptingRuns`) már az
    * 1. lépés előtt elutasít, szintén írás nélkül.
+   *
+   * **A JavaScript szkript források fordítása aszinkron** (SPEC-014 5.7, 5.8:
+   * saját, eldobott WebAssembly modulon fut, research
+   * `2026-11-04-szkript-csomopont.md` 7.3), ezért a menet egyetlen `await`
+   * pontja a szinkron 1 ... 4. lépés (`prepareRunStart`) UTÁN áll: az olcsó
+   * ellenőrzések előbb buknak, és a fordítás csak érvényes gráfon fut. A
+   * szabályos leállás jele az `await` alatt megérkezhet, ezért a fordítás után,
+   * az első írás előtt a leállás ellenőrzése megismétlődik (SPEC-004 10.2 1.
+   * pont, M-36).
    */
-  function startRunInternals(request: InternalStartRunRequest): Outcome<StartedRunInternals> {
-    if (!isAcceptingRuns) {
-      return {
-        kind: 'error',
-        message: formatEngineErrorMessage(
-          'engine_shutting_down',
-          `A(z) "${request.workflowId}" workflow futása nem indul el, mert a motor szabályos leállása már elkezdődött`,
-        ),
-      };
+  async function startRunInternals(request: InternalStartRunRequest): Promise<Outcome<StartedRunInternals>> {
+    if (!canStartRuns()) {
+      return shuttingDownError(request.workflowId);
     }
 
+    const prepared = prepareRunStart(request);
+    if (prepared.kind === 'error') {
+      return prepared;
+    }
+
+    // 3. (a JavaScript szkript források fordítása, SPEC-014 5.7).
+    const scriptSources = await validateScriptSources(prepared.value.validated.nodeConfigsById, ports.scriptRunner);
+    if (scriptSources.kind === 'error') {
+      return scriptSources;
+    }
+
+    if (!canStartRuns()) {
+      return shuttingDownError(request.workflowId);
+    }
+
+    // 5 ... 7.
+    return startValidatedRun(request, prepared.value);
+  }
+
+  /**
+   * A 4.8 menet szinkron 1 ... 4. lépése, írás nélkül: a bemenetek olvasása, a
+   * provider feloldás, a gráf, a nyelvi mezők, a strukturált kimenet sémái, a
+   * skill és az MCP hivatkozások ellenőrzése, a provider validáció és a bemenet
+   * ellenőrzése.
+   */
+  function prepareRunStart(request: InternalStartRunRequest): Outcome<PreparedRun> {
     // 1. A workflow, a gráfja és a globális beállítás olvasása. A három
     //    olvasás eredményét a `collectRunInputs` fűzi össze, hogy a hívási
     //    helyen egyetlen, ténylegesen mindkét kimenetében előforduló elágazás
@@ -235,13 +281,15 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
       return nodePlans;
     }
 
-    // 5 ... 7.
-    return startValidatedRun(request, {
-      snapshot: { ...snapshotInput, providerByNodeId: validated.value.effectiveProviderByNodeId },
-      validated: validated.value,
-      nodePlans: nodePlans.value,
-      structuredOutputValidators: structuredOutputSchemas.value,
-    });
+    return {
+      kind: 'ok',
+      value: {
+        snapshot: { ...snapshotInput, providerByNodeId: validated.value.effectiveProviderByNodeId },
+        validated: validated.value,
+        nodePlans: nodePlans.value,
+        structuredOutputValidators: structuredOutputSchemas.value,
+      },
+    };
   }
 
   /**
@@ -349,8 +397,8 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
     }
   }
 
-  function startRun(request: StartRunRequest): Outcome<StartedRun> {
-    const started = startRunInternals(request);
+  async function startRun(request: StartRunRequest): Promise<Outcome<StartedRun>> {
+    const started = await startRunInternals(request);
     if (started.kind === 'error') {
       return started;
     }
@@ -364,18 +412,18 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
    * típusszinten sem szivároghat át), és a **még futó** gyerek rekordjának
    * visszaadása.
    */
-  function startChildRun(request: ChildWorkflowRunRequest): Promise<Outcome<WorkflowRunRecord>> {
-    const started = startRunInternals({
+  async function startChildRun(request: ChildWorkflowRunRequest): Promise<Outcome<WorkflowRunRecord>> {
+    const started = await startRunInternals({
       workflowId: request.targetWorkflowId,
       input: request.input,
       parent: request.parent,
       parentRunId: request.parentRunId,
     });
     if (started.kind === 'error') {
-      return Promise.resolve(started);
+      return started;
     }
     childCompletions.set(started.value.run.id, awaitChildCompletion(started.value));
-    return Promise.resolve({ kind: 'ok', value: started.value.run });
+    return { kind: 'ok', value: started.value.run };
   }
 
   /**

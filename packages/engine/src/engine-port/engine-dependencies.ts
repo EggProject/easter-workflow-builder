@@ -9,10 +9,12 @@ import type { IdGeneratorPort } from './id-generator-port.ts';
 import type { ProcessEnvironmentPort } from './process-environment-port.ts';
 import type { SkillLibraryPort } from './skill-library-port.ts';
 import type { StructuredOutputSchemaCompilerPort } from './structured-output-schema-compiler-port.ts';
+import type { ScriptRunnerPort } from './script-runner-port.ts';
 
 /**
- * A motorba befecskendezett tizenegy port, a `createEngine(dependencies)`
- * paramétere (SPEC-004 3.1, 3.2). Egyik mező sem opcionális és egyiknek
+ * A motorba befecskendezett tizenkét port, a `createEngine(dependencies)`
+ * paramétere (SPEC-004 3.1, 3.2). A tizenkettedik a `scriptRunner` (SPEC-014
+ * 5.2, 5.8): a `script` node és a `join` `script` módjának JavaScript ága. Egyik mező sem opcionális és egyiknek
  * sincs alapértelmezett értéke: a motorban nincs olyan függőség, ami
  * "magától előkerül".
  */
@@ -28,4 +30,5 @@ export interface EngineDependencies {
   readonly processEnvironment: ProcessEnvironmentPort;
   readonly skillLibrary: SkillLibraryPort;
   readonly structuredOutputSchemaCompiler: StructuredOutputSchemaCompilerPort;
+  readonly scriptRunner: ScriptRunnerPort;
 }

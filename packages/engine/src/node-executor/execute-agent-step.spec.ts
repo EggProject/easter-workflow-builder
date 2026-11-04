@@ -20,7 +20,7 @@ import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import type { TemplateRendererPort } from '../engine-port/template-renderer-port.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { executeAgentStep } from './execute-agent-step.ts';
 import { MAX_STORED_OUTPUT_LENGTH } from './max-stored-output-length.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
@@ -37,7 +37,7 @@ const SCHEMA_COMPILER: StructuredOutputSchemaCompilerPort = {
     compileStructuredOutputSchema(schema, { info: ignoreLogLine, warn: ignoreLogLine, error: ignoreLogLine }),
 };
 
-type AgentStepNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'agent_step' }>;
+type AgentStepNodeConfig = Extract<WellFormedNodeConfig, { readonly type: 'agent_step' }>;
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -295,6 +295,7 @@ function dependenciesOf(
     idGenerator: { nextId: notCalled },
     processEnvironment: { read: () => null, readAll: () => ({}) },
     structuredOutputSchemaCompiler: SCHEMA_COMPILER,
+    scriptRunner: { compile: notCalled, run: notCalled },
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },

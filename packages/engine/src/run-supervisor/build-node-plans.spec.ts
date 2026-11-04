@@ -8,7 +8,7 @@ import type {
   ProviderCapabilityDescriptor,
   ProviderId,
 } from '@easter-workflow-builder/provider-capability';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { validateRun } from '../run-validation/validate-run.ts';
 import type { ValidatedRun } from '../run-validation/validated-run.ts';
 import { buildNodePlans } from './build-node-plans.ts';
@@ -215,10 +215,10 @@ describe('buildNodePlans', () => {
 
   it('null onUnhandledError esetén unhandled_error_policy_missing', () => {
     const validated = validatedOf(DOCUMENT);
-    const brokenConfig: ExecutableNodeConfig = { type: 'start', inputFields: [], onUnhandledError: null };
+    const brokenConfig: WellFormedNodeConfig = { type: 'start', inputFields: [], onUnhandledError: null };
     const withNullPolicy: ValidatedRun = {
       ...validated,
-      nodeConfigsById: new Map<string, ExecutableNodeConfig>([['start', brokenConfig]]),
+      nodeConfigsById: new Map<string, WellFormedNodeConfig>([['start', brokenConfig]]),
     };
 
     const outcome = buildNodePlans(withNullPolicy, descriptorOf);

@@ -6,7 +6,7 @@ import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import type { ExecutedStepInstance } from '../run-context/executed-step-instance.ts';
 import type { StepInstanceReference } from '../run-context/step-instance-reference.ts';
 import { resolveStepReference } from '../run-context/resolve-step-reference.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { beginStepRun } from './begin-step-run.ts';
 import type { ChildWorkflowRunner } from './child-workflow-runner.ts';
 import { detectWorkflowRecursion } from './detect-workflow-recursion.ts';
@@ -17,7 +17,7 @@ import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
-type SubWorkflowNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'sub_workflow' }>;
+type SubWorkflowNodeConfig = Extract<WellFormedNodeConfig, { readonly type: 'sub_workflow' }>;
 
 /**
  * A `sub_workflow` node bemenete (SPEC-004 5. szekció 9. sora, 5.9 szekció).

@@ -1,6 +1,6 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 /**
  * A SPEC-004 8.2 3. pontja: "A `backoffMs` lista hossza validáláskor legalább
@@ -21,7 +21,7 @@ import type { ExecutableNodeConfig } from './executable-node-config.ts';
  * ellenőrzés: a szabály nem a 4.7 táblázatban, hanem a 8.2 szekcióban áll,
  * ezért a T-005-15 nem tartalmazta (PLAN-005 T-005-24).
  */
-export function validateErrorHandlerBackoff(configsById: ReadonlyMap<string, ExecutableNodeConfig>): Outcome<void> {
+export function validateErrorHandlerBackoff(configsById: ReadonlyMap<string, WellFormedNodeConfig>): Outcome<void> {
   for (const [nodeId, config] of configsById) {
     if (config.type !== 'error_handler') {
       continue;

@@ -2,7 +2,7 @@ import type { AgentStepConfig } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { validateAgentStepCapabilities } from '../agent-step/validate-agent-step-capabilities.ts';
 import { validateSdkVersionMatch } from '../capability-policy/validate-sdk-version-match.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import type { NodePlan } from './run-execution.ts';
 
 /**
@@ -10,7 +10,7 @@ import type { NodePlan } from './run-execution.ts';
  * lépést. Ugyanaz a két ág, amit a `collectSessionSourceNodes` is
  * megkülönböztet (SPEC-004 5. szekció táblázatának 2. és 5. sora).
  */
-function readAgentStepConfig(config: ExecutableNodeConfig): AgentStepConfig | undefined {
+function readAgentStepConfig(config: WellFormedNodeConfig): AgentStepConfig | undefined {
   if (config.type === 'agent_step') {
     return config;
   }

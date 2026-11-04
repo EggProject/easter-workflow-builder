@@ -7,7 +7,7 @@ import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import type { ExecutedStepInstance } from '../run-context/executed-step-instance.ts';
 import type { RunContext } from '../run-context/run-context.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 
 /**
@@ -35,6 +35,10 @@ import type { NodeExecutionInstance } from './node-executor-instance.ts';
  *   kimenet ellenőrző (SPEC-015 5.4), pontosan akkor megadva, ha a node
  *   strukturált kimenetet vár; az `agent_step` és a `join` `ai_synthesis`
  *   olvassa.
+ * - `stopSignal`: a futás leállításának jele (`RunExecution.stopController`:
+ *   felhasználói megszakítás, szabályos leállás, a futás saját `fail_run`
+ *   bukása). Az `error_handler` backoff várakozása és a futó szkript lépés
+ *   (SPEC-014 5.8) ezen szakad meg; a többi ág nem olvassa.
  */
 interface ExecuteNodeCommonFields {
   readonly instance: NodeExecutionInstance;
@@ -48,6 +52,7 @@ interface ExecuteNodeCommonFields {
   readonly sessionSourceNodes: SessionSourceNodes;
   readonly sessionInstances: readonly SessionBearingInstance[];
   readonly structuredOutputValidator: StructuredOutputValidator | undefined;
+  readonly stopSignal: AbortSignal;
 }
 
 /**
@@ -56,31 +61,28 @@ interface ExecuteNodeCommonFields {
  * **Miért van egyáltalán diszkrimináns a `config.type` mellett.** Az
  * `error_handler` node az egyetlen, aminek a végrehajtásához a node
  * configján és a példány adatain kívül a **hibát adó másik lépés** két adata
- * is kell (`failedErrorKind`, `failedAttempt`, SPEC-004 8.2 bevezető), és a
- * futás leállításának jele (`stopSignal`), amin a backoff várakozása megszakad
- * (9. szekció). Ha ez
- * a három mező a közös részben állna, opcionális lenne, és a diszpécser
+ * is kell (`failedErrorKind`, `failedAttempt`, SPEC-004 8.2 bevezető). Ha ez
+ * a két mező a közös részben állna, opcionális lenne, és a diszpécser
  * `error_handler` ágának egy olyan hiányzó-érték ágat kellene kezelnie, ami a
  * hívási szerződés szerint sosem fordul elő. A TypeScript viszont **nem szűkít beágyazott diszkriminánsra**
  * (`request.config.type` a `request` unióját nem szűkíti, a fordító
  * ténylegesen `TS2339` hibát ad), ezért a diszkriminánsnak a legfelső szinten
- * kell állnia. Így a három mező típusszinten kötelező pontosan ott, ahol
+ * kell állnia. Így a két mező típusszinten kötelező pontosan ott, ahol
  * kell, és sehol máshol nem létezik.
  *
  * A `node` ág configja ezért `ErrorHandlerNodeConfig` nélküli unió: a
- * diszpécser `switch(config.type)` szerkezete kilenc ágat fed le (a `join`
- * két módjával), és kimerítő marad a `switch-exhaustiveness-check` szabály
+ * diszpécser `switch(config.type)` szerkezete tíz ágat fed le (a `join`
+ * három módjával), és kimerítő marad a `switch-exhaustiveness-check` szabály
  * alatt.
  */
 export type ExecuteNodeRequest =
   | (ExecuteNodeCommonFields & {
       readonly kind: 'node';
-      readonly config: Exclude<ExecutableNodeConfig, ErrorHandlerNodeConfig>;
+      readonly config: Exclude<WellFormedNodeConfig, ErrorHandlerNodeConfig>;
     })
   | (ExecuteNodeCommonFields & {
       readonly kind: 'error_handler';
       readonly config: ErrorHandlerNodeConfig;
       readonly failedErrorKind: EngineErrorKind;
       readonly failedAttempt: number;
-      readonly stopSignal: AbortSignal;
     });

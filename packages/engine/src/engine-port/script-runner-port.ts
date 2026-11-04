@@ -15,7 +15,9 @@ import type { ScriptRunResult } from './script-run-result.ts';
  *   WebAssembly modulon fut, és a modul példányosítása a telepített
  *   `quickjs-emscripten-core` 0.32.0 forrása szerint aszinkron
  *   (`newQuickJSWASMModuleFromVariant`; research `2026-11-04-szkript-csomopont.md`
- *   T-015-4 szekció).
+ *   T-015-4 szekció). A hibaág üzenete teljes mondat, a végén a zárójeles
+ *   `script_compile_failed` osztállyal (`formatEngineErrorMessage`); a motor
+ *   csak a csomópont azonosítóját fűzi elé (`validate-script-sources.ts`).
  * - `run`: egy szkript lépés lefuttatása; a hibaág nem kivétel, hanem a
  *   `ScriptRunResult` saját ága.
  *

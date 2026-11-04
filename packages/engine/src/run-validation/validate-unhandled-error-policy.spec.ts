@@ -1,19 +1,19 @@
 /* eslint-disable unicorn/no-null -- az `onUnhandledError` tárolt alakja `UnhandledErrorPolicy | null`, ahol a `null` a "nincs beállítva" állapot (SPEC-003 4.3, SPEC-004 8.3), nem helyőrző `undefined` */
 import { describe, expect, it } from 'vitest';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 import { validateUnhandledErrorPolicy } from './validate-unhandled-error-policy.ts';
 
-const FAIL_RUN: ExecutableNodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
-const FAIL_BRANCH: ExecutableNodeConfig = {
+const FAIL_RUN: WellFormedNodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
+const FAIL_BRANCH: WellFormedNodeConfig = {
   type: 'join',
   mode: 'merge',
   onUnhandledError: 'fail_branch',
 };
-const MISSING: ExecutableNodeConfig = { type: 'start', inputFields: [], onUnhandledError: null };
+const MISSING: WellFormedNodeConfig = { type: 'start', inputFields: [], onUnhandledError: null };
 
 describe('validateUnhandledErrorPolicy', () => {
   it('mindkét beállított politikára zöld', () => {
-    const configsById: ReadonlyMap<string, ExecutableNodeConfig> = new Map<string, ExecutableNodeConfig>([
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
       ['start', FAIL_RUN],
       ['j', FAIL_BRANCH],
     ]);
@@ -22,7 +22,7 @@ describe('validateUnhandledErrorPolicy', () => {
   });
 
   it('hiányzó politikára unhandled_error_policy_missing hibát ad', () => {
-    const configsById: ReadonlyMap<string, ExecutableNodeConfig> = new Map<string, ExecutableNodeConfig>([
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
       ['start', MISSING],
     ]);
 

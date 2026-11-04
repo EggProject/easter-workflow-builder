@@ -16,7 +16,6 @@ describe('protocolErrorClassMessage', () => {
     ['invalid_start_node', 'A gráfban pontosan egy Indítás csomópontnak kell lennie.'],
     ['dangling_edge', 'A gráf egyik éle nem létező csomópontra hivatkozik.'],
     ['unreachable_node', 'A gráf egyik csomópontja nem érhető el az Indítás csomópontból.'],
-    ['unimplemented_node_type', 'A gráf szkriptet futtató lépést tartalmaz, amit a rendszer még nem hajt végre.'],
     [
       'branch_key_unknown',
       'Egy Elágazás csomópont éle vagy alapértelmezett ága olyan kulcsra hivatkozik, ami nincs az ágai között.',

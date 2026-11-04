@@ -449,6 +449,10 @@ function openHarness(options: HarnessOptions = {}): Harness {
     },
     processEnvironment: options.processEnvironment ?? { read: () => null, readAll: () => ({}) },
     structuredOutputSchemaCompiler: SCHEMA_COMPILER,
+    scriptRunner: {
+      compile: () => Promise.resolve({ kind: 'ok', value: undefined }),
+      run: () => Promise.reject(new Error('ebben a tesztben nem hívott port')),
+    },
     skillLibrary: options.skillLibrary ?? {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },

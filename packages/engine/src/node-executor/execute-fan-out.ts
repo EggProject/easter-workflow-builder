@@ -2,7 +2,7 @@ import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import type { RunContext } from '../run-context/run-context.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { beginStepRun } from './begin-step-run.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import { finishStepRunFailed } from './finish-step-run-failed.ts';
@@ -13,7 +13,7 @@ import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
-type FanOutNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'fan_out' }>;
+type FanOutNodeConfig = Extract<WellFormedNodeConfig, { readonly type: 'fan_out' }>;
 
 export interface ExecuteFanOutInput {
   readonly instance: NodeExecutionInstance;

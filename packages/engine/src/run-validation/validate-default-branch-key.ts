@@ -1,6 +1,6 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 /**
  * A SPEC-004 4.7 táblázat 6. sora: "a `defaultBranchKey`, ha nem `null`,
@@ -15,7 +15,7 @@ import type { ExecutableNodeConfig } from './executable-node-config.ts';
  * kifejezés eredményéhez nem illeszkedő érték a `branch_no_matching_edge`
  * futásidejű hibaága (SPEC-004 5.), nem indítási validációs hiba.
  */
-export function validateDefaultBranchKey(configsById: ReadonlyMap<string, ExecutableNodeConfig>): Outcome<void> {
+export function validateDefaultBranchKey(configsById: ReadonlyMap<string, WellFormedNodeConfig>): Outcome<void> {
   for (const [nodeId, config] of configsById) {
     if (config.type !== 'branch') {
       continue;

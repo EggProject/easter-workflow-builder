@@ -2,10 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { isRecord } from '@easter-workflow-builder/typeguards';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { validateRunInput } from './validate-run-input.ts';
 
-function startConfig(fields: readonly { readonly name: string; readonly required: boolean }[]): ExecutableNodeConfig {
+function startConfig(fields: readonly { readonly name: string; readonly required: boolean }[]): WellFormedNodeConfig {
   return {
     type: 'start',
     inputFields: fields.map((field) => ({
@@ -18,9 +18,9 @@ function startConfig(fields: readonly { readonly name: string; readonly required
   };
 }
 
-type FieldSpec = Extract<ExecutableNodeConfig, { readonly type: 'start' }>['inputFields'][number];
+type FieldSpec = Extract<WellFormedNodeConfig, { readonly type: 'start' }>['inputFields'][number];
 
-function typedConfig(fields: readonly FieldSpec[]): ExecutableNodeConfig {
+function typedConfig(fields: readonly FieldSpec[]): WellFormedNodeConfig {
   return { type: 'start', inputFields: fields, onUnhandledError: 'fail_run' };
 }
 
@@ -48,7 +48,7 @@ function inputFromJson(text: string): Readonly<Record<string, unknown>> {
   return parsed;
 }
 
-function configsOf(config: ExecutableNodeConfig): ReadonlyMap<string, ExecutableNodeConfig> {
+function configsOf(config: WellFormedNodeConfig): ReadonlyMap<string, WellFormedNodeConfig> {
   return new Map([['start', config]]);
 }
 
@@ -95,7 +95,7 @@ describe('validateRunInput', () => {
   });
 
   it('nem start típusú configra invalid_start_node', () => {
-    const branch: ExecutableNodeConfig = {
+    const branch: WellFormedNodeConfig = {
       type: 'branch',
       expression: 'x',
       branches: [],

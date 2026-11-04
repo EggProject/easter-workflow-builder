@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 import { validateErrorHandlerBackoff } from './validate-error-handler-backoff.ts';
 
-const START: ExecutableNodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
+const START: WellFormedNodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
 
 // A `maxAttempts`/`backoffMs` párt közvetlenül veszi át, hogy a tesztek
 // hívásai ne lépjék át az `unicorn/max-nested-calls` hármas mélységét.
-function mapOf(maxAttempts: number, backoffMs: readonly number[]): ReadonlyMap<string, ExecutableNodeConfig> {
-  return new Map<string, ExecutableNodeConfig>([
+function mapOf(maxAttempts: number, backoffMs: readonly number[]): ReadonlyMap<string, WellFormedNodeConfig> {
+  return new Map<string, WellFormedNodeConfig>([
     ['eh', { type: 'error_handler', maxAttempts, backoffMs, handledErrorKinds: [], onUnhandledError: 'fail_run' }],
   ]);
 }
@@ -32,7 +32,7 @@ describe('validateErrorHandlerBackoff', () => {
   });
 
   it('nem error_handler node-okat átugorja', () => {
-    const configsById: ReadonlyMap<string, ExecutableNodeConfig> = new Map<string, ExecutableNodeConfig>([
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
       ['start', START],
     ]);
 

@@ -1,6 +1,6 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 /**
  * A SPEC-004 4.2 szekció fenntartott `branch_key` értékei, szó szerint: a
@@ -30,7 +30,7 @@ const RESERVED_BRANCH_KEYS: ReadonlySet<string> = new Set([
  * az éleken: egy fenntartott kulcs akkor is tiltott, ha még egyetlen él sem
  * hivatkozik rá.
  */
-export function validateReservedBranchKeys(configsById: ReadonlyMap<string, ExecutableNodeConfig>): Outcome<void> {
+export function validateReservedBranchKeys(configsById: ReadonlyMap<string, WellFormedNodeConfig>): Outcome<void> {
   for (const [nodeId, config] of configsById) {
     if (config.type !== 'branch') {
       continue;

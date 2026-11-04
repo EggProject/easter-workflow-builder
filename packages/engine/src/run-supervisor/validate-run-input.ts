@@ -1,12 +1,12 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import { isBoolean, isNumber, isString, isStringArray } from '@easter-workflow-builder/typeguards';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 
 /**
  * A `start` node egy bemeneti mezője (a `valueKind` szerinti unió, SPEC-016 5.1).
  */
-type StartInputField = Extract<ExecutableNodeConfig, { readonly type: 'start' }>['inputFields'][number];
+type StartInputField = Extract<WellFormedNodeConfig, { readonly type: 'start' }>['inputFields'][number];
 
 /**
  * Az érték elvárt típusának leírása, ha az érték nem felel meg a mező
@@ -75,7 +75,7 @@ function readOwnInputValue(input: Readonly<Record<string, unknown>>, name: strin
  * függvény önmagában hívható tetszőleges térképpel.
  */
 export function validateRunInput(
-  nodeConfigsById: ReadonlyMap<string, ExecutableNodeConfig>,
+  nodeConfigsById: ReadonlyMap<string, WellFormedNodeConfig>,
   startNodeId: string,
   input: Readonly<Record<string, unknown>>,
 ): Outcome<void> {

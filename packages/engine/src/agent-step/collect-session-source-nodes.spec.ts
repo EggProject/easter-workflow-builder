@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- az `AgentStepConfig` és a node config nullázható mezői (`providerId`, `modelId`, `structuredOutput`, `onUnhandledError`, ...) a tárolt JSON-ban `null` értéket hordoznak (SPEC-003 4.3, 4.4), nem helyőrző `undefined`-et */
 import { describe, expect, it } from 'vitest';
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
-import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
+import type { WellFormedNodeConfig } from '../run-validation/well-formed-node-config.ts';
 import { collectSessionSourceNodes } from './collect-session-source-nodes.ts';
 
 function agentStepConfig(sessionMode: AgentStepConfig['sessionMode']): AgentStepConfig {
@@ -28,21 +28,21 @@ function agentStepConfig(sessionMode: AgentStepConfig['sessionMode']): AgentStep
   };
 }
 
-function agentStepNode(sessionMode: AgentStepConfig['sessionMode']): ExecutableNodeConfig {
+function agentStepNode(sessionMode: AgentStepConfig['sessionMode']): WellFormedNodeConfig {
   return { type: 'agent_step', ...agentStepConfig(sessionMode), onUnhandledError: 'fail_run' };
 }
 
-function aiSynthesisJoinNode(sessionMode: AgentStepConfig['sessionMode']): ExecutableNodeConfig {
+function aiSynthesisJoinNode(sessionMode: AgentStepConfig['sessionMode']): WellFormedNodeConfig {
   return { type: 'join', mode: 'ai_synthesis', settings: agentStepConfig(sessionMode), onUnhandledError: 'fail_run' };
 }
 
-const mergeJoinNode: ExecutableNodeConfig = {
+const mergeJoinNode: WellFormedNodeConfig = {
   type: 'join',
   mode: 'merge',
   onUnhandledError: 'fail_run',
 };
 
-const branchNode: ExecutableNodeConfig = {
+const branchNode: WellFormedNodeConfig = {
   type: 'branch',
   expression: 'x',
   branches: [],
@@ -79,7 +79,7 @@ describe('collectSessionSourceNodes', () => {
 
   it('a merge módú join és a nem agent node egyik halmazba sem kerül be', () => {
     const result = collectSessionSourceNodes(
-      new Map<string, ExecutableNodeConfig>([
+      new Map<string, WellFormedNodeConfig>([
         ['j', mergeJoinNode],
         ['b', branchNode],
       ]),

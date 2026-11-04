@@ -1,8 +1,9 @@
 import type { Outcome } from '@easter-workflow-builder/core';
+import type { ScriptConfig } from '@easter-workflow-builder/db';
 import type { ExpressionEvaluatorPort } from '../engine-port/expression-evaluator-port.ts';
 import type { TemplateRendererPort } from '../engine-port/template-renderer-port.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 /**
  * A két port, amiből az ellenőrzés kizárólag a `compile` metódust hívja.
@@ -22,26 +23,60 @@ interface LanguageField {
   readonly errorKind: 'template_render_failed' | 'expression_evaluation_failed';
 }
 
+type JoinNodeConfig = Extract<WellFormedNodeConfig, { readonly type: 'join' }>;
+
 /**
- * A SPEC-010 9.2 hét vizsgált mezője, a node típusa szerint. A `join`
- * `merge` módjának, a `start`, az `error_handler` és a `sub_workflow` node-nak
- * nincs sablon vagy kifejezés mezője.
+ * A szkript `source` mezője a CEL ágon kifejezés mező, ugyanazzal az
+ * osztállyal, mint a `branch` kifejezése (SPEC-014 5.7, 5.8); a JavaScript ág
+ * fordítása a `scriptRunner` porton fut (`validate-script-sources.ts`).
  */
-function languageFieldsOf(config: ExecutableNodeConfig): readonly LanguageField[] {
+function scriptLanguageFieldsOf(script: ScriptConfig, field: string): readonly LanguageField[] {
+  return script.runtime === 'expression'
+    ? [{ field, source: script.source, errorKind: 'expression_evaluation_failed' }]
+    : [];
+}
+
+/**
+ * A `join` node módjai külön függvényben, ugyanazzal az indokkal, mint a
+ * diszpécser `executeJoinNode` függvénye (`execute-node.ts`): a beágyazott
+ * `switch` a `sonarjs/no-fallthrough` szabálynak fallthrough-nak látszana.
+ */
+function joinLanguageFieldsOf(config: JoinNodeConfig): readonly LanguageField[] {
+  switch (config.mode) {
+    case 'ai_synthesis': {
+      return [
+        {
+          field: 'settings.promptTemplate',
+          source: config.settings.promptTemplate,
+          errorKind: 'template_render_failed',
+        },
+      ];
+    }
+    case 'script': {
+      return scriptLanguageFieldsOf(config.settings, 'settings.source');
+    }
+    case 'merge': {
+      return [];
+    }
+  }
+}
+
+/**
+ * A SPEC-010 9.2 hét vizsgált mezője, plusz a szkript CEL `source` mezője
+ * (SPEC-014 5.7), a node típusa szerint. A `join` `merge` módjának, a `start`,
+ * az `error_handler` és a `sub_workflow` node-nak nincs sablon vagy kifejezés
+ * mezője.
+ */
+function languageFieldsOf(config: WellFormedNodeConfig): readonly LanguageField[] {
   switch (config.type) {
     case 'agent_step': {
       return [{ field: 'promptTemplate', source: config.promptTemplate, errorKind: 'template_render_failed' }];
     }
     case 'join': {
-      return config.mode === 'ai_synthesis'
-        ? [
-            {
-              field: 'settings.promptTemplate',
-              source: config.settings.promptTemplate,
-              errorKind: 'template_render_failed',
-            },
-          ]
-        : [];
+      return joinLanguageFieldsOf(config);
+    }
+    case 'script': {
+      return scriptLanguageFieldsOf(config, 'source');
     }
     case 'human_approval': {
       return [{ field: 'bodyTemplate', source: config.bodyTemplate, errorKind: 'template_render_failed' }];
@@ -70,7 +105,7 @@ function languageFieldsOf(config: ExecutableNodeConfig): readonly LanguageField[
 
 /**
  * A futás indítási ellenőrzése a sablon és a kifejezés mezőkre (SPEC-010
- * 9.2): minden sablon mező lefordítható a `templateRenderer.compile`, minden
+ * 9.2, a szkript CEL `source` mezőjével, SPEC-014 5.7): minden sablon mező lefordítható a `templateRenderer.compile`, minden
  * kifejezés mező az `expressionEvaluator.compile` hívással, különben
  * `template_render_failed`, illetve `expression_evaluation_failed` hiba.
  *
@@ -80,7 +115,7 @@ function languageFieldsOf(config: ExecutableNodeConfig): readonly LanguageField[
  * hibaleírását adja tovább; a mező szövegét nem idézi (SPEC-010 9.5).
  */
 export function validateLanguageFields(
-  configsById: ReadonlyMap<string, ExecutableNodeConfig>,
+  configsById: ReadonlyMap<string, WellFormedNodeConfig>,
   ports: LanguageCompilePorts,
 ): Outcome<void> {
   for (const [nodeId, config] of configsById) {

@@ -149,6 +149,7 @@ function enginePorts(database: DatabaseContext, published: unknown[], runner: Ag
     idGenerator: { nextId: notCalled },
     processEnvironment: { read: () => null, readAll: () => ({}) },
     structuredOutputSchemaCompiler: SCHEMA_COMPILER,
+    scriptRunner: { compile: notCalled, run: notCalled },
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },
@@ -348,6 +349,7 @@ function plainRequest(runId: string, nodeId: string, config: PlainNodeConfig): E
     sessionSourceNodes: { sourceNodeIds: new Set(), continuedNodeIds: new Set() },
     sessionInstances: [],
     structuredOutputValidator: undefined,
+    stopSignal: new AbortController().signal,
   };
 }
 
@@ -434,6 +436,62 @@ describe('executeNode', () => {
     expect(outcome.kind).toBe('succeeded');
     expect(outcome.stepRun.output).toStrictEqual(['elso', 'masodik']);
     expect(outcome.stepRun.nodeType).toBe('join');
+  });
+
+  it('join script módban az executeJoinScript fut: a kimenet a szkript eredménye, join_resolved esemény script módban', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const published: unknown[] = [];
+    const request = plainRequest(runId, 'osszegzes', {
+      type: 'join',
+      mode: 'script',
+      settings: { source: 'joinInputs.size()', runtime: 'expression' },
+      onUnhandledError: 'fail_run',
+    });
+
+    const outcome = settledOrThrow(await executeNode(request, dependenciesOf(database, published)));
+
+    expect(outcome.kind).toBe('succeeded');
+    expect(outcome.stepRun.output).toBe(true);
+    expect(outcome.stepRun.nodeType).toBe('join');
+    expect(published).toContainEqual(
+      expect.objectContaining({ kind: 'join_resolved', payload: { mode: 'script', inputCount: 2 } }),
+    );
+  });
+
+  it('script ágon az executeScript fut: a JavaScript futtató a kérés leállítási jelét kapja', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const signals: AbortSignal[] = [];
+    const base = dependenciesOf(database, []);
+    const dependencies: NodeExecutorDependencies = {
+      ...base,
+      ports: {
+        ...base.ports,
+        scriptRunner: {
+          compile: notCalled,
+          run: (scriptRequest) => {
+            signals.push(scriptRequest.signal);
+            return Promise.resolve({ kind: 'succeeded', output: { js: true } });
+          },
+        },
+      },
+    };
+    const request = plainRequest(runId, 'szkript', {
+      type: 'script',
+      source: 'return { js: true };',
+      runtime: 'javascript',
+      timeoutMs: null,
+      cwd: null,
+      memoryLimitMb: null,
+      onUnhandledError: 'fail_run',
+    });
+
+    const outcome = settledOrThrow(await executeNode(request, dependencies));
+
+    expect(outcome.kind).toBe('succeeded');
+    expect(outcome.stepRun).toMatchObject({ nodeType: 'script', output: { js: true } });
+    expect(signals).toStrictEqual([request.stopSignal]);
   });
 
   it('join ai_synthesis módban az executeJoinAiSynthesis fut: join_resolved esemény ai_synthesis módban', async () => {

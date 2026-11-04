@@ -26,6 +26,7 @@ import type { ClockPort } from '../engine-port/clock-port.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import type { ExpressionEvaluatorPort } from '../engine-port/expression-evaluator-port.ts';
+import type { ScriptRunnerPort } from '../engine-port/script-runner-port.ts';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
@@ -336,6 +337,7 @@ interface HarnessOptions {
   readonly descriptorLookup?: (providerId: ProviderId) => ProviderCapabilityDescriptor<string, string>;
   readonly onPublish?: (event: unknown) => void;
   readonly withoutDefaultProvider?: boolean;
+  readonly scriptRunner?: ScriptRunnerPort;
 }
 
 function openHarness(options: HarnessOptions = {}): Harness {
@@ -371,6 +373,10 @@ function openHarness(options: HarnessOptions = {}): Harness {
     },
     processEnvironment: { read: () => null, readAll: () => ({}) },
     structuredOutputSchemaCompiler: SCHEMA_COMPILER,
+    scriptRunner: options.scriptRunner ?? {
+      compile: () => Promise.resolve({ kind: 'ok', value: undefined }),
+      run: () => Promise.reject(new Error('ebben a tesztben nem hívott port')),
+    },
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },
@@ -492,6 +498,77 @@ function errorHandlerNode(id: string, maxAttempts: number, backoffMs: readonly n
 function subWorkflowNode(id: string, targetWorkflowId: string): WorkflowNodeInput {
   return nodeOf(id, { type: 'sub_workflow', targetWorkflowId, inputMapping: {}, onUnhandledError: 'fail_run' });
 }
+function celScriptNode(id: string, source: string): WorkflowNodeInput {
+  return nodeOf(id, { type: 'script', source, runtime: 'expression', onUnhandledError: 'fail_run' });
+}
+function javaScriptNode(
+  id: string,
+  source: string,
+  onUnhandledError: UnhandledErrorPolicy = 'fail_run',
+): WorkflowNodeInput {
+  return nodeOf(id, {
+    type: 'script',
+    source,
+    runtime: 'javascript',
+    timeoutMs: null,
+    cwd: null,
+    memoryLimitMb: null,
+    onUnhandledError,
+  });
+}
+
+/**
+ * A `scriptRunner` csonkja, ami a futást a kérés leállítási jeléig tartja, és
+ * utána `aborted` eredményt ad (a valódi futtató `waitForSettlement` ágának
+ * alakja, SPEC-014 5.8).
+ */
+function abortWaitingScriptRunner(): ScriptRunnerPort {
+  return {
+    compile: () => Promise.resolve({ kind: 'ok', value: undefined }),
+    run: (request) =>
+      new Promise((resolve) => {
+        request.signal.addEventListener(
+          'abort',
+          () => {
+            resolve({ kind: 'aborted' });
+          },
+          { once: true },
+        );
+      }),
+  };
+}
+
+/**
+ * Megvárja, amíg a futás adott csomópontjának lépése `running` állapotba kerül.
+ * Csak mikrotaszkot ürít, valós idő nélkül (SPEC-004 14.2).
+ */
+async function waitForRunningStep(database: DatabaseContext, runId: string, nodeId: string): Promise<string> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const running = stepRunsOf(database, runId).find((row) => row.nodeId === nodeId && row.status === 'running');
+    if (running !== undefined) {
+      return running.id;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`a(z) ${nodeId} lépése nem került running állapotba`);
+}
+
+/**
+ * A `scriptRunner` csonkja: az `UNCOMPILABLE` forrás fordítása a valódi
+ * futtató alakjában bukik (teljes mondat, a végén az osztállyal), a futtatás
+ * nem hívott.
+ */
+function compilingScriptRunner(): ScriptRunnerPort {
+  return {
+    compile: (source) =>
+      Promise.resolve(
+        source === UNCOMPILABLE
+          ? { kind: 'error', message: 'A JavaScript szkript nem fordul le (script_compile_failed).' }
+          : { kind: 'ok', value: undefined },
+      ),
+    run: () => Promise.reject(new Error('ebben a tesztben nem hívott port')),
+  };
+}
 
 function createWorkflow(
   database: DatabaseContext,
@@ -522,7 +599,7 @@ async function runToEnd(
   workflowId: string,
   input: Readonly<Record<string, unknown>> = {},
 ): Promise<string> {
-  const started = okOrThrow(harness.supervisor.startRun({ workflowId, input }));
+  const started = okOrThrow(await harness.supervisor.startRun({ workflowId, input }));
   const handle = handleOf(harness.supervisor, started.run.id);
   okOrThrow(await handle.completion);
   return started.run.id;
@@ -549,7 +626,7 @@ async function waitForPendingApproval(database: DatabaseContext): Promise<string
  * sorrendben, ahogy a valós hívónak is kell majd.
  */
 async function decideAndRun(harness: Harness, workflowId: string, decision: 'approved' | 'rejected'): Promise<string> {
-  const started = okOrThrow(harness.supervisor.startRun({ workflowId, input: {} }));
+  const started = okOrThrow(await harness.supervisor.startRun({ workflowId, input: {} }));
   const handle = handleOf(harness.supervisor, started.run.id);
   const stepRunId = await waitForPendingApproval(harness.database);
   okOrThrow(harness.database.approvals.decideApproval({ stepRunId, decision }));
@@ -624,10 +701,10 @@ describe('createRunSupervisor', () => {
   });
 
   describe('érvénytelen futás: egyetlen adat sem íródik (4.8 zárómondata)', () => {
-    it('nem létező workflow esetén nem jön létre workflow_run sor', () => {
+    it('nem létező workflow esetén nem jön létre workflow_run sor', async () => {
       const harness = openHarness();
 
-      const outcome = harness.supervisor.startRun({ workflowId: 'nincs-ilyen', input: {} });
+      const outcome = await harness.supervisor.startRun({ workflowId: 'nincs-ilyen', input: {} });
 
       expect(outcome.kind).toBe('error');
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
@@ -645,7 +722,7 @@ describe('createRunSupervisor', () => {
       expect(harness.supervisor.isAcceptingRuns()).toBe(true);
       harness.supervisor.stopAcceptingRuns();
       expect(harness.supervisor.isAcceptingRuns()).toBe(false);
-      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+      const outcome = await harness.supervisor.startRun({ workflowId, input: {} });
       const child = await harness.supervisor.startChildRun({
         targetWorkflowId: workflowId,
         input: {},
@@ -659,25 +736,142 @@ describe('createRunSupervisor', () => {
       expect(harness.published).toStrictEqual([]);
     });
 
-    it('érvénytelen gráf (script node) esetén nem jön létre workflow_run sor', () => {
-      const harness = openHarness();
+    it.each([
+      {
+        field: 'source',
+        nodes: [startNode('start'), javaScriptNode('sc', UNCOMPILABLE)],
+        edges: [edgeOf('e1', 'start', 'sc')],
+      },
+      {
+        field: 'settings.source',
+        nodes: [
+          startNode('start'),
+          fanOutNode('fo', '[1,2]'),
+          agentNode('elem', 'sikeres'),
+          nodeOf('sc', {
+            type: 'join',
+            mode: 'script',
+            settings: { source: UNCOMPILABLE, runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: null },
+            onUnhandledError: 'fail_run',
+          }),
+        ],
+        edges: [edgeOf('e1', 'start', 'fo'), edgeOf('e2', 'fo', 'elem'), edgeOf('e3', 'elem', 'sc')],
+      },
+    ])(
+      'a JavaScript $field mező fordítási hibája script_compile_failed osztállyal elutasítja az indítást, és nem jön létre workflow_run sor (SPEC-014 5.7)',
+      async ({ field, nodes, edges }) => {
+        const harness = openHarness({ scriptRunner: compilingScriptRunner() });
+        const workflowId = createWorkflow(harness.database, `js-forditas-${field}`, nodes, edges);
+
+        const outcome = await harness.supervisor.startRun({ workflowId, input: {} });
+
+        expect(outcome).toStrictEqual({
+          kind: 'error',
+          message: `A(z) sc csomópont ${field} mezője nem fordítható le. A JavaScript szkript nem fordul le (script_compile_failed).`,
+        });
+        expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+        expect(harness.published).toStrictEqual([]);
+      },
+    );
+
+    it('a CEL szkript forrását nem a scriptRunner fordítja, a JavaScript forrást igen', async () => {
+      const compiled: string[] = [];
+      const harness = openHarness({
+        scriptRunner: {
+          compile: (source) => {
+            compiled.push(source);
+            return Promise.resolve({ kind: 'ok', value: undefined });
+          },
+          run: () => Promise.resolve({ kind: 'succeeded', output: 'js' }),
+        },
+      });
       const workflowId = createWorkflow(
         harness.database,
-        'script',
-        [
-          startNode('start'),
-          nodeOf('sc', { type: 'script', source: 'x', runtime: 'expression', onUnhandledError: 'fail_run' }),
-        ],
+        'ket-nyelv',
+        [startNode('start'), celScriptNode('cel', '"cel"'), javaScriptNode('js', 'return 1;')],
+        [edgeOf('e1', 'start', 'cel'), edgeOf('e2', 'cel', 'js')],
+      );
+
+      const runId = await runToEnd(harness, workflowId);
+
+      expect(compiled).toStrictEqual(['return 1;']);
+      expect(statusOf(harness.database, runId)).toBe('succeeded');
+    });
+
+    it('a fail_run testvér hiba a futó JavaScript szkript lépést a leállítás jelén állítja le, a sora cancelled (SPEC-014 5.8)', async () => {
+      const harness = openHarness({ scriptRunner: abortWaitingScriptRunner() });
+      const workflowId = createWorkflow(
+        harness.database,
+        'szkript-fail-run',
+        [startNode('start'), javaScriptNode('sc', 'await new Promise(() => {});'), celScriptNode('hiba', 'HIBA')],
+        [edgeOf('e1', 'start', 'sc'), edgeOf('e2', 'start', 'hiba')],
+      );
+
+      const runId = await runToEnd(harness, workflowId);
+
+      const run = okOrThrow(harness.database.runs.getRun(runId));
+      expect(run.status).toBe('failed');
+      expect(run.errorKind).toBe('expression_evaluation_failed');
+      const statuses = Object.fromEntries(stepRunsOf(harness.database, runId).map((row) => [row.nodeId, row.status]));
+      expect(statuses).toStrictEqual({ start: 'succeeded', sc: 'cancelled', hiba: 'failed' });
+    });
+
+    it('a felhasználói megszakítás a futó JavaScript szkript lépést a leállítás jelén állítja le, a futás és a sor cancelled (SPEC-014 5.8)', async () => {
+      const harness = openHarness({ scriptRunner: abortWaitingScriptRunner() });
+      const workflowId = createWorkflow(
+        harness.database,
+        'szkript-megszakitas',
+        [startNode('start'), javaScriptNode('sc', 'await new Promise(() => {});')],
+        [edgeOf('e1', 'start', 'sc')],
+      );
+      const started = okOrThrow(await harness.supervisor.startRun({ workflowId, input: {} }));
+      const stepRunId = await waitForRunningStep(harness.database, started.run.id, 'sc');
+
+      okOrThrow(
+        await interruptRun(started.run.id, {
+          database: harness.database,
+          eventPublisher: {
+            publish: (event) => {
+              harness.published.push(event);
+            },
+          },
+          runSupervisor: harness.supervisor,
+          concurrencyGate: harness.concurrencyGate,
+          agentQueryRegistry: harness.agentQueryRegistry,
+          approvalRegistry: harness.approvalRegistry,
+        }),
+      );
+
+      expect(statusOf(harness.database, started.run.id)).toBe('cancelled');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(stepRunId)).status).toBe('cancelled');
+    });
+
+    it('REGRESSZIÓ (research 7.3): a fordítás alatt elkezdődött szabályos leállás után engine_shutting_down, és nem jön létre workflow_run sor (SPEC-004 10.2 1. pont, M-36)', async () => {
+      const compiled = Promise.withResolvers<Outcome<void>>();
+      const harness = openHarness({
+        scriptRunner: {
+          compile: () => compiled.promise,
+          run: () => Promise.reject(new Error('ebben a tesztben nem hívott port')),
+        },
+      });
+      const workflowId = createWorkflow(
+        harness.database,
+        'leallas-forditas-kozben',
+        [startNode('start'), javaScriptNode('sc', 'return 1;')],
         [edgeOf('e1', 'start', 'sc')],
       );
 
-      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+      const pending = harness.supervisor.startRun({ workflowId, input: {} });
+      harness.supervisor.stopAcceptingRuns();
+      compiled.resolve({ kind: 'ok', value: undefined });
+      const outcome = await pending;
 
-      expect(outcome.kind === 'error' ? outcome.message : '').toContain('unimplemented_node_type');
+      expect(outcome.kind === 'error' ? outcome.message : '').toContain('(engine_shutting_down)');
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+      expect(harness.published).toStrictEqual([]);
     });
 
-    it('választatlan módú join (mode: null) esetén malformed_node_config, és nem jön létre workflow_run sor (SPEC-008 O-33, user döntés 2026-10-14)', () => {
+    it('választatlan módú join (mode: null) esetén malformed_node_config, és nem jön létre workflow_run sor (SPEC-008 O-33, user döntés 2026-10-14)', async () => {
       const harness = openHarness();
       const workflowId = createWorkflow(
         harness.database,
@@ -691,7 +885,7 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'fo'), edgeOf('e2', 'fo', 'elem'), edgeOf('e3', 'elem', 'j')],
       );
 
-      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+      const outcome = await harness.supervisor.startRun({ workflowId, input: {} });
 
       expect(outcome).toStrictEqual({
         kind: 'error',
@@ -701,7 +895,7 @@ describe('createRunSupervisor', () => {
       expect(harness.published).toStrictEqual([]);
     });
 
-    it('érvénytelen strukturált kimenet séma esetén invalid_structured_output_schema, és nem jön létre workflow_run sor (SPEC-015 5.4, AC3)', () => {
+    it('érvénytelen strukturált kimenet séma esetén invalid_structured_output_schema, és nem jön létre workflow_run sor (SPEC-015 5.4, AC3)', async () => {
       const harness = openHarness();
       const workflowId = createWorkflow(
         harness.database,
@@ -721,7 +915,7 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'a1')],
       );
 
-      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+      const outcome = await harness.supervisor.startRun({ workflowId, input: {} });
 
       expect(outcome).toStrictEqual({
         kind: 'error',
@@ -760,7 +954,7 @@ describe('createRunSupervisor', () => {
       );
     });
 
-    it('hiányzó kötelező bemenet esetén nem jön létre workflow_run sor', () => {
+    it('hiányzó kötelező bemenet esetén nem jön létre workflow_run sor', async () => {
       const harness = openHarness();
       const workflowId = createWorkflow(
         harness.database,
@@ -769,13 +963,13 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'a1')],
       );
 
-      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+      const outcome = await harness.supervisor.startRun({ workflowId, input: {} });
 
       expect(outcome.kind === 'error' ? outcome.message : '').toContain('missing_required_input');
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
     });
 
-    it('a mező típusától eltérő bemenet esetén invalid_input_type, és nem jön létre workflow_run sor (SPEC-016 5.5)', () => {
+    it('a mező típusától eltérő bemenet esetén invalid_input_type, és nem jön létre workflow_run sor (SPEC-016 5.5)', async () => {
       const harness = openHarness();
       const workflowId = createWorkflow(
         harness.database,
@@ -791,14 +985,14 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'a1')],
       );
 
-      const outcome = harness.supervisor.startRun({ workflowId, input: { darab: '5' } });
+      const outcome = await harness.supervisor.startRun({ workflowId, input: { darab: '5' } });
 
       expect(outcome.kind === 'error' ? outcome.message : '').toContain('invalid_input_type');
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
       expect(harness.published).toStrictEqual([]);
     });
 
-    it('hiányzó globális alapértelmezett provider esetén nem jön létre workflow_run sor', () => {
+    it('hiányzó globális alapértelmezett provider esetén nem jön létre workflow_run sor', async () => {
       const harness = openHarness({ withoutDefaultProvider: true });
       const workflowId = createWorkflow(
         harness.database,
@@ -807,13 +1001,13 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'a1')],
       );
 
-      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+      const outcome = await harness.supervisor.startRun({ workflowId, input: {} });
 
       expect(outcome.kind === 'error' ? outcome.message : '').toContain('no_default_provider');
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
     });
 
-    it('a leíró és a telepített SDK verzió eltérése esetén nem jön létre workflow_run sor', () => {
+    it('a leíró és a telepített SDK verzió eltérése esetén nem jön létre workflow_run sor', async () => {
       const harness = openHarness({
         descriptorLookup: (providerId) => ({ ...descriptorOf(providerId), sdkVersionPin: '9.9.9-masik' }),
       });
@@ -824,7 +1018,7 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'a1')],
       );
 
-      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+      const outcome = await harness.supervisor.startRun({ workflowId, input: {} });
 
       expect(outcome.kind === 'error' ? outcome.message : '').toContain('provider_descriptor_sdk_mismatch');
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
@@ -924,13 +1118,40 @@ describe('createRunSupervisor', () => {
           edgeOf('e4', 'cel', 'vege', 'exit'),
         ],
       },
+      {
+        nodeId: 'cel',
+        field: 'source',
+        errorKind: 'expression_evaluation_failed',
+        nodes: [
+          startNode('start'),
+          nodeOf('cel', { type: 'script', source: UNCOMPILABLE, runtime: 'expression', onUnhandledError: 'fail_run' }),
+        ],
+        edges: [START_EDGE],
+      },
+      {
+        nodeId: 'j',
+        field: 'settings.source',
+        errorKind: 'expression_evaluation_failed',
+        nodes: [
+          startNode('start'),
+          fanOutNode('cel', '[1,2]'),
+          agentNode('elem', 'sikeres'),
+          nodeOf('j', {
+            type: 'join',
+            mode: 'script',
+            settings: { source: UNCOMPILABLE, runtime: 'expression' },
+            onUnhandledError: 'fail_run',
+          }),
+        ],
+        edges: FAN_OUT_EDGES,
+      },
     ])(
       'a(z) $field mező fordítási hibája $errorKind osztállyal elutasítja az indítást, és nem jön létre workflow_run sor',
-      ({ nodeId, field, errorKind, nodes, edges }) => {
+      async ({ nodeId, field, errorKind, nodes, edges }) => {
         const harness = openHarness();
         const workflowId = createWorkflow(harness.database, `forditas-${field}`, nodes, edges);
 
-        const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+        const outcome = await harness.supervisor.startRun({ workflowId, input: {} });
 
         expect(outcome).toStrictEqual({
           kind: 'error',
@@ -1329,7 +1550,7 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'jov'), edgeOf('e2', 'jov', 'utana', 'approved')],
       );
 
-      const started = okOrThrow(harness.supervisor.startRun({ workflowId, input: {} }));
+      const started = okOrThrow(await harness.supervisor.startRun({ workflowId, input: {} }));
       const stepRunId = await waitForPendingApproval(harness.database);
 
       // A megszakítás a VALÓS belépési ponton megy be, és VÉGET IS ÉR: a
@@ -1477,7 +1698,7 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'jov')],
       );
 
-      const started = okOrThrow(harness.supervisor.startRun({ workflowId, input: {} }));
+      const started = okOrThrow(await harness.supervisor.startRun({ workflowId, input: {} }));
       const handle = handleOf(harness.supervisor, started.run.id);
       expect(handle.rootRunId).toBe(started.run.id);
       expect(handle.workflowId).toBe(workflowId);
@@ -1502,7 +1723,7 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'jov'), edgeOf('e2', 'jov', 'utana', 'approved')],
       );
 
-      const started = okOrThrow(harness.supervisor.startRun({ workflowId, input: {} }));
+      const started = okOrThrow(await harness.supervisor.startRun({ workflowId, input: {} }));
       const handle = handleOf(harness.supervisor, started.run.id);
       const stepRunId = await waitForPendingApproval(harness.database);
       handle.requestStop('cancelled');
@@ -1520,7 +1741,7 @@ describe('createRunSupervisor', () => {
   });
 
   describe('adatbázis hiba a futás indításának írási szakaszában', () => {
-    it('a startRun hibája nem hagy futó futást, és hibaágon tér vissza', () => {
+    it('a startRun hibája nem hagy futó futást, és hibaágon tér vissza', async () => {
       const harness = openHarness({
         descriptorLookup: (providerId) => {
           harness.database.close();
@@ -1534,12 +1755,12 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'a1')],
       );
 
-      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+      const outcome = await harness.supervisor.startRun({ workflowId, input: {} });
 
       expect(outcome.kind).toBe('error');
     });
 
-    it('a markRunRunning hibája hibaágon tér vissza', () => {
+    it('a markRunRunning hibája hibaágon tér vissza', async () => {
       const harness = openHarness({
         onPublish: (event) => {
           if (isFixtureRoot(event) && event['kind'] === 'run_started') {
@@ -1554,7 +1775,7 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'a1')],
       );
 
-      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+      const outcome = await harness.supervisor.startRun({ workflowId, input: {} });
 
       expect(outcome.kind).toBe('error');
     });

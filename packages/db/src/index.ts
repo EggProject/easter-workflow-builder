@@ -32,9 +32,9 @@ export type {
 export type { NodeType } from './workflow-graph/node-type/node-type.ts';
 // A node config unió, a két `script` jellegű ága és az `isNodeConfig` guard
 // (T-005-15, SPEC-004 4.7): az `engine` csomag `run-validation` témája ezekből
-// építi a `malformed_node_config` ellenőrzést és az `ExecutableNodeConfig =
-// Exclude<NodeConfig, ScriptNodeConfig | JoinScriptNodeConfig>` típusszintű
-// szűkítést. A többi ág típusa szándékosan **nem** kerül ki: a szűkítés az
+// építi a `malformed_node_config` ellenőrzést, a `node-executor` témája a két
+// `script` jellegű ágat névvel említi (SPEC-014 5.8; a korábbi
+// végrehajthatósági szűkítés megszűnt). A többi ág típusa szándékosan **nem** kerül ki: a szűkítés az
 // unióból számol, a validáció pedig a diszkriminátorokon (`type`, `mode`)
 // keresztül szűkít, tehát az ágakat névvel egyetlen szignatúra sem említi.
 //
@@ -44,8 +44,7 @@ export type { NodeType } from './workflow-graph/node-type/node-type.ts';
 // utóbbi a `resolveErrorRoute` bemenetében (8.3): mindkettőt névvel említi
 // egy motor felület, tehát az `Exclude`-alapú szűkítés itt nem elég.
 //
-// A `JoinUnselectedNodeConfig` (SPEC-008 5.4, O-33) ugyanazon az okon kerül
-// ki, mint a két `script` jellegű ág: a motor `malformed_node_config`
+// A `JoinUnselectedNodeConfig` (SPEC-008 5.4, O-33) azért kerül ki, mert a motor `malformed_node_config`
 // ellenőrzése után a `WellFormedNodeConfig = Exclude<NodeConfig,
 // JoinUnselectedNodeConfig>` szűkítés ebből számol.
 export type {

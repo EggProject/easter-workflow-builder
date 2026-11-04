@@ -410,33 +410,27 @@ describe('validateRun, a SPEC-004 4.7 táblázat tíz ellenőrzése', () => {
     });
   });
 
-  it('script node-ra unimplemented_node_type', () => {
-    const nodes = replacingNode(
-      baseNodes(),
-      node('x', 'script', { type: 'script', source: 'ertek', runtime: 'expression', onUnhandledError: 'fail_run' }),
-    );
+  it('a script node átmegy a validáción, a configja a térképben áll (SPEC-014 5.8)', () => {
+    const script = { type: 'script', source: 'ertek', runtime: 'expression', onUnhandledError: 'fail_run' } as const;
+    const nodes = replacingNode(baseNodes(), node('x', 'script', script));
 
-    expect(validateBase(nodes)).toStrictEqual({
-      kind: 'error',
-      message: 'A(z) x node a script node típus, amit az első verzió nem hajt végre (unimplemented_node_type).',
-    });
+    const outcome = validateBase(nodes);
+
+    expect(outcome.kind === 'ok' ? outcome.value.nodeConfigsById.get('x') : outcome.message).toStrictEqual(script);
   });
 
-  it('script módú join node-ra unimplemented_node_type', () => {
-    const nodes = replacingNode(
-      baseNodes(),
-      node('j', 'join', {
-        type: 'join',
-        mode: 'script',
-        settings: { source: 'ertek', runtime: 'expression' },
-        onUnhandledError: 'fail_run',
-      }),
-    );
+  it('a script módú join node átmegy a validáción, a configja a térképben áll (SPEC-014 5.8)', () => {
+    const join = {
+      type: 'join',
+      mode: 'script',
+      settings: { source: 'ertek', runtime: 'expression' },
+      onUnhandledError: 'fail_run',
+    } as const;
+    const nodes = replacingNode(baseNodes(), node('j', 'join', join));
 
-    expect(validateBase(nodes)).toStrictEqual({
-      kind: 'error',
-      message: 'A(z) j node a join node script módja, amit az első verzió nem hajt végre (unimplemented_node_type).',
-    });
+    const outcome = validateBase(nodes);
+
+    expect(outcome.kind === 'ok' ? outcome.value.nodeConfigsById.get('j') : outcome.message).toStrictEqual(join);
   });
 
   it('ismeretlen branch él kulcsra branch_key_unknown', () => {

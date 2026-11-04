@@ -56,7 +56,6 @@ const ENGINE_VALIDATION_ERROR_CLASSES = [
   'invalid_start_node',
   'dangling_edge',
   'unreachable_node',
-  'unimplemented_node_type',
   'branch_key_unknown',
   'invalid_error_handler_edge',
   'malformed_node_config',

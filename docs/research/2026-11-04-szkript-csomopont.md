@@ -396,6 +396,19 @@ került be), és a T-015-2 próbáihoz telepített `quickjs-emscripten-core` 0.3
   leállás jele ebben az ablakban megérkezhet; a SPEC-004 10.2 1. pontja (mérve: SPEC-006 M-36) szerint a leállás után
   új futás nem indulhat. A T-015-5-ben a leállás ellenőrzését a fordítás után, az első írás előtt meg kell ismételni,
   és ezt teszttel kell lefedni. A gyerek futás indítása (`startChildRun`) már ma is `Promise`-t ad.
+- **Lezárva a T-015-5-ben (2026-11-04).** A legkisebb helyes változtatás: a `RunSupervisor.startRun` és a
+  belső `startRunInternals` aszinkron lett (`Promise<Outcome<...>>`), a szinkron 1 ... 4. lépés egy külön
+  függvénybe került (`prepareRunStart`, változatlan sorrenddel), és a menet egyetlen `await` pontja a
+  JavaScript források fordítása (`validateScriptSources`) EZUTÁN, az első írás (`startValidatedRun`) előtt. A
+  fordítás után a leállás ellenőrzése megismétlődik; a változót egy függvény olvassa (`canStartRuns`), mert a
+  közvetlen olvasást a fordító az első ellenőrzés szerint szűkítené (`no-unnecessary-condition`). Ha a gráfban
+  nincs JavaScript forrás, a `validateScriptSources` port hívás nélkül tér vissza, de az `await` ekkor is egy
+  mikrofeladat; a motor tesztjei (a kézikönyv a `startRun` visszatérése után kiolvasható) ezzel változatlanul
+  zöldek. A `createEngine.startRun` és a `restartRun` a korábbi `Promise.resolve` burkolás helyett közvetlenül
+  adja tovább az ígéretet, a `startChildRun` `async` lett. A fordítás a szinkron ellenőrzések után fut, tehát az
+  olcsó hibák (gráf, nyelvi mezők, bemenet) a WebAssembly modul betöltése előtt buknak. Teszt: a
+  `create-run-supervisor.spec.ts` "a fordítás alatt elkezdődött szabályos leállás" regressziója (a fordítás
+  ígéretét a teszt a `stopAcceptingRuns` után oldja fel; a futás `engine_shutting_down`, sor és esemény nélkül).
 - A `run` eredménye nem kivétel, hanem háromágú unió: `succeeded` (JSON kimenet), `failed` (a három futásidejű osztály
   egyike), `aborted` (a motor külső jele, SPEC-014 5.8: a lépés `cancelled` állapotban zár). A `null` alapértékeket
   (`timeoutMs`, `cwd`, `memoryLimitMb`) a futtató oldja fel, mert a rendszermemória (`os.totalmem()`) csak ott ismert.

@@ -8,8 +8,7 @@ import type { JoinUnselectedNodeConfig, NodeConfig } from '@easter-workflow-buil
  * 2026-10-14, SPEC-004 4.7).
  *
  * A `validateNodeConfigs` sikeres ága ezt a szűkített uniót adja vissza,
- * tehát sem a `validateImplementedNodeTypes`, sem a végrehajtó diszpécser nem
- * lát `mode: null` ágat: a `join` módjain futó kimerítő `switch` szerkezetben
+ * tehát a végrehajtó diszpécser nem lát `mode: null` ágat: a `join` módjain futó kimerítő `switch` szerkezetben
  * nem keletkezik garantáltan sosem futó `case null` (`.claude/CLAUDE.md` 5.
  * szekció, 100 százalékos lefedettség).
  */

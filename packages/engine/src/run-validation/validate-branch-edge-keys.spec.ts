@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { NodeType, SnapshotEdge, SnapshotNode } from '@easter-workflow-builder/db';
 import { buildExecutableGraph } from '../run-graph/build-executable-graph.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
-import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 import { validateBranchEdgeKeys } from './validate-branch-edge-keys.ts';
 
 function node(id: string, type: NodeType): SnapshotNode {
@@ -24,7 +24,7 @@ function graphOf(nodes: readonly SnapshotNode[], edges: readonly SnapshotEdge[])
   });
 }
 
-const BRANCH: ExecutableNodeConfig = {
+const BRANCH: WellFormedNodeConfig = {
   type: 'branch',
   expression: 'ertek',
   branches: [
@@ -35,9 +35,9 @@ const BRANCH: ExecutableNodeConfig = {
   onUnhandledError: 'fail_run',
 };
 
-const START: ExecutableNodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
+const START: WellFormedNodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
 
-const configsById: ReadonlyMap<string, ExecutableNodeConfig> = new Map<string, ExecutableNodeConfig>([
+const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
   ['start', START],
   ['b', BRANCH],
 ]);

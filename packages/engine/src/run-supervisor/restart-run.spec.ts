@@ -128,7 +128,7 @@ describe('restartRun', () => {
   it('az eredeti futás workflowId-jét és input-ját adja tovább a runSupervisor.startRun-nak, a restartedFromRunId mezővel kiegészítve', async () => {
     const database = openMemoryDatabase();
     const seeded = seedOriginalRun(database, { tema: 'nyuszi' });
-    const startRun = vi.fn(() => SUCCEEDED_START);
+    const startRun = vi.fn(() => Promise.resolve(SUCCEEDED_START));
     const dependencies: RestartRunDependencies = { database, runSupervisor: { startRun } };
 
     const outcome = okOrThrow(await restartRun(seeded.runId, dependencies));
@@ -147,10 +147,9 @@ describe('restartRun', () => {
   it('a runSupervisor.startRun hibaága változatlanul az Outcome hibaágán jelenik meg', async () => {
     const database = openMemoryDatabase();
     const seeded = seedOriginalRun(database, {});
-    const startRun = vi.fn((): Outcome<StartedRun> => ({
-      kind: 'error',
-      message: 'nincs alapértelmezett provider (no_default_provider).',
-    }));
+    const startRun = vi.fn((): Promise<Outcome<StartedRun>> =>
+      Promise.resolve({ kind: 'error', message: 'nincs alapértelmezett provider (no_default_provider).' }),
+    );
     const dependencies: RestartRunDependencies = { database, runSupervisor: { startRun } };
 
     const outcome = await restartRun(seeded.runId, dependencies);
@@ -282,6 +281,10 @@ function createTrivialSupervisor(database: DatabaseContext): RunSupervisor {
     idGenerator: { nextId: () => 'id-1' },
     processEnvironment: { read: () => null, readAll: () => ({}) },
     structuredOutputSchemaCompiler: SCHEMA_COMPILER,
+    scriptRunner: {
+      compile: () => Promise.resolve({ kind: 'ok', value: undefined }),
+      run: () => Promise.reject(new Error('ebben a tesztben nem hívott port')),
+    },
     skillLibrary: {
       readSkillLibrary: () => ({ rootDirectory: '/skill-konyvtar', pluginName: 'skill-konyvtar', skillNames: [] }),
     },
@@ -322,7 +325,7 @@ async function startOriginalThenChangeGraph(
   );
   const originalStart = nodeOf('start', startWithField('text', true));
   okOrThrow(database.workflows.replaceGraph(workflow.id, [originalStart], []));
-  const original = okOrThrow(supervisor.startRun({ workflowId: workflow.id, input: { tema: 'nyuszi' } }));
+  const original = okOrThrow(await supervisor.startRun({ workflowId: workflow.id, input: { tema: 'nyuszi' } }));
   await runToEnd(supervisor, original.run.id);
 
   okOrThrow(database.workflows.replaceGraph(workflow.id, [nodeOf('start', changedConfig)], []));
@@ -342,7 +345,7 @@ describe('restartRun - valós RunSupervisor-ral (AC-55, SPEC-003 27. kritérium)
     const originalNodes = [nodeOf('start-v1', startNodeConfig())];
     okOrThrow(database.workflows.replaceGraph(workflow.id, originalNodes, []));
 
-    const original = okOrThrow(supervisor.startRun({ workflowId: workflow.id, input: { tema: 'nyuszi' } }));
+    const original = okOrThrow(await supervisor.startRun({ workflowId: workflow.id, input: { tema: 'nyuszi' } }));
     await runToEnd(supervisor, original.run.id);
     const originalRow = okOrThrow(database.runs.getRun(original.run.id));
     expect(originalRow.status).toBe('succeeded');

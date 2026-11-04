@@ -573,23 +573,17 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       'invalid_start_node',
       'dangling_edge',
       'unreachable_node',
-      'unimplemented_node_type',
       'branch_key_unknown',
       'invalid_error_handler_edge',
       'malformed_node_config',
       'unhandled_error_policy_missing',
     ];
-    // A megjelenítő leképezés (nem validáció) és a hozzá tartozó teszt, egy
-    // REST hiba fixtúra teszt, és a szerkesztő statikus figyelmeztető szövege
-    // (a motor hibájára hivatkozó magyarázat, nem ellenőrzés) a dokumentált
-    // kivétel.
+    // A megjelenítő leképezés (nem validáció) és a hozzá tartozó teszt, és egy
+    // REST hiba fixtúra teszt a dokumentált kivétel.
     const allowedFiles = new Set([
       path.join('protocol-error-message', 'protocol-error-class-message.ts'),
       path.join('protocol-error-message', 'protocol-error-class-message.spec.ts'),
       path.join('rest-client', 'perform-route-request.spec.ts'),
-      path.join('graph-node-card', 'script-unimplemented-error-class.ts'),
-      path.join('node-inspector', 'ScriptNodeFields.tsx'),
-      path.join('node-inspector', 'ScriptNodeFields.spec.tsx'),
       // A saját listája ennek a tesztnek is tartalmazza a mintákat.
       path.join('greppable-invariants', 'greppable-invariants.spec.ts'),
     ]);
