@@ -1,11 +1,50 @@
 import type { Outcome } from '@easter-workflow-builder/core';
+import { isBoolean, isNumber, isString, isStringArray } from '@easter-workflow-builder/typeguards';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
 
 /**
+ * A `start` node egy bemeneti mezője (a `valueKind` szerinti unió, SPEC-016 5.1).
+ */
+type StartInputField = Extract<ExecutableNodeConfig, { readonly type: 'start' }>['inputFields'][number];
+
+/**
+ * Az érték elvárt típusának leírása, ha az érték nem felel meg a mező
+ * `valueKind` típusának (SPEC-016 5.5 táblázat), különben `undefined`. A
+ * `json` ágon nincs ellenőrzés: a drót JSON-t ad, más érték nem érkezhet, egy
+ * ottani ellenőrző ág tehát garantáltan sosem futna.
+ */
+function describeInputTypeMismatch(field: StartInputField, value: unknown): string | undefined {
+  switch (field.valueKind) {
+    case 'text': {
+      return isString(value) ? undefined : 'szöveg';
+    }
+    case 'number': {
+      return isNumber(value) ? undefined : 'véges szám';
+    }
+    case 'boolean': {
+      return isBoolean(value) ? undefined : 'logikai érték';
+    }
+    case 'choice': {
+      return isString(value) && field.options.includes(value)
+        ? undefined
+        : `az opciók egyike (${field.options.join(', ')})`;
+    }
+    case 'list': {
+      return isStringArray(value) ? undefined : 'szövegek tömbje';
+    }
+    case 'json': {
+      return undefined;
+    }
+  }
+}
+
+/**
  * A futás bemenetének ellenőrzése a `start` node `inputFields` listája ellen
  * (SPEC-004 4.8 4. lépés): "minden `required: true` mezőnek szerepelnie kell,
- * különben `missing_required_input`".
+ * különben `missing_required_input`". A kötelező mezők után minden **jelen
+ * lévő** mező értéke a `valueKind` típusára is ellenőrzött, eltérésnél
+ * `invalid_input_type` (SPEC-016 5.5).
  *
  * **Ez a lépés nem ír adatot** (4.8 zárómondata: az 1 ... 5. lépés egyetlen
  * adatot sem ír), tehát egy hiányzó kötelező mező soha nem hoz létre
@@ -48,6 +87,23 @@ export function validateRunInput(
         message: formatEngineErrorMessage(
           'missing_required_input',
           `A futás bemenetéből hiányzik a(z) "${field.name}" kötelező mező`,
+        ),
+      };
+    }
+  }
+
+  for (const field of config.inputFields) {
+    const value = input[field.name];
+    if (value === undefined) {
+      continue;
+    }
+    const expected = describeInputTypeMismatch(field, value);
+    if (expected !== undefined) {
+      return {
+        kind: 'error',
+        message: formatEngineErrorMessage(
+          'invalid_input_type',
+          `A futás bemenetének "${field.name}" mezője nem a beállított típusú, elvárt: ${expected}`,
         ),
       };
     }

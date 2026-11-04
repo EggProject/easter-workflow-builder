@@ -32,6 +32,8 @@ export type EngineErrorKind =
   | 'unhandled_error_policy_missing'
   // 4.8: a futás indításának validációja
   | 'missing_required_input'
+  // SPEC-016 5.5: egy jelen lévő bemeneti mező értéke nem a `valueKind` típusú
+  | 'invalid_input_type'
   // 5.: a kifejezés és a sablon port hibaágai, minden node típusnál közösek
   | 'expression_evaluation_failed'
   | 'template_render_failed'

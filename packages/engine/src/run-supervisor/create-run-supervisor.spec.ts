@@ -705,6 +705,29 @@ describe('createRunSupervisor', () => {
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
     });
 
+    it('a mező típusától eltérő bemenet esetén invalid_input_type, és nem jön létre workflow_run sor (SPEC-016 5.5)', () => {
+      const harness = openHarness();
+      const workflowId = createWorkflow(
+        harness.database,
+        'bemenet-tipus',
+        [
+          nodeOf('start', {
+            type: 'start',
+            inputFields: [{ name: 'darab', label: 'Darab', valueKind: 'number', required: true }],
+            onUnhandledError: 'fail_run',
+          }),
+          agentNode('a1', 'sikeres'),
+        ],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      const outcome = harness.supervisor.startRun({ workflowId, input: { darab: '5' } });
+
+      expect(outcome.kind === 'error' ? outcome.message : '').toContain('invalid_input_type');
+      expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+      expect(harness.published).toStrictEqual([]);
+    });
+
     it('hiányzó globális alapértelmezett provider esetén nem jön létre workflow_run sor', () => {
       const harness = openHarness({ withoutDefaultProvider: true });
       const workflowId = createWorkflow(
