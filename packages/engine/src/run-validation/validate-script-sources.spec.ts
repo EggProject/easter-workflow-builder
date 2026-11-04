@@ -5,7 +5,15 @@ import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 import { validateScriptSources } from './validate-script-sources.ts';
 
 function javaScriptSettings(source: string) {
-  return { source, runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: null } as const;
+  return {
+    source,
+    runtime: 'javascript',
+    timeoutMs: null,
+    cwd: null,
+    memoryLimitMb: null,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
+  } as const;
 }
 
 function configs(): ReadonlyMap<string, WellFormedNodeConfig> {

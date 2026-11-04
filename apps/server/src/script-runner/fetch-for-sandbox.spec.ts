@@ -128,7 +128,7 @@ describe('fetchForSandbox', () => {
     await expect(fetchForSandbox(`${target.origin}/hello`, undefined, liveSignal(), 3)).resolves.toStrictEqual({
       kind: 'rejected',
       name: 'TypeError',
-      message: 'a válasz törzse nagyobb, mint a lépés memória korlátja',
+      message: 'a válasz törzse nagyobb, mint a lépés olvasási plafonja (fetchResponseLimitMb)',
     });
   });
 

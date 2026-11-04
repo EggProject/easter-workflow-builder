@@ -284,7 +284,15 @@ describe('JoinNodeFields', () => {
     const javascriptConfig: JoinNodeConfig = {
       type: 'join',
       mode: 'script',
-      settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: null },
+      settings: {
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+      },
       onUnhandledError: null,
     };
     act(() => {

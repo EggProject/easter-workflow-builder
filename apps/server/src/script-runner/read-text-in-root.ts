@@ -17,7 +17,8 @@ import { resolvePathInRoot } from './resolve-path-in-root.ts';
  * `/dev` alá mutató útvonal a lexikális és a feloldott alakján is elutasított
  * (user döntés 2026-11-04). Az ellenőrzés
  * és az olvasás közötti linkcsere ellen nem véd (TOCTOU, 5.10 3. pont). Az
- * olvasás legfeljebb `maxBytes` bájtig tart (a lépés memória korlátja), a
+ * olvasás legfeljebb `maxBytes` bájtig tart (a gazda oldali olvasási plafon,
+ * `fileReadLimitMb`, SPEC-014 5.4 "Olvasási plafon"), a
  * nagyobb fájl hiba: korlát nélkül egy nagy vagy végtelen fájl (`/dev/zero`) a
  * szerver folyamat memóriáját fogyasztotta (PLAN-015 T-015-12).
  */
@@ -43,7 +44,7 @@ export async function readTextInRoot(root: string, requested: unknown, maxBytes:
       return {
         kind: 'rejected',
         name: 'Error',
-        message: `a fájl nagyobb, mint a lépés memória korlátja: ${target.requested}`,
+        message: `a fájl nagyobb, mint a lépés olvasási plafonja (fileReadLimitMb): ${target.requested}`,
       };
     }
     return { kind: 'resolved', json: JSON.stringify(bytes.toString('utf8')) };

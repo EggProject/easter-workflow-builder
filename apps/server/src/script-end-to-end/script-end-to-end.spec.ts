@@ -230,7 +230,15 @@ function nodeOf(id: string, config: WorkflowNodeInput['config']): WorkflowNodeIn
 }
 
 function javaScript(source: string) {
-  return { source, runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: null } as const;
+  return {
+    source,
+    runtime: 'javascript',
+    timeoutMs: null,
+    cwd: null,
+    memoryLimitMb: null,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
+  } as const;
 }
 
 function edge(id: string, sourceNodeId: string, targetNodeId: string): WorkflowEdgeInput {

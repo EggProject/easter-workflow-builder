@@ -1,12 +1,12 @@
 # PLAN-015: A szkript csomópont végrehajtásának terve
 
-|         |                                                                                                                                                                                                                                      |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Státusz | végrehajtva (T-015-1 ... T-015-11); a T-015-12 (adverzariális átvizsgálás) és a T-015-13 (merge kapu) a PR előtti lépés: a SPEC-014 O-1 ... O-6 és a T-3 mind lezárva (user döntés 2026-11-04), a 7.2 T-5 kimondott korláttal nyitva |
-| Dátum   | 2026-11-03, átvezetve 2026-11-04                                                                                                                                                                                                     |
-| Spec    | [`../spec/SPEC-014-szkript-csomopont.md`](../spec/SPEC-014-szkript-csomopont.md)                                                                                                                                                     |
-| Forrás  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md)                                                                                                                       |
-| Branch  | `feat/spec-014-szkript-csomopont`                                                                                                                                                                                                    |
+|         |                                                                                                                                                                                                                          |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Státusz | végrehajtva (T-015-1 ... T-015-12, T-015-14 ... T-015-16); a T-015-13 (merge kapu) a PR előtti lépés: a SPEC-014 O-1 ... O-9 és a T-3 mind lezárva (user döntés 2026-11-04), a 7.2 T-4 és T-5 kimondott korláttal nyitva |
+| Dátum   | 2026-11-03, átvezetve 2026-11-04                                                                                                                                                                                         |
+| Spec    | [`../spec/SPEC-014-szkript-csomopont.md`](../spec/SPEC-014-szkript-csomopont.md)                                                                                                                                         |
+| Forrás  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md)                                                                                                           |
+| Branch  | `feat/spec-014-szkript-csomopont`                                                                                                                                                                                        |
 
 A lépések a SPEC-014 8. szekciójának kritérium számára hivatkoznak (`ACn`). Végrehajtási sorrend a három
 terv között: PLAN-017, PLAN-016, PLAN-015 (a research 9. szekciója); ez a terv a harmadik, mert mindhárom a

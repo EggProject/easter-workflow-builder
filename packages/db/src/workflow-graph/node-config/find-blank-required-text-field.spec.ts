@@ -69,7 +69,15 @@ describe('findBlankRequiredTextField', () => {
       findBlankRequiredTextField({
         type: 'join',
         mode: 'script',
-        settings: { source: ' ', runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: null },
+        settings: {
+          source: ' ',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd: null,
+          memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        },
         onUnhandledError: null,
       }),
     ).toBe('settings.source');
@@ -87,6 +95,8 @@ describe('findBlankRequiredTextField', () => {
         timeoutMs: null,
         cwd: null,
         memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
         onUnhandledError: null,
       }),
     ).toBe('source');
@@ -98,6 +108,8 @@ describe('findBlankRequiredTextField', () => {
         timeoutMs: null,
         cwd: '',
         memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
         onUnhandledError: null,
       }),
     ).toBeUndefined();

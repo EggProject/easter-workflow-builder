@@ -171,6 +171,8 @@ const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
       timeoutMs: 120_000,
       cwd: 'munka/almappa',
       memoryLimitMb: 512,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
     },
     onUnhandledError: null,
   },
@@ -205,6 +207,8 @@ const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
     timeoutMs: null,
     cwd: null,
     memoryLimitMb: null,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
     onUnhandledError: null,
   },
 ];
@@ -418,6 +422,8 @@ describe('a szkript source mezője a JavaScript ágon is kötelező mindkét old
         timeoutMs: null,
         cwd,
         memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
         onUnhandledError: 'fail_run',
       }),
     },
@@ -427,7 +433,15 @@ describe('a szkript source mezője a JavaScript ágon is kötelező mindkét old
       build: (source: string, cwd: string | null): unknown => ({
         type: 'join',
         mode: 'script',
-        settings: { source, runtime: 'javascript', timeoutMs: null, cwd, memoryLimitMb: null },
+        settings: {
+          source,
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd,
+          memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        },
         onUnhandledError: 'fail_run',
       }),
     },
@@ -514,6 +528,8 @@ const POSITIVE_INTEGER_FIELD_CASES: readonly NumberFieldCase[] = [
       timeoutMs: value,
       cwd: null,
       memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
       onUnhandledError: 'fail_run',
     }),
   },
@@ -523,7 +539,15 @@ const POSITIVE_INTEGER_FIELD_CASES: readonly NumberFieldCase[] = [
     build: (value) => ({
       type: 'join',
       mode: 'script',
-      settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: value, cwd: null, memoryLimitMb: null },
+      settings: {
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: value,
+        cwd: null,
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+      },
       onUnhandledError: 'fail_run',
     }),
   },
@@ -638,6 +662,8 @@ describe('a JavaScript szkript timeoutMs felső határa a protokoll mentési sé
         timeoutMs: value,
         cwd: null,
         memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
         onUnhandledError: 'fail_run',
       }),
     },
@@ -647,7 +673,15 @@ describe('a JavaScript szkript timeoutMs felső határa a protokoll mentési sé
       build: (value) => ({
         type: 'join',
         mode: 'script',
-        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: value, cwd: null, memoryLimitMb: null },
+        settings: {
+          source: 'return 1;',
+          runtime: 'javascript',
+          timeoutMs: value,
+          cwd: null,
+          memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        },
         onUnhandledError: 'fail_run',
       }),
     },
@@ -679,6 +713,75 @@ describe('a JavaScript szkript timeoutMs felső határa a protokoll mentési sé
 });
 
 /**
+ * A JavaScript szkript két gazda oldali olvasási plafonja (`fetchResponseLimitMb`,
+ * `fileReadLimitMb`, SPEC-014 5.3): `null` vagy egész 1 és 2048 között. A
+ * `protocol` mentési sémájának szabálya a `db` `isNodeConfig` guard szabályának
+ * szándékos duplikátuma; a hibás érték mindkét oldalon elbukik, a jó mindkettőn
+ * átmegy, az olvasó séma a tartományon kívüli számot is elfogadja.
+ */
+describe('a JavaScript szkript két olvasási plafonjának tartománya a protokoll mentési sémáján és a db isNodeConfig guardján is ugyanúgy dönt', () => {
+  const builders = (['fetchResponseLimitMb', 'fileReadLimitMb'] as const).flatMap((key) => [
+    {
+      field: `script ${key}`,
+      path: key,
+      build: (value: unknown): unknown => ({
+        type: 'script',
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+        [key]: value,
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    {
+      field: `join script ${key}`,
+      path: `settings.${key}`,
+      build: (value: unknown): unknown => ({
+        type: 'join',
+        mode: 'script',
+        settings: {
+          source: 'return 1;',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd: null,
+          memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+          [key]: value,
+        },
+        onUnhandledError: 'fail_run',
+      }),
+    },
+  ]);
+
+  for (const { field, path, build } of builders) {
+    describe(field, () => {
+      for (const value of [1, 50, 2048, null]) {
+        it(`a(z) ${String(value)} mindkettőn átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse(build(value)).success).toBe(true);
+          expect(isNodeConfig(build(value))).toBe(true);
+        });
+      }
+
+      for (const value of [0, 2049, 1.5]) {
+        it(`a(z) ${String(value)} mindkettőn elbukik, a protokoll a mező útvonalán; az olvasó séma elfogadja`, () => {
+          const parsed = NodeConfigSaveSchema.safeParse(build(value));
+
+          expect(parsed.success).toBe(false);
+          expect(parsed.error?.issues.map((issue) => issue.path.join('.'))).toEqual([path]);
+          expect(isNodeConfig(build(value))).toBe(false);
+          expect(NodeConfigSchema.safeParse(build(value)).success).toBe(true);
+        });
+      }
+    });
+  }
+});
+
+/**
  * A JavaScript szkript `memoryLimitMb` tartománya (SPEC-014 5.3, research Q-9):
  * `null` vagy egész 16 és 2048 között, mindkét határ megengedett. A `protocol`
  * mentési sémájának szabálya a `db` `isNodeConfig` guard szabályának szándékos
@@ -702,6 +805,8 @@ describe('a JavaScript szkript memoryLimitMb tartománya a protokoll mentési s�
         timeoutMs: null,
         cwd: null,
         memoryLimitMb: value,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
         onUnhandledError: 'fail_run',
       }),
     },
@@ -711,7 +816,15 @@ describe('a JavaScript szkript memoryLimitMb tartománya a protokoll mentési s�
       build: (value) => ({
         type: 'join',
         mode: 'script',
-        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: value },
+        settings: {
+          source: 'return 1;',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd: null,
+          memoryLimitMb: value,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        },
         onUnhandledError: 'fail_run',
       }),
     },
@@ -875,6 +988,8 @@ const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
       timeoutMs: 60_000,
       cwd: 'munka/almappa',
       memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
       onUnhandledError: 'fail_run',
     },
     accepted: true,
@@ -892,6 +1007,8 @@ const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
       runtime: 'javascript',
       cwd: null,
       memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
       onUnhandledError: 'fail_run',
     },
     accepted: false,
@@ -905,6 +1022,8 @@ const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
       timeoutMs: null,
       cwd: 7,
       memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
       onUnhandledError: 'fail_run',
     },
     accepted: false,
@@ -1029,6 +1148,8 @@ const UNKNOWN_KEY_CASES: readonly { readonly label: string; readonly config: unk
         timeoutMs: null,
         cwd: null,
         memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
         [UNKNOWN_KEY]: true,
       },
       onUnhandledError: 'fail_run',

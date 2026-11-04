@@ -107,6 +107,8 @@ const JAVASCRIPT: ScriptConfig = {
   timeoutMs: 250,
   cwd: '/munka',
   memoryLimitMb: 64,
+  fetchResponseLimitMb: null,
+  fileReadLimitMb: null,
 };
 const EXPRESSION: ScriptConfig = { runtime: 'expression', source: 'input.tema' };
 
@@ -202,6 +204,8 @@ describe('executeScript', () => {
         timeoutMs: 250,
         cwd: '/munka',
         memoryLimitMb: 64,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
         signal: stop.signal,
       },
     ]);

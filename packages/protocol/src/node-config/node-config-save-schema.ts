@@ -36,6 +36,13 @@ const SCRIPT_TIMEOUT_TOO_LARGE_MESSAGE = `A mező értéke legfeljebb ${String(M
 const SCRIPT_MEMORY_LIMIT_OUT_OF_RANGE_MESSAGE = `A mező értéke ${String(MIN_SCRIPT_MEMORY_LIMIT_MB)} és ${String(MAX_SCRIPT_MEMORY_LIMIT_MB)} közötti egész szám lehet.`;
 
 /**
+ * A JavaScript szkript olvasási plafon mezőinek (`fetchResponseLimitMb`,
+ * `fileReadLimitMb`) tartományán kívüli érték hibaüzenete (SPEC-014 5.3): pozitív
+ * egész, legfeljebb a modul plafonja (`MAX_SCRIPT_MEMORY_LIMIT_MB`).
+ */
+const SCRIPT_READ_LIMIT_OUT_OF_RANGE_MESSAGE = `A mező értéke 1 és ${String(MAX_SCRIPT_MEMORY_LIMIT_MB)} közötti egész szám lehet.`;
+
+/**
  * A JavaScript szkript `/proc` vagy `/dev` alá mutató `cwd` mezőjének
  * hibaüzenete (user döntés 2026-11-04, "/proc és /dev tiltva", SPEC-014 5.9).
  */
@@ -185,6 +192,36 @@ function addScriptMemoryLimitOutOfRangeIssues(config: NodeConfig, context: Custo
 }
 
 /**
+ * A JavaScript szkript két olvasási plafon mezőjének útvonala (SPEC-014 5.3), a
+ * `SCRIPT_MEMORY_LIMIT_FIELD_PATHS` mintájára. A tartomány a `db` `isNodeConfig`
+ * guardjának szabályát duplikálja.
+ */
+const SCRIPT_READ_LIMIT_FIELD_PATHS = {
+  start: [],
+  agent_step: [],
+  branch: [],
+  fan_out: [],
+  join: ['settings.fetchResponseLimitMb', 'settings.fileReadLimitMb'],
+  loop: [],
+  human_approval: [],
+  error_handler: [],
+  sub_workflow: [],
+  script: ['fetchResponseLimitMb', 'fileReadLimitMb'],
+} as const satisfies Readonly<Record<NodeConfig['type'], readonly string[]>>;
+
+/**
+ * A JavaScript szkript tartományon kívüli olvasási plafon értékének felvétele a mező útvonalára (SPEC-014 5.3).
+ */
+function addScriptReadLimitOutOfRangeIssues(config: NodeConfig, context: CustomIssueSink): void {
+  const paths: readonly string[] = SCRIPT_READ_LIMIT_FIELD_PATHS[config.type];
+  for (const path of paths) {
+    for (const fieldPath of findIntegerFieldsOutsideRange(config, path, 1, MAX_SCRIPT_MEMORY_LIMIT_MB)) {
+      context.addIssue({ code: 'custom', path: [...fieldPath], message: SCRIPT_READ_LIMIT_OUT_OF_RANGE_MESSAGE });
+    }
+  }
+}
+
+/**
  * A JavaScript szkript `cwd` mezőjének útvonala (SPEC-014 5.9), a
  * `SCRIPT_TIMEOUT_FIELD_PATHS` mintájára: a `script` node-on és a `join`
  * `settings` alobjektumán.
@@ -250,8 +287,9 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  *    `backoffMs` minden eleme pozitív egész (user döntés 2026-10-17, O-37); a
  *    JavaScript szkript `timeoutMs` mezője is pozitív egész, és legfeljebb
  *    `MAX_SCRIPT_TIMEOUT_MS`, a `memoryLimitMb` mezője pedig `null` vagy
- *    `MIN_SCRIPT_MEMORY_LIMIT_MB` és `MAX_SCRIPT_MEMORY_LIMIT_MB` közötti egész
- *    (SPEC-014 5.3);
+ *    `MIN_SCRIPT_MEMORY_LIMIT_MB` és `MAX_SCRIPT_MEMORY_LIMIT_MB` közötti egész,
+ *    a `fetchResponseLimitMb` és a `fileReadLimitMb` mezője `null` vagy 1 és
+ *    `MAX_SCRIPT_MEMORY_LIMIT_MB` közötti egész (SPEC-014 5.3);
  * 5. a lépés `mcpServerReferences` hivatkozásainak `envBindings` értéke és nem
  *    `null` `authEnvName` mezője env változó név alakú (SPEC-009 6.1,
  *    T-012-27); az agent definíciók azonos mezőjét a motor indításkori
@@ -330,6 +368,7 @@ export const NodeConfigSaveSchema = NodeConfigSchema.superRefine(
     }
     addScriptTimeoutTooLargeIssues(config, context);
     addScriptMemoryLimitOutOfRangeIssues(config, context);
+    addScriptReadLimitOutOfRangeIssues(config, context);
     addScriptForbiddenCwdIssues(config, context);
     addInvalidChoiceOptionIssues(config, context);
     const agentStep = agentStepPathOf(config);

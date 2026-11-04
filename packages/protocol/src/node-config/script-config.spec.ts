@@ -17,6 +17,8 @@ describe('ScriptConfigSchema', () => {
       timeoutMs: null,
       cwd: null,
       memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
     });
 
     expect(parsed.success).toBe(true);

@@ -35,7 +35,9 @@ export const MAX_SCRIPT_MEMORY_LIMIT_MB = 2048;
  * írás oldali szabály a mentési sémában (`NodeConfigSaveSchema`), a `db`
  * `isNodeConfig` guard pedig mindkét irányban szigorú (O-37 mintája). A
  * `memoryLimitMb` ugyanígy: olvasáskor `number | null`, a 16 ... 2048 egész
- * tartomány írás oldali szabály.
+ * tartomány írás oldali szabály. A `fetchResponseLimitMb` és a
+ * `fileReadLimitMb` (a gazda oldali olvasási plafon, SPEC-014 5.3) ugyanígy:
+ * olvasáskor `number | null`, az 1 ... 2048 egész tartomány írás oldali szabály.
  */
 export const JavaScriptScriptConfigSchema = z
   .strictObject({
@@ -44,6 +46,8 @@ export const JavaScriptScriptConfigSchema = z
     timeoutMs: z.number().nullable(),
     cwd: z.string().nullable(),
     memoryLimitMb: z.number().nullable(),
+    fetchResponseLimitMb: z.number().nullable(),
+    fileReadLimitMb: z.number().nullable(),
   })
   .readonly();
 

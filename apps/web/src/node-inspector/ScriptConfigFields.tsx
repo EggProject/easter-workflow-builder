@@ -31,14 +31,15 @@ const RUNTIME_OPTIONS = [
 /**
  * A szkript beállítás mezői, a `script` node és a `join` `script` mód közös
  * szerkesztője (SPEC-014 5.9): `runtime` választó, `source`, és JavaScript
- * esetén az időkorlát (másodpercben), a munkakönyvtár és a memória korlát.
- * A három JavaScript mező alapértelmezése (üresen) a mező `placeholder`
+ * esetén az időkorlát (másodpercben), a munkakönyvtár, a memória korlát és a
+ * két gazda oldali olvasási plafon (a hálózati válasz és a fájl olvasás, MB-ban,
+ * SPEC-014 5.3). Az öt JavaScript mező alapértelmezése (üresen) a mező `placeholder`
  * szövege: a design systemben nincs külön segédszöveg elem a mezők alatt, a
  * placeholder pedig pont addig látszik, amíg az üres mező az alapértéket jelenti.
  *
- * CSOPORTOSÍTÁS: nincs összecsukható panel. A három JavaScript mező csak a
+ * CSOPORTOSÍTÁS: nincs összecsukható panel. Az öt JavaScript mező csak a
  * JavaScript ág kiválasztása után jelenik meg, és a futás szempontjából
- * lényeges (határidő, hozzáférési gyökér, memória), elrejtésük plusz kattintást
+ * lényeges (határidő, hozzáférési gyökér, memória, olvasási plafon), elrejtésük plusz kattintást
  * adna a ritkán szerkesztett mezők panelének hasznához képest.
  */
 export function ScriptConfigFields(properties: Readonly<ScriptConfigFieldsProperties>): ReactElement {
@@ -50,6 +51,8 @@ export function ScriptConfigFields(properties: Readonly<ScriptConfigFieldsProper
     useFieldError(`${fieldPathPrefix}timeoutMs`) === undefined ? undefined : TIMEOUT_SECONDS_FIELD_ERROR_MESSAGE;
   const cwdError = useFieldError(`${fieldPathPrefix}cwd`);
   const memoryLimitError = useFieldError(`${fieldPathPrefix}memoryLimitMb`);
+  const fetchResponseLimitError = useFieldError(`${fieldPathPrefix}fetchResponseLimitMb`);
+  const fileReadLimitError = useFieldError(`${fieldPathPrefix}fileReadLimitMb`);
 
   /**
    * A `SelectField` az aktuális opció újraválasztásakor is hív, ezt a
@@ -66,7 +69,15 @@ export function ScriptConfigFields(properties: Readonly<ScriptConfigFieldsProper
         break;
       }
       case 'javascript': {
-        onChange({ runtime: 'javascript', source: config.source, timeoutMs: null, cwd: null, memoryLimitMb: null });
+        onChange({
+          runtime: 'javascript',
+          source: config.source,
+          timeoutMs: null,
+          cwd: null,
+          memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        });
         break;
       }
     }
@@ -123,6 +134,28 @@ export function ScriptConfigFields(properties: Readonly<ScriptConfigFieldsProper
             error={memoryLimitError}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               onChange({ ...config, memoryLimitMb: fromNumberFieldValue(event.target.value) });
+            }}
+          />
+          <TextField
+            size="sm"
+            type="number"
+            label="Hálózati válasz plafon (MB)"
+            placeholder="Üresen 50 MB, legfeljebb a memória korlát"
+            value={toNumberFieldValue(config.fetchResponseLimitMb)}
+            error={fetchResponseLimitError}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              onChange({ ...config, fetchResponseLimitMb: fromNumberFieldValue(event.target.value) });
+            }}
+          />
+          <TextField
+            size="sm"
+            type="number"
+            label="Fájl olvasási plafon (MB)"
+            placeholder="Üresen 50 MB, legfeljebb a memória korlát"
+            value={toNumberFieldValue(config.fileReadLimitMb)}
+            error={fileReadLimitError}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              onChange({ ...config, fileReadLimitMb: fromNumberFieldValue(event.target.value) });
             }}
           />
         </>

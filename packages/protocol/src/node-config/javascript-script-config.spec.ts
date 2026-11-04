@@ -2,7 +2,15 @@
 import { describe, expect, it } from 'vitest';
 import { JavaScriptScriptConfigSchema } from './javascript-script-config.ts';
 
-const VALID = { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: null };
+const VALID = {
+  source: 'return 1;',
+  runtime: 'javascript',
+  timeoutMs: null,
+  cwd: null,
+  memoryLimitMb: null,
+  fetchResponseLimitMb: null,
+  fileReadLimitMb: null,
+};
 
 describe('JavaScriptScriptConfigSchema', () => {
   it('elfogadja a null és a megadott timeoutMs és cwd értéket', () => {
@@ -20,7 +28,14 @@ describe('JavaScriptScriptConfigSchema', () => {
 
   it('az olvasó séma a megadott és a tartományon kívüli memoryLimitMb értéket is elfogadja', () => {
     for (const memoryLimitMb of [256, 0, 15, 2049, 16.5]) {
-      expect(JavaScriptScriptConfigSchema.safeParse({ ...VALID, memoryLimitMb }).success).toBe(true);
+      expect(
+        JavaScriptScriptConfigSchema.safeParse({
+          ...VALID,
+          memoryLimitMb,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        }).success,
+      ).toBe(true);
     }
   });
 
@@ -29,13 +44,26 @@ describe('JavaScriptScriptConfigSchema', () => {
       JavaScriptScriptConfigSchema.safeParse({ source: 'x', runtime: 'javascript', timeoutMs: null, cwd: null })
         .success,
     ).toBe(false);
-    expect(JavaScriptScriptConfigSchema.safeParse({ ...VALID, memoryLimitMb: '256' }).success).toBe(false);
+    expect(
+      JavaScriptScriptConfigSchema.safeParse({
+        ...VALID,
+        memoryLimitMb: '256',
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+      }).success,
+    ).toBe(false);
   });
 
   it('a hiányzó timeoutMs vagy cwd mezőt elutasítja', () => {
     expect(
-      JavaScriptScriptConfigSchema.safeParse({ source: 'x', runtime: 'javascript', cwd: null, memoryLimitMb: null })
-        .success,
+      JavaScriptScriptConfigSchema.safeParse({
+        source: 'x',
+        runtime: 'javascript',
+        cwd: null,
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+      }).success,
     ).toBe(false);
     expect(
       JavaScriptScriptConfigSchema.safeParse({
@@ -43,6 +71,8 @@ describe('JavaScriptScriptConfigSchema', () => {
         runtime: 'javascript',
         timeoutMs: null,
         memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
       }).success,
     ).toBe(false);
   });

@@ -64,6 +64,8 @@ const TIMEOUT_SECONDS_MESSAGE =
   'Az időkorlát pozitív szám legyen másodpercben, legfeljebb három tizedesjeggyel, és legfeljebb 2 147 483,647 másodperc.';
 const MEMORY_OUT_OF_RANGE_MESSAGE = 'A mező értéke 16 és 2048 közötti egész szám lehet.';
 
+const READ_LIMIT_OUT_OF_RANGE_MESSAGE = 'A mező értéke 1 és 2048 közötti egész szám lehet.';
+
 const CWD_FORBIDDEN_MESSAGE = 'A munkakönyvtár nem lehet a /proc vagy a /dev könyvtárban.';
 
 /**
@@ -200,6 +202,8 @@ test('az időkorlát másodpercben beírva ezredmásodpercként kerül a mentés
     timeoutMs: 1500,
     cwd: '/munka',
     memoryLimitMb: 512,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
     onUnhandledError: 'fail_run',
   });
 
@@ -221,6 +225,8 @@ test('az időkorlát másodpercben beírva ezredmásodpercként kerül a mentés
     timeoutMs: null,
     cwd: null,
     memoryLimitMb: null,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
   });
 
   await chooseSelectOption(page, panel.getByRole('combobox', { name: 'Futásidő (runtime)' }), 'CEL kifejezés');
@@ -282,6 +288,36 @@ for (const invalid of ['8', '4096', '16.5', '0']) {
     expect(putBodies).toHaveLength(1);
   });
 }
+
+test('a két olvasási plafon külön mező: a tartományon kívüli érték a saját mezője alatt jelez, PUT nélkül; érvényes értékkel a PUT törzsébe kerül', async ({
+  page,
+}) => {
+  const putBodies: unknown[] = [];
+  const panel = await openScriptPanel(page, putBodies);
+  await switchToJavaScript(page, panel);
+  const response = panel.getByLabel('Hálózati válasz plafon (MB)');
+  const file = panel.getByLabel('Fájl olvasási plafon (MB)');
+  await expect(response).toHaveAttribute('placeholder', 'Üresen 50 MB, legfeljebb a memória korlát');
+  await expect(file).toHaveAttribute('placeholder', 'Üresen 50 MB, legfeljebb a memória korlát');
+
+  await response.fill('0');
+  await file.fill('2049');
+  await saveButton(page).click();
+  await expectFieldError(response, READ_LIMIT_OUT_OF_RANGE_MESSAGE);
+  await expectFieldError(file, READ_LIMIT_OUT_OF_RANGE_MESSAGE);
+  expect(putBodies).toHaveLength(0);
+
+  await response.fill('100');
+  await file.fill('8');
+  await expectNoFieldError(response);
+  await expectNoFieldError(file);
+  await saveButton(page).click();
+  await expect(page.getByText('Gráf mentve')).toBeVisible();
+  expect(parseSavedGraph(putBodies[0]).nodes.find((node) => node.id === 'n2')?.config).toMatchObject({
+    fetchResponseLimitMb: 100,
+    fileReadLimitMb: 8,
+  });
+});
 
 for (const forbidden of ['/proc/self', '/dev', '/srv/../dev/shm']) {
   test(`a /proc vagy /dev alá mutató munkakönyvtár (${forbidden}) a mező alatt jelez, PUT nélkül; más könyvtárral a mentés lefut`, async ({

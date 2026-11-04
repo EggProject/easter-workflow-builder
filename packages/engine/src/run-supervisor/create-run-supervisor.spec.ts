@@ -513,6 +513,8 @@ function javaScriptNode(
     timeoutMs: null,
     cwd: null,
     memoryLimitMb: null,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
     onUnhandledError,
   });
 }
@@ -751,7 +753,15 @@ describe('createRunSupervisor', () => {
           nodeOf('sc', {
             type: 'join',
             mode: 'script',
-            settings: { source: UNCOMPILABLE, runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: null },
+            settings: {
+              source: UNCOMPILABLE,
+              runtime: 'javascript',
+              timeoutMs: null,
+              cwd: null,
+              memoryLimitMb: null,
+              fetchResponseLimitMb: null,
+              fileReadLimitMb: null,
+            },
             onUnhandledError: 'fail_run',
           }),
         ],

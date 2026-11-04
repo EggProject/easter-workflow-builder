@@ -94,6 +94,8 @@ function request(source: string, overrides: Partial<ScriptRunRequest> = {}): Scr
     timeoutMs: 5000,
     cwd: null,
     memoryLimitMb: 64,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
     signal: new AbortController().signal,
     ...overrides,
   };
@@ -132,7 +134,16 @@ describe('runScript', () => {
     });
 
     it('a null időkorláttal és null memória korláttal is fut (az alapértékek)', async () => {
-      await expect(runScript(request('return 1;', { timeoutMs: null, memoryLimitMb: null }))).resolves.toStrictEqual({
+      await expect(
+        runScript(
+          request('return 1;', {
+            timeoutMs: null,
+            memoryLimitMb: null,
+            fetchResponseLimitMb: null,
+            fileReadLimitMb: null,
+          }),
+        ),
+      ).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 1,
       });
@@ -470,7 +481,9 @@ describe('runScript', () => {
     it('a memória túllépés a sandboxban elkapható', async () => {
       const source =
         'const a = []; try { while (true) { a.push(new Array(1e5).fill(1)); } } catch (e) { a.length = 0; return e.name + ": " + e.message; }';
-      await expect(runScript(request(source, { memoryLimitMb: 16 }))).resolves.toStrictEqual({
+      await expect(
+        runScript(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
+      ).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 'InternalError: out of memory',
       });
@@ -478,7 +491,9 @@ describe('runScript', () => {
 
     it('az el nem kapott memória túllépés script_evaluation_failed', async () => {
       const source = 'const a = []; while (true) { a.push(new Array(1e5).fill(1)); }';
-      await expect(runScript(request(source, { memoryLimitMb: 16 }))).resolves.toStrictEqual({
+      await expect(
+        runScript(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
+      ).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_evaluation_failed',
         message: 'a szkript hibát dobott: InternalError: out of memory',

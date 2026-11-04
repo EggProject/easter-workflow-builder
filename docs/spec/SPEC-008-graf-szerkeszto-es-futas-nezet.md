@@ -311,18 +311,18 @@ A szerkesztő útvonala a `/editor`, a szerkesztett workflow azonosítója a `?w
 
 A típusok zárt listája a `packages/db` `node-type` témájából jön (M-87), a `protocol` `NodeTypeSchema` tükrözésével. A vászon **egyetlen** egyedi node komponenst regisztrál, `nodeTypes` alatt, modul szintű `const` objektumban (M-56); a tíz típus közötti különbséget egy adat tábla írja le, nem tíz komponens.
 
-| Típus            | Bemenő handle | Kimenő handle-ök                                  | Mit szerkeszt a felület                                                                     |
-| ---------------- | ------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `start`          | nincs         | egy, névtelen                                     | a bemeneti mezők listája (`name`, `label`, `valueKind`, `required`)                         |
-| `agent_step`     | egy           | egy, névtelen                                     | a teljes `AgentStepConfig` (5.2)                                                            |
-| `branch`         | egy           | ágankénti egy, a `branches[].key` értékkel (O-23) | `expression`, az ágak listája, `defaultBranchKey`                                           |
-| `fan_out`        | egy           | egy, névtelen                                     | `itemsExpression`, `branchLabelTemplate`                                                    |
-| `join`           | egy           | egy, névtelen                                     | `mode`, és a módhoz tartozó `settings`                                                      |
-| `loop`           | egy           | kettő: `continue` és `exit`                       | `maxIterations`, `continueExpression`                                                       |
-| `human_approval` | egy           | kettő: `approved` és `rejected`                   | `title`, `bodyTemplate`, `timeoutMs`                                                        |
-| `error_handler`  | egy           | kettő: névtelen és `on_error`                     | `maxAttempts`, `backoffMs`, `handledErrorKinds`                                             |
-| `sub_workflow`   | egy           | egy, névtelen                                     | `targetWorkflowId`, `inputMapping`                                                          |
-| `script`         | egy           | egy, névtelen                                     | `source`, `runtime`; JavaScript ágon még `timeoutMs`, `cwd`, `memoryLimitMb` (SPEC-014 5.3) |
+| Típus            | Bemenő handle | Kimenő handle-ök                                  | Mit szerkeszt a felület                                                                                                                |
+| ---------------- | ------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `start`          | nincs         | egy, névtelen                                     | a bemeneti mezők listája (`name`, `label`, `valueKind`, `required`)                                                                    |
+| `agent_step`     | egy           | egy, névtelen                                     | a teljes `AgentStepConfig` (5.2)                                                                                                       |
+| `branch`         | egy           | ágankénti egy, a `branches[].key` értékkel (O-23) | `expression`, az ágak listája, `defaultBranchKey`                                                                                      |
+| `fan_out`        | egy           | egy, névtelen                                     | `itemsExpression`, `branchLabelTemplate`                                                                                               |
+| `join`           | egy           | egy, névtelen                                     | `mode`, és a módhoz tartozó `settings`                                                                                                 |
+| `loop`           | egy           | kettő: `continue` és `exit`                       | `maxIterations`, `continueExpression`                                                                                                  |
+| `human_approval` | egy           | kettő: `approved` és `rejected`                   | `title`, `bodyTemplate`, `timeoutMs`                                                                                                   |
+| `error_handler`  | egy           | kettő: névtelen és `on_error`                     | `maxAttempts`, `backoffMs`, `handledErrorKinds`                                                                                        |
+| `sub_workflow`   | egy           | egy, névtelen                                     | `targetWorkflowId`, `inputMapping`                                                                                                     |
+| `script`         | egy           | egy, névtelen                                     | `source`, `runtime`; JavaScript ágon még `timeoutMs`, `cwd`, `memoryLimitMb`, `fetchResponseLimitMb`, `fileReadLimitMb` (SPEC-014 5.3) |
 
 **A `start` bemeneti mezőjének értéktípusa (SPEC-016 5.1, 5.3, 5.6).** A beállítás panel a mezőhöz "Érték típusa" `SelectField` mezőt ad a hat érték feliratával (Szöveg, Szám, Igen/nem, Választólista, Lista, JSON adat); az új mező alapértéke `text`. A `choice` típusnál a mező alatt "Opciók (soronként egy)" `TextAreaField` áll a meglévő soronkénti lista mintával (`string-list-field-value.ts`), a hiba a mező alatt, a `inputFields.<n>.options` útvonalon; a típus váltása az `options` kulcsot felveszi vagy elhagyja (a `choice` ág zárt kulcslistájában áll, a többiében nem).
 

@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                                                                                                                   |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | végrehajtva (PLAN-015 T-015-3 ... T-015-10, 2026-11-04); a 7.1 szekció O-1 ... O-6 termékkérdése mind lezárva (user döntés 2026-11-04), a 7.2 T-5 kimondott korláttal nyitva                                                                                      |
+| Státusz  | végrehajtva (PLAN-015 T-015-3 ... T-015-10, T-015-14 ... T-015-16, 2026-11-04); a 7.1 szekció O-1 ... O-9 termékkérdése mind lezárva (user döntés 2026-11-04), a 7.2 T-4 és T-5 kimondott korláttal nyitva                                                        |
 | Dátum    | 2026-11-03, átvezetve 2026-11-04                                                                                                                                                                                                                                  |
 | Előzmény | [`SPEC-003`](SPEC-003-domain-perzisztencia.md) 4.3, [`SPEC-004`](SPEC-004-vegrehajto-motor.md) 4.7, 5. szekció 10. sora, [`SPEC-008`](SPEC-008-graf-szerkeszto-es-futas-nezet.md) 5.1, O-43, [`SPEC-010`](SPEC-010-sablon-es-kifejezes-nyelv.md) 7. és 8. szekció |
 | Bemenet  | [`../research/2026-11-03-szkript-kimenet-ertektipus.md`](../research/2026-11-03-szkript-kimenet-ertektipus.md) 2., 3., 8. és 9. szekció; a hiányleltár H-13 tétele                                                                                                |
@@ -127,7 +127,7 @@ gazda hívást is indíthat egyszerre (`Promise.all`).
 
 - `db`: a `ScriptConfig` diszkriminált unió lesz a `runtime` mezőn:
   `{ runtime: 'expression'; source: string }` vagy
-  `{ runtime: 'javascript'; source: string; timeoutMs: number | null; cwd: string | null; memoryLimitMb: number | null }`.
+  `{ runtime: 'javascript'; source: string; timeoutMs: number | null; cwd: string | null; memoryLimitMb: number | null; fetchResponseLimitMb: number | null; fileReadLimitMb: number | null }`.
   A `timeoutMs` `null` jelentése az alapérték (60 000 ms), a `null` a meglévő konvenció a hiányra (az `undefined`
   nem éli túl a JSON oszlopot, `agent-step-config.ts` `PresetSystemPrompt` doksija).
 - A `cwd` a fájl hozzáférés gyökere (O-5), az agent lépés `cwd` mezőjének mintájára; a `null` a szerver folyamat
@@ -141,6 +141,11 @@ gazda hívást is indíthat egyszerre (`Promise.all`).
   szabály mindkét oldalon áll (`db` guard és `protocol` mentési séma), az `apps/server` `node-config-drift-protection`
   témájában mezőnként futásidejű ággal, a `timeoutMs` mintájára; a tartományon kívüli érték a mentéskor a mező alatti
   hibát ad.
+- A `fetchResponseLimitMb` és a `fileReadLimitMb` a gazda oldali olvasási plafon egész MB-ban (O-9, 5.4 "Olvasási
+  plafon"); a `null` az alapérték (50 MB). Pozitív egész, legfeljebb 2048 (a modul plafonja: ennél nagyobb tartalom a
+  sandboxba sosem férne be); a szabály mindkét oldalon áll (`db` guard, `protocol` mentési séma), az `apps/server`
+  `node-config-drift-protection` témájában mezőnként futásidejű ággal, a tartományon kívüli érték a mentéskor a mező
+  alatti hibát ad.
 - A user kérése a nagyobb érték megadhatósága; a szabály a kisebb értéket sem tiltja, mert a pozitív egész
   szabály a projektben minden időkorlát mezőn ugyanaz, és egy alsó határra nincs forrás.
 - Zárt kulcslista mindkét ágra (`isRecordWithKnownKeys`, `z.strictObject`), a `protocol` oldalon
@@ -180,8 +185,8 @@ Kizárólag `http:` és `https:` séma (az OWASP SSRF lap szerint a nem HTTP sé
 J-15). Átirányítás követése nincs (`redirect: 'manual'`, J-15); a szkript a `status` és a `location` fejléc
 alapján maga dönt. Címszűrés nincs (O-6 user döntés): a szkript bármely címet elérhet, a helyi gépet is. A második
 argumentum csak a `method`, a `headers` (szöveg értékek) és a `body` (szöveg) mezőt tartalmazhatja, más kulcs
-`TypeError`; a válasz `headers` mezője a `Headers` bejárása kisbetűs névvel. A válasz törzse legfeljebb a lépés memória
-korlátjáig (`memoryLimitMb`, bájtban) olvasott, a hosszabb törzs `TypeError` (research
+`TypeError`; a válasz `headers` mezője a `Headers` bejárása kisbetűs névvel. A válasz törzse legfeljebb az olvasási
+plafonig (`fetchResponseLimitMb`, lásd lent) olvasott, a hosszabb törzs elkapható `TypeError` (research
 `2026-11-04-szkript-csomopont.md` 10.1 F4). A kérés a kérés jelén és a lépés végén
 (határidő, lebontás) szakad meg, a jel után érkező eredmény a sandboxot nem érinti (research
 `2026-11-04-szkript-csomopont.md` 9.1).
@@ -194,8 +199,8 @@ link ne vezessen ki (J-15); a gyökéren kívüli út `script_evaluation_failed`
 szintaktikai ellenőrzés nem véd az ellenőrzés és a használat közötti linkcsere ellen (TOCTOU, nem ellenőrzött
 forrással, 5.10). Az abszolút `path` a gyökér alatt is elutasított; az írás létező célnál a cél, nem létezőnél a
 szülő könyvtár `fs.realpath` alakját ellenőrzi, és az új fájlt `wx` jelzővel hozza létre, ami a függő szimbolikus
-linkre is hibát ad. A `list` a bejegyzések nevét adja. A `readText` legfeljebb a lépés memória korlátjáig olvas, a nagyobb
-fájl hiba (research 10.1 F4). A hibaüzenet a szkript saját útvonalát és a Node hibakódot
+linkre is hibát ad. A `list` a bejegyzések nevét adja. A `readText` legfeljebb az olvasási plafonig (`fileReadLimitMb`,
+lásd lent) olvas, a nagyobb fájl elkapható hiba (research 10.1 F4). A hibaüzenet a szkript saját útvonalát és a Node hibakódot
 mondja (`a fájl művelet nem sikerült (ENOENT): a.txt`), a gazda abszolút gyökerét nem (research 9.1 7. pont).
 
 **A `/proc` és a `/dev` tiltása.** A user döntése (2026-11-04), szó szerint: "/proc és /dev tiltva". A gyökér és a
@@ -218,6 +223,22 @@ mentési séma és a futtató ugyanazt olvassa.
   a feloldott útvonalon fut. Ami marad: az ellenőrzés és a megnyitás között egy KÜLSŐ folyamat a feloldott útvonal
   egy könyvtár elemét linkre cserélheti, és a megnyitás azt követi (5.10 3.). A szkript maga linket nem tud
   létrehozni (a `files` felületén nincs ilyen művelet).
+
+**Olvasási plafon.** A user döntése (2026-11-04), szó szerint: "Igen, iparági alapértékkel". A gazda a `fetch` válasz
+törzsét és a `readText` fájlját a sandboxba másolás előtt a saját memóriájában tartja (puffer, szöveg, JSON szöveg),
+ezért mindkettő saját, csomópontonként állítható plafont kap: `fetchResponseLimitMb` és `fileReadLimitMb` (5.3). A
+`null` alapértéke mindkettőn 50 MB; a hatályos plafon a beállított (vagy alapértelmezett) érték és a lépés memória
+korlátja közül a kisebb. A plafon fölötti tartalom olvasása a határon megáll, a szkript elkapható hibát kap (`TypeError`,
+illetve `Error`, a mező nevével), a szerver folyamat fut tovább (unit teszt a 300 MB-os válaszra és fájlra; a plafon
+nélkül ugyanez a válasz a szerver folyamatot leállította, research 10.3 és 11. szekció).
+
+- Az alapérték forrása: a Google Apps Script `UrlFetchApp` dokumentált korlátja, "URL Fetch response size 50 MB / call"
+  (<https://developers.google.com/apps-script/guides/services/quotas>), a legközelebbi analóg (szkript futtató gazda
+  oldali `fetch` válasz korlátja), két független megerősítéssel; a fájl olvasásé az Apps Script blob 50 MB-os korlátja
+  és egy sandbox futtató `readFile` alapértéke. A források, a megerősítések és a vizsgált, eltérő értékű futtatók
+  (AWS Lambda, Pipedream, Val Town) a research 11. szekciójában.
+- Ami marad: a gazda a plafon többszörösét tarthatja egyszerre (puffer, szöveg, JSON szöveg), és több párhuzamos lépés
+  plafonja összeadódik; egy 2048 MB-ra állított plafon a gép memóriáját továbbra is meghaladhatja (5.10 5.).
 
 **Időkorlát.** A határidő a lépés indulásától számít (a modul betöltése is beleszámít), `timeoutMs` vagy 60 000 ms. Két ága van, mert az
 interrupt kezelő a gazda ígéretre várakozás alatt nem fut (J-6): (1) CPU kötött kódra
@@ -318,7 +339,9 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
   (PLAN-015 T-015-10). JavaScript esetén a "Munkakönyvtár (cwd)" `TextField` is
   megjelenik (az agent lépés mintájára), üresen `null`. JavaScript esetén a "Memória korlát (MB)" `TextField`
   `type="number"` is megjelenik, üresen `null` (alapérték: a rendszermemória, legfeljebb 2048 MB); a 16 ... 2048
-  tartományon kívüli érték a mentéskor a mező alatti hibát ad. A `/proc` vagy `/dev` alá mutató munkakönyvtár (5.4
+  tartományon kívüli érték a mentéskor a mező alatti hibát ad. JavaScript esetén a "Hálózati válasz plafon (MB)" és a
+  "Fájl olvasási plafon (MB)" `TextField` `type="number"` is megjelenik, üresen `null` (placeholder: "Üresen 50 MB,
+  legfeljebb a memória korlát"); az 1 ... 2048 tartományon kívüli érték a mentéskor a mező alatti hibát ad. A `/proc` vagy `/dev` alá mutató munkakönyvtár (5.4
   "A `/proc` és a `/dev` tiltása") a mentéskor a "Munkakönyvtár (cwd)" mező alatt jelez ("A munkakönyvtár nem lehet a
   /proc vagy a /dev könyvtárban."), PUT nélkül; a szabály a `protocol` mentési sémájában áll, `db` oldali párja
   nincs (az `onUnhandledError` mintájára), a második védvonal a futtató.
@@ -351,8 +374,9 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
 5. **Szolgáltatás kiesés.** A CPU kötött szkript a határidőig az eseményhurkot foglalja (5.4), a nagyobb
    `timeoutMs` ezt arányosan növeli, és a külső megszakítás sem állítja meg (5.8). A memória alapértéke a rendszermemória (legfeljebb 2048 MB) lépésenként: több
    párhuzamos szkript lépés együtt a gép memóriáját meghaladó foglalást kísérelhet meg (a user döntése az alapértékről,
-   kimondott kockázat). A gazda a `fetch` törzsét és a `readText` fájlját a lépés korlátjáig a saját memóriájában is
-   tartja (puffer, szöveg, JSON szöveg), tehát a gazda foglalása a korlát többszöröse lehet (mérve, research 10.3).
+   kimondott kockázat). A gazda a `fetch` törzsét és a `readText` fájlját az olvasási plafonig (alapból 50 MB, O-9) a
+   saját memóriájában is tartja (puffer, szöveg, JSON szöveg), tehát a gazda foglalása a plafon többszöröse lehet
+   (mérve, research 10.3); a csomópontonként 2048 MB-ig emelhető plafon ezt arányosan növeli.
 
 ## 6. Tesztelés
 
@@ -412,7 +436,9 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
    2147483647, mindkét oldalon, a sodródás védelemmel.
 7. A memória korlát a lépés saját `WebAssembly.Memory` maximuma (`memoryLimitMb`, alapból a rendszermemória, legfeljebb
    2048 MB, 16 ... 2048 mindkét oldalon a sodródás védelemmel); a túllépés és a gazdára kijutó `RangeError` a lépés
-   hibája, a szerver folyamat fut tovább (unit teszt); a `setMaxStackSize` 131072.
+   hibája, a szerver folyamat fut tovább (unit teszt); a `setMaxStackSize` 131072. A gazda oldali olvasási plafon
+   (`fetchResponseLimitMb`, `fileReadLimitMb`, alapból 50 MB, 1 ... 2048 mindkét oldalon a sodródás védelemmel) fölötti
+   válasz és fájl a sandboxban elkapható hiba, a szerver folyamat fut tovább (unit teszt a 300 MB-os esetre).
 8. A fájl és a hálózat gazda függvénye az O-5 és az O-6 user döntése szerint működik (a gyökér a `cwd`, címszűrés nincs); a gyökéren kívüli út és a
    szimbolikus link kivezetése elutasítva, átirányítás nincs követve, csak `http:` és `https:`; a `/proc` és a `/dev`
    gyökérként és útvonalként (lexikálisan és `fs.realpath` után) tiltott, mentéskor a `cwd` mező alatt jelez (O-8).

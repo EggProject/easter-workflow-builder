@@ -58,8 +58,9 @@ function failure(errorKind: EngineErrorKind, nodeId: string, detail: string): Sc
  * A két futtató közti választás, kimerítő `switch` a `runtime` mezőn
  * (SPEC-014 5.2, 5.8): a CEL ág a meglévő `expressionEvaluator` porton fut
  * (az eredményt a port a SPEC-010 7.4 szerint normalizálja), a JavaScript ág a
- * `scriptRunner` porton, a tárolt `timeoutMs`, `cwd` és `memoryLimitMb`
- * mezővel (a `null` alapértéket a futtató oldja fel).
+ * `scriptRunner` porton, a tárolt `timeoutMs`, `cwd`, `memoryLimitMb`,
+ * `fetchResponseLimitMb` és `fileReadLimitMb` mezővel (a `null` alapértéket a
+ * futtató oldja fel).
  */
 async function evaluateScript(input: ExecuteScriptInput, ports: ScriptPorts): Promise<ScriptEvaluation> {
   const { script, runContext } = input;
@@ -79,6 +80,8 @@ async function evaluateScript(input: ExecuteScriptInput, ports: ScriptPorts): Pr
         timeoutMs: script.timeoutMs,
         cwd: script.cwd,
         memoryLimitMb: script.memoryLimitMb,
+        fetchResponseLimitMb: script.fetchResponseLimitMb,
+        fileReadLimitMb: script.fileReadLimitMb,
         signal: input.stopSignal,
       });
       if (result.kind === 'failed') {

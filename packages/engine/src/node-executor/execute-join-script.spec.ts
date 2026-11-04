@@ -61,6 +61,8 @@ const CONFIG: JoinScriptNodeConfig = {
     timeoutMs: null,
     cwd: null,
     memoryLimitMb: null,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
   },
   onUnhandledError: 'fail_run',
 };

@@ -104,6 +104,8 @@ describe('NodeConfigSchema', () => {
         timeoutMs: 120_000,
         cwd: 'munka/almappa',
         memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
       },
       onUnhandledError: null,
     };
@@ -195,6 +197,8 @@ describe('NodeConfigSchema', () => {
       timeoutMs: null,
       cwd: null,
       memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
       onUnhandledError: null,
     };
     expect(NodeConfigSchema.safeParse(config).success).toBe(true);

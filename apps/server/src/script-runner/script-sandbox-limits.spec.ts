@@ -11,4 +11,9 @@ describe('SCRIPT_SANDBOX_LIMITS', () => {
     expect(SCRIPT_SANDBOX_LIMITS.defaultTimeoutMs).toBe(60_000);
     expect(SCRIPT_SANDBOX_LIMITS.initialPages).toBe(256);
   });
+
+  it('az olvasási plafon alapértéke mindkét gazda olvasásra 50 MB (iparági alapérték, SPEC-014 5.4 "Olvasási plafon")', () => {
+    expect(SCRIPT_SANDBOX_LIMITS.defaultFetchResponseLimitMb).toBe(50);
+    expect(SCRIPT_SANDBOX_LIMITS.defaultFileReadLimitMb).toBe(50);
+  });
 });

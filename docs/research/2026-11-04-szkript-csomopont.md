@@ -624,12 +624,12 @@ cors`, `user-agent: node`, `accept-encoding: gzip, deflate`; süti és hitelesí
 - **Titok a fájl hozzáférésen át (mérve).** A `cwd` a `/proc/self` vagy a `/` könyvtárra állítva a
   `files.readText("environ")` a szerver folyamat indulási környezeti változóit adja (saját mérés: a `PATH=` benne
   van). A SPEC-014 5.10 4. pontjának "a környezeti változók nem érhetők el" mondata ezért pontatlan volt, a spec
-  javítva. A korlátozás (például a `/proc` és a `/dev` tiltása, vagy a `cwd` megkötése) termékdöntés, lásd a
-  kérdéseket.
+  javítva. **Lezárva** (user döntés 2026-11-04, "/proc és /dev tiltva"): 11.2.
 - **A gazda memóriája a korlát többszöröse lehet.** A törzs a korlátig olvasott, de a gazda a puffert, a szöveget és a
   JSON szöveget egyszerre tartja, a sandbox WebAssembly memóriája mellett. 3,9 GB-os gépen az alapértelmezett 2048 MB-os
   korláttal egy 300 MB-os válasz a folyamatot leállította (`Zone Allocation failed`). Egy, a memória korlátnál kisebb
-  gazda oldali olvasási plafon termékdöntés (új szám, forrás nélkül nem választható).
+  gazda oldali olvasási plafon termékdöntés (új szám, forrás nélkül nem választható). **Lezárva** (user döntés
+  2026-11-04, "Igen, iparági alapértékkel"): 50 MB, 11.3.
 - **A `readText` nem kapja a lépés jelét:** egy nevesített cső (FIFO) megnyitása a gyökér alatt a lépés vége után is
   blokkolhat egy libuv szálat. A szkript FIFO-t nem tud létrehozni; nem javítva, nem ellenőrzött mélységben.
 - **T-4, a pinelt QuickJS ismert hibái (maradék kockázat, kimondva).** A pinelt bellard pillanatkép (4. szekció)
@@ -645,7 +645,8 @@ cors`, `user-agent: node`, `accept-encoding: gzip, deflate`; süti és hitelesí
   `TypedArrays` csoport nélkül is létrehozható (`quickjs-emscripten-core` 0.32.0 `DefaultIntrinsics`, `IntrinsicsFlags`:
   a csoporttal az `ArrayBuffer` is eltűnik), az `Array.prototype.toReversed`, `with`, `toSpliced`, `toSorted`, a
   `FinalizationRegistry` és a `WeakRef` pedig az előkészítő kódban törölhető (saját mérés: mind a hat `delete` igaz,
-  utána `typeof` `undefined`, a globális nevek száma 44). Ez a szkript nyelvi felületének szűkítése, tehát termékdöntés.
+  utána `typeof` `undefined`, a globális nevek száma 44). Ez a szkript nyelvi felületének szűkítése, tehát termékdöntés. **Lezárva** (user döntés 2026-11-04, "A hat név törlése"): 11.1; a `TypedArrays` csoport
+  marad.
 
 ### 10.4 A SPEC-014 8. szekció kritériumai
 
@@ -663,3 +664,87 @@ cors`, `user-agent: node`, `accept-encoding: gzip, deflate`; süti és hitelesí
 | 10  | teljesül                                                      | `docs/research/2026-08-26-toolchain.md` `quickjs-emscripten-core` és `@jitl/quickjs-wasmfile-release-sync` 0.32.0 sor, két forrással (npm registry, jsDelivr, GitHub tag)                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 11  | a T-015-13-ban                                                | a merge kapu (kilenc kapu a fejen, teljes e2e, `coverage:e2e:report`); a T-015-12 commitjai előtt a kilenc kapu helyben zöld volt                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | 12  | teljesül                                                      | `866898b` (T-015-11 átvezetés: SPEC-003, SPEC-004, SPEC-008, SPEC-014, csomag `CLAUDE.md`-k, szabálykönyv, H-13)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+
+## 11. A 10.3 nyitott tételeinek lezárása: a user három döntése (2026-11-04)
+
+A 10.3 három termékkérdésére a user döntése, szó szerint: (1) a QuickJS ismert hibái (T-4): "A hat név törlése"; (2) a
+fájl hozzáférés: "/proc és /dev tiltva"; (3) a gazda oldali olvasási plafon: "Igen, iparági alapértékkel". Az átvezetés
+a SPEC-014 5.3, 5.4 ("Eltávolított nevek", "Fájl", "A `/proc` és a `/dev` tiltása", "Olvasási plafon"), 5.9, 5.10, 7.1
+(O-7, O-8, O-9) és 8. szekciójában, a PLAN-015 T-015-14 ... T-015-16 lépésében áll.
+
+### 11.1 A hat név helye és törlése (T-015-14)
+
+Saját mérés a pinelt modulon (`quickjs-emscripten-core` 0.32.0, `@jitl/quickjs-wasmfile-release-sync`): a
+`toReversed`, `with`, `toSpliced` és `toSorted` saját tulajdonsága az `Array.prototype`-nak; a `toReversed`, `with` és
+`toSorted` a `TypedArray` közös prototípusának (`Object.getPrototypeOf(Uint8Array.prototype)`) saját tulajdonsága, a
+`toSpliced` ott nem létezik, és az egyes típusos tömbök (`Uint8Array.prototype`) saját tulajdonságai között egyik sincs;
+a `FinalizationRegistry` és a `WeakRef` a globális objektum tulajdonsága. Mind a hét tulajdonság `configurable: true`.
+A törlés az előkészítő kódban, a szkript előtt fut (`run-script.ts` `PRELUDE_SOURCE`).
+
+Igazolás (`run-script.spec.ts`, "a pinelt QuickJS ismert hibáit hordozó hat név" csoport): a hat név az `Array`, mind a
+tizenkét típusos tömb példányán és a globális objektumon `undefined`; a globális objektumból tulajdonság leírókon és
+prototípus láncon át bejárt gráfban (getter hívás nélkül) egyik natív függvény sem található; az `eval`, a `Function`
+konstruktor és a `Reflect.get` sem éri el őket; a megmaradt `sort`, `reverse`, `at` működik. A törlés nélküli
+előkészítő kóddal (a `ef3ff9a` állapota) a csoport három tiltó tesztje és a globális kulcslista tesztje elbukik
+(saját futtatás, 4 bukott, 33 zöld). A globális nevek száma 61-ről 59-re csökkent.
+
+### 11.2 A `/proc` és a `/dev` tiltása (T-015-15)
+
+- Mentés: a `protocol` mentési sémája a `cwd` abszolút alakját lexikálisan normalizálja (`isForbiddenScriptCwd`), a
+  tiltott érték a `cwd` (`join` `script` módban a `settings.cwd`) útvonalán hibát ad. Igazolás:
+  `node-config-save-schema.spec.ts`, `is-forbidden-script-cwd.spec.ts`, e2e `graph-script-node.spec.ts` (három érték,
+  PUT nélkül, a mező alatt).
+- Futás: a gyökér a szkript indítása előtt (`is-forbidden-script-root.ts`, lexikálisan és `fs.realpath` után), a
+  `readText`, `writeText` és `list` útvonala a lexikális és a feloldott alakon (`is-forbidden-host-path.ts`). Igazolás:
+  `run-script.spec.ts` ("a /proc és a /dev gyökér tiltása"), `read-text-in-root.spec.ts`, `list-in-root.spec.ts`,
+  `write-text-in-root.spec.ts` (a `/dev`-re mutató szimbolikus link a `/` gyökér alatt, létező és új célra is). A `/`
+  gyökér alatt a `proc/self/environ` olvasása ma elkapható hiba (a 10.3 mérésében a `PATH=` olvasható volt).
+- TOCTOU, ami marad: az ellenőrzés a feloldott, link nélküli útvonalon történik, és a művelet ugyanazt a feloldott
+  útvonalat nyitja meg (a meglévő minta). Ha az ellenőrzés és a megnyitás között egy KÜLSŐ folyamat a feloldott útvonal
+  egy könyvtár elemét `/proc` vagy `/dev` alá mutató linkre cseréli, a megnyitás azt követi. A szkript maga linket nem
+  tud létrehozni. Nem ellenőrzött, hogy a Node `fs` API-ján kívül (például `openat2` `RESOLVE_BENEATH`) lenne-e a
+  Node 26 alatt elérhető, link követést tiltó megnyitás; a projekt ezt nem vezette be.
+- A relatív `cwd` (például `../../proc`) a mentéskor nem dönthető el (a séma a böngészőben is fut), csak futáskor.
+
+### 11.3 Az olvasási plafon alapértéke és forrásai (T-015-16)
+
+A választott alapérték: **50 MB** (1 MB = 1024 * 1024 bájt) mindkét gazda olvasásra, csomópontonként felülírható
+(`fetchResponseLimitMb`, `fileReadLimitMb`, egész 1 ... 2048), a hatályos plafon a beállított érték és a lépés memória
+korlátja közül a kisebb.
+
+| Plafon                 | Elsődleges forrás                                                                                                                                                                                          | Megerősítés 1                                                                                                                                                                                 | Megerősítés 2                                                                                                                                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| hálózati válasz, 50 MB | Google Apps Script "Quotas for Google Services", "Current limitations": "URL Fetch response size 50 MB / call" (<https://developers.google.com/apps-script/guides/services/quotas>, lekérdezve 2026-11-04) | GLUKIT "Limits & Quotas - Google Apps Script": "URL Fetch response size 50 MB / call" (<https://glukit.com/google-apps-script/limits.html>)                                                   | Justin Poehnelt "UrlFetchApp: The Unofficial Documentation", "Response Size 50 MB ... Scripts will throw an exception if exceeded" (<https://justin.poehnelt.com/posts/definitive-guide-to-urlfetchapp/>); továbbá Stack Overflow 58402500 a dokumentációt idézi |
+| fájl olvasás, 50 MB    | Axellero sandbox `readFile` csomópont: "maxSize ... Maximum file size to read in bytes (default: 50MB)" (<https://docs.axellero.io/docs/nodes/sandbox/file-system/read-file>)                              | Google Apps Script blob olvasás: "the maximum size of the blob for Google Apps Script is 50 MB (52,428,800 bytes)" (<https://groups.google.com/g/google-apps-script-community/c/jxLTqkXKqWE>) | MBS Tech Nexus Blog: a `DriveApp.getBlob()` 50 MB-os korlátja (<https://technexus-blog.mbs.jp/2025/05/drive-apiresumable-uploadgooglegcs.html>); a Windmill közösségi kiadás kötetei fájlonként 50 MB (<https://www.windmill.dev/docs/core_concepts/volumes.md>) |
+
+Miért ez: a vizsgált futtatók közül egyedül az Apps Script dokumentálja a szkript saját, kimenő `fetch` hívásának
+válasz korlátját; a többi talált érték más dolgot korlátoz, és eltér: AWS Lambda szinkron hívás kérés és válasz
+payload 6 MB (<https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html>), ez a függvény saját
+be- és kimenete, nem a függvényből indított kérés válasza; Pipedream a naplók és a lépés exportok együttes méretét
+6 MB-ra korlátozza (<https://pipedream.com/docs/workflows/limits>); a Val Town a worker memóriáját (4 GiB) korlátozza,
+`fetch` válasz korlátot nem ad (<https://www.val.town/limits>). **Nem ellenőrzött:** az Apps Script blob olvasás 50
+MB-os korlátja a hivatalos kvóta oldalon nem szerepel (a két megerősítés közösségi mérés és blog); hivatalos
+dokumentáció csak az írás oldali párjára van (`DriveApp.createFile(name, content)`: kivétel, ha a tartalom 50 MB-nál
+nagyobb, <https://developers.google.com/apps-script/reference/drive/drive-app>). A fájl plafon elsődleges forrása
+ezért a sandbox futtató `readFile` dokumentált alapértéke.
+
+Mérés (saját, ezen a gépen: 4 mag, 3,9 GB memória, swap nélkül, Node 26.7.0): az
+`install-host-functions.spec.ts` "a 300 MB-os válasz az alapértelmezett olvasási plafonon (50 MB) elkapható TypeError
+..." tesztje a plafon nélküli alapértékkel (az alapérték ideiglenesen 2048 MB-ra állítva, ami a korábbi, memória korlát
+szerinti viselkedés `memoryLimitMb: null` mellett) a vitest workert `FATAL ERROR: Zone Allocation failed - process out
+of memory` hibával leállította; az 50 MB-os alapértékkel a szkript `TypeError`-t kap, a teszt szerver a 300 MB-nak csak
+a töredékét küldte el, és a következő lépés hibátlanul fut. A 300 MB-os (ritka) fájl a `readText`-en ugyanígy elkapható
+hiba. A két mező egymástól független (a `fetchResponseLimitMb: 1` a fájl olvasást nem érinti), unit teszttel.
+
+Ami marad (SPEC-014 5.10 5.): a gazda a plafon többszörösét tarthatja egyszerre (puffer, szöveg, JSON szöveg), több
+párhuzamos lépés plafonja összeadódik, és a 2048 MB-ig emelhető plafon a gép memóriáját továbbra is meghaladhatja.
+
+### 11.4 A kritérium tábla változása
+
+| #   | Ítélet                                         | Új bizonyíték                                                                                                                                                                                                      |
+| --- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 5   | teljesül                                       | `run-script.spec.ts` "a globális objektum kulcslistája pontosan a QuickJS 59 megmaradt neve, ...", a hat név csoport négy tesztje (11.1)                                                                           |
+| 7   | teljesül, kimondott maradék kockázattal (11.3) | `install-host-functions.spec.ts` a 300 MB-os válasz és fájl, a két mező felülírása; `node-config-drift-protection` "a JavaScript szkript két olvasási plafonjának tartománya ..."; `script-sandbox-limits.spec.ts` |
+| 8   | teljesül, kimondott TOCTOU maradékkal (11.2)   | a 11.2 tesztjei (gyökér és útvonal, lexikálisan és `fs.realpath` után)                                                                                                                                             |
+| 9   | teljesül                                       | e2e `graph-script-node.spec.ts` a tiltott munkakönyvtár (három érték) és a két olvasási plafon mező alatti hibája, PUT nélkül; `ScriptConfigFields.spec.tsx`                                                       |
+| 11  | a T-015-13-ban                                 | a merge kapu a végső fejen (PR leírás)                                                                                                                                                                             |

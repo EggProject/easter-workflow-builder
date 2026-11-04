@@ -29,7 +29,7 @@ describe('readTextInRoot', () => {
     await expect(readTextInRoot(fixtureDirectory.root, 'al/a.txt', 12)).resolves.toStrictEqual({
       kind: 'rejected',
       name: 'Error',
-      message: 'a fájl nagyobb, mint a lépés memória korlátja: al/a.txt',
+      message: 'a fájl nagyobb, mint a lépés olvasási plafonja (fileReadLimitMb): al/a.txt',
     });
   });
 

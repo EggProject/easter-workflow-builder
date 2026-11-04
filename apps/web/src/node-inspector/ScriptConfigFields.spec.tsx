@@ -76,6 +76,8 @@ const JAVASCRIPT_CONFIG: ScriptConfig = {
   timeoutMs: 60_000,
   cwd: '/munka',
   memoryLimitMb: 256,
+  fetchResponseLimitMb: 8,
+  fileReadLimitMb: 4,
 };
 const EMPTY_JAVASCRIPT_CONFIG: ScriptConfig = {
   runtime: 'javascript',
@@ -83,6 +85,8 @@ const EMPTY_JAVASCRIPT_CONFIG: ScriptConfig = {
   timeoutMs: null,
   cwd: null,
   memoryLimitMb: null,
+  fetchResponseLimitMb: null,
+  fileReadLimitMb: null,
 };
 
 describe('ScriptConfigFields', () => {
@@ -124,7 +128,7 @@ describe('ScriptConfigFields', () => {
     expect(onChange).toHaveBeenLastCalledWith({ runtime: 'expression', source: 'input.x + 2' });
   });
 
-  it('JavaScript ágon megjelenik az időkorlát, a munkakönyvtár és a memória korlát, az értékekkel és az alapérték feliratokkal', () => {
+  it('JavaScript ágon megjelenik az időkorlát, a munkakönyvtár, a memória korlát és a két olvasási plafon, az értékekkel és az alapérték feliratokkal', () => {
     render(JAVASCRIPT_CONFIG, vi.fn());
     expect(fieldLabels(container)).toEqual([
       'Futásidő (runtime)',
@@ -132,6 +136,8 @@ describe('ScriptConfigFields', () => {
       'Időkorlát (másodperc)',
       'Munkakönyvtár (cwd)',
       'Memória korlát (MB)',
+      'Hálózati válasz plafon (MB)',
+      'Fájl olvasási plafon (MB)',
     ]);
     expect(runtimeTrigger(container).textContent).toContain('JavaScript');
     const timeout = inputByLabel(container, 'Időkorlát (másodperc)');
@@ -145,6 +151,14 @@ describe('ScriptConfigFields', () => {
     expect(memory.type).toBe('number');
     expect(memory.value).toBe('256');
     expect(memory.placeholder).toBe('Üresen a rendszermemória, legfeljebb 2048 MB');
+    const response = inputByLabel(container, 'Hálózati válasz plafon (MB)');
+    expect(response.type).toBe('number');
+    expect(response.value).toBe('8');
+    expect(response.placeholder).toBe('Üresen 50 MB, legfeljebb a memória korlát');
+    const file = inputByLabel(container, 'Fájl olvasási plafon (MB)');
+    expect(file.type).toBe('number');
+    expect(file.value).toBe('4');
+    expect(file.placeholder).toBe('Üresen 50 MB, legfeljebb a memória korlát');
   });
 
   it('a null értékű JavaScript mezők üresek', () => {
@@ -152,6 +166,21 @@ describe('ScriptConfigFields', () => {
     expect(inputByLabel(container, 'Időkorlát (másodperc)').value).toBe('');
     expect(inputByLabel(container, 'Munkakönyvtár (cwd)').value).toBe('');
     expect(inputByLabel(container, 'Memória korlát (MB)').value).toBe('');
+    expect(inputByLabel(container, 'Hálózati válasz plafon (MB)').value).toBe('');
+    expect(inputByLabel(container, 'Fájl olvasási plafon (MB)').value).toBe('');
+  });
+
+  it('a két olvasási plafon külön szerkeszthető, üresen null', () => {
+    const onChange = vi.fn();
+    render(JAVASCRIPT_CONFIG, onChange);
+    act(() => {
+      typeInto(inputByLabel(container, 'Hálózati válasz plafon (MB)'), '100');
+    });
+    expect(onChange).toHaveBeenLastCalledWith({ ...JAVASCRIPT_CONFIG, fetchResponseLimitMb: 100 });
+    act(() => {
+      typeInto(inputByLabel(container, 'Fájl olvasási plafon (MB)'), '');
+    });
+    expect(onChange).toHaveBeenLastCalledWith({ ...JAVASCRIPT_CONFIG, fileReadLimitMb: null });
   });
 
   it('CEL-ről JavaScriptre váltva a cél ág alakja áll, a forrás megmarad', () => {
@@ -165,6 +194,8 @@ describe('ScriptConfigFields', () => {
       timeoutMs: null,
       cwd: null,
       memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
     });
   });
 
@@ -246,7 +277,7 @@ describe('ScriptConfigFields', () => {
     expect(onChange).toHaveBeenLastCalledWith({ ...JAVASCRIPT_CONFIG, memoryLimitMb: null });
   });
 
-  it('a négy mező hibája az előtaggal együtt a saját mezője alatt jelenik meg, aria kötéssel', () => {
+  it('a hat mező hibája az előtaggal együtt a saját mezője alatt jelenik meg, aria kötéssel', () => {
     act(() => {
       root.render(
         <FieldErrorVisibilityContext.Provider value>
@@ -257,6 +288,8 @@ describe('ScriptConfigFields', () => {
                 ['settings.timeoutMs', 'Időkorlát hiba'],
                 ['settings.cwd', 'Munkakönyvtár hiba'],
                 ['settings.memoryLimitMb', 'Memória hiba'],
+                ['settings.fetchResponseLimitMb', 'Válasz plafon hiba'],
+                ['settings.fileReadLimitMb', 'Fájl plafon hiba'],
               ])
             }
           >
@@ -272,6 +305,8 @@ describe('ScriptConfigFields', () => {
       TIMEOUT_SECONDS_FIELD_ERROR_MESSAGE,
       'Munkakönyvtár hiba',
       'Memória hiba',
+      'Válasz plafon hiba',
+      'Fájl plafon hiba',
     ]);
     const timeout = inputByLabel(container, 'Időkorlát (másodperc)');
     expect(timeout.getAttribute('aria-invalid')).toBe('true');

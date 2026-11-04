@@ -221,7 +221,11 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   maximuma ezen kívül nem példányosítható), a `db` guardban és a `protocol` mentési sémájában (a hiba a
   mező útvonalán, `config.memoryLimitMb`, a `join` `script` módján `settings.memoryLimitMb`), az olvasó
   séma itt is csak a típust ellenőrzi; a határértékek mezőnkénti futásidejű ága az `apps/server`
-  `node-config-drift-protection` témában áll (SPEC-014 5.3, user döntés 2026-11-04).
+  `node-config-drift-protection` témában áll (SPEC-014 5.3, user döntés 2026-11-04). **A két gazda oldali
+  olvasási plafon (`fetchResponseLimitMb`, `fileReadLimitMb`) ugyanezt a védelmet kapja:** `null` vagy
+  pozitív egész legfeljebb 2048, mindkét oldalon, mezőnkénti futásidejű ággal; az alapérték (50 MB) a
+  futtatóé, a forrása a research `2026-11-04-szkript-csomopont.md` 11.3 (user döntés 2026-11-04, "Igen,
+  iparági alapértékkel").
 
 - **A `db` `NodeConfig` guard minden ismeretlen kulcsot elutasít, és a `protocol` ugyanazt a szabályt
   duplikálja, ugyanezzel a védelemmel.** Az `isNodeConfig` és az `isAgentStepConfig` objektumonként zárt

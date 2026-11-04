@@ -66,6 +66,8 @@ const validConfigs: readonly NodeConfig[] = [
       timeoutMs: 120_000,
       cwd: 'munka/almappa',
       memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
     },
     onUnhandledError: 'fail_run',
   },
@@ -100,6 +102,8 @@ const validConfigs: readonly NodeConfig[] = [
     timeoutMs: null,
     cwd: null,
     memoryLimitMb: 256,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
     onUnhandledError: null,
   },
 ];
@@ -421,6 +425,8 @@ describe('isNodeConfig', () => {
           timeoutMs,
           cwd: null,
           memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
           onUnhandledError: null,
         },
       ],
@@ -429,7 +435,15 @@ describe('isNodeConfig', () => {
         {
           type: 'join',
           mode: 'script',
-          settings: { source: 'a', runtime: 'javascript', timeoutMs, cwd: null, memoryLimitMb: null },
+          settings: {
+            source: 'a',
+            runtime: 'javascript',
+            timeoutMs,
+            cwd: null,
+            memoryLimitMb: null,
+            fetchResponseLimitMb: null,
+            fileReadLimitMb: null,
+          },
           onUnhandledError: null,
         },
       ],
@@ -443,6 +457,8 @@ describe('isNodeConfig', () => {
         timeoutMs: null,
         cwd: 7,
         memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
         onUnhandledError: null,
       },
     ],
@@ -455,7 +471,15 @@ describe('isNodeConfig', () => {
       {
         type: 'join',
         mode: 'script',
-        settings: { source: 'a', runtime: 'javascript', timeoutMs: null, cwd: 7, memoryLimitMb: null },
+        settings: {
+          source: 'a',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd: 7,
+          memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        },
       },
     ],
     [
@@ -543,6 +567,8 @@ describe('isNodeConfig', () => {
           timeoutMs: null,
           cwd: null,
           memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
           [UNKNOWN_KEY]: true,
         },
         onUnhandledError: null,
@@ -595,9 +621,63 @@ describe('isNodeConfig', () => {
           timeoutMs,
           cwd: 'munka',
           memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
           onUnhandledError: null,
         }),
       ).toBe(true);
+    }
+  });
+
+  describe('a javascript szkript két olvasási plafon mezője null vagy 1 ... 2048 közötti egész (SPEC-014 5.3)', () => {
+    for (const key of ['fetchResponseLimitMb', 'fileReadLimitMb'] as const) {
+      const builders: readonly (readonly [string, (value: unknown) => unknown])[] = [
+        [
+          `script ${key}`,
+          (value) => ({
+            type: 'script',
+            source: 'a',
+            runtime: 'javascript',
+            timeoutMs: null,
+            cwd: null,
+            memoryLimitMb: null,
+            fetchResponseLimitMb: null,
+            fileReadLimitMb: null,
+            [key]: value,
+            onUnhandledError: null,
+          }),
+        ],
+        [
+          `join script ${key}`,
+          (value) => ({
+            type: 'join',
+            mode: 'script',
+            settings: {
+              source: 'a',
+              runtime: 'javascript',
+              timeoutMs: null,
+              cwd: null,
+              memoryLimitMb: null,
+              fetchResponseLimitMb: null,
+              fileReadLimitMb: null,
+              [key]: value,
+            },
+            onUnhandledError: null,
+          }),
+        ],
+      ];
+      for (const [label, build] of builders) {
+        for (const value of [null, 1, 50, 2048]) {
+          it(`${label}: a(z) ${String(value)} érvényes`, () => {
+            expect(isNodeConfig(build(value))).toBe(true);
+          });
+        }
+        for (const value of [0, -1, 2049, 1.5, '50', undefined]) {
+          it(`${label}: a(z) ${String(value)} érvénytelen`, () => {
+            expect(isNodeConfig(build(value))).toBe(false);
+          });
+        }
+      }
     }
   });
 
@@ -612,6 +692,8 @@ describe('isNodeConfig', () => {
           timeoutMs: null,
           cwd: null,
           memoryLimitMb,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
           onUnhandledError: null,
         }),
       ],
@@ -620,7 +702,15 @@ describe('isNodeConfig', () => {
         (memoryLimitMb) => ({
           type: 'join',
           mode: 'script',
-          settings: { source: 'a', runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb },
+          settings: {
+            source: 'a',
+            runtime: 'javascript',
+            timeoutMs: null,
+            cwd: null,
+            memoryLimitMb,
+            fetchResponseLimitMb: null,
+            fileReadLimitMb: null,
+          },
           onUnhandledError: null,
         }),
       ],

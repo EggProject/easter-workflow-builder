@@ -16,6 +16,7 @@ import { installHostFunctions } from './install-host-functions.ts';
 import { isForbiddenScriptRoot } from './is-forbidden-script-root.ts';
 import { loadQuickJsModule } from './load-quickjs-module.ts';
 import { resolveMemoryLimitMb } from './resolve-memory-limit-mb.ts';
+import { resolveReadLimitBytes } from './resolve-read-limit-bytes.ts';
 import { SCRIPT_FILE_NAME } from './script-file-name.ts';
 import { SCRIPT_SANDBOX_LIMITS } from './script-sandbox-limits.ts';
 import { waitForSettlement } from './wait-for-settlement.ts';
@@ -57,8 +58,9 @@ const PARSE_SOURCE = 'JSON.parse';
 
 /**
  * A lépés futás közbeni állapota: a lebontandó handle-ök, a még nem rendezett
- * gazda hívások, a fájl hozzáférés gyökere, a gazda olvasás felső határa (a
- * lépés memória korlátja bájtban), a gazda hívások jele (a kérés jele
+ * gazda hívások, a fájl hozzáférés gyökere, a gazda olvasás két felső határa (a
+ * `fetch` válasz és a `readText` fájl olvasási plafonja bájtban), a gazda
+ * hívások jele (a kérés jele
  * és a lépés vége együtt) és az interrupt kezelő jelzése.
  */
 interface SandboxStep {
@@ -67,7 +69,8 @@ interface SandboxStep {
   readonly handles: QuickJSHandle[];
   readonly pendingCalls: Set<QuickJSDeferredPromise>;
   readonly root: string;
-  readonly maxReadBytes: number;
+  readonly maxResponseBytes: number;
+  readonly maxFileBytes: number;
   readonly hostSignal: AbortSignal;
   readonly timeoutMs: number;
   readonly deadlineMs: number;
@@ -151,7 +154,16 @@ async function runInFreshModule(
     handles: [],
     pendingCalls: new Set(),
     root,
-    maxReadBytes: resolveMemoryLimitMb(request.memoryLimitMb) * 2 ** 20,
+    maxResponseBytes: resolveReadLimitBytes(
+      request.fetchResponseLimitMb,
+      SCRIPT_SANDBOX_LIMITS.defaultFetchResponseLimitMb,
+      resolveMemoryLimitMb(request.memoryLimitMb),
+    ),
+    maxFileBytes: resolveReadLimitBytes(
+      request.fileReadLimitMb,
+      SCRIPT_SANDBOX_LIMITS.defaultFileReadLimitMb,
+      resolveMemoryLimitMb(request.memoryLimitMb),
+    ),
     hostSignal: AbortSignal.any([request.signal, stepEnd.signal]),
     timeoutMs,
     deadlineMs,
@@ -191,7 +203,7 @@ async function evaluateInSandbox(step: SandboxStep, request: ScriptRunRequest): 
     },
     isInterrupted: () => step.state.interrupted,
   };
-  for (const handle of installHostFunctions(scope, step.root, step.maxReadBytes)) {
+  for (const handle of installHostFunctions(scope, step.root, step.maxResponseBytes, step.maxFileBytes)) {
     keep(handle);
   }
 

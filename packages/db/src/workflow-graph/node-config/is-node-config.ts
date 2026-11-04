@@ -154,6 +154,8 @@ const JAVASCRIPT_SCRIPT_CONFIG_KEYS: Readonly<Record<keyof JavaScriptScriptConfi
   timeoutMs: true,
   cwd: true,
   memoryLimitMb: true,
+  fetchResponseLimitMb: true,
+  fileReadLimitMb: true,
 };
 
 const EXPRESSION_SCRIPT_NODE_CONFIG_KEYS: Readonly<Record<keyof ExpressionScriptNodeConfig, true>> = {
@@ -170,6 +172,8 @@ const JAVASCRIPT_SCRIPT_NODE_CONFIG_KEYS: Readonly<Record<keyof JavaScriptScript
   timeoutMs: true,
   cwd: true,
   memoryLimitMb: true,
+  fetchResponseLimitMb: true,
+  fileReadLimitMb: true,
   onUnhandledError: true,
 };
 
@@ -223,6 +227,16 @@ function isScriptMemoryLimitMb(value: unknown): value is number | null {
 }
 
 /**
+ * A JavaScript szkript gazda oldali olvasási plafonja (`fetchResponseLimitMb`,
+ * `fileReadLimitMb`, SPEC-014 5.3): `null` az alapérték, egyébként pozitív
+ * egész, legfeljebb `MAX_SCRIPT_MEMORY_LIMIT_MB` (a modul plafonja fölötti
+ * tartalom a sandboxba sosem férne be).
+ */
+function isScriptReadLimitMb(value: unknown): value is number | null {
+  return value === null || (isPositiveInteger(value) && value <= MAX_SCRIPT_MEMORY_LIMIT_MB);
+}
+
+/**
  * A user 1. döntése (SPEC-004 8.3): a node config `onUnhandledError` mezője.
  */
 function isUnhandledErrorPolicy(value: unknown): value is UnhandledErrorPolicy {
@@ -264,7 +278,9 @@ function isScriptConfig(
         isRecordWithKnownKeys(value, javascriptKeys) &&
         isScriptTimeoutMs(value['timeoutMs']) &&
         (value['cwd'] === null || isString(value['cwd'])) &&
-        isScriptMemoryLimitMb(value['memoryLimitMb'])
+        isScriptMemoryLimitMb(value['memoryLimitMb']) &&
+        isScriptReadLimitMb(value['fetchResponseLimitMb']) &&
+        isScriptReadLimitMb(value['fileReadLimitMb'])
       );
     }
     default: {

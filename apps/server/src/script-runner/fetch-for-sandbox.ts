@@ -19,10 +19,11 @@ const ALLOWED_PROTOCOLS: ReadonlySet<string> = new Set(['http:', 'https:']);
  *   megszakítása); a gazda csak a dokumentált mezőket adja tovább.
  * - A válasz `{ status, headers, body }`: a fejlécek a `Headers` bejárásából
  *   (kisbetűs név), a törzs szöveg (UTF-8 dekódolás, mint a `Response.text()`).
- * - A törzs legfeljebb `maxBodyBytes` bájt (a lépés memória korlátja): a
- *   hosszabb törzs olvasása a határon megáll, és `TypeError` az eredmény. A
- *   korlátnál hosszabb törzs a sandboxba amúgy sem férne be, a korlát nélküli
- *   olvasás viszont a szerver folyamat memóriáját fogyasztotta (T-015-12).
+ * - A törzs legfeljebb `maxBodyBytes` bájt (a gazda oldali olvasási plafon,
+ *   `fetchResponseLimitMb`, alapból 50 MB, legfeljebb a lépés memória korlátja,
+ *   SPEC-014 5.4 "Olvasási plafon"): a hosszabb törzs olvasása a határon megáll,
+ *   és `TypeError` az eredmény, amit a szkript elkaphat. A korlát nélküli
+ *   olvasás a szerver folyamat memóriáját fogyasztotta (T-015-12).
  * - A hálózati hiba elutasított ígéret, az üzenetben a gazda hiba típusneve.
  */
 export async function fetchForSandbox(
@@ -48,7 +49,7 @@ export async function fetchForSandbox(
     const response = await fetch(target, { ...init, redirect: 'manual', signal });
     const bytes = response.body === null ? Buffer.alloc(0) : await readCappedBytes(response.body, maxBodyBytes);
     if (bytes === undefined) {
-      return typeError('a válasz törzse nagyobb, mint a lépés memória korlátja');
+      return typeError('a válasz törzse nagyobb, mint a lépés olvasási plafonja (fetchResponseLimitMb)');
     }
     const body = new TextDecoder().decode(bytes);
     return {

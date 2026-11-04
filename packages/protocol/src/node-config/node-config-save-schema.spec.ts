@@ -195,6 +195,8 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
       timeoutMs: null,
       cwd: null,
       memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
       onUnhandledError: 'fail_run',
     }),
   },
@@ -204,7 +206,15 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
     build: (text) => ({
       type: 'join',
       mode: 'script',
-      settings: { source: text, runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb: null },
+      settings: {
+        source: text,
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+      },
       onUnhandledError: 'fail_run',
     }),
   },
@@ -649,6 +659,8 @@ function javascriptScriptNodeWithTimeout(timeoutMs: unknown): unknown {
     timeoutMs,
     cwd: null,
     memoryLimitMb: null,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
     onUnhandledError: 'fail_run',
   };
 }
@@ -657,7 +669,15 @@ function javascriptJoinScriptWithTimeout(timeoutMs: unknown): unknown {
   return {
     type: 'join',
     mode: 'script',
-    settings: { source: 'return 1;', runtime: 'javascript', timeoutMs, cwd: null, memoryLimitMb: null },
+    settings: {
+      source: 'return 1;',
+      runtime: 'javascript',
+      timeoutMs,
+      cwd: null,
+      memoryLimitMb: null,
+      fetchResponseLimitMb: null,
+      fileReadLimitMb: null,
+    },
     onUnhandledError: 'fail_run',
   };
 }
@@ -1087,6 +1107,8 @@ describe('NodeConfigSaveSchema: a JavaScript szkript memoryLimitMb mezője null 
         timeoutMs: null,
         cwd: null,
         memoryLimitMb,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
         onUnhandledError: 'fail_run',
       }),
     },
@@ -1096,7 +1118,15 @@ describe('NodeConfigSaveSchema: a JavaScript szkript memoryLimitMb mezője null 
       build: (memoryLimitMb) => ({
         type: 'join',
         mode: 'script',
-        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd: null, memoryLimitMb },
+        settings: {
+          source: 'return 1;',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd: null,
+          memoryLimitMb,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        },
         onUnhandledError: 'fail_run',
       }),
     },
@@ -1169,6 +1199,8 @@ describe('NodeConfigSaveSchema: a JavaScript szkript cwd mezője nem mutathat a 
         timeoutMs: null,
         cwd,
         memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
         onUnhandledError: 'fail_run',
       }),
     },
@@ -1178,7 +1210,15 @@ describe('NodeConfigSaveSchema: a JavaScript szkript cwd mezője nem mutathat a 
       build: (cwd) => ({
         type: 'join',
         mode: 'script',
-        settings: { source: 'return 1;', runtime: 'javascript', timeoutMs: null, cwd, memoryLimitMb: null },
+        settings: {
+          source: 'return 1;',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd,
+          memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+        },
         onUnhandledError: 'fail_run',
       }),
     },
@@ -1202,6 +1242,80 @@ describe('NodeConfigSaveSchema: a JavaScript szkript cwd mezője nem mutathat a 
           }
           expect(issuePaths(parsed.error)).toEqual([path]);
           expect(parsed.error.issues[0]?.message).toBe(SCRIPT_CWD_FORBIDDEN_MESSAGE);
+        });
+      }
+    });
+  }
+});
+
+const SCRIPT_READ_LIMIT_OUT_OF_RANGE_MESSAGE = 'A mező értéke 1 és 2048 közötti egész szám lehet.';
+
+describe('NodeConfigSaveSchema: a JavaScript szkript két olvasási plafon mezője null vagy 1 ... 2048 közötti egész (SPEC-014 5.3)', () => {
+  const SCRIPT_READ_LIMIT_CASES: readonly {
+    readonly field: string;
+    readonly path: readonly string[];
+    readonly build: (value: unknown) => unknown;
+  }[] = (['fetchResponseLimitMb', 'fileReadLimitMb'] as const).flatMap((key) => [
+    {
+      field: `script ${key}`,
+      path: [key],
+      build: (value: unknown) => ({
+        type: 'script',
+        source: 'return 1;',
+        runtime: 'javascript',
+        timeoutMs: null,
+        cwd: null,
+        memoryLimitMb: null,
+        fetchResponseLimitMb: null,
+        fileReadLimitMb: null,
+        [key]: value,
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    {
+      field: `join script ${key}`,
+      path: ['settings', key],
+      build: (value: unknown) => ({
+        type: 'join',
+        mode: 'script',
+        settings: {
+          source: 'return 1;',
+          runtime: 'javascript',
+          timeoutMs: null,
+          cwd: null,
+          memoryLimitMb: null,
+          fetchResponseLimitMb: null,
+          fileReadLimitMb: null,
+          [key]: value,
+        },
+        onUnhandledError: 'fail_run',
+      }),
+    },
+  ]);
+
+  for (const { field, path, build } of SCRIPT_READ_LIMIT_CASES) {
+    describe(field, () => {
+      for (const value of [1, 50, 2048, null]) {
+        it(`a(z) ${String(value)} átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse(build(value)).success).toBe(true);
+        });
+      }
+
+      for (const [description, value] of [
+        ['nulla', 0],
+        ['negatív', -1],
+        ['a tartomány fölötti (2049)', 2049],
+        ['tört', 1.5],
+      ] as const) {
+        it(`${description} érték elbukik, a hiba a mező útvonalán áll`, () => {
+          const parsed = NodeConfigSaveSchema.safeParse(build(value));
+
+          expect(parsed.success).toBe(false);
+          if (parsed.success) {
+            return;
+          }
+          expect(issuePaths(parsed.error)).toEqual([path]);
+          expect(parsed.error.issues[0]?.message).toBe(SCRIPT_READ_LIMIT_OUT_OF_RANGE_MESSAGE);
         });
       }
     });

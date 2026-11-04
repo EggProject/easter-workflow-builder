@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-null -- a port `cwd` mezőjének üres értéke a tárolt `null` (SPEC-014 5.3) */
 import { readdirSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from 'node:fs/promises';
 import { once } from 'node:events';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -26,6 +26,10 @@ const CONTEXT: RunContext = {
 // A teszt szerver címe; a `beforeAll` tölti ki.
 const target = { origin: '' };
 const hangingRequests: IncomingMessage[] = [];
+
+// A 300 MB-os válasz mérete MB-ban és az elküldött bájtok száma.
+const HUGE_RESPONSE_MB = 300;
+const hugeResponse = { writtenBytes: 0 };
 
 function ignoreClientAbort(): void {
   // A kliens bontásakor a kérés `error` (aborted) eseményt is kap; a teszt a bezárást figyeli.
@@ -56,6 +60,29 @@ function handle(request: IncomingMessage, response: ServerResponse): void {
     };
     response.on('error', ignoreClientAbort);
     writeNext(17);
+    return;
+  }
+  if (request.url === '/huge') {
+    // A 300 MB-os válasz (research `2026-11-04-szkript-csomopont.md` 10.3: a plafon előtt a
+    // szerver folyamatot leállította); az elküldött bájtokat a teszt számolja.
+    response.writeHead(200);
+    const chunk = Buffer.alloc(2 ** 20, 'a');
+    const writeNext = (remaining: number): void => {
+      if (remaining === 0 || response.destroyed) {
+        response.end();
+        return;
+      }
+      hugeResponse.writtenBytes += chunk.byteLength;
+      if (response.write(chunk)) {
+        writeNext(remaining - 1);
+        return;
+      }
+      response.once('drain', () => {
+        writeNext(remaining - 1);
+      });
+    };
+    response.on('error', ignoreClientAbort);
+    writeNext(HUGE_RESPONSE_MB);
     return;
   }
   if (request.url === '/redirect') {
@@ -108,6 +135,8 @@ function request(source: string, overrides: Partial<ScriptRunRequest> = {}): Scr
     timeoutMs: 5000,
     cwd: fixtureDirectory.root,
     memoryLimitMb: 64,
+    fetchResponseLimitMb: null,
+    fileReadLimitMb: null,
     signal: new AbortController().signal,
     ...overrides,
   };
@@ -176,10 +205,36 @@ describe('installHostFunctions', () => {
 
     it('a lépés memória korlátjánál hosszabb válasz törzs elkapható TypeError, a gazda nem olvassa végig (T-015-12)', async () => {
       const source = `try { await fetch("${target.origin}/big"); return "olvasva"; } catch (e) { return e.name + ": " + e.message; }`;
-      await expect(runScript(request(source, { memoryLimitMb: 16 }))).resolves.toStrictEqual({
+      await expect(
+        runScript(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
+      ).resolves.toStrictEqual({
         kind: 'succeeded',
-        output: 'TypeError: a válasz törzse nagyobb, mint a lépés memória korlátja',
+        output: 'TypeError: a válasz törzse nagyobb, mint a lépés olvasási plafonja (fetchResponseLimitMb)',
       });
+    });
+
+    it('a 300 MB-os válasz az alapértelmezett olvasási plafonon (50 MB) elkapható TypeError, a gazda nem olvassa végig, és a szerver folyamat fut tovább (SPEC-014 5.4)', async () => {
+      hugeResponse.writtenBytes = 0;
+      const source = `try { await fetch("${target.origin}/huge"); return "olvasva"; } catch (e) { return e.name + ": " + e.message; }`;
+      const result = await runScript(
+        request(source, { memoryLimitMb: null, fetchResponseLimitMb: null, fileReadLimitMb: null }),
+      );
+      expect(result).toStrictEqual({
+        kind: 'succeeded',
+        output: 'TypeError: a válasz törzse nagyobb, mint a lépés olvasási plafonja (fetchResponseLimitMb)',
+      });
+      expect(hugeResponse.writtenBytes).toBeLessThan(HUGE_RESPONSE_MB * 2 ** 20);
+      await expect(runScript(request('return 1;'))).resolves.toStrictEqual({ kind: 'succeeded', output: 1 });
+    });
+
+    it('a csomópont fetchResponseLimitMb mezője felülírja az alapértéket, a fájl plafonját nem érinti', async () => {
+      await writeFile(path.join(fixtureDirectory.root, 'ket-mb.txt'), Buffer.alloc(2 * 2 ** 20, 'a'));
+      const source =
+        `const out = []; try { await fetch("${target.origin}/big"); out.push("olvasva"); } catch (e) { out.push(e.name); }` +
+        ' out.push((await files.readText("ket-mb.txt")).length); return out;';
+      await expect(
+        runScript(request(source, { memoryLimitMb: 64, fetchResponseLimitMb: 1, fileReadLimitMb: null })),
+      ).resolves.toStrictEqual({ kind: 'succeeded', output: ['TypeError', 2 * 2 ** 20] });
     });
 
     it('a határidőn függő válasz script_timed_out, és a kérés megszakad', async () => {
@@ -220,9 +275,38 @@ describe('installHostFunctions', () => {
       await writeFile(path.join(fixtureDirectory.root, 'nagy.txt'), Buffer.alloc(17 * 2 ** 20, 'a'));
       const source =
         'try { await files.readText("nagy.txt"); return "olvasva"; } catch (e) { return e.name + ": " + e.message; }';
-      await expect(runScript(request(source, { memoryLimitMb: 16 }))).resolves.toStrictEqual({
+      await expect(
+        runScript(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
+      ).resolves.toStrictEqual({
         kind: 'succeeded',
-        output: 'Error: a fájl nagyobb, mint a lépés memória korlátja: nagy.txt',
+        output: 'Error: a fájl nagyobb, mint a lépés olvasási plafonja (fileReadLimitMb): nagy.txt',
+      });
+    });
+
+    it('a 300 MB-os fájl az alapértelmezett olvasási plafonon (50 MB) elkapható hiba (SPEC-014 5.4)', async () => {
+      // Ritka fájl: a 300 MB a lemezen nem foglal helyet, az olvasás viszont 300 MB-ot adna.
+      await writeFile(path.join(fixtureDirectory.root, 'ritka.bin'), '');
+      await truncate(path.join(fixtureDirectory.root, 'ritka.bin'), 300 * 2 ** 20);
+      const source =
+        'try { await files.readText("ritka.bin"); return "olvasva"; } catch (e) { return e.name + ": " + e.message; }';
+      await expect(
+        runScript(request(source, { memoryLimitMb: null, fetchResponseLimitMb: null, fileReadLimitMb: null })),
+      ).resolves.toStrictEqual({
+        kind: 'succeeded',
+        output: 'Error: a fájl nagyobb, mint a lépés olvasási plafonja (fileReadLimitMb): ritka.bin',
+      });
+    });
+
+    it('a csomópont fileReadLimitMb mezője felülírja az alapértéket: 1 MB-on a 2 MB-os fájl hiba, 3 MB-on olvasható', async () => {
+      await writeFile(path.join(fixtureDirectory.root, 'ket-mb.txt'), Buffer.alloc(2 * 2 ** 20, 'a'));
+      const source = 'try { return (await files.readText("ket-mb.txt")).length; } catch (e) { return e.name; }';
+      await expect(runScript(request(source, { fileReadLimitMb: 1 }))).resolves.toStrictEqual({
+        kind: 'succeeded',
+        output: 'Error',
+      });
+      await expect(runScript(request(source, { fileReadLimitMb: 3 }))).resolves.toStrictEqual({
+        kind: 'succeeded',
+        output: 2 * 2 ** 20,
       });
     });
 
