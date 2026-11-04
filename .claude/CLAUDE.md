@@ -862,7 +862,8 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   mezőjében adja, a kliens ehhez saját magyar mondatot rendel (2026-10-25 óta a futás indításának
   sablon és kifejezés hibájára is, SPEC-010 9.6; a user 2026-10-28-i döntése szerint a skill feltöltés
   elutasítási okaira, a hiányzó skillre, a hiányzó MCP definícióra és a hiányzó MCP env változóra is,
-  SPEC-009 5.4 és 6.4), és a `message` szövegét nem elemzi;
+  SPEC-009 5.4 és 6.4), és a `message` szövegét nem elemzi (az egyetlen kivétel a strukturált kimenet
+  sémájának mezőútja, lent);
   hiányzó mezőnél a kód mondata marad, a mentés mezőútja nem kap mondatot. **Egyetlen, szűkített
   kivétel: a strukturált kimenet sémája** (SPEC-015 5.7, user döntés 2026-11-04, "Mentéskor és
   indításkor"): a szerver a mentéskor a sémát az `agent` fordítójával ellenőrzi, a nem fordítható

@@ -29,7 +29,9 @@ describe('compileStructuredOutputSchema', () => {
   it.each([
     ['draft 2020-12', 'https://json-schema.org/draft/2020-12/schema'],
     ['draft 2019-09', 'https://json-schema.org/draft/2019-09/schema'],
-  ])('a draft-07-nél újabb $schema (%s) érvénytelen', (_name, metaSchema) => {
+    // eslint-disable-next-line unicorn/prefer-https -- a meta-séma azonosítója szó szerint ez
+    ['draft-04, a régebbi változat', 'http://json-schema.org/draft-04/schema#'],
+  ])('a nem draft-07 $schema (%s) érvénytelen', (_name, metaSchema) => {
     expect(compileStructuredOutputSchema({ $schema: metaSchema, type: 'object' })).toEqual({
       kind: 'error',
       message: `A strukturált kimenet sémája érvénytelen: no schema with key or ref "${metaSchema}"`,

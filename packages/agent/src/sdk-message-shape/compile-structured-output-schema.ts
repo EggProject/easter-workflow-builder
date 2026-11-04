@@ -9,8 +9,9 @@ const INVALID_SCHEMA_PREFIX = 'A strukturált kimenet sémája érvénytelen';
 /**
  * A lépés `structuredOutput.schema` mezőjének fordítása (SPEC-015 5.2, 5.4).
  * Az Ajv alap osztálya draft-07 szerint fordít, alapból strict módban, és a
- * sémát a meta-sémára is ellenőrzi; a draft-07-nél újabb `$schema`
- * deklarációt nem ismeri, tehát az is hibaág (K-3, K-7). Az `allErrors: false`
+ * sémát a meta-sémára is ellenőrzi; csak a draft-07 meta-séma azonosítóját
+ * ismeri (a `json-schema.org/draft-07/schema` azonosító `http` alakja), tehát a draft-07-nél
+ * újabb (K-3, K-7), a régebbi és a más alakú `$schema` deklaráció is hibaág. Az `allErrors: false`
  * a K-8 ajánlása, minden más opció az Ajv alapértékén marad.
  *
  * Az `$async: true` séma ellenőrzője ígéretet ad vissza, amit a szinkron
@@ -25,7 +26,8 @@ export function compileStructuredOutputSchema(schema: unknown): Outcome<Structur
     return { kind: 'error', message: `${INVALID_SCHEMA_PREFIX}: a séma nem objektum és nem logikai érték` };
   }
   const ajv = new Ajv({ allErrors: false });
-  let validator;
+  // A `compile` utolsó túlterhelése (`AnySchema` bemenet) az aszinkron ellenőrzőt is magában foglaló alak.
+  let validator: ReturnType<Ajv['compile']>;
   try {
     validator = ajv.compile(schema);
   } catch (error) {

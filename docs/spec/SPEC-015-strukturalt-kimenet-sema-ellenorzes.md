@@ -106,7 +106,9 @@ a réteg térkép nem változik, mert külső csomag.
   `invalid_structured_output_schema`, a `ProtocolErrorClass` szótárba és a kliens magyar mondatai közé is
   felvéve, a meglévő sodródás védelemmel. Ez megelőzi, hogy az SDK a lépés elején álljon le (K-3), miközben
   a futás többi lépése már lefutott.
-- Draft-07-nél újabb `$schema` deklaráció érvénytelen, ugyanúgy, mint az SDK-ban (K-3).
+- Draft-07-nél újabb `$schema` deklaráció érvénytelen, ugyanúgy, mint az SDK-ban (K-3). Az Ajv alap osztálya csak
+  a draft-07 meta-séma azonosítóját ismeri, tehát a régebbi (például draft-04) és a `https` alakú azonosító is
+  érvénytelen (mérve a végrehajtáskor, `compile-structured-output-schema.spec.ts`).
 - A mentéskor is ellenőriz (O-2 user döntés), lásd 5.7.
 
 ### 5.5 Eltérés esetén

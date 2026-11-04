@@ -138,6 +138,11 @@ function classifyResult(
  * (`validateStructuredOutputSchemas`), a lépés mégis maga fordít, mert az
  * ellenőrzőt nem a futás állapota hordozza; egy itt bukó séma a lépést a
  * futtatás előtt, `invalid_structured_output_schema` osztállyal állítja meg.
+ * A termékúton (indítás, újraindítás, al-workflow) az indítás már lefordította
+ * ugyanezt a sémát, tehát ez az ág védő ág, ugyanazon minta szerint, mint a
+ * lépés szintű leíró ellenőrzés (`agent-node-lifecycle.ts`, a futás indításakor
+ * is futó `validateAgentStepCapabilities`); a teszt a `runAgentStep`
+ * közvetlen hívásával éri el.
  */
 function compileStepSchema(nodeId: string, config: AgentStepConfig): Outcome<StructuredOutputValidator | undefined> {
   if (config.structuredOutput === null) {

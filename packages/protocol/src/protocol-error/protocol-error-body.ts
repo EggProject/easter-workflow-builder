@@ -11,7 +11,10 @@ import { ProtocolErrorCodeSchema } from './protocol-error-code.ts';
  *
  * Az `errorClass` a hibaosztály géppel olvasható neve, de csak akkor áll a
  * törzsben, ha a `ProtocolErrorClassSchema` zárt szótárában szerepel (8.5):
- * a kliens ebből választ saját mondatot, a `message` szövegét nem elemzi.
+ * a kliens ebből választ saját mondatot, a `message` szövegét nem elemzi. Az
+ * egyetlen kivétel az `invalid_request` mezőlistája, és abból is csak a
+ * strukturált kimenet sémájának mezőútja (`readInvalidRequestFieldPaths`,
+ * SPEC-015 5.7).
  * Elhagyható, nem `null`: a szótáron kívüli hibaosztálynál és a mező előtti
  * szerver válaszánál egyaránt hiányzik, és a kliens mindkettőre a `code`
  * mondatát mutatja.
