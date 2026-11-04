@@ -2,7 +2,7 @@
 
 |              |                                                                                    |
 | ------------ | ---------------------------------------------------------------------------------- |
-| Státusz      | tervezet                                                                           |
+| Státusz      | végrehajtva (2026-08-26)                                                           |
 | Dátum        | 2026-08-26                                                                         |
 | Spec         | [`../spec/SPEC-001-monorepo-toolchain.md`](../spec/SPEC-001-monorepo-toolchain.md) |
 | Verzióforrás | [`../research/2026-08-26-toolchain.md`](../research/2026-08-26-toolchain.md)       |

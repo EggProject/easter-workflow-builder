@@ -588,9 +588,12 @@ SPEC-009.
 
 **A képesség leíró és a bizonyíték kényszer.** A MiniMax képességei eltérnek az Anthropicétól, és
 modellenként mások: a korábbi modellre mért korlátok (strukturált kimenet, `tool_choice`, `effort`) a
-`MiniMax-M3.1-Flash`-re nem vihetők át, a Flash leírójában ezek `unknown` mezők a megismétlendő
-méréssel, a Flash `thinking` módja csak `adaptive` (a `disabled` 400 választ kap), az `effort`
-dokumentáltan elfogadott (SPEC-013 3.2, 3.3). Ezért van `ProviderCapabilityDescriptor`. Minden képességmező háromállapotú `Fact<T>` burkolóban
+`MiniMax-M3.1-Flash`-re nem vihetők át, ezért a Flash leíró e mezői saját, Flash-sel megismételt
+mérésen (`M-xx-flash`) vagy dokumentáción állnak: az `sdk_output_format` strukturált kimenet és az
+`effort` `known` (mérés, illetve dokumentáció), a `toolChoice.accepted` és a strukturált kimenet
+`defaultStrategy` mezője `unknown` (a mérés nem döntött, illetve nem futott; a mai értékek:
+`packages/provider-minimax/src/request-shaping/`). A Flash `thinking` módja csak `adaptive` (a
+`disabled` a forrás szerint 400 választ kap; SPEC-013 3.2, 3.3, 11. szekció O-8 ... O-10). Ezért van `ProviderCapabilityDescriptor`. Minden képességmező háromállapotú `Fact<T>` burkolóban
 áll: vagy `known` egy **nem üres** bizonyítéklistával, vagy `unknown` indoklással és a blokkoló
 mérési eset azonosítójával. A nem üres lista típusszintű követelmény, tehát bizonyíték nélküli
 `known` mező **nem fordul le**. Képességet megtippelni tilos: minden mező mögött mérés vagy

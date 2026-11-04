@@ -145,8 +145,8 @@ Fázisonként egy PR; minden PR a 2. szekció merge kapuján megy át.
 A következők külön specek vagy külön PR-ok, a hiánylista szerinti gazdával (ideiglenes nevek), a
 SPEC-009 14.6 szekciója szerint: helyi indítás, valódi próba és a kimenő környezet javítása (SPEC-012,
 végrehajtva, PR #63); join merge `settings` törlése, a `readRunEvents` kimondása és az error_handler
-megszakítható várakozás (végrehajtva, PR #62, `cbaff94`); szkript csomópont; strukturált kimenet séma ellenőrzés; Start
-bemenet `valueKind`; elavult kommentek és doksik (doksi javító PR).
+megszakítható várakozás (végrehajtva, PR #62, `cbaff94`); szkript csomópont (SPEC-014, végrehajtva, PR #77); strukturált kimenet séma ellenőrzés (SPEC-015, végrehajtva, PR #74); Start
+bemenet `valueKind` (SPEC-016, végrehajtva, PR #72); elavult kommentek és doksik (doksi javító PR-ok, az első a #65).
 
 ## 7. Definition of Done
 

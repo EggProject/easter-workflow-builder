@@ -11,7 +11,8 @@ import type { RunEventTransientFrame } from '@easter-workflow-builder/protocol';
  * eredeti kiadott érték `AgentStreamMessage` volt (SPEC-004 M-31): ha a
  * lecsapolás nem talál új sort erre a futásra (mert az üzenet nem
  * perzisztálódott, SPEC-005 6.1 táblázat "kikapcsolt kapcsoló" sora), a
- * kapcsolat ezt küldi ki helyette (O-6 elfogadott megoldása, SPEC-006 6.5).
+ * kapcsolat ezt küldi ki helyette (a SPEC-006 nyitott O-6 kérdésének addigi
+ * viselkedése, user döntés nélkül; SPEC-006 6.5).
  * `EngineEvent` eredetű jelzésnél `undefined`, mert M-32 szerint a motor a
  * `publish` hívást az írás UTÁN teszi, tehát a lecsapolás mindig talál sort.
  */

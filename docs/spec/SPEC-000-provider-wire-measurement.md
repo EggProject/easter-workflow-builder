@@ -1,11 +1,11 @@
 # SPEC-000: Provider drótszintű mérés
 
-|         |                                                                                                                  |
-| ------- | ---------------------------------------------------------------------------------------------------------------- |
-| Státusz | tervezet                                                                                                         |
-| Dátum   | 2026-08-26                                                                                                       |
-| Bemenet | [`../research/2026-08-26-agent-sdk-minimax.md`](../research/2026-08-26-agent-sdk-minimax.md) 4. szekció (Q1-Q12) |
-| Kimenet | `ProviderCapabilityDescriptor` típusterv + kitöltött `minimax` leíró                                             |
+|         |                                                                                                                                                                                                      |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Státusz | végrehajtva (2026-08-26, PLAN-000: a mérések és a provider leírók); tervezet 2026-08-26. A 9. szekció a mérés előtti állapotot rögzíti, a mai MiniMax leíró a SPEC-013 szerinti `MiniMax-M3.1-Flash` |
+| Dátum   | 2026-08-26                                                                                                                                                                                           |
+| Bemenet | [`../research/2026-08-26-agent-sdk-minimax.md`](../research/2026-08-26-agent-sdk-minimax.md) 4. szekció (Q1-Q12)                                                                                     |
+| Kimenet | `ProviderCapabilityDescriptor` típusterv + kitöltött `minimax` leíró                                                                                                                                 |
 
 ---
 
@@ -61,7 +61,7 @@ Gyökér: `docs/measurements/2026-08-26-minimax/`. Mérési esetenként egy alk�
 
 ### Maszkolás
 
-- Az `authorization` és `x-api-key` headerek értéke `REDACTED`-re cserélődik.
+- Az `authorization` és `x-api-key` headerek értéke hossz- és utolsó négy karakter megtartó maszkot kap (`maskSecretValue`, `tools/wire-probe/src/proxy/mask.ts`): a csillagok a titok hosszát, az utolsó négy karakter a kulcs azonosítását őrzi, a titok maga nem kerül lemezre.
 - Az `ANTHROPIC_AUTH_TOKEN` env változó (a MiniMax kulcs, a korábbi `MINIMAX_API_KEY` helyett, SPEC-012 O-20 (b)) értékének minden előfordulása minden rögzített szövegben `REDACTED`-re cserélődik, még a lemezre írás előtt, memóriában.
 - Nyers, maszkolatlan artefaktum soha nem íródik lemezre. Nincs `raw/` mentés, amit később törölni kellene.
 - A kulcs csak env változóból jön, a mérési konfigban sem szerepel literálként.
@@ -708,7 +708,9 @@ interface ProviderCapabilityDescriptor<TModelId extends string, TFamilyId extend
 | `rateLimits`                                    | dokumentált bucketek plusz a megfigyelt headerek                               | research 2. szekció, M-18, M-36                   |
 | `anthropicBetaHeaders`                          | Q12, a header elemek, párban a body mezőkkel                                   | M-14                                              |
 
-### A `minimax` leíró jelen állapota
+### A `minimax` leíró állapota a mérés előtt (történeti)
+
+**Történeti táblázat:** a mérések előtti kiinduló állapotot rögzíti, a mai leíró nem ez. A mérések eredménye a `docs/research/2026-08-26-spec000-kiertekeles.md` fájlban áll, a mai MiniMax leíró a `packages/provider-minimax` csomagban, a SPEC-013 szerinti `MiniMax-M3.1-Flash` modellre.
 
 A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModelId, MiniMaxFamilyId>` alakban íródik, ahol `MiniMaxModelId = 'MiniMax-M3'`, `MiniMaxFamilyId = 'M3'`. A mérés lezárása előtti állapot:
 
@@ -760,7 +762,7 @@ A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModel
 1. A `tools/wire-proxy/` mérőeszköz egyetlen paranccsal újrafuttatható, és a futás után minden mérési esethez létezik a 3. szekcióban felsorolt fájlkészlet a `docs/measurements/2026-08-26-minimax/M-<n>/` alatt.
 2. Mind a 18 mérési esethez (M-01 ... M-18) létezik legalább egy rögzített HTTP tranzakció, vagy a `meta.json`-ban indoklás, hogy miért nem volt reprodukálható.
 3. A Q1-Q12 táblázat minden sora lezárt: vagy konkrét mérési eset azonosítóval és megfigyeléssel eldöntve, vagy explicit `unknown` státusszal és indoklással. Tippelt lezárás nincs.
-4. A mérési könyvtárban az `ANTHROPIC_AUTH_TOKEN` értékére futtatott szöveges keresés nulla találatot ad, és minden rögzített `authorization` és `x-api-key` header értéke `REDACTED`.
+4. A mérési könyvtárban az `ANTHROPIC_AUTH_TOKEN` értékére futtatott szöveges keresés nulla találatot ad, és minden rögzített `authorization` és `x-api-key` header értéke a 3. szekció szerinti maszkolt alak (csillagok plusz az utolsó négy karakter; a kód: `tools/wire-probe/src/proxy/mask.ts` `maskHeaders`), nem a nyers érték.
 5. A `.gitignore` kizárja a proxy naplóját és a `.env` fájlt, a maszkolt artefaktumok viszont commitolva vannak.
 6. A `ProviderCapabilityDescriptor` típus szigorú TypeScript beállítással fordul, nincs benne `any`, nincs `as`, a leíró objektum `satisfies` operátorral kapcsolódik.
 7. A `Fact<T>` `known` ága nem üres bizonyítéklistát követel a típusrendszer szintjén, tehát bizonyíték nélküli `known` mező nem fordul le. Ezt egy szándékosan hibás minta fordítási hibája igazolja.

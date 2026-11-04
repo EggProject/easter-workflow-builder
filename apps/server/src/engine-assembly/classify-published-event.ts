@@ -14,7 +14,8 @@ import type { RunSignal } from '../stream-registry/run-signal.ts';
  *   `payload`): ha a lecsapolás nem talál új sort (mert az üzenet nem
  *   perzisztálódott, a delta kapcsoló kikapcsolva, SPEC-005 6.1 táblázat),
  *   a `transientFrame` a `run_event_transient` keret jelöltje, `sdk_stream_event`
- *   kinddel (O-6 elfogadott megoldása).
+ *   kinddel (a SPEC-006 nyitott O-6 kérdésének addigi viselkedése, user döntés
+ *   nélkül).
  *
  * Ismeretlen alakra `undefined`: a motor szerződése szerint ez ma nem
  * fordul elő (M-31), de a port bemenete `unknown`, tehát a szerver nem

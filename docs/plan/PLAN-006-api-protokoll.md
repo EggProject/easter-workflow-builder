@@ -2,7 +2,7 @@
 
 |               |                                                                                                  |
 | ------------- | ------------------------------------------------------------------------------------------------ |
-| Státusz       | tervezet                                                                                         |
+| Státusz       | végrehajtva (2026-08-29, T-006-14)                                                               |
 | Dátum         | 2026-08-29                                                                                       |
 | Spec          | [`../spec/SPEC-005-api-protokoll.md`](../spec/SPEC-005-api-protokoll.md)                         |
 | Előzmény spec | [`../spec/SPEC-004-vegrehajto-motor.md`](../spec/SPEC-004-vegrehajto-motor.md)                   |
@@ -170,7 +170,7 @@ A fázisok szigorúan sorosak, egy kivétellel: a T-006-8 párhuzamosítható a 
 28. A séma hiba üzenete a hibás mező útvonalát nevezi meg és a kapott értéket soha nem tartalmazza; erre titkot tartalmazó törzzsel van teszt (T-006-4).
 29. A `ProviderSummary` env változó nevet hordoz, és nincs olyan mezője, ami env változó értéket vagy API kulcsot vihetne (T-006-8).
 30. A SPEC-005 két Mermaid rajza a valódi `mermaid` csomag `parse()` hívásával validált, kontroll rajzzal együtt, és a `mermaid` csomag nem került a repóba (T-006-1, T-006-16).
-31. A SPEC-005 11. szekció mind a hét nyitott kérdése nyitottként áll, a "mi a viselkedés addig" és a "mi zárná le" mezővel kitöltve; tippeléssel lezárt pont nincs (T-006-15, T-006-16).
+31. A SPEC-005 11. szekció mind a hét nyitott kérdése (a végrehajtáskor; azóta az O-1, O-2 és O-4 a SPEC-006, SPEC-007 és SPEC-012 user döntéseivel lezárva) nyitottként áll, a "mi a viselkedés addig" és a "mi zárná le" mezővel kitöltve; tippeléssel lezárt pont nincs (T-006-15, T-006-16).
 32. Az adverzariális átvizsgálás nem talált forrás nélküli számot, kitalált HTTP vagy böngésző viselkedést, sem megkerülhető szabályt; ahol talált, az javítva vagy nyitott kérdésként jelölve (T-006-15).
 33. A SPEC-005 mind a 47 elfogadási kritériuma teljesül, kritériumonként futtatott parancsra vagy tesztre hivatkozva (T-006-16).
 34. A `.claude/CLAUDE.md` megkapta a Zod eltérés szabályát a forrásával, és a `docs/research/2026-08-26-toolchain.md` a `zod` sorát (T-006-17).

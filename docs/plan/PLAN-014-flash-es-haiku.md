@@ -1,26 +1,26 @@
 # PLAN-014: A Flash csere, a két kulcsnév és a thinking átadás javításának végrehajtási terve
 
-|         |                                                                                                                     |
-| ------- | ------------------------------------------------------------------------------------------------------------------- |
-| Státusz | végrehajtásra kész: a SPEC-013 O-1 ... O-7 a user 2026-10-27-i döntéseivel lezárva (az O-7 elfogadott nyitott pont) |
-| Dátum   | 2026-10-27                                                                                                          |
-| Spec    | [`../spec/SPEC-013-flash-es-haiku.md`](../spec/SPEC-013-flash-es-haiku.md)                                          |
-| Forrás  | [`../research/2026-10-27-flash-es-haiku.md`](../research/2026-10-27-flash-es-haiku.md)                              |
-| Branch  | `feat/spec-013-flash-es-haiku`                                                                                      |
+|         |                                                                                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Státusz | végrehajtva (2026-10-27, PR #64): a SPEC-013 O-1 ... O-7 a user 2026-10-27-i döntéseivel lezárva (az O-7 a SPEC-013 11. szekciója szerint lezárva 2026-10-28) |
+| Dátum   | 2026-10-27                                                                                                                                                    |
+| Spec    | [`../spec/SPEC-013-flash-es-haiku.md`](../spec/SPEC-013-flash-es-haiku.md)                                                                                    |
+| Forrás  | [`../research/2026-10-27-flash-es-haiku.md`](../research/2026-10-27-flash-es-haiku.md)                                                                        |
+| Branch  | `feat/spec-013-flash-es-haiku`                                                                                                                                |
 
 Ez a terv a SPEC-013-at egyenként ellenőrizhető lépésekre bontja. A számozás: a PLAN-012 a SPEC-009-é
-(a `feat/spec-009-beallitasok` branchen), a PLAN-013 a SPEC-012-é, ezért ez a PLAN-014. Minden
+(a `main`-en a PR #67 óta), a PLAN-013 a SPEC-012-é, ezért ez a PLAN-014. Minden
 lépéshez azonosító, leírás, függőség, a végrehajtó subagent `model` és `effort` beállítása és
 elfogadási kritérium tartozik, a SPEC-013 10. szekciójának kritérium számára hivatkozva (`ACn`).
 
 ## 1. Előfeltételek
 
-| Feltétel                  | Elvárt érték                                                            | Ellenőrzés                        |
-| ------------------------- | ----------------------------------------------------------------------- | --------------------------------- |
-| SPEC-013 nyitott kérdései | O-1 ... O-6 lezárva, az O-7 elfogadott nyitott pont, átvezetve a specbe | a SPEC-013 11. szekciója          |
-| Feature branch            | `feat/spec-013-flash-es-haiku`, a friss `main`-nel                      | `git rev-parse --abbrev-ref HEAD` |
-| A mai állapot zöld        | a kilenc kapu a kiinduló fejen                                          | a T-014-1 kimenete                |
-| Tiszta munkakönyvtár      | nincs uncommitted változás                                              | `git status --porcelain` üres     |
+| Feltétel                  | Elvárt érték                                                                                                                            | Ellenőrzés                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| SPEC-013 nyitott kérdései | O-1 ... O-6 lezárva, az O-7 a végrehajtáskor elfogadott nyitott pont (2026-10-28 óta lezárva, SPEC-013 11. szekció), átvezetve a specbe | a SPEC-013 11. szekciója          |
+| Feature branch            | `feat/spec-013-flash-es-haiku`, a friss `main`-nel                                                                                      | `git rev-parse --abbrev-ref HEAD` |
+| A mai állapot zöld        | a kilenc kapu a kiinduló fejen                                                                                                          | a T-014-1 kimenete                |
+| Tiszta munkakönyvtár      | nincs uncommitted változás                                                                                                              | `git status --porcelain` üres     |
 
 A `main` védett, a zárás PR-rel történik. `npm` és `npx` nem használható. Pusholni a sandboxból csak a
 user által adott hitelesítéssel lehet; force push tilos.

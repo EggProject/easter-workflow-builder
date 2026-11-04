@@ -1173,8 +1173,10 @@ dokumentál (11. szekció, gyökér `.claude/CLAUDE.md`).
   párhuzamossági korláttal ez nem exponálódik. 2026-09-23 óta ez a szabályos leállásra (a
   `close` elutasítással oldja fel a várakozókat) és a felhasználói `interruptRun` útra is megoldott
   (a `stopAndAwaitRunTree` a `denyWaitingForRunIds` elutasításával), ugyanígy a `fail_run` ágra
-  is, lásd a `concurrency-gate` téma döntéseit és a "Szabályok" elejét. Az (1) megnevezett hiány,
-  nem elfogadott végállapot.
+  is, lásd a `concurrency-gate` téma döntéseit és a "Szabályok" elejét. Az (1) is megoldott, más
+  eszközzel: a megszakítás a döntésre váró `human_approval` várakozást az `ApprovalWaitRegistry`
+  `cancelWaitingForRunIds` hívásával zárja le (`stop-and-await-run-tree.ts`), a jóváhagyás sorát
+  pedig előtte `cancelled` állapotba teszi (`cancel-active-run-tree.ts`, `closeWaitingApprovalStepRuns`).
 
 **A `startup-recovery` téma és a bővített `run-interrupt` (T-005-27) tervezési döntései.**
 

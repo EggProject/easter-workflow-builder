@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | tervezet                                                                                                                                                                                                                                                                    |
+| Státusz  | végrehajtva (2026-10-21, PLAN-009, PR #54); nyitott tételek: a 14.2 szekció O-34, O-35, O-36 és O-42 sora és a 73. kritérium; tervezet 2026-09-05                                                                                                                           |
 | Dátum    | 2026-09-05                                                                                                                                                                                                                                                                  |
 | Előzmény | [`SPEC-007-frontend-alkalmazas.md`](SPEC-007-frontend-alkalmazas.md) (a felület váza, amire épül), [`SPEC-005-api-protokoll.md`](SPEC-005-api-protokoll.md) (a fogyasztott szerződés), [`SPEC-004-vegrehajto-motor.md`](SPEC-004-vegrehajto-motor.md) (a futás állapotgépe) |
 | Kimenet  | a `packages/ui` csomag egy, az `apps/web` alkalmazás tíz és a `packages/protocol` csomag egy új téma mappája (11.1, 11.2, 11.3)                                                                                                                                             |
@@ -393,10 +393,10 @@ Az `agent_step` és a `join` `ai_synthesis` módja a teljes `AgentStepConfig` al
 
 **Két mező szerkesztése a SPEC-009 tárgya volt, és ott megvalósult:**
 
-| Mező         | Miért                                                                                                                                                                        |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `skills`     | szerkeszthető, a `SkillsField` vezérlőn, a feltöltött skillek listájából (SPEC-009 5.2)                                                                                      |
-| `mcpServers` | a régi, lépésenkénti alak olvasható marad, a futás nem használja; az MCP szervert a `mcpServerReferences` hivatkozás mező választja a központi listából (SPEC-009 6.2, O-42) |
+| Mező         | Miért                                                                                                                                                                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `skills`     | szerkeszthető, a `SkillsField` vezérlőn, a feltöltött skillek listájából (SPEC-009 5.2)                                                                                                                                                             |
+| `mcpServers` | a régi, lépésenkénti alak olvasható marad, a futás nem használja; az MCP szervert a `mcpServerReferences` hivatkozás mező választja a központi listából (SPEC-009 6.2 és a SPEC-009 14.7 szekció O-42 tétele; nem a 14.2 szekció saját O-42 tétele) |
 
 #### Az `agents` mező űrlapja, a mérés eredménye szerint
 
@@ -1667,7 +1667,7 @@ A kritériumok a lista végén, a következő szabad sorszámokkal állnak. A 10
 
 ### A 2026-10-17-i user döntések (O-37, O-38, O-39)
 
-A kritériumok a lista végén, a következő szabad sorszámokkal állnak. A zárójeles hivatkozás a 2026-10-17-én lezárt tételre mutat (14.1). A megvalósításuk a PLAN-009 T-009-60 és T-009-61 lépése; amíg ezek nem futottak le, a három kritérium teljesítetlen.
+A kritériumok a lista végén, a következő szabad sorszámokkal állnak. A zárójeles hivatkozás a 2026-10-17-én lezárt tételre mutat (14.1). A megvalósításuk a PLAN-009 T-009-60 és T-009-61 lépése, mindkettő kész (PR #48 és #49, 2026-10-17), tehát a három kritérium teljesült.
 
 116. **A szám mezők pozitív egész szabálya (O-37).** Unit teszt: a `protocol` mentési sémája a `loop.maxIterations`, az `error_handler.maxAttempts` és az `error_handler.backoffMs` minden elemére elutasítja a 0, a negatív és a nem egész értéket (például 0, -3 és 1,5), a hiba útvonala a hibás mező útvonala; egy pozitív egész érték átmegy; az olvasó sémák (`NodeConfigSchema`, `WorkflowNodeSchema`, `WorkflowGraphDocumentSchema`) változatlanok. Az `apps/server` `PUT .../graph` végpontja ugyanezekre `400 invalid_request` választ ad, a tárolt gráf változatlan, és a `node-config-drift-protection` a szabályra mezőnkénti futásidejű ággal zöld. A `db` `replaceGraph` a három mezőre a 0, a -3 és az 1,5 értékkel `malformed_node_config` hibaágat ad, sort nem ír, a korábbi gráf változatlan (valós `:memory:` adatbázis, `as` nélkül), a pozitív egész érték beíródik. Valós Chromiumban, e2e: a három mezőn a hibás érték mentési kísérlete `PUT` kérés nélkül marad, és a hiba a mező alatt jelenik meg (a 69. kritérium megjelenési szabálya szerint); érvényes érték után a mentés lefut (5.4).
 

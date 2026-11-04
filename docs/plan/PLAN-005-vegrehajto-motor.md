@@ -2,7 +2,7 @@
 
 |               |                                                                                                      |
 | ------------- | ---------------------------------------------------------------------------------------------------- |
-| Státusz       | tervezet                                                                                             |
+| Státusz       | végrehajtva (2026-08-29, T-005-30)                                                                   |
 | Dátum         | 2026-08-28                                                                                           |
 | Spec          | [`../spec/SPEC-004-vegrehajto-motor.md`](../spec/SPEC-004-vegrehajto-motor.md)                       |
 | Előzmény spec | [`../spec/SPEC-003-domain-perzisztencia.md`](../spec/SPEC-003-domain-perzisztencia.md)               |
@@ -177,8 +177,8 @@ A fázisok szigorúan sorosak, két kivétellel: a T-005-4 párhuzamosítható a
 9. A halott ág jelölés terjed: a nem választott `branch` ág node-jai `step_run` sor nélkül maradnak, és a lentebbi `join` mégis lefut (T-005-17).
 10. N elemű `fan_out` N példányt hoz létre, a `join` egyszer fut a külső kontextusban N bemenettel, és N = 0 esetén üres bemeneti listával, hiba nélkül (T-005-17).
 11. A hatókör kiegyensúlyozatlanság mind a három formája `unbalanced_fan_out_scope` hibát ad (T-005-11).
-12. Mind a kilenc végrehajtható node típusnak van végrehajtója, a diszpécser `ExecutableNodeConfig` uniót kap, és `script` ág nincs benne (T-005-20 ... T-005-24).
-13. `script` node vagy `script` módú `join` a gráfban `unimplemented_node_type` hibával elutasítja a futás indítását, és soha nem jut végrehajtóig (T-005-15).
+12. Mind a kilenc végrehajtható node típusnak van végrehajtója, a diszpécser `ExecutableNodeConfig` uniót kap, és `script` ág nincs benne (T-005-20 ... T-005-24). **Felülírva (SPEC-014, PLAN-015, 2026-11-04):** a `script` node és a `script` módú `join` futtatható, a diszpécser `script` ágat kap (`packages/engine/src/node-executor/execute-node.ts`).
+13. `script` node vagy `script` módú `join` a gráfban `unimplemented_node_type` hibával elutasítja a futás indítását, és soha nem jut végrehajtóig (T-005-15). **Felülírva (SPEC-014, PLAN-015, 2026-11-04):** a `script` futtatható, az `unimplemented_node_type` hibaág megszűnt (a `packages` és `apps` forrásában nincs előfordulása).
 14. Az `agent_step` lépés akkor és csak akkor `succeeded`, ha a `result` `subtype` értéke `success` és a strukturált kimenet ténylegesen megérkezett; különben `missing_structured_output` vagy `agent_result_not_success` (T-005-19, T-005-21).
 15. A motor nem olvassa és nem összegzi a `total_cost_usd` értéket, és a mezőnév a `packages/engine/src` alatt nem szerepel (T-005-19, T-005-29).
 16. A session modell teljes: `isolated` nem küld `resume`, `continued` a legközelebbi ős session azonosítóját küldi, a `forkSession` a `resolveForkSession` tiszta függvényből jön, ős hiányában `no_resumable_session`, és minden lépés `persistSession: true` értéket kap (T-005-19).
@@ -204,7 +204,7 @@ A fázisok szigorúan sorosak, két kivétellel: a T-005-4 párhuzamosítható a
 36. A motorban nincs `Date.now()`, `setTimeout`, `randomUUID`, `process.env` és `Math.random` hívás; minden ilyen a `clock`, az `idGenerator` és a `processEnvironment` porton megy át, tehát az ütemező determinisztikusan tesztelhető (T-005-8, T-005-29).
 37. Minden adatbázist érintő `.spec.ts` valós `better-sqlite3` `:memory:` példány ellen fut, a commitolt migrációkkal felépítve; mockolt adatbázis nincs (T-005-9 ... T-005-27).
 38. A SPEC-004 két Mermaid rajza a valódi `mermaid` csomag `parse()` hívásával validált, és a SPEC-003 `erDiagram` rajza kontrollként ugyanabban a futtatásban átment (T-005-1, T-005-32).
-39. A SPEC-004 15. szekció mind a nyolc nyitott kérdése nyitottként áll, a "mi a viselkedés addig" és a "mi zárná le" mezővel kitöltve; tippeléssel lezárt pont nincs (T-005-30, T-005-31).
+39. A SPEC-004 15. szekció mind a nyolc nyitott kérdése (a végrehajtáskor; azóta tíz tétel, az O-1, O-6, O-9 és O-10 user döntéssel lezárva) nyitottként áll, a "mi a viselkedés addig" és a "mi zárná le" mezővel kitöltve; tippeléssel lezárt pont nincs (T-005-30, T-005-31).
 40. Az adverzariális átvizsgálás nem talált forrás nélküli számot, kitalált SDK mezőt vagy megkerülhető szabályt; ahol talált, az javítva vagy nyitott kérdésként jelölve (T-005-30).
 41. A SPEC-004 mind a 69 elfogadási kritériuma teljesül, kritériumonként futtatott parancsra vagy tesztre hivatkozva (T-005-31).
 42. Mind a kilenc minőségi kapu nulla kilépési kóddal fut a teljes workspace-en, és a lefedettség mind a négy metrikán 100 százalék, kizárás bővítése nélkül (T-005-32).
