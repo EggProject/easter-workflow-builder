@@ -49,7 +49,7 @@ export function createHardenedSdkQuery(sdkQuery: SdkQueryFunction): SdkQueryFunc
   return ({ prompt, options }) => {
     const hardened = hardenAgentOptions(options);
     const skillSelection = readPluginSkillSelection(hardened.options);
-    if (hardened.mcpServers === undefined && skillSelection === undefined) {
+    if (skillSelection === undefined && hardened.mcpServers === undefined) {
       return sdkQuery({ prompt, options: hardened.options });
     }
     const directory = mkdtempSync(path.join(tmpdir(), 'easter-step-'));

@@ -98,7 +98,7 @@ export function resolveOutgoingAgents(
         ),
       };
     }
-    const conflictingServer = Object.keys(parsed.mcpServerReferences ?? {}).find((name) => stepServerNames.has(name));
+    const conflictingServer = Object.keys(parsed.mcpServerReferences).find((name) => stepServerNames.has(name));
     if (conflictingServer !== undefined) {
       return {
         kind: 'error',

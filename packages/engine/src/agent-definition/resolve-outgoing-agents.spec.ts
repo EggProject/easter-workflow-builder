@@ -18,7 +18,9 @@ const GITHUB: McpServerDefinitionRecord = {
 
 const NO_OVERRIDE = { envBindings: {}, authEnvName: null };
 
-/** A lépés configja a megadott agent rekorddal; a lépés alapból minden feltöltött skillt kiválaszt. */
+/**
+ * A lépés configja a megadott agent rekorddal; a lépés alapból minden feltöltött skillt kiválaszt.
+ */
 function step(agents: AgentStepConfig['agents'], overrides: Partial<AgentStepConfig> = {}): AgentStepConfig {
   return {
     promptTemplate: 'prompt',

@@ -120,29 +120,31 @@ describe('createHardenedSdkQuery', () => {
   });
 });
 
+function pluginPathOf(options: Readonly<Record<string, unknown>> | undefined): string {
+  const plugins = options?.['plugins'];
+  const first: unknown = Array.isArray(plugins) ? plugins[0] : undefined;
+  return isRecord(first) && isString(first['path']) ? first['path'] : '';
+}
+
 describe('createHardenedSdkQuery: a plugins gyökér a lépés kiválasztott skilljeinek másolata (SPEC-009 O-47, M-150)', () => {
   const created: string[] = [];
   afterEach(() => {
-    for (const directory of created.splice(0)) {
+    for (const directory of created) {
       rmSync(directory, { recursive: true, force: true });
     }
+    created.length = 0;
   });
 
   function library(names: readonly string[]): string {
-    const root = path.join(mkdtempSync(path.join(tmpdir(), 'skill-konyvtar-')), 'skills');
-    created.push(path.dirname(root));
+    const parent = mkdtempSync(path.join(tmpdir(), 'skill-konyvtar-'));
+    const root = path.join(parent, 'skills');
+    created.push(parent);
     for (const name of names) {
       mkdirSync(path.join(root, 'skills', name, 'reszek'), { recursive: true });
       writeFileSync(path.join(root, 'skills', name, 'SKILL.md'), `---\ndescription: ${name}\n---\n`);
       writeFileSync(path.join(root, 'skills', name, 'reszek', 'a.md'), name);
     }
     return root;
-  }
-
-  function pluginPathOf(options: Readonly<Record<string, unknown>> | undefined): string {
-    const plugins = options?.['plugins'];
-    const first: unknown = Array.isArray(plugins) ? plugins[0] : undefined;
-    return isRecord(first) && isString(first['path']) ? first['path'] : '';
   }
 
   it('csak a kiválasztott skillek kerülnek a gyökérbe, azonos plugin névvel, a folyam végén törlődik', async () => {
@@ -168,7 +170,8 @@ describe('createHardenedSdkQuery: a plugins gyökér a lépés kiválasztott ski
 
     expect(await drain(handle)).toStrictEqual(['a']);
     expect(existsSync(staged)).toBe(false);
-    expect(readdirSync(path.join(root, 'skills')).toSorted()).toStrictEqual(['alfa', 'beta']);
+    const librarySkills = readdirSync(path.join(root, 'skills'));
+    expect(new Set(librarySkills)).toStrictEqual(new Set(['alfa', 'beta']));
   });
 
   it('az üres skills lista üres skills mappájú gyökeret ad (M-150 C3)', () => {
@@ -201,12 +204,12 @@ describe('createHardenedSdkQuery: a plugins gyökér a lépés kiválasztott ski
     created.push(parent);
     const previous = process.env['TMPDIR'];
     process.env['TMPDIR'] = parent;
-    let called = false;
+    let isCalled = false;
     try {
       expect(tmpdir()).toBe(parent);
       expect(() =>
         createHardenedSdkQuery(() => {
-          called = true;
+          isCalled = true;
           return fakeQuery([], [])({ prompt: 'p', options: {} });
         })({ prompt: 'p', options: { plugins: [{ type: 'local', path: root }], skills: ['skills:nincs'] } }),
       ).toThrow(/ENOENT/u);
@@ -217,7 +220,7 @@ describe('createHardenedSdkQuery: a plugins gyökér a lépés kiválasztott ski
         process.env['TMPDIR'] = previous;
       }
     }
-    expect(called).toBe(false);
+    expect(isCalled).toBe(false);
     expect(readdirSync(parent)).toStrictEqual([]);
   });
 });
