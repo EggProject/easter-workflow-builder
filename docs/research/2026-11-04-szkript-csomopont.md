@@ -335,3 +335,67 @@ végrehajtás:
 742 mélység). A gazdára kijutó `RangeError` (a Q-6 táblája szerint ezen az értéken a mély forrás elemzés és a mély
 `JSON.stringify`) a lépés `script_evaluation_failed` hibája, és a modult eldobjuk (a lépésenkénti friss modul miatt a
 következő lépés újat kap).
+
+## 7. T-015-4: a motor validáció, az `unimplemented_node_type` sorsa és a lépések sorrendje
+
+Lépés: PLAN-015 T-015-4 (2026-11-04). Módszer: kódolvasás a `f618229` fejen (a T-015-8 commitja, `22c9f11`, előtte
+került be), és a T-015-2 próbáihoz telepített `quickjs-emscripten-core` 0.32.0 `dist/index.mjs` forrása.
+
+### 7.1 Az `unimplemented_node_type` sorsa: törlendő
+
+- Egyetlen előállító hely van: a `run-validation/validate-implemented-node-types.ts` `isExecutableNodeConfig`
+  predikátuma, ami kizárólag a `script` node-ot és a `join` `script` módját utasítja el (a teljes repóban más
+  `formatEngineErrorMessage('unimplemented_node_type', ...)` hívás nincs).
+- Ha a két ág végrehajtható, a predikátum minden `WellFormedNodeConfig`-ra igazat ad, tehát a hibaág soha nem fut: a
+  100 százalékos lefedettség mellett halott ág (szabálykönyv 5. szekció, "tilos olyan ágat bevezetni, ami ... sosem
+  fut"). Ugyanígy az `ExecutableNodeConfig` és a `WellFormedNodeConfig` különbsége megszűnik.
+- Tárolt adat nem hivatkozik rá: a hibaosztály a futás indításának 3. lépésében keletkezik, és a SPEC-004 4.8 menet 1 ... 5. lépése egyetlen adatot sem ír (`run-supervisor/create-run-supervisor.ts`, a `startRunInternals` doksija). Nincs
+  `workflow_run.error_kind` vagy esemény, ami olvasáskor igényelné.
+- **Döntés: törlés**, megtartási ok nincs. A törlés köre: a `validateImplementedNodeTypes` lépés és tesztjei, az
+  `ExecutableNodeConfig` szűkítés (a hívók a `WellFormedNodeConfig`-ot kapják), a motor uniójának és guardjának tagja,
+  a `ProtocolErrorClass` szótár tagja, az `apps/server` validációs osztály listája, a kliens magyar mondata, a
+  `greppable-invariants` (21) listája, és a felület statikus szövegei (a T-015-10 köre, `has-script-node`,
+  `script-unimplemented-error-class`).
+
+### 7.2 Miért nem zöldíthető a T-015-4 önmagában: a lépések átrendezése
+
+1. **A szűkítés megszüntetése a diszpécser `script` ágát igényli ugyanabban a commitban.** A `node-executor/execute-node.ts`
+   `executeNode` és `executeJoinNode` függvénye egy `Promise`-t visszaadó, `default` ág nélküli `switch` az
+   `ExecutableNodeConfig` `type`, illetve `mode` mezőjén. Ha a unió `script` tagot kap, a függvény vége elérhetővé
+   válik, és a fordító "Function lacks ending return statement" hibát ad; a `switch-exhaustiveness-check` lint szabály
+   ugyanezt jelzi. A `script` ág a T-015-5 végrehajtója.
+2. **A JavaScript ág a `scriptRunner` port bekötését igényli.** A végrehajtó és a futás indításának fordítása a portot
+   az `EngineDependencies` mezőjéből kapja; a mező kötelező (a meglévő portok mintája, `engine-dependencies.ts`: "Egyik
+   mező sem opcionális"). Az `apps/server` `engine-assembly` témája valódi megvalósítás nélkül nem tudja kitölteni, a
+   QuickJS függőség és a futtató viszont a T-015-6 lépése.
+3. A köztes megoldások mind kizártak: egy opcionális port a motorban örökre kettős ágat hagyna; egy ideiglenes szerver
+   oldali elutasítás vagy csonk később törlendő termékág; a `runtime: 'javascript'` ág ideiglenes `unimplemented_node_type`
+   elutasítása ugyanígy később törlendő.
+
+**Döntés (a lépések átrendezése, PLAN-015 4. szekció):**
+
+- **T-015-4 (ez a lépés):** a `ScriptRunnerPort`, a `ScriptRunRequest` és a `ScriptRunResult` típusa az `engine-port`
+  témában, a barrelből exportálva, de még nem az `EngineDependencies` mezője; a SPEC-004 3.2 port táblája; ez a
+  döntés. Termékkód és ág nem változik.
+- **T-015-6 előre kerül a T-015-5 elé:** a JavaScript futtató az `apps/server` oldalon, a port típusát
+  `satisfies`-szal kielégítve, önállóan tesztelve, még a motorba kötés nélkül.
+- **T-015-5 (a T-015-4 maradékával együtt, egy commitban):** a `validateImplementedNodeTypes` és az
+  `unimplemented_node_type` törlése (7.1), a CEL `source` a `validateLanguageFields` kifejezés mezői közé (ugyanaz az
+  `expression_evaluation_failed` osztály, mint a `branch` kifejezésnél), a JavaScript `source` fordítása a futás
+  indításakor (`script_compile_failed`), a `scriptRunner` az `EngineDependencies` mezőjeként és az `apps/server`
+  összeállításában, a diszpécser és a `join` `script` ága, a közös végrehajtó.
+
+### 7.3 A `compile` aszinkron, és ennek következménye a futás indítására
+
+- A SPEC-014 5.4 és a 6. szekció 1. pontja szerint a futás indításának fordítási ellenőrzése is saját, eldobott
+  WebAssembly modulon fut. A modul példányosítása a telepített forrásban aszinkron: a
+  `newQuickJSWASMModuleFromVariant` `await`-tel tölti be a modul betöltőt és az FFI-t (`quickjs-emscripten-core`
+  0.32.0 `dist/index.mjs`). A port `compile` művelete ezért `Promise<Outcome<void>>`.
+- **Következmény a T-015-5-re:** a futás indításának belső menete (`startRunInternals`) ma szinkron, és a
+  `isAcceptingRuns` ellenőrzés és az első írás között nincs `await`. Ha a fordítás `await`-tel közé kerül, a szabályos
+  leállás jele ebben az ablakban megérkezhet; a SPEC-004 10.2 1. pontja (mérve: SPEC-006 M-36) szerint a leállás után
+  új futás nem indulhat. A T-015-5-ben a leállás ellenőrzését a fordítás után, az első írás előtt meg kell ismételni,
+  és ezt teszttel kell lefedni. A gyerek futás indítása (`startChildRun`) már ma is `Promise`-t ad.
+- A `run` eredménye nem kivétel, hanem háromágú unió: `succeeded` (JSON kimenet), `failed` (a három futásidejű osztály
+  egyike), `aborted` (a motor külső jele, SPEC-014 5.8: a lépés `cancelled` állapotban zár). A `null` alapértékeket
+  (`timeoutMs`, `cwd`, `memoryLimitMb`) a futtató oldja fel, mert a rendszermemória (`os.totalmem()`) csak ott ismert.

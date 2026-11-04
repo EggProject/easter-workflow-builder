@@ -15,6 +15,12 @@ export type { IdGeneratorPort } from './engine-port/id-generator-port.ts';
 export type { ProcessEnvironmentPort } from './engine-port/process-environment-port.ts';
 export type { SkillLibraryPort } from './engine-port/skill-library-port.ts';
 export type { SkillLibrarySnapshot } from './engine-port/skill-library-snapshot.ts';
+// A JavaScript szkript futtató port (SPEC-014 5.2): a típusa már áll, az
+// `EngineDependencies` mezőjeként a szerver oldali megvalósítással együtt kerül
+// be (PLAN-015, research `2026-11-04-szkript-csomopont.md` T-015-4 szekció).
+export type { ScriptRunnerPort } from './engine-port/script-runner-port.ts';
+export type { ScriptRunRequest } from './engine-port/script-run-request.ts';
+export type { ScriptRunResult } from './engine-port/script-run-result.ts';
 export type { EngineDependencies } from './engine-port/engine-dependencies.ts';
 // A motor teljes felülete és a `createEngine` összeállítás (SPEC-004 3.1
 // szekció, PLAN-005 T-005-28): az `Engine` interfész, a négy eredmény típus
