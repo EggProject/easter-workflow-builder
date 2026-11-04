@@ -5,40 +5,42 @@ verzió-döntéseinek forrása. Ha frissítesz egy csomagot, ide is vezesd át.
 
 ## Rögzített verziók
 
-| Csomag                           | Verzió                     | Forrás / megjegyzés                                   |
-| -------------------------------- | -------------------------- | ----------------------------------------------------- |
-| `@anthropic-ai/claude-agent-sdk` | 0.3.245                    | **pinelve**, lásd lent                                |
-| TypeScript                       | **6.0.3**                  | fix, nem frissítjük 7-re                              |
-| Bun                              | 1.4.0                      | csak csomagkezelő és workspace                        |
-| Node.js                          | 26.7.0                     | runtime, `.nvmrc` = v26.0.0                           |
-| Turborepo                        | 2.10.12                    | `tasks` séma, nem `pipeline`                          |
-| React                            | 19.2.8                     | nincs React 20                                        |
-| Vite                             | 8.2.2                      | Rolldown alapú                                        |
-| `@xyflow/react`                  | 12.11.6                    | MIT, React 19 kompatibilis                            |
-| `react-window`                   | 2.3.1                      | MIT, React 18/19 kompatibilis, `List`/`Grid` API      |
-| `@dagrejs/dagre`                 | 3.1.1                      | MIT, nincs peer dependency                            |
-| Vitest                           | 4.1.11                     | v8 coverage provider                                  |
-| `@playwright/test`               | 1.62.1                     |                                                       |
-| ESLint                           | 10.9.1                     | csak flat config, `.eslintrc` megszűnt                |
-| `typescript-eslint`              | 8.68.0                     | peer: `typescript >=4.8.4 <6.1.0`                     |
-| `eslint-plugin-unicorn`          | 73.0.0                     | peer: `eslint >=10.4`                                 |
-| `eslint-plugin-import-x`         | 4.17.1                     | az `eslint-plugin-import` karbantartott forkja        |
-| `eslint-plugin-sonarjs`          | 4.2.0                      | **LGPL-3.0-only**, dev függőség                       |
-| Prettier                         | 3.9.6                      | nincs 4.0                                             |
-| Drizzle ORM                      | 0.45.2                     | még 0.x                                               |
-| `better-sqlite3`                 | 13.0.3                     | natív modul                                           |
-| `drizzle-kit`                    | 0.31.10                    | npm `latest`, T-003-2, lásd lent                      |
-| `@types/better-sqlite3`          | 9.6.0                      | npm `latest`, T-003-2, lásd lent                      |
-| `ws`                             | 8.21.3                     |                                                       |
-| `pino` / `pino-roll`             | 10.3.1 / 4.0.0             | log rotation                                          |
-| `zod`                            | `^4.4.0` (telepítve 4.4.3) | `packages/protocol` drótszintű séma, T-006, lásd lent |
-| `mustache`                       | 4.2.0                      | **pinelve**, sablon nyelv, SPEC-010, lásd lent        |
-| `@types/mustache`                | 4.2.6                      | **pinelve**, dev függőség, SPEC-010, lásd lent        |
-| `@marcbachmann/cel-js`           | 8.0.0                      | **pinelve**, kifejezés nyelv, SPEC-010, lásd lent     |
-| `yauzl`                          | 3.4.0                      | **pinelve**, ZIP kicsomagolás, SPEC-009, lásd lent    |
-| `@types/yauzl`                   | 3.4.0                      | **pinelve**, dev függőség, SPEC-009, lásd lent        |
-| `yaml`                           | 2.9.1                      | **pinelve**, `SKILL.md` frontmatter, SPEC-009, lent   |
-| `ajv`                            | 8.20.0                     | **pinelve**, JSON Schema ellenőrzés, SPEC-015, lent   |
+| Csomag                                | Verzió                     | Forrás / megjegyzés                                                       |
+| ------------------------------------- | -------------------------- | ------------------------------------------------------------------------- |
+| `@anthropic-ai/claude-agent-sdk`      | 0.3.245                    | **pinelve**, lásd lent                                                    |
+| TypeScript                            | **6.0.3**                  | fix, nem frissítjük 7-re                                                  |
+| Bun                                   | 1.4.0                      | csak csomagkezelő és workspace                                            |
+| Node.js                               | 26.7.0                     | runtime, `.nvmrc` = v26.0.0                                               |
+| Turborepo                             | 2.10.12                    | `tasks` séma, nem `pipeline`                                              |
+| React                                 | 19.2.8                     | nincs React 20                                                            |
+| Vite                                  | 8.2.2                      | Rolldown alapú                                                            |
+| `@xyflow/react`                       | 12.11.6                    | MIT, React 19 kompatibilis                                                |
+| `react-window`                        | 2.3.1                      | MIT, React 18/19 kompatibilis, `List`/`Grid` API                          |
+| `@dagrejs/dagre`                      | 3.1.1                      | MIT, nincs peer dependency                                                |
+| Vitest                                | 4.1.11                     | v8 coverage provider                                                      |
+| `@playwright/test`                    | 1.62.1                     |                                                                           |
+| ESLint                                | 10.9.1                     | csak flat config, `.eslintrc` megszűnt                                    |
+| `typescript-eslint`                   | 8.68.0                     | peer: `typescript >=4.8.4 <6.1.0`                                         |
+| `eslint-plugin-unicorn`               | 73.0.0                     | peer: `eslint >=10.4`                                                     |
+| `eslint-plugin-import-x`              | 4.17.1                     | az `eslint-plugin-import` karbantartott forkja                            |
+| `eslint-plugin-sonarjs`               | 4.2.0                      | **LGPL-3.0-only**, dev függőség                                           |
+| Prettier                              | 3.9.6                      | nincs 4.0                                                                 |
+| Drizzle ORM                           | 0.45.2                     | még 0.x                                                                   |
+| `better-sqlite3`                      | 13.0.3                     | natív modul                                                               |
+| `drizzle-kit`                         | 0.31.10                    | npm `latest`, T-003-2, lásd lent                                          |
+| `@types/better-sqlite3`               | 9.6.0                      | npm `latest`, T-003-2, lásd lent                                          |
+| `ws`                                  | 8.21.3                     |                                                                           |
+| `pino` / `pino-roll`                  | 10.3.1 / 4.0.0             | log rotation                                                              |
+| `zod`                                 | `^4.4.0` (telepítve 4.4.3) | `packages/protocol` drótszintű séma, T-006, lásd lent                     |
+| `mustache`                            | 4.2.0                      | **pinelve**, sablon nyelv, SPEC-010, lásd lent                            |
+| `@types/mustache`                     | 4.2.6                      | **pinelve**, dev függőség, SPEC-010, lásd lent                            |
+| `@marcbachmann/cel-js`                | 8.0.0                      | **pinelve**, kifejezés nyelv, SPEC-010, lásd lent                         |
+| `yauzl`                               | 3.4.0                      | **pinelve**, ZIP kicsomagolás, SPEC-009, lásd lent                        |
+| `@types/yauzl`                        | 3.4.0                      | **pinelve**, dev függőség, SPEC-009, lásd lent                            |
+| `yaml`                                | 2.9.1                      | **pinelve**, `SKILL.md` frontmatter, SPEC-009, lent                       |
+| `ajv`                                 | 8.20.0                     | **pinelve**, JSON Schema ellenőrzés, SPEC-015, lent                       |
+| `quickjs-emscripten-core`             | 0.32.0                     | **pinelve**, JavaScript szkript futtató, SPEC-014, lent                   |
+| `@jitl/quickjs-wasmfile-release-sync` | 0.32.0                     | **pinelve**, a QuickJS alap (bellard, szinkron) változata, SPEC-014, lent |
 
 ## `drizzle-kit` és `@types/better-sqlite3` verzió, 2026-08-27 (T-003-2, SPEC-003)
 
@@ -285,6 +287,23 @@ tömb hordozza. A választás technikai döntés, a SPEC-009 9. szekciójában r
 `fast-deep-equal`, `fast-uri`, `json-schema-traverse`, `require-from-string`; saját típusdeklarációval
 szállít. A repóban tranzitívan már jelen volt ugyanez a verzió (a `@modelcontextprotocol/sdk` és az
 `ajv-formats` függősége a `bun.lock` szerint).
+
+## JavaScript szkript futtató, 2026-11-04 (SPEC-014, PLAN-015 T-015-2)
+
+Élő lekérdezés `curl`-lel, két független forrással (a választás indoka és a blokkoló mérések:
+`docs/research/2026-11-04-szkript-csomopont.md` 3. szekció).
+
+| Csomag                                | Verzió   | Forrás 1                                                                                          | Forrás 2                                                                                                                         |
+| ------------------------------------- | -------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `quickjs-emscripten-core`             | `0.32.0` | `https://registry.npmjs.org/quickjs-emscripten-core` (`dist-tags.latest`, 2026-02-16)             | `https://data.jsdelivr.com/v1/packages/npm/quickjs-emscripten-core` (`tags.latest`), plusz a GitHub `v0.32.0` tag (`df4efb9ef2`) |
+| `@jitl/quickjs-wasmfile-release-sync` | `0.32.0` | `https://registry.npmjs.org/@jitl/quickjs-wasmfile-release-sync` (`dist-tags.latest`, 2026-02-16) | `https://data.jsdelivr.com/v1/packages/npm/@jitl/quickjs-wasmfile-release-sync` (`tags.latest`)                                  |
+
+**Pontos verzióval** az `apps/server` `package.json` fájljába kerül (a T-015-6 lépésben). Mindkettő MIT licencű,
+egyetlen függőségük a `@jitl/quickjs-ffi-types` `0.32.0`. A teljes `quickjs-emscripten` csomag (szintén `0.32.0`,
+`engines.node` `>=16.0.0`) a négy WebAssembly változatot együtt hozza; helyette a README "Reducing package size"
+szakasza szerinti legkisebb felállás áll, mert a SPEC-014 5.2 csak az alap, szinkron változatot használja. A
+változat a bellard QuickJS `2025-09-13+f1139494` pillanatképét hozza (a változat README-je); a verzió 1.0 alatti, a
+frissítés előtt a T-015-2 próbái regresszióként futnak (`docs/research/2026-11-04-szkript-csomopont/futtat.sh`).
 
 ## GitHub Actions verziók
 

@@ -1,0 +1,294 @@
+# Szkript csomópont: a QuickJS blokkoló mérései és a verzió pin (SPEC-014, PLAN-015)
+
+Dátum: 2026-11-04. Lépés: PLAN-015 T-015-2. Spec: [`../spec/SPEC-014-szkript-csomopont.md`](../spec/SPEC-014-szkript-csomopont.md),
+terv: [`../plan/PLAN-015-szkript-csomopont.md`](../plan/PLAN-015-szkript-csomopont.md). Ez a terv saját research fájlja:
+a további lépések saját szekcióban ide vezetik a méréseiket és döntéseiket.
+
+## 1. Módszer
+
+**Futtatókörnyezet.** Node `v26.7.0`, Bun `1.4.0`, Linux sandbox, 4 CPU, 3906 MB memória, swap nélkül.
+
+**Csomagok.** `quickjs-emscripten-core@0.32.0` és `@jitl/quickjs-wasmfile-release-sync@0.32.0` (a tranzitív
+`@jitl/quickjs-ffi-types@0.32.0`-val), a repón kívüli eldobható könyvtárba telepítve
+(`bun add quickjs-emscripten-core@0.32.0 @jitl/quickjs-wasmfile-release-sync@0.32.0`). A repó függőségei
+változatlanok: a felvétel a T-015-6 lépése. A verzió és a csomag választás indoka a 3. szekcióban.
+
+**A próbák.** A [`2026-11-04-szkript-csomopont/`](2026-11-04-szkript-csomopont/) mappában, a bizonyíték előállító
+eszköz a repóban (szabálykönyv 12. szekció). Minden próba külön Node folyamat (`node q<n>-*.mjs`), mert több próba a
+WebAssembly modult szándékosan hibára futtatja. A `futtat.sh` a telepített könyvtárba másolva sorban lefuttatja
+mindet, és a `MEASUREMENT` sorokat a `kimenet.jsonl` fájlba gyűjti (a commitolt kimenet a 2026-11-04-i futásé, első
+sora a környezet). A számok egy futásból valók; ahol a jelenség ingadozik, a próba ismétel (Q-3c, Q-3d).
+
+**Forrásolvasás.** A pinelt bellard QuickJS forrása a variáns README-je szerinti commiton
+(`f1139494d18a2053630c5ed3384a42bb70db3c53`, <https://github.com/bellard/quickjs>), a wrapper C rétege
+(`c/interface.c`) és a variáns build sablonja (`templates/Variant.mk`) a `v0.32.0` tagen
+(<https://github.com/justjake/quickjs-emscripten>), a telepített `dist` fájlok, és a Node `v26.7.0`
+`lib/internal/abort_controller.js` forrása.
+
+## 2. T-015-2 mérések
+
+### Q-1: CPU kötött végtelen ciklus és az interrupt kezelő (T-2)
+
+`runtime.setInterruptHandler(shouldInterruptAfterDeadline(Date.now() + határidő))`, a szkript
+`while (true) { i++ }`. Script: `q1-cpu-loop.mjs`.
+
+| Határidő (ms) | Eltelt (ms) | Túllépés (ms) | Kezelő hívás | Hiba a sandboxban            |
+| ------------- | ----------- | ------------- | ------------ | ---------------------------- |
+| 100           | 101         | 1             | 378          | `InternalError: interrupted` |
+| 500           | 501         | 1             | 3966         | `InternalError: interrupted` |
+| 2000          | 2001        | 1             | 16048        | `InternalError: interrupted` |
+
+A megszakítás a szkriptben nem kapható el: `try { while (true) {} } catch (e) {}` mellett is a kiértékelés hibája
+`InternalError: interrupted` (a `catch` ág nem futott).
+
+### Q-2: gazda ígéretre váró szkript és a lebontás (T-2)
+
+A gazda függvény `context.newPromise()` ígéretét adja, amit sosem old fel; a szkript
+`(async () => { await hostWait(); return 1; })()`, a gazda `executePendingJobs` után `resolvePromise`-ra vár,
+`AbortSignal.timeout(300)` ellen versenyeztetve. Script: `q2-host-promise.mjs` (változat: A, B, C), `q2b-after-abort.mjs`.
+
+| Változat | Lebontás                                       | Kimenet   | Eltelt (ms) | Kezelő hívás a várakozás alatt | Lebontás eredménye                                                                         |
+| -------- | ---------------------------------------------- | --------- | ----------- | ------------------------------ | ------------------------------------------------------------------------------------------ |
+| A        | a függő `deferred` felszabadítása nélkül       | `aborted` | 312         | 0                              | `RuntimeError: Aborted(Assertion failed: list_empty(&rt->gc_obj_list) ... JS_FreeRuntime)` |
+| B        | `deferred.dispose()`, utána kontextus, runtime | `aborted` | 318         | 0                              | tiszta                                                                                     |
+| C        | mint B, utána késői `deferred.resolve()`       | `aborted` | 312         | 0                              | tiszta; a késői `resolve` nem dob                                                          |
+
+- Az interrupt kezelő a gazda ígéretre várakozás alatt egyszer sem hívódott (a kiértékelés alatt egyszer, a
+  feladatsor alatt nullaszor). Ez a J-6 forrásból levont következtetésének mérése: igaz.
+- A `resolvePromise` natív ígérete a lebontás után 500 ms alatt sem rendeződött (mindhárom változatban függő maradt).
+- A késői `resolve` azért nem dob, mert a `QuickJSDeferredPromise.resolve` csak élő `resolveHandle` mellett hív
+  (`resolveHandle.alive && ...`, telepített `quickjs-emscripten-core` `dist/chunk-V2S4ZYJR.mjs`).
+- **A tiszta lebontás feltétele:** minden, a lépés alatt létrehozott handle (köztük a függő `deferred`) felszabadítása
+  a runtime `dispose` előtt. Egy elhagyott handle a `JS_FreeRuntime` assertjét váltja ki (a próbák saját, el nem
+  engedett handle-jei ugyanezt adták, Q-4c és Q-8 első futása). Az assert a gazdán elkapható
+  `WebAssembly.RuntimeError`; a folyamat fut tovább.
+- Q-2b: az assert után ugyanaz a modul egy egyszerű kiértékelésre (`1 + 1`) működött, és egy újonnan betöltött modul
+  is. Hogy az abortált runtime memóriája a modulban marad-e, és a modul állapota minden szempontból ép-e, ebből nem
+  dönthető el.
+- **A határidő jele nem tartja életben a folyamatot:** a Node `AbortSignal.timeout` időzítője `unref` (Node `v26.7.0`
+  `lib/internal/abort_controller.js` 215. sor, `timeout.unref()`). Egy életben tartó handle nélkül a próba
+  `Detected unsettled top-level await` figyelmeztetéssel, 13-as kóddal kilépett az abort előtt; a szerverben a nyitott
+  socketek tartják életben a folyamatot, a próba egy `setInterval`-lal.
+
+### Q-3: mikrofeladatokkal pörgő szkript és az `executePendingJobs` (T-2)
+
+Határidő 300 ms, a gazda egyetlen `executePendingJobs()` hívása. Script: `q3-microtask-loop.mjs`, `q3b-then-chain.mjs`,
+`q3c-leak-repeat.mjs`, `q3d-fresh-module.mjs`.
+
+| Változat                                                  | Eltelt (ms) | Kezelő hívás | Futott feladat | Az ígéret állapota | Lebontás |
+| --------------------------------------------------------- | ----------- | ------------ | -------------- | ------------------ | -------- |
+| `while (true) { await Promise.resolve(); }`               | 301         | 231          | 328571         | `rejected`         | tiszta   |
+| `for (;;) { try { await null; } catch (e) {} }`           | 302         | 225          | 373333         | `rejected`         | tiszta   |
+| `then` lánc (`spin = () => Promise.resolve().then(spin)`) | 332         | 152          | 219283         | `pending`          | assert   |
+
+- Az ígéret lánc nem kerüli meg az időkorlátot: az interrupt kezelő az `executePendingJobs` hívásban is fut, és a
+  határidő után a feladatsor megáll, mindhárom alakon.
+- **A megszakított `then` lánc után a lebontás nem mindig tiszta.** A `JS_FreeRuntime` assertje jön, a handle-ök
+  hibátlan kezelése mellett is (Q-3b: a véges, megszakítás nélküli lánc tiszta, a megszakított végtelen lánc assert).
+  Ismételve: közös modulon 100 ms-os határidővel 20 próbából 2 (Q-3c); próbánként friss modulon 5 ms-mal 0/100,
+  20 ms-mal 0/100, 100 ms-mal 100/100 (Q-3d). A jelenség a megszakítás helyétől függ; az okát forrásból nem
+  azonosítottam (nem ellenőrzött).
+- Q-3c: a 20 próba után a közös modul lineáris memóriája 16 MB-ról 40 MB-ra nőtt, és utána 200 rövid runtime mind
+  hibátlanul futott. A friss modul betöltése (`newQuickJSWASMModuleFromVariant`) 1 ... 2 ms, az első 4 ms; minden
+  betöltés külön WebAssembly memóriát kap (Q-3d `distinctMemory: true`).
+
+### Q-4: a `setMemoryLimit` és a modul szintű plafon (T-3)
+
+Script: `q4-memory-limit.mjs`, `q4b-limit-effect.mjs` (korlát MB-ban és foglalási alak), `q4c-usage.mjs`.
+
+| `setMemoryLimit` | Foglalás                        | Eredmény a sandboxban          | Darab   | A modul memóriája utána | Gazda RSS (MB) |
+| ---------------- | ------------------------------- | ------------------------------ | ------- | ----------------------- | -------------- |
+| 16 MB            | `new Array(1e5).fill(1)` tömbök | `InternalError: out of memory` | 1935    | 2048 MB                 | 1541           |
+| 128 MB           | ugyanaz                         | `InternalError: out of memory` | 1935    | 2048 MB                 | 1541           |
+| nincs            | ugyanaz                         | `InternalError: out of memory` | 1935    | 2048 MB                 | 1541           |
+| 16 MB            | 1 MB-os sztringek               | `InternalError: out of memory` | 2141    | 2048 MB                 | 2106           |
+| 128 MB           | ugyanaz                         | `InternalError: out of memory` | 2141    | 2048 MB                 | 2106           |
+| nincs            | ugyanaz                         | `InternalError: out of memory` | 2141    | 2048 MB                 | 2106           |
+| 16 MB            | kis objektumok (`{ i, s }`)     | `InternalError: out of memory` | 466609  | 69 MB                   | 114            |
+| 128 MB           | ugyanaz                         | `InternalError: out of memory` | 5314959 | 707 MB                  | 706            |
+
+- **A `setMemoryLimit` nem bájtkorlát ebben a buildben.** A tömb és a sztring foglalás a korláttól függetlenül a
+  modul plafonjáig (2048 MB) jutott; a kis objektumok darabszáma a korláttal arányos. Ok, a pinelt forrásból: a
+  `js_def_malloc` a korlátot a `malloc_size` számlálón ellenőrzi, amit a `js_def_malloc_usable_size(ptr) +
+MALLOC_OVERHEAD` növel; `EMSCRIPTEN` alatt a `js_def_malloc_usable_size` `0`-t ad, a `MALLOC_OVERHEAD` `8`
+  (`quickjs.c` 58 ... 62. és 1717 ... 1750. sor). A wrapper az alapértelmezett foglalóval épít runtime-ot
+  (`c/interface.c` 407. sor, `JS_NewRuntime()`). A korlát tehát foglalásonként 8 bájtot számol, a foglalt méretet
+  nem: a kis objektumos sor a korlát / 8 nagyságrendű foglalásnál állt meg (Q-4b `mallocCount`). Q-4c: egy 100 MB-os
+  sztring után a runtime `memory_used_size` értéke 64 bájttal nőtt, a modul memóriája 16 MB-ról 126 MB-ra.
+- **A modul szintű plafon 2048 MB:** a modul `new WebAssembly.Memory({ initial: 256, maximum: 32768 })` lapot kér
+  (telepített `emscripten-module.mjs`), a build `ALLOW_MEMORY_GROWTH=1` (`templates/Variant.mk`). A plafon elérésekor
+  a sandboxban `InternalError: out of memory` jön (elkapható, Q-4 "tömb, elkapva"), a gazda folyamat fut tovább, a
+  kontextus és egy új runtime ugyanazon a modulon használható marad (Q-4), a lebontás tiszta. A gazda folyamat RSS-e
+  viszont a plafon közelébe nő (2106 MB), és a lineáris memória nem zsugorodik vissza.
+- A memóriakorlát nélküli kis objektumos esetet nem mértem (150 s alatt nem futott le).
+
+### Q-5: saját `WebAssembly.Memory` maximummal (T-3)
+
+A build `IMPORTED_MEMORY=1` (`templates/Variant.mk`: "Allow passing WASM memory to Emscripten"), a betöltő a
+`Module.wasmMemory` mezőt használja, ha meg van adva (telepített `emscripten-module.mjs`), és a
+`newVariant(variant, { wasmMemory })` ezt adja át (`quickjs-emscripten-core` `newVariant`). Lépésenként friss modul,
+`new WebAssembly.Memory({ initial: 256, maximum: <plafon> / 64 KiB })`. Script: `q5-wasm-memory-cap.mjs`.
+
+| Plafon | Foglalás        | Eredmény a sandboxban          | Darab | A modul memóriája | Lebontás | A modul utána | Gazda RSS (MB) |
+| ------ | --------------- | ------------------------------ | ----- | ----------------- | -------- | ------------- | -------------- |
+| 128 MB | tömbök, elkapva | `InternalError: out of memory` | 112   | 126 MB            | tiszta   | működik       | 143            |
+| 128 MB | sztringek       | `InternalError: out of memory` | 126   | 126 MB            | tiszta   | működik       | 183            |
+| 128 MB | el nem kapva    | a kiértékelés hibája ugyanez   |       | 126 MB            | tiszta   | működik       | 145            |
+| 256 MB | tömbök, elkapva | `InternalError: out of memory` | 229   | 248 MB            | tiszta   | működik       | 232            |
+| 256 MB | sztringek       | `InternalError: out of memory` | 254   | 248 MB            | tiszta   | működik       | 306            |
+
+A saját memória maximuma valódi bájtkorlát: a foglalás a plafonnál megáll, a hiba a sandboxban marad, a gazda és a
+modul ép.
+
+### Q-6: mély rekurzió és a `setMaxStackSize` (T-3)
+
+Script: `q6-recursion.mjs` (stack méret), `q6b-recursion-margin.mjs` (stack méret és a gazda oldali előfogyasztott
+hívási mélység). A QuickJS alapértéke 1 MB (`quickjs.h` `JS_DEFAULT_STACK_SIZE (1024 * 1024)`), a build árnyék stackje
+5 MB (`templates/Variant.mk` `STACK_SIZE=5MB`).
+
+**Alapértéken** (a `setMaxStackSize` hívása nélkül) mind az öt eset (farok és nem farok rekurzió, elkapott
+rekurzió, sok argumentum, `JSON.parse` 1e6 mélységű tömbbel) a **gazdán** bukott:
+`RangeError: Maximum call stack size exceeded` (a V8 natív stackje fogyott el a WebAssembly hívásokban, mielőtt a
+QuickJS saját ellenőrzése jelzett volna), és a runtime lebontása a `JS_FreeRuntime` assertjét adta. A szkript a
+hibát nem kaphatja el. Egy egyszerű kiértékelés ugyanazon a modulon utána működött.
+
+| `setMaxStackSize` | Gazda mélység | A sandboxban maradt                                                           | A gazdára jutott                                               | Rekurziós mélység |
+| ----------------- | ------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------- | ----------------- |
+| 524288            | 0             | egyik sem                                                                     | mind az öt                                                     | nem mért          |
+| 327680            | 0             | nem farok rekurzió                                                            | farok, elkapott, sok argumentum, `JSON.parse`                  | nem mért          |
+| 262144            | 0             | farok, nem farok, elkapott, sok argumentum                                    | `JSON.parse`                                                   | nem mért          |
+| 131072            | 0             | rekurzió, sok argumentum, `JSON.parse`, getter, Proxy, `toString`             | `JSON.stringify` mély, mély forrás elemzés                     | 742               |
+| 131072            | 2000          | rekurzió, sok argumentum, getter, Proxy, `toString`                           | `JSON.parse`, `JSON.stringify`, forrás elemzés                 | 742               |
+| 131072            | 5000          | rekurzió, getter, Proxy, `toString`                                           | sok argumentum, `JSON.parse`, `JSON.stringify`, forrás elemzés | 742               |
+| 65536             | 0 ... 5000    | a forrás elemzésen és (2000, 5000 mélységen) a `JSON.stringify`-on kívül mind | mély forrás elemzés, `JSON.stringify`                          | 370               |
+| 32768             | 0 ... 5000    | a mély forrás elemzésen kívül mind                                            | mély forrás elemzés                                            | 184               |
+| 16384             | 0 ... 5000    | mind a kilenc eset                                                            | egyik sem                                                      | 91                |
+| 8192              | 0 ... 5000    | mind a kilenc eset                                                            | egyik sem                                                      | 44                |
+
+A "mély forrás elemzés" `eval("(".repeat(1e5) + "1" + ")".repeat(1e5))`, a `JSON.stringify` mély esete 1e5 mélységű
+objektum. A README példa értéke (`runtime.setMaxStackSize(1024 * 320)`) a mérésben négy esetből a gazdára engedte a
+hibát. A QuickJS stack ellenőrzése az árnyék stack mutatóját nézi, a V8 korlátja a natív WebAssembly hívási vermet;
+a kettő aránya esetenként más, ezért a sandboxban maradás határa esetfüggő. A mérés csak a felsorolt eseteket fedi,
+és csak a fő szálon, alapértelmezett Node stack mellett futott; egy `worker_threads` szálon vagy más
+`--stack-size` mellett nem mértem.
+
+### Q-7: fordítás futtatás nélkül és a csomagolás (`script_compile_failed`)
+
+Script: `q7-compile.mjs`. A `context.evalCode(code, filename, { compileOnly: true })` a pinelt verzióban létezik
+(`ContextEvalOptions.compileOnly`, "compile but do not run", telepített `index.d.ts`), és a `JS_EVAL_FLAG_COMPILE_ONLY`
+jelzőre képez.
+
+| Törzs (az `(async () => {\n<törzs>\n})()` csomagolásban)   | `compileOnly` eredmény                |
+| ---------------------------------------------------------- | ------------------------------------- |
+| `const x = await Promise.resolve(input); return { y: 1 };` | siker                                 |
+| `return {`                                                 | `SyntaxError: expecting ';'`          |
+| `return await 1;`                                          | siker                                 |
+| `sideEffect = 2; return 1;`                                | siker, a mellékhatás nem futott (`0`) |
+| `}); sideEffect = 1; (async () => {`                       | siker                                 |
+
+- A fordítás mellékhatás nélküli: a globális `sideEffect` a fordítások után `0`. A sikeres fordítás eredménye egy
+  bytecode objektum handle, amit fel kell szabadítani.
+- A szintaktikai hiba helye a csomagolt szövegben áll: `stack: "at script.js:4:2"` egy háromsoros törzs második sorának
+  hibájára, tehát a sorszám a csomagoló első sora miatt eggyel eltolt.
+- **A csomagolásból kitörő törzs** (`}); ...; (async () => {`) lefordul, mert a csomagolt szöveg érvényes program
+  marad. Az `AsyncFunction` konstruktor (`Object.getPrototypeOf(async function () {}).constructor(törzs)`) sem véd:
+  ugyanez a törzs a konstruktor hívásakor lefutott (`sideEffect` `1` lett). A kitörés ugyanabban a sandboxban fut,
+  tehát a határt nem lépi át, de a "a törzs egy függvény törzse" alakot nem garantálja; a T-015-12 tétele.
+
+### Q-8: a friss kontextus globális objektuma
+
+Script: `q8-globals.mjs`. `Object.getOwnPropertyNames(globalThis)` 61 név:
+
+`AggregateError`, `Array`, `ArrayBuffer`, `BigInt`, `BigInt64Array`, `BigUint64Array`, `Boolean`, `DataView`, `Date`,
+`Error`, `EvalError`, `FinalizationRegistry`, `Float16Array`, `Float32Array`, `Float64Array`, `Function`, `Infinity`,
+`Int16Array`, `Int32Array`, `Int8Array`, `InternalError`, `Iterator`, `JSON`, `Map`, `Math`, `NaN`, `Number`, `Object`,
+`Promise`, `Proxy`, `RangeError`, `ReferenceError`, `Reflect`, `RegExp`, `Set`, `SharedArrayBuffer`, `String`,
+`Symbol`, `SyntaxError`, `TypeError`, `URIError`, `Uint16Array`, `Uint32Array`, `Uint8Array`, `Uint8ClampedArray`,
+`WeakMap`, `WeakRef`, `WeakSet`, `decodeURI`, `decodeURIComponent`, `encodeURI`, `encodeURIComponent`, `escape`,
+`eval`, `globalThis`, `isFinite`, `isNaN`, `parseFloat`, `parseInt`, `undefined`, `unescape`.
+
+Szimbólum kulcs: `Symbol(Symbol.toStringTag)`. Nincs: `console`, `fetch`, `require`, `process`, `setTimeout`,
+`queueMicrotask`, `WebAssembly`, `std`, `os`, `Atomics`. A futtató unit tesztje erre a listára plusz a hét futás
+kontextus névre, a `fetch`-re és a `files`-ra épülhet.
+
+## 3. A verzió és a csomag választás
+
+**Verzió.** `0.32.0` mindhárom csomagra (`quickjs-emscripten`, `quickjs-emscripten-core`,
+`@jitl/quickjs-wasmfile-release-sync`): a registry `dist-tags.latest` értéke, kiadva 2026-02-16; a jsDelivr
+`tags.latest` ugyanez; a GitHub tag `v0.32.0` (`df4efb9ef2`). A forrásokat a toolchain research fájl táblája rögzíti.
+
+**Csomag.** `quickjs-emscripten-core` plusz `@jitl/quickjs-wasmfile-release-sync`, nem a teljes `quickjs-emscripten`.
+Indok a README "Reducing package size" szakaszából: a fő csomag négy WebAssembly változatot hoz (debug és release,
+sync és asyncify, "about 9.04mb"), és "you can switch to the `quickjs-emscripten-core` package ... and install one
+(or more) variants a-la-carte"; a legkisebb felállás pontosan ez a kettő. A SPEC-014 5.2 az alap, szinkron változatot
+írja elő, az asyncify változatot elveti, tehát a többi három változatra nincs szükség. Mért méret a próba
+könyvtárában: `quickjs-emscripten-core` 832 KB, `@jitl/quickjs-wasmfile-release-sync` 692 KB,
+`@jitl/quickjs-ffi-types` 108 KB; a teljes fő csomag a négy változattal 2,4 MB plusz a változatok (debug-sync 2,1 MB,
+debug-asyncify 2,0 MB, release-asyncify 1,3 MB). A Q-5 út (`newVariant` a saját memóriával) a core csomag API-ja.
+
+**A pinelt bellard QuickJS.** A variáns README-je: "Version 2025-09-13+f1139494 vendored to quickjs-emscripten on
+2026-02-15"; a commit dátuma 2025-12-22 (`f1139494`, "regexp: removed alloca() is lre_exec() ..."). A README szerint
+"quickjs-emscripten may switch to using quickjs-ng by default in the future", és a csomag verziója 1.0 alatti
+("expect occasional breaking API changes", J-1).
+
+## 4. T-4: a quickjs-ng 2026-os advisory-i és a pinelt bellard változat
+
+A quickjs-ng security oldalán (<https://github.com/quickjs-ng/quickjs/security>, a GitHub API advisory listája,
+lekérdezve 2026-11-04) tíz advisory áll 2026-ból. A bellard repó a pin után 15 olyan commitot kapott, amelynek üzenete
+memóriabiztonsági vagy szivárgási javítást mond (a klónozott repó `git log f1139494..HEAD`, 2026-11-04-i fej `712e8c0`).
+
+| quickjs-ng advisory                                                          | Súly     | A pinelt bellard kód                                                                                                                                                                                                                                                                                                                                        | Ítélet                                    |
+| ---------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| GHSA-m53g-qx47-3h38, `toReversed`/`with`/`toSpliced`/`toSorted` másolás      | critical | a `js_allocate_fast_array` a `count = len` beállítás után nem inicializálja a slotokat, a `js_array_toReversed` lassú útja utána felhasználói gettert hívhat, a `js_array_mark` `count`-ig jár; a bellard `4c722ce` (2026-03-21) "modified js_allocate_fast_array() so that the array is fully initialized ... avoids several nasty bugs (#471)" a pin után | ugyanaz a minta a pinben, a javítás utána |
+| GHSA-v647-xff9-jxf7, `build_backtrace` OOM use-after-free                    | low      | a bellard `cd97c2b` (2026-10-26) "fixed a use after free in build_backtrace() on out of memory (#529)" a pin után                                                                                                                                                                                                                                           | a javító commit a pin után van            |
+| GHSA-9wv5-5cgr-grj6, `TypedArray.prototype.sort` túlcsordulás 32 biten       | high     | a bellard `0989d4c` (2026-03-21) a `TypedArray` sort túlcsordulását javítja átméretezésnél; hogy az ng 32 bites szorzás túlcsordulása ugyanaz-e, nem vetettem össze                                                                                                                                                                                         | nem ellenőrzött                           |
+| GHSA-jp52-chwg-2p9p, `js_proxy_get_own_property_names` 32 bites túlcsordulás | high     | a pinelt függvényben nincs `len + extra_len` összeadás; a teljes logikát nem vetettem össze                                                                                                                                                                                                                                                                 | nem ellenőrzött                           |
+| GHSA-r6vf-p8wr-4vg9, `set_array_length` use-after-free                       | high     | a pinelt `set_array_length` rövidítéskor felszabadít és `count = len`; az ng által leírt visszanövesztési út nem vetve össze                                                                                                                                                                                                                                | nem ellenőrzött                           |
+| GHSA-52gx-967m-hxp3, `ArrayBuffer.prototype.transfer` külső pufferen         | high     | a bellard `75b5230` (2025-11-03, a pin előtt) és `f838177` (2026-06-02, a pin után) módosította; a wrapper `JS_NewArrayBuffer` hívást is tartalmaz saját felszabadítóval (`c/interface.c` 536. sor)                                                                                                                                                         | nem ellenőrzött                           |
+| GHSA-rxpx-wj25-jhqq, RegExp OOM írás                                         | high     | az érintett ng tartomány `>= 0.15.1`, az ng saját újabb kódja                                                                                                                                                                                                                                                                                               | nem ellenőrzött                           |
+| GHSA-3jf7-4qfx-xc2h, `JSON.stringify` rope                                   | medium   | a pinelt kódban van rope (`JS_TAG_STRING_ROPE`); a `space` kezelését nem vetettem össze                                                                                                                                                                                                                                                                     | nem ellenőrzött                           |
+| GHSA-wm7w-r6qf-3c9w, `Atomics.store` szivárgás                               | medium   | az `Atomics` a kontextusban nem létezik (Q-8)                                                                                                                                                                                                                                                                                                               | a sandboxból nem érhető el                |
+| GHSA-crgj-9jv8-xfhq, ígéret feloldó OOM use-after-free                       | low      | modul kiértékelés útja; a futtató modult nem tölt be                                                                                                                                                                                                                                                                                                        | nem ellenőrzött                           |
+
+További, a pin utáni bellard javítások a kontextusban elérhető részen: `5022f2b` (2026-03-21) "fixed use-after-free via
+re-entrant GC in FinalizationRegistry weak reference cleanup (#494)" (a `FinalizationRegistry` a kontextusban van,
+Q-8), `841dd03` `TypedArray.prototype.with` és `68caa5f` `TypedArray` konstruktor puffer túlcsordulás.
+
+**Megállapítás.** A pinelt bellard pillanatkép legalább két, az ng advisory-kkal azonos függvényt érintő hibát
+tartalmaz, amelyet a bellard repó a pin után javított (`4c722ce`, `cd97c2b`), és további, a sandboxból elérhető
+memóriabiztonsági javítások is a pin utániak. A `quickjs-emscripten` legfrissebb kiadása (0.32.0) ezt a pint hozza,
+újabb nincs. **Kimondott korlát:** hogy ezek a hibák a WebAssembly lineáris memóriáján belül maradnak-e, vagy a
+gazdára hatnak, nem ellenőrzött (SPEC-014 5.10 1. pont változatlanul).
+
+## 5. Mit jelent ez a SPEC-014 5.4 pontjaira
+
+**Kettős időkorlát (T-2).** Mérve igazolt: a CPU kötött kód az interrupt kezelővel a határidőn belül 1 ms-mal megáll
+(Q-1), a gazda ígéretre várakozás alatt a kezelő nem fut (Q-2), tehát a gazda oldali `AbortSignal` ág szükséges, és a
+mikrofeladat lánc az `executePendingJobs` hívásban is megáll (Q-3). Pontosítások a T-015-6 számára:
+
+1. A futó gazda hívások ígéretét (`deferred`) és minden handle-t a lebontás előtt fel kell szabadítani (Q-2 B).
+2. A runtime `dispose` hívása a megszakított `then` lánc után a handle-ök hibátlan kezelése mellett is
+   `WebAssembly.RuntimeError` assertet adhat (Q-3b ... Q-3d), tehát a lebontás hibáját el kell kapni. A lépésenként
+   friss modul (Q-3d, betöltés 1 ... 2 ms) ezt egy eldobható modulra korlátozza.
+3. Az `AbortSignal.timeout` időzítője `unref`: a folyamatot nem tartja életben (Q-2); a unit tesztben ezzel számolni
+   kell.
+
+**Memória (T-3).** **A spec mechanizmusa a mérésen elbukik:** a `setMemoryLimit(128 * 1024 * 1024)` ebben a buildben
+nem korlátozza a foglalt bájtokat (Q-4), egy szkript a korlát mellett is 2048 MB-ig foglal, és a gazda RSS-e
+ugyanennyit nő. A folyamat nem áll le, a hiba a sandboxban `InternalError`, de egy lépés a gép memóriájának több mint
+felét elviheti (a mérő gépen 3906 MB). A 128 MB-os bájtkorlát mérten elérhető lépésenként friss modullal és saját
+`WebAssembly.Memory` maximummal (Q-5); ez a spec 5.4 életciklusának (lépésenként új runtime) bővítése lépésenként új
+modulra, és a mechanizmus cseréje: a döntés a spec gazdájáé, ez a fájl nem írja át.
+
+**Stack (T-3).** **A spec "mért korlát" ága a mérésen elbukik:** alapértéken a mély rekurzió a gazdán bukik (Q-6), és
+nincs olyan `setMaxStackSize` érték, ami minden mért esetet a sandboxban tart és közben használható rekurziós mélységet
+ad: a 16384 bájt az utolsó, amin mind a kilenc eset a sandboxban maradt, 91-es rekurziós mélységgel; a 131072 bájt
+(742 mélység) mellett a mély forrás elemzés és a mély `JSON.stringify` a gazdára jut. A gazdára jutott hiba elkapható
+`RangeError`, a folyamat fut tovább, a runtime lebontása assertet ad (a lépésenként friss modul ezt is egy eldobható
+modulra korlátozza). Hogy melyik értéket válasszuk, vagy a gazdán elkapott `RangeError`-t a lépés hibájának tekintsük,
+termék és kockázati döntés; ez a fájl nem dönti el.
+
+**Fordítás (`script_compile_failed`).** A `compileOnly` mellékhatás nélkül fordít és a szintaktikai hibát adja (Q-7);
+a csomagolásból kitörő törzs lefordul, ez a T-015-12 tétele.
+
+**Globális nevek.** A 61 név a 2. szekció Q-8 pontjában; a `console` nincs, egyezik az 5.4 "Globális nevek" pontjával.
