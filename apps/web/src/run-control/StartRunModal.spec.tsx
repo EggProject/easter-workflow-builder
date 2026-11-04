@@ -235,6 +235,20 @@ describe('StartRunModal', () => {
     });
   });
 
+  it('a szám mező a gépelés köztes alakját (1.0) nem írja át, így az 1.05 begépelése 1.05-öt küld', () => {
+    renderModal({ fields: [{ name: 'count', label: 'Darab', valueKind: 'number', required: false }] });
+
+    for (const partial of ['1', '1.0', '1.05']) {
+      act(() => {
+        typeInto(fieldInput('Darab'), partial);
+      });
+      expect(fieldInput('Darab').value).toBe(partial);
+    }
+    submitForm();
+
+    expect(onSubmit).toHaveBeenCalledWith({ count: 1.05 });
+  });
+
   it('az üresen hagyott nem kötelező mezők kulcsa hiányzik, a logikai mező viszont hamis értékkel megy', () => {
     renderModal({ fields: ALL_KIND_FIELDS });
     act(() => {

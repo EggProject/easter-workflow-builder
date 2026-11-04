@@ -5,7 +5,10 @@ import type { StartInputField } from '@easter-workflow-builder/protocol';
  * mező `valueKind` típusa dönti el, melyiket olvassa a felület és a kiértékelés
  * (SPEC-016 5.1): a `text`, a `choice`, a `list` és a `json` a `text` szöveget,
  * a `number` a `number` értéket (`NaN` = üres, a `valueAsNumber` üres mezőre
- * adott értéke), a `boolean` a `checked` értéket. Így nincs olyan állapot, ami
+ * adott értéke), a `boolean` a `checked` értéket. A `number` mező a `text`
+ * helyen a begépelt nyers szöveget is tárolja, mert a beviteli elem csak azt
+ * mutathatja vissza gépelés közben (`1.0` nem írható vissza `1`-ként), az
+ * olvasás viszont a `number` értékből megy. Így nincs olyan állapot, ami
  * egy másik típusú mező értékével nem egyezne.
  */
 export interface StartRunFieldValue {

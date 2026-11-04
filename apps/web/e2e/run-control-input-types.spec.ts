@@ -165,3 +165,20 @@ test('az értelmezhetetlen JSON a mező alatt jelez, kérés nem indul, a javít
   await expect(page).toHaveURL(/\/run\?runId=run-1$/);
   expect(bodies).toEqual([JSON.stringify({ input: { topic: 'AI', urgent: false, payload: [1, 2] } })]);
 });
+
+test('a szám mező billentyűzetről gépelve nem írja át a köztes alakot, az 1.05 1.05-ként megy el', async ({ page }) => {
+  const bodies: string[] = [];
+  await mockEditor(page, bodies);
+  const dialog = await openStartModal(page);
+  const count = dialog.getByRole('spinbutton', { name: 'Darab' });
+
+  await dialog.getByRole('textbox', { name: 'Téma' }).fill('AI');
+  // A `fill()` egy lépésben írja az értéket, ezért a köztes alakot (`1.0`) nem
+  // látja: a leütésenkénti bevitel a valódi gépelést adja vissza.
+  await count.pressSequentially('1.05');
+  await expect(count).toHaveValue('1.05');
+  await dialog.getByRole('button', { name: 'Indítás', exact: true }).click();
+
+  await expect(page).toHaveURL(/\/run\?runId=run-1$/);
+  expect(bodies).toEqual([JSON.stringify({ input: { topic: 'AI', count: 1.05, urgent: false } })]);
+});

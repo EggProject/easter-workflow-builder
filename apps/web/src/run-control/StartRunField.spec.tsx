@@ -107,13 +107,21 @@ describe('StartRunField', () => {
     act(() => {
       typeInto(input, '4.5');
     });
-    expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY_START_RUN_FIELD_VALUE, number: 4.5 });
+    expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY_START_RUN_FIELD_VALUE, text: '4.5', number: 4.5 });
+  });
+
+  it('a szám mező a begépelt nyers szöveget mutatja vissza, a köztes alakot (1.0) sem írja át a számra', () => {
+    renderField(
+      { name: 'count', label: 'Darab', valueKind: 'number', required: false },
+      { ...EMPTY_START_RUN_FIELD_VALUE, text: '1.0', number: 1 },
+    );
+    expect(requireElement(container.querySelector<HTMLInputElement>('input.input'), 'a szám mezőt').value).toBe('1.0');
   });
 
   it('a szám mező kiürítése NaN értéket ad', () => {
     renderField(
       { name: 'count', label: 'Darab', valueKind: 'number', required: false },
-      { ...EMPTY_START_RUN_FIELD_VALUE, number: 4.5 },
+      { ...EMPTY_START_RUN_FIELD_VALUE, text: '4.5', number: 4.5 },
     );
     const input = requireElement(container.querySelector<HTMLInputElement>('input.input'), 'a szám mezőt');
     expect(input.value).toBe('4.5');
@@ -124,10 +132,10 @@ describe('StartRunField', () => {
     expect(onChange.mock.lastCall?.[0].number).toBeNaN();
   });
 
-  it('a szám mező a kapott számot mutatja', () => {
+  it('a szám mező a kapott szöveget mutatja, a nulla is érték', () => {
     renderField(
       { name: 'count', label: 'Darab', valueKind: 'number', required: false },
-      { ...EMPTY_START_RUN_FIELD_VALUE, number: 0 },
+      { ...EMPTY_START_RUN_FIELD_VALUE, text: '0', number: 0 },
     );
     expect(requireElement(container.querySelector<HTMLInputElement>('input.input'), 'a szám mezőt').value).toBe('0');
   });
