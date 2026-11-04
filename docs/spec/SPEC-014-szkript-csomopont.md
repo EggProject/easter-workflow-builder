@@ -171,7 +171,9 @@ Kizárólag `http:` és `https:` séma (az OWASP SSRF lap szerint a nem HTTP sé
 J-15). Átirányítás követése nincs (`redirect: 'manual'`, J-15); a szkript a `status` és a `location` fejléc
 alapján maga dönt. Címszűrés nincs (O-6 user döntés): a szkript bármely címet elérhet, a helyi gépet is. A második
 argumentum csak a `method`, a `headers` (szöveg értékek) és a `body` (szöveg) mezőt tartalmazhatja, más kulcs
-`TypeError`; a válasz `headers` mezője a `Headers` bejárása kisbetűs névvel. A kérés a kérés jelén és a lépés végén
+`TypeError`; a válasz `headers` mezője a `Headers` bejárása kisbetűs névvel. A válasz törzse legfeljebb a lépés memória
+korlátjáig (`memoryLimitMb`, bájtban) olvasott, a hosszabb törzs `TypeError` (research
+`2026-11-04-szkript-csomopont.md` 10.1 F4). A kérés a kérés jelén és a lépés végén
 (határidő, lebontás) szakad meg, a jel után érkező eredmény a sandboxot nem érinti (research
 `2026-11-04-szkript-csomopont.md` 9.1).
 
@@ -183,7 +185,8 @@ link ne vezessen ki (J-15); a gyökéren kívüli út `script_evaluation_failed`
 szintaktikai ellenőrzés nem véd az ellenőrzés és a használat közötti linkcsere ellen (TOCTOU, nem ellenőrzött
 forrással, 5.10). Az abszolút `path` a gyökér alatt is elutasított; az írás létező célnál a cél, nem létezőnél a
 szülő könyvtár `fs.realpath` alakját ellenőrzi, és az új fájlt `wx` jelzővel hozza létre, ami a függő szimbolikus
-linkre is hibát ad. A `list` a bejegyzések nevét adja. A hibaüzenet a szkript saját útvonalát és a Node hibakódot
+linkre is hibát ad. A `list` a bejegyzések nevét adja. A `readText` legfeljebb a lépés memória korlátjáig olvas, a nagyobb
+fájl hiba (research 10.1 F4). A hibaüzenet a szkript saját útvonalát és a Node hibakódot
 mondja (`a fájl művelet nem sikerült (ENOENT): a.txt`), a gazda abszolút gyökerét nem (research 9.1 7. pont).
 
 **Időkorlát.** A határidő a lépés indulásától számít (a modul betöltése is beleszámít), `timeoutMs` vagy 60 000 ms. Két ága van, mert az
@@ -192,7 +195,10 @@ interrupt kezelő a gazda ígéretre várakozás alatt nem fut (J-6): (1) CPU k�
 végén törölt `setTimeout` a határidőre (`waitForSettlement`), a kérés jelével versenyeztetve; nem `AbortSignal.timeout`,
 mert annak időzítője `unref` (research Q-2) és nem törölhető. A folyamatban lévő hálózati kérés a lépés jelén szakad meg
 (a határidő után a lépés vége, külső megszakításkor a kérés jele; research 9.1 2. pont). Bármelyik
-ág lejár, a lépés `script_timed_out` osztállyal bukik, és a runtime felszabadul.
+ág lejár, a lépés `script_timed_out` osztállyal bukik, és a runtime felszabadul. Az interrupt kezelő közvetlenül a
+szkript előtt áll be, és a megszakítás után a gazda függvény az argumentum olvasása nélkül elutasít, mert az argumentum
+olvasása a szkript kódját (`toJSON`, getter) futtatja, és az ott érkező megszakítás elkapható hibaként jutna vissza
+(research 10.1 F1, F3).
 
 **Memória.** A user döntése (2026-11-04), szó szerint: "friss motor lepesenkent es lehessen beallitani, de default
 teljes rendszermemoria". A korlát a lépés saját `WebAssembly.Memory` objektumának maximuma
@@ -300,13 +306,16 @@ szótárába és a kliens magyar mondatai közé kerül, az `error-class-drift-p
 3. **A fájl hozzáférés írni is tud.** A gyökér alatt a szkript felülírhat bármit, és a szintaktikai ellenőrzés
    nem véd a TOCTOU linkcsere ellen (5.4). A gyökér az O-5 user döntése szerint csomópontonként megadott
    (`cwd`), üresen a szerver munkakönyvtára; a kockázat kimondott és elfogadott.
-4. **Titok.** A gazda `fetch` nem ad hozzá hitelesítő fejlécet és sütit, és a környezeti változók nem érhetők el
-   a sandboxból (nincs `process`). A szerző saját figyelmeztetése szerint egy hitelesített gazda `fetch`
+4. **Titok.** A gazda `fetch` nem ad hozzá hitelesítő fejlécet és sütit, és nincs `process`. A fájl hozzáférésen át
+   viszont a gyökér alatti minden fájl olvasható: ha a `cwd` a `/proc/self` vagy a `/` könyvtár, a
+   `/proc/self/environ` a szerver indulási környezeti változóit adja (mérve, research 10.3), és az üres `cwd` a szerver
+   munkakönyvtára, az ott álló fájlokkal. A szerző saját figyelmeztetése szerint egy hitelesített gazda `fetch`
    kiadása a sandbox értelmét veszi el (J-4).
 5. **Szolgáltatás kiesés.** A CPU kötött szkript a határidőig az eseményhurkot foglalja (5.4), a nagyobb
    `timeoutMs` ezt arányosan növeli, és a külső megszakítás sem állítja meg (5.8). A memória alapértéke a rendszermemória (legfeljebb 2048 MB) lépésenként: több
    párhuzamos szkript lépés együtt a gép memóriáját meghaladó foglalást kísérelhet meg (a user döntése az alapértékről,
-   kimondott kockázat).
+   kimondott kockázat). A gazda a `fetch` törzsét és a `readText` fájlját a lépés korlátjáig a saját memóriájában is
+   tartja (puffer, szöveg, JSON szöveg), tehát a gazda foglalása a korlát többszöröse lehet (mérve, research 10.3).
 
 ## 6. Tesztelés
 
