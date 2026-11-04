@@ -58,6 +58,8 @@ describe('mapOutcomeMessageToErrorCode', () => {
     'insufficient_backoff_list',
     'missing_required_input',
     'invalid_input_type',
+    'invalid_structured_output_schema',
+    'structured_output_schema_mismatch',
     'structured_output_strategy_unsupported',
     'insufficient_max_turns',
     'forced_tool_choice_silently_dropped',

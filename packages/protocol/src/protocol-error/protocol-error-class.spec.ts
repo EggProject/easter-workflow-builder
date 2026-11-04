@@ -10,6 +10,11 @@ describe('ProtocolErrorClassSchema', () => {
     expect(ProtocolErrorClassSchema.safeParse('invalid_input_type').success).toBe(true);
   });
 
+  it('tartalmazza a strukturált kimenet séma ellenőrzésének két hibaosztályát (SPEC-015 5.4, 5.5)', () => {
+    expect(ProtocolErrorClassSchema.safeParse('invalid_structured_output_schema').success).toBe(true);
+    expect(ProtocolErrorClassSchema.safeParse('structured_output_schema_mismatch').success).toBe(true);
+  });
+
   it('a szótáron kívüli hibaosztályt elutasítja (a kliens ilyenkor a kód mondatát mutatja)', () => {
     expect(ProtocolErrorClassSchema.safeParse('database_closed').success).toBe(false);
   });
