@@ -1,6 +1,7 @@
 import type { SubWorkflowNodeConfig } from '@easter-workflow-builder/protocol';
-import { TextAreaField, TextField } from '@easter-workflow-builder/ui';
+import { TextField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
+import { LineListTextAreaField } from './LineListTextAreaField.tsx';
 import { fromStringRecordFieldValue, toStringRecordFieldValue } from './string-record-field-value.ts';
 import { useFieldError } from './use-field-error.ts';
 
@@ -34,13 +35,14 @@ export function SubWorkflowNodeFields(properties: Readonly<SubWorkflowNodeFields
           onChange({ ...config, targetWorkflowId: event.target.value });
         }}
       />
-      <TextAreaField
-        size="sm"
+      <LineListTextAreaField
         label="Bemenet leképezés (soronként kulcs=érték)"
-        value={toStringRecordFieldValue(config.inputMapping)}
+        value={config.inputMapping}
+        toText={toStringRecordFieldValue}
+        fromText={fromStringRecordFieldValue}
         error={inputMappingError}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-          onChange({ ...config, inputMapping: fromStringRecordFieldValue(event.target.value) });
+        onChange={(inputMapping) => {
+          onChange({ ...config, inputMapping });
         }}
       />
     </>

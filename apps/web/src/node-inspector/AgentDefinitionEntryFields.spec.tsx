@@ -1,5 +1,5 @@
 /* eslint-disable unicorn/no-null -- a teszt a hivatkozás `authEnvName` mezőjének `null` értékét (nincs felülírás) vizsgálja (SPEC-009 6.2). */
-import { act } from 'react';
+import { act, useState, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
@@ -261,6 +261,41 @@ describe('AgentDefinitionEntryFields', () => {
       typeInto(toolsTextarea, 'WebSearch\nWebFetch');
     });
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ tools: ['WebSearch', 'WebFetch'] }));
+  });
+
+  it('gépelés közben a lista szerkesztőben (tools) az Enter megmarad, a bejegyzésbe a bontott lista kerül', () => {
+    let latest: Readonly<Record<string, unknown>> = { ...FULL_ENTRY, tools: [] };
+    function Host(): ReactElement {
+      const [entry, setEntry] = useState(latest);
+      return (
+        <AgentDefinitionEntryFields
+          fieldPathPrefix="agents.kutato."
+          value={entry}
+          onChange={(next) => {
+            latest = next;
+            setEntry(next);
+          }}
+        />
+      );
+    }
+    act(() => {
+      root.render(<Host />);
+    });
+    const toolsTextarea = [...container.querySelectorAll<HTMLTextAreaElement>('textarea')].find(
+      (textarea) =>
+        textarea.closest('.field')?.querySelector('.field__label')?.textContent === 'Engedélyezett eszközök',
+    );
+    if (toolsTextarea === undefined) {
+      throw new Error('a teszt nem találta a tools mezőt');
+    }
+
+    for (const partial of ['WebSearch', 'WebSearch\n', 'WebSearch\nWebFetch']) {
+      act(() => {
+        typeInto(toolsTextarea, partial);
+      });
+      expect(toolsTextarea.value).toBe(partial);
+    }
+    expect(latest).toEqual(expect.objectContaining({ tools: ['WebSearch', 'WebFetch'] }));
   });
 
   it('a nem támogatott memory mező a tárolt értéket és az okot mutatja, és eltávolítható (O-53)', () => {

@@ -16,6 +16,7 @@ import {
   type AgentDefinitionFieldDescriptor,
   type AgentDefinitionFieldGroup,
 } from './agent-definition-field-table.ts';
+import { LineListTextAreaField } from './LineListTextAreaField.tsx';
 import { McpServerReferencesField } from './McpServerReferencesField.tsx';
 import { SkillsField } from './SkillsField.tsx';
 import { describeUnknownValue } from './describe-unknown-value.ts';
@@ -130,12 +131,13 @@ function renderFieldControl(
     }
     case 'string-list': {
       return (
-        <TextAreaField
-          size="sm"
+        <LineListTextAreaField
           label={field.label}
-          value={toStringListFieldValue(isStringArray(rawValue) ? rawValue : [])}
-          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-            setField(field.key, fromStringListFieldValue(event.target.value));
+          value={isStringArray(rawValue) ? rawValue : []}
+          toText={toStringListFieldValue}
+          fromText={fromStringListFieldValue}
+          onChange={(nextValue) => {
+            setField(field.key, nextValue);
           }}
         />
       );

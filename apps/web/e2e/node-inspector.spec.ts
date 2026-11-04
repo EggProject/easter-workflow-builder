@@ -312,6 +312,22 @@ async function openAccordion(scope: Locator, title: string): Promise<Locator> {
   return region;
 }
 
+/**
+ * A `fill()` egy lépésben írja az értéket, ezért a köztes alakot (a sor végi
+ * Enter-t, a befejezetlen `kulcs=érték` sort) nem látja: a leütésenkénti
+ * bevitel a valódi gépelés. A régi mező minden leütésnél a bontott config
+ * értékből épült vissza, ezért az Enter (és a leképezésben a befejezetlen
+ * sor) a leütés pillanatában eltűnt (a SPEC-016 H2 hibájának párja).
+ */
+async function typeLines(field: Locator, first: string, second: string): Promise<void> {
+  await field.fill('');
+  await field.pressSequentially(first);
+  await field.press('Enter');
+  await expect(field).toHaveValue(`${first}\n`);
+  await field.pressSequentially(second);
+  await expect(field).toHaveValue(`${first}\n${second}`);
+}
+
 test.describe('a panel fejléce és a bezárás', () => {
   test('a fejléc a katalógus címkéjét és a node azonosítót mutatja, a Bezárás gomb elrejti a panelt', async ({
     page,
@@ -1193,6 +1209,60 @@ test.describe('sub_workflow node', () => {
     await expect(reopened.getByLabel('Célzott workflow azonosítója')).toHaveValue('w-masik');
     await expect(reopened.getByLabel('Bemenet leképezés (soronként kulcs=érték)')).toHaveValue(
       'topic=input.topic\ncount=input.count',
+    );
+  });
+});
+
+test.describe('soronkénti lista mezők billentyűzetes gépelése', () => {
+  test('agent_step: az eszköz és könyvtár listákban az Enter megmarad, és a bontott lista megmarad újranyitás után', async ({
+    page,
+  }) => {
+    const panel = await openNode(page, 'n-agent');
+    const group = await openAccordion(panel, 'Eszközök és környezet');
+    await typeLines(group.getByLabel('Engedélyezett eszközök'), 'Read', 'Write');
+    await typeLines(group.getByLabel('Tiltott eszközök'), 'Bash', 'Edit');
+    await typeLines(group.getByLabel('További engedélyezett könyvtárak'), '/tmp', '/var/data');
+
+    await closePanel(page);
+    const reopened = await openNode(page, 'n-agent');
+    const reopenedGroup = await openAccordion(reopened, 'Eszközök és környezet');
+    await expect(reopenedGroup.getByLabel('Engedélyezett eszközök')).toHaveValue('Read\nWrite');
+    await expect(reopenedGroup.getByLabel('Tiltott eszközök')).toHaveValue('Bash\nEdit');
+    await expect(reopenedGroup.getByLabel('További engedélyezett könyvtárak')).toHaveValue('/tmp\n/var/data');
+  });
+
+  test('agents bejegyzés: az eszköz listában az Enter megmarad', async ({ page }) => {
+    const panel = await openNode(page, 'n-agent');
+    const agentsGroup = await openAccordion(panel, 'Al-agentek (agents)');
+    const kutatoGroup = agentsGroup.getByRole('group', { name: 'kutato', exact: true });
+    await kutatoGroup.getByRole('button', { name: 'Kibontás' }).click();
+    const kutatoTools = await openAccordion(kutatoGroup, 'Eszközök és környezet');
+    await typeLines(kutatoTools.getByLabel('Engedélyezett eszközök'), 'Read', 'Grep');
+  });
+
+  test('error_handler: a várakozás és a hibafajta listában az Enter megmarad, és a bontott lista megmarad újranyitás után', async ({
+    page,
+  }) => {
+    const panel = await openNode(page, 'n-error');
+    await typeLines(panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)'), '100', '250');
+    await typeLines(panel.getByLabel('Kezelt hibafajták (soronként egy)'), 'timeout', 'rate_limit');
+
+    await closePanel(page);
+    const reopened = await openNode(page, 'n-error');
+    await expect(reopened.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)')).toHaveValue('100\n250');
+    await expect(reopened.getByLabel('Kezelt hibafajták (soronként egy)')).toHaveValue('timeout\nrate_limit');
+  });
+
+  test('sub_workflow: a leképezésben a befejezetlen sor és az Enter megmarad, és a teljes sorok megmaradnak újranyitás után', async ({
+    page,
+  }) => {
+    const panel = await openNode(page, 'n-subworkflow');
+    await typeLines(panel.getByLabel('Bemenet leképezés (soronként kulcs=érték)'), 'topic=input.topic', 'nyelv=hu');
+
+    await closePanel(page);
+    const reopened = await openNode(page, 'n-subworkflow');
+    await expect(reopened.getByLabel('Bemenet leképezés (soronként kulcs=érték)')).toHaveValue(
+      'topic=input.topic\nnyelv=hu',
     );
   });
 });
