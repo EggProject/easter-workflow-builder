@@ -5,16 +5,22 @@ describe('readPluginSkillSelection', () => {
   it('a motor alakjából a gyökeret, a plugin nevet és a puszta neveket adja', () => {
     expect(
       readPluginSkillSelection({
-        plugins: [{ type: 'local', path: '/adat/skills' }],
-        skills: ['skills:alfa', 'skills:beta'],
+        plugins: [{ type: 'local', path: '/adat/sajat-konyvtar' }],
+        skills: ['sajat-konyvtar:alfa', 'sajat-konyvtar:beta'],
       }),
-    ).toStrictEqual({ rootDirectory: '/adat/skills', pluginName: 'skills', skillNames: ['alfa', 'beta'] });
+    ).toStrictEqual({
+      rootDirectory: '/adat/sajat-konyvtar',
+      pluginName: 'sajat-konyvtar',
+      skillNames: ['alfa', 'beta'],
+    });
   });
 
   it('az üres skills lista üres kiválasztás', () => {
-    expect(readPluginSkillSelection({ plugins: [{ type: 'local', path: '/adat/skills' }], skills: [] })).toStrictEqual({
-      rootDirectory: '/adat/skills',
-      pluginName: 'skills',
+    expect(
+      readPluginSkillSelection({ plugins: [{ type: 'local', path: '/adat/sajat-konyvtar' }], skills: [] }),
+    ).toStrictEqual({
+      rootDirectory: '/adat/sajat-konyvtar',
+      pluginName: 'sajat-konyvtar',
       skillNames: [],
     });
   });
@@ -22,15 +28,15 @@ describe('readPluginSkillSelection', () => {
   it('a más előtagú és a nem szöveg elemet kihagyja', () => {
     expect(
       readPluginSkillSelection({
-        plugins: [{ type: 'local', path: '/adat/skills' }],
-        skills: ['masik:x', 7, 'skills:a'],
+        plugins: [{ type: 'local', path: '/adat/sajat-konyvtar' }],
+        skills: ['masik:x', 7, 'sajat-konyvtar:a'],
       })?.skillNames,
     ).toStrictEqual(['a']);
   });
 
   it.each([
-    ['plugins nélkül', { skills: ['skills:a'] }],
-    ['skills nélkül', { plugins: [{ type: 'local', path: '/adat/skills' }] }],
+    ['plugins nélkül', { skills: ['sajat-konyvtar:a'] }],
+    ['skills nélkül', { plugins: [{ type: 'local', path: '/adat/sajat-konyvtar' }] }],
     [
       'két plugin',
       {

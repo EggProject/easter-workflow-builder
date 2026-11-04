@@ -11,7 +11,9 @@ import { SKILLS_SUBDIRECTORY } from '../skill-endpoint/skills-subdirectory.ts';
  * `.claude-plugin/plugin.json` manifesztet, és manifeszt nélkül a CLI a plugin
  * gyökér könyvtárnevét használja (M-136 4a, 4b,
  * `docs/research/2026-10-28-spec-009-blokkolo-meresek.md` 2. szekció 2. pont).
- * Ez az egyetlen hely, ahol a név előáll.
+ * A motor itt kapja a nevet; a szerver `sdk-query-hardening` témája ugyanezt a szabályt
+ * alkalmazza a kimenő `plugins` gyökérre (`readPluginSkillSelection`), a lépés szűkített
+ * másolatának elnevezéséhez.
  *
  * A skillek a `<gyökér>/skills/` mappa könyvtárai (a más fájlok nem), név
  * szerint rendezve, ugyanazzal a szabállyal, mint a `GET /api/skills`. Amíg

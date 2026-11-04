@@ -49,6 +49,10 @@ export function createHardenedSdkQuery(sdkQuery: SdkQueryFunction): SdkQueryFunc
   return ({ prompt, options }) => {
     const hardened = hardenAgentOptions(options);
     const skillSelection = readPluginSkillSelection(hardened.options);
+    // Zárva bukó: egy nem olvasható `plugins` alak a teljes skill könyvtárat adná az al-agentnek (O-47).
+    if (skillSelection === undefined && Object.hasOwn(hardened.options, 'plugins')) {
+      throw new Error('A kimenő plugins opció nem a lépés skill kiválasztásának alakja (SPEC-009 O-47).');
+    }
     if (skillSelection === undefined && hardened.mcpServers === undefined) {
       return sdkQuery({ prompt, options: hardened.options });
     }

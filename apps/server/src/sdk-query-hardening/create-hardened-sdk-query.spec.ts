@@ -137,7 +137,9 @@ describe('createHardenedSdkQuery: a plugins gyökér a lépés kiválasztott ski
 
   function library(names: readonly string[]): string {
     const parent = mkdtempSync(path.join(tmpdir(), 'skill-konyvtar-'));
-    const root = path.join(parent, 'skills');
+    // A gyökér neve szándékosan nem `skills`: a plugin név a gyökér könyvtárneve (M-136 4a), és ez
+    // így elválik a `skills` almappától.
+    const root = path.join(parent, 'sajat-konyvtar');
     created.push(parent);
     for (const name of names) {
       mkdirSync(path.join(root, 'skills', name, 'reszek'), { recursive: true });
@@ -158,14 +160,14 @@ describe('createHardenedSdkQuery: a plugins gyökér a lépés kiválasztott ski
       stagedSkills = readdirSync(path.join(staged, 'skills'));
       stagedBody = readFileSync(path.join(staged, 'skills', 'beta', 'reszek', 'a.md'), 'utf8');
       return inner(request);
-    })({ prompt: 'p', options: { plugins: [{ type: 'local', path: root }], skills: ['skills:beta'] } });
+    })({ prompt: 'p', options: { plugins: [{ type: 'local', path: root }], skills: ['sajat-konyvtar:beta'] } });
 
     const staged = pluginPathOf(captured[0]?.options);
-    expect(path.basename(staged)).toBe('skills');
+    expect(path.basename(staged)).toBe('sajat-konyvtar');
     expect(staged).not.toBe(root);
     expect(stagedSkills).toStrictEqual(['beta']);
     expect(stagedBody).toBe('beta');
-    expect(captured[0]?.options['skills']).toStrictEqual(['skills:beta']);
+    expect(captured[0]?.options['skills']).toStrictEqual(['sajat-konyvtar:beta']);
     expect(captured[0]?.configPath).toBeUndefined();
 
     expect(await drain(handle)).toStrictEqual(['a']);
@@ -190,7 +192,11 @@ describe('createHardenedSdkQuery: a plugins gyökér a lépés kiválasztott ski
     const captured: Captured[] = [];
     createHardenedSdkQuery(fakeQuery([], captured))({
       prompt: 'p',
-      options: { plugins: [{ type: 'local', path: root }], skills: ['skills:alfa'], mcpServers: { docs: HTTP_SERVER } },
+      options: {
+        plugins: [{ type: 'local', path: root }],
+        skills: ['sajat-konyvtar:alfa'],
+        mcpServers: { docs: HTTP_SERVER },
+      },
     });
 
     expect(path.dirname(pluginPathOf(captured[0]?.options))).toBe(path.dirname(captured[0]?.configPath ?? ''));
@@ -211,7 +217,7 @@ describe('createHardenedSdkQuery: a plugins gyökér a lépés kiválasztott ski
         createHardenedSdkQuery(() => {
           isCalled = true;
           return fakeQuery([], [])({ prompt: 'p', options: {} });
-        })({ prompt: 'p', options: { plugins: [{ type: 'local', path: root }], skills: ['skills:nincs'] } }),
+        })({ prompt: 'p', options: { plugins: [{ type: 'local', path: root }], skills: ['sajat-konyvtar:nincs'] } }),
       ).toThrow(/ENOENT/u);
     } finally {
       if (previous === undefined) {
@@ -222,5 +228,28 @@ describe('createHardenedSdkQuery: a plugins gyökér a lépés kiválasztott ski
     }
     expect(isCalled).toBe(false);
     expect(readdirSync(parent)).toStrictEqual([]);
+  });
+
+  it.each([
+    ['skills nélkül', { plugins: [{ type: 'local', path: '/adat/sajat-konyvtar' }] }],
+    [
+      'két plugin',
+      {
+        plugins: [
+          { type: 'local', path: '/a' },
+          { type: 'local', path: '/b' },
+        ],
+        skills: [],
+      },
+    ],
+  ])('a nem olvasható plugins alak (%s) dob, a query() nem fut (zárva bukó, O-47)', (_label, options) => {
+    let wasCalled = false;
+    expect(() =>
+      createHardenedSdkQuery(() => {
+        wasCalled = true;
+        return fakeQuery([], [])({ prompt: 'p', options: {} });
+      })({ prompt: 'p', options }),
+    ).toThrow(/O-47/u);
+    expect(wasCalled).toBe(false);
   });
 });
