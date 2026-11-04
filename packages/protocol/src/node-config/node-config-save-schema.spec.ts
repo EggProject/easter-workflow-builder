@@ -839,3 +839,115 @@ describe('NodeConfigSaveSchema: az agent definíció memory mezője és közvetl
     ).toBe(true);
   });
 });
+
+function savableStartWith(...inputFields: readonly unknown[]): unknown {
+  return { type: 'start', inputFields, onUnhandledError: 'fail_run' };
+}
+
+function choiceFieldWith(options: unknown): unknown {
+  return { name: 'szin', label: 'Szín', valueKind: 'choice', options, required: true };
+}
+
+function plainFieldWith(valueKind: string, extra: Readonly<Record<string, unknown>>): unknown {
+  return { name: 'a', label: 'A', valueKind, required: false, ...extra };
+}
+
+describe('NodeConfigSaveSchema: a choice bemeneti mező opciói (SPEC-016 5.3)', () => {
+  it('érvényes opciókkal átmegy', () => {
+    const config = savableStartWith(choiceFieldWith(['piros', 'zöld']));
+
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
+  });
+
+  for (const [description, options] of [
+    ['üres lista', []],
+    ['üres elem', ['piros', '']],
+    ['csak szóközös elem', ['piros', ' '.repeat(3)]],
+    ['duplikált elem', ['piros', 'zöld', 'piros']],
+  ] as const) {
+    const config = savableStartWith(choiceFieldWith(options));
+
+    it(`${description} elbukik, a hiba a mező options útvonalán áll`, () => {
+      const parsed = NodeConfigSaveSchema.safeParse(config);
+
+      expect(parsed.success).toBe(false);
+      if (parsed.success) {
+        return;
+      }
+      expect(issuePaths(parsed.error)).toEqual([['inputFields', 0, 'options']]);
+      expect(parsed.error.issues[0]?.message).toBe(
+        'Legalább egy opció kell, az opciók nem lehetnek üresek és nem ismétlődhetnek.',
+      );
+    });
+
+    it(`${description}: a ReplaceGraphRequestSchema a teljes útvonalon utasítja el`, () => {
+      const request = ReplaceGraphRequestSchema.safeParse({ nodes: [nodeWith(config)], edges: [] });
+
+      expect(request.success).toBe(false);
+      if (request.success) {
+        return;
+      }
+      expect(issuePaths(request.error)).toEqual([['nodes', 0, 'config', 'inputFields', 0, 'options']]);
+    });
+
+    it(`${description}: az olvasó sémák elfogadják (csak az írás oldala szigorodik)`, () => {
+      const stored = storedNodeWith(config);
+
+      expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+      expect(WorkflowNodeSchema.safeParse(stored).success).toBe(true);
+    });
+  }
+
+  it('a hibát egy másik, típushibás mező mellett is jelzi (when feltétel)', () => {
+    const field = { name: 7, label: 'Szín', valueKind: 'choice', options: [], required: true };
+    const parsed = NodeConfigSaveSchema.safeParse(savableStartWith(field));
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      return;
+    }
+    expect(issuePaths(parsed.error)).toEqual([
+      ['inputFields', 0, 'name'],
+      ['inputFields', 0, 'options'],
+    ]);
+  });
+
+  it('nem szöveg elemű options a séma saját típushibája, mellé nem kerül második hiba', () => {
+    const parsed = NodeConfigSaveSchema.safeParse(savableStartWith(choiceFieldWith([1])));
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      return;
+    }
+    expect(issuePaths(parsed.error)).toEqual([['inputFields', 0, 'options', 0]]);
+  });
+});
+
+describe('NodeConfigSaveSchema: a start bemeneti mező valueKind típusa (SPEC-016 5.1, 5.2)', () => {
+  for (const valueKind of ['text', 'number', 'boolean', 'list', 'json'] as const) {
+    it(`a(z) ${valueKind} options nélkül átmegy`, () => {
+      const config = savableStartWith(plainFieldWith(valueKind, {}));
+
+      expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
+    });
+
+    it(`a(z) ${valueKind} ágon az options ismeretlen kulcs, elbukik`, () => {
+      const config = savableStartWith(plainFieldWith(valueKind, { options: ['x'] }));
+
+      expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
+    });
+  }
+
+  it('a régi szabad szöveges érték elbukik az olvasó és a mentési sémán is', () => {
+    const config = savableStartWith(plainFieldWith('string', {}));
+
+    expect(NodeConfigSchema.safeParse(config).success).toBe(false);
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
+  });
+
+  it('a choice ágon az options hiánya elbukik', () => {
+    const config = savableStartWith(plainFieldWith('choice', {}));
+
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
+  });
+});

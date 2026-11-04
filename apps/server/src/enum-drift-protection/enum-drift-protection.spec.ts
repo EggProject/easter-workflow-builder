@@ -1,20 +1,26 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { isApprovalDecision, isRunEventKind } from '@easter-workflow-builder/db';
+import { isApprovalDecision, isNodeConfig, isRunEventKind } from '@easter-workflow-builder/db';
 import type {
   ApprovalDecision as DatabaseApprovalDecision,
   NodeType as DatabaseNodeType,
   RunEventKind as DatabaseRunEventKind,
   RunInterruptedReason as DatabaseRunInterruptedReason,
   RunStatus as DatabaseRunStatus,
+  StartInputValueKind as DatabaseStartInputValueKind,
   StepRunStatus as DatabaseStepRunStatus,
 } from '@easter-workflow-builder/db';
-import { ApprovalDecisionSchema, RunEventKindSchema } from '@easter-workflow-builder/protocol';
+import {
+  ApprovalDecisionSchema,
+  RunEventKindSchema,
+  StartInputValueKindSchema,
+} from '@easter-workflow-builder/protocol';
 import type {
   ApprovalDecision as ProtocolApprovalDecision,
   NodeType as ProtocolNodeType,
   RunEventKind as ProtocolRunEventKind,
   RunInterruptedReason as ProtocolRunInterruptedReason,
   RunStatus as ProtocolRunStatus,
+  StartInputValueKind as ProtocolStartInputValueKind,
   StepRunStatus as ProtocolStepRunStatus,
 } from '@easter-workflow-builder/protocol';
 
@@ -70,6 +76,10 @@ describe('a protokoll és a db hat drótszintű felsorolása kétirányban megeg
   it('RunInterruptedReason', () => {
     expectTypeOf<ProtocolRunInterruptedReason>().toEqualTypeOf<DatabaseRunInterruptedReason>();
   });
+
+  it('StartInputValueKind (SPEC-016 5.1, a hetedik felsorolás)', () => {
+    expectTypeOf<ProtocolStartInputValueKind>().toEqualTypeOf<DatabaseStartInputValueKind>();
+  });
 });
 
 /**
@@ -94,5 +104,31 @@ describe('ahol a db futásidejű guardot exportál, a protokoll minden felsorolt
     for (const value of ApprovalDecisionSchema.options) {
       expect(isApprovalDecision(value)).toBe(true);
     }
+  });
+});
+
+/**
+ * A `StartInputValueKind` értékeinek futásidejű ága (SPEC-016 5.1): a `db` a
+ * felsorolás guardját nem exportálja (a barrel futásidejű felülete zárt), ezért
+ * a védelem a `isNodeConfig` guardon át megy. A protokoll séma minden felsorolt
+ * értékével épített `start` konfignak át kell mennie rajta, a `choice` ág a
+ * kötelező `options` mezővel; egy a felsoroláson kívüli érték elbukik.
+ */
+describe('a db isNodeConfig guardja a protokoll StartInputValueKind minden értékét elfogadja', () => {
+  for (const valueKind of StartInputValueKindSchema.options) {
+    it(`${valueKind} érték`, () => {
+      const field =
+        valueKind === 'choice'
+          ? { name: 'a', label: 'A', valueKind, options: ['x'], required: true }
+          : { name: 'a', label: 'A', valueKind, required: true };
+
+      expect(isNodeConfig({ type: 'start', inputFields: [field], onUnhandledError: 'fail_run' })).toBe(true);
+    });
+  }
+
+  it('a felsoroláson kívüli érték elbukik', () => {
+    const field = { name: 'a', label: 'A', valueKind: 'string', required: true };
+
+    expect(isNodeConfig({ type: 'start', inputFields: [field], onUnhandledError: 'fail_run' })).toBe(false);
   });
 });

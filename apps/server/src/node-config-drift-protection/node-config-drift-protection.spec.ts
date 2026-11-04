@@ -109,6 +109,18 @@ const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
     inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }],
     onUnhandledError: null,
   },
+  {
+    type: 'start',
+    inputFields: [
+      { name: 'a', label: 'A', valueKind: 'text', required: true },
+      { name: 'b', label: 'B', valueKind: 'number', required: false },
+      { name: 'c', label: 'C', valueKind: 'boolean', required: false },
+      { name: 'd', label: 'D', valueKind: 'choice', options: ['piros', 'zöld'], required: true },
+      { name: 'e', label: 'E', valueKind: 'list', required: false },
+      { name: 'f', label: 'F', valueKind: 'json', required: false },
+    ],
+    onUnhandledError: null,
+  },
   { ...VALID_AGENT_STEP_SETTINGS, type: 'agent_step', onUnhandledError: 'fail_run' },
   {
     type: 'branch',
@@ -470,11 +482,52 @@ const SAVABLE_AGENT_STEP = { ...VALID_AGENT_STEP_SETTINGS, type: 'agent_step', o
  * (`docs/research/2026-10-17-szam-es-agent-mezok.md`). Ha egy eset itt eltér, a
  * két oldal szétvált, és a kezelő a `db`-be a guardon elbukó konfigot írhatna.
  */
+function startWithField(field: unknown): unknown {
+  return { type: 'start', inputFields: [field], onUnhandledError: 'fail_run' };
+}
+
+function choiceFieldWith(options: unknown): unknown {
+  return { name: 'szin', label: 'Szín', valueKind: 'choice', options, required: true };
+}
+
 const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
   readonly label: string;
   readonly config: unknown;
   readonly accepted: boolean;
 }[] = [
+  {
+    label: 'choice mező érvényes opciókkal',
+    config: startWithField(choiceFieldWith(['piros', 'zöld'])),
+    accepted: true,
+  },
+  { label: 'choice mező egyetlen opcióval', config: startWithField(choiceFieldWith(['piros'])), accepted: true },
+  { label: 'choice mező üres opciólistával', config: startWithField(choiceFieldWith([])), accepted: false },
+  { label: 'choice mező üres opció elemmel', config: startWithField(choiceFieldWith(['piros', ''])), accepted: false },
+  {
+    label: 'choice mező csak szóközös opció elemmel',
+    config: startWithField(choiceFieldWith(['piros', ' '.repeat(3)])),
+    accepted: false,
+  },
+  {
+    label: 'choice mező duplikált opcióval',
+    config: startWithField(choiceFieldWith(['piros', 'zöld', 'piros'])),
+    accepted: false,
+  },
+  {
+    label: 'choice mező szöveg helyett szám elemmel',
+    config: startWithField(choiceFieldWith([1])),
+    accepted: false,
+  },
+  {
+    label: 'choice mező options nélkül',
+    config: startWithField({ name: 'szin', label: 'Szín', valueKind: 'choice', required: true }),
+    accepted: false,
+  },
+  {
+    label: 'a régi szabad szöveges valueKind',
+    config: startWithField({ name: 'a', label: 'A', valueKind: 'string', required: true }),
+    accepted: false,
+  },
   {
     label: 'preset rendszer prompt minden mezővel',
     config: {
@@ -607,6 +660,21 @@ const UNKNOWN_KEY_CASES: readonly { readonly label: string; readonly config: unk
     },
   },
   {
+    label: 'start choice bemeneti mezője',
+    config: startWithField({
+      name: 'szin',
+      label: 'Szín',
+      valueKind: 'choice',
+      options: ['piros'],
+      required: true,
+      [UNKNOWN_KEY]: true,
+    }),
+  },
+  {
+    label: 'start text bemeneti mezőjén az options kulcs (csak a choice ágé)',
+    config: startWithField({ name: 'a', label: 'A', valueKind: 'text', options: ['x'], required: true }),
+  },
+  {
     label: 'branch opciója',
     config: {
       type: 'branch',
@@ -693,7 +761,7 @@ const UNKNOWN_KEY_CASES: readonly { readonly label: string; readonly config: unk
 
 describe('egy ismeretlen kulcs a protokoll sémáin és a db isNodeConfig guardján is elbukik (SPEC-011 5.2)', () => {
   it('az esetek a tíz típust, a join mind a négy ágát és a beágyazott objektumokat lefedik', () => {
-    expect(UNKNOWN_KEY_CASES).toHaveLength(REPRESENTATIVE_NODE_CONFIGS.length + 10);
+    expect(UNKNOWN_KEY_CASES).toHaveLength(REPRESENTATIVE_NODE_CONFIGS.length + 12);
   });
 
   for (const { label, config } of UNKNOWN_KEY_CASES) {

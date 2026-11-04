@@ -1,6 +1,7 @@
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
 import { BLANK_FIELD_MESSAGE } from './blank-field-message.ts';
 import { findBlankTextFields } from './find-blank-text-fields.ts';
+import { findInvalidChoiceOptions } from './find-invalid-choice-options.ts';
 import { findInvalidMcpServerReferenceEnvironmentNames } from './find-invalid-mcp-server-reference-environment-names.ts';
 import { findNonPositiveIntegerFields } from './find-non-positive-integer-fields.ts';
 import { findUnsupportedAgentDefinitionFields } from './find-unsupported-agent-definition-fields.ts';
@@ -20,6 +21,32 @@ const NOT_POSITIVE_INTEGER_MESSAGE = 'A mező értéke nem pozitív egész szám
  */
 const INVALID_ENV_NAME_MESSAGE =
   'A változó név betűvel vagy aláhúzással kezdődik, és csak betűt, számot és aláhúzást tartalmaz.';
+
+/**
+ * A `choice` típusú bemeneti mező hibás opciólistájának hibaüzenete (SPEC-016
+ * 5.3): egyetlen mondat a három okra, mert a felület a mező alatt jelzi.
+ */
+const INVALID_CHOICE_OPTIONS_MESSAGE = 'Legalább egy opció kell, az opciók nem lehetnek üresek és nem ismétlődhetnek.';
+
+/**
+ * Egy hiba felvétele a mentési séma finomításának környezetébe.
+ */
+interface CustomIssueSink {
+  readonly addIssue: (issue: {
+    readonly code: 'custom';
+    readonly path: PropertyKey[];
+    readonly message: string;
+  }) => void;
+}
+
+/**
+ * A `choice` mezők hibás opciólistáinak felvétele a mező `options` útvonalára (SPEC-016 5.3).
+ */
+function addInvalidChoiceOptionIssues(config: NodeConfig, context: CustomIssueSink): void {
+  for (const fieldPath of findInvalidChoiceOptions(config)) {
+    context.addIssue({ code: 'custom', path: [...fieldPath], message: INVALID_CHOICE_OPTIONS_MESSAGE });
+  }
+}
 
 /**
  * Az agent definíció nem támogatott mezőjének hibaüzenete (SPEC-009 6.2, O-53).
@@ -90,7 +117,7 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
 }
 
 /**
- * A mentési séma (SPEC-008 5.4): a `NodeConfigSchema` olvasó séma plusz hat
+ * A mentési séma (SPEC-008 5.4): a `NodeConfigSchema` olvasó séma plusz hét
  * írás oldali szabály, egyetlen `superRefine` hívásban:
  *
  * 1. a kötelező szöveg mezők nem üresek (user döntés 2026-09-28, O-21);
@@ -105,7 +132,11 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  * 6. az agent definíciókban nincs `memory` mező és nem szöveg elemű régi
  *    `mcpServers` lista (SPEC-009 6.2, O-53, user döntés 2026-10-28); a
  *    szabálynak nincs `db` oldali párja, az olvasó út a tárolt adatot
- *    változatlanul elfogadja, a motor a két mezőt nem adja ki.
+ *    változatlanul elfogadja, a motor a két mezőt nem adja ki;
+ * 7. a `start` bemeneti mező `choice` típusának `options` listája nem üres,
+ *    minden eleme nem üres, és az elemek egyediek (SPEC-016 5.3): a `db`
+ *    `isNodeConfig` guard szabályának szándékos duplikátuma, a mezőnkénti
+ *    egyezését az `apps/server` `node-config-drift-protection` tesztje őrzi.
  *
  * **A szabályok a konfig típushibája mellett is lefutnak** (user döntés
  * 2026-10-16, "Egyszerre látsszon mind", SPEC-008 81. kritérium): a zod
@@ -165,6 +196,7 @@ export const NodeConfigSaveSchema = NodeConfigSchema.superRefine(
         context.addIssue({ code: 'custom', path: [...fieldPath], message: NOT_POSITIVE_INTEGER_MESSAGE });
       }
     }
+    addInvalidChoiceOptionIssues(config, context);
     const agentStep = agentStepPathOf(config);
     if (agentStep !== undefined) {
       for (const fieldPath of findInvalidMcpServerReferenceEnvironmentNames(agentStep.value)) {
