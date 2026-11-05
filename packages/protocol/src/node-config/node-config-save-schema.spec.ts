@@ -326,11 +326,23 @@ describe('NodeConfigSaveSchema: a kötelező szöveg mezők (SPEC-008 5.4, O-21)
       type: 'error_handler',
       maxAttempts: 3,
       backoffMs: [1000],
-      handledErrorKinds: [''],
+      handledErrorKinds: [],
       onUnhandledError: 'fail_run',
     };
 
     expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
+  });
+
+  it('a mentési séma is elutasítja a zárt listán kívüli kezelt hibafajtát (SPEC-004 8.2, O-5)', () => {
+    const config = {
+      type: 'error_handler',
+      maxAttempts: 3,
+      backoffMs: [1000],
+      handledErrorKinds: ['timeout'],
+      onUnhandledError: 'fail_run',
+    };
+
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
   });
 
   it('a kimeneti típus ugyanaz, mint az olvasó sémáé', () => {

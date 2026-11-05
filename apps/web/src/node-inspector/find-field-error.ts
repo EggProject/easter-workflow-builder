@@ -3,7 +3,7 @@
  *
  * A mező PONTOS útvonala mellett a mező ALATTI útvonalakat is elfogadja: ez
  * azokhoz a vezérlőkhöz kell, amik egy egész gyűjteményt szerkesztenek
- * egyetlen mezőben (a `backoffMs` és a `handledErrorKinds` soronkénti
+ * egyetlen mezőben (a `backoffMs` soronkénti
  * listája, az `inputMapping` kulcs-érték listája). Ott a Zod a HIBÁS ELEM
  * útvonalán jelez (`backoffMs.1`), a felhasználó viszont egyetlen mezőt lát,
  * tehát a hibaüzenetnek ott kell megjelennie.

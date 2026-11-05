@@ -1,7 +1,12 @@
 /* eslint-disable unicorn/no-null -- a `WorkflowRepository`/`CreateStepRunInput`/`NodeExecutionInstance` nullázható mezői (SPEC-003 5.1, 9.2, SPEC-004 4.3) a teszt fixture valódi kezdő értékei, nem helyőrzők */
 import { describe, expect, it } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
-import type { CreateStepRunInput, DatabaseContext, ErrorHandlerNodeConfig } from '@easter-workflow-builder/db';
+import type {
+  CreateStepRunInput,
+  DatabaseContext,
+  ErrorHandlerNodeConfig,
+  HandledErrorKind,
+} from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
 import { isRecord } from '@easter-workflow-builder/typeguards';
 import type { ClockPort } from '../engine-port/clock-port.ts';
@@ -126,7 +131,7 @@ function retryInput(runId: string): CreateStepRunInput {
 interface HandlerCase {
   readonly maxAttempts: number;
   readonly backoffMs: readonly number[];
-  readonly handledErrorKinds?: readonly string[];
+  readonly handledErrorKinds?: readonly HandledErrorKind[];
   readonly failedAttempt?: number;
   readonly stopSignal?: AbortSignal;
 }

@@ -68,6 +68,11 @@ export type { JavaScriptScriptConfig } from './workflow-graph/node-config/javasc
 // A Start bemeneti mező értéktípusa (SPEC-016 5.1): az `apps/server` `enum-drift-protection`
 // témája a `protocol` párjával veti össze, a motor a futás indításakor ez alapján ellenőriz.
 export type { StartInputValueKind } from './workflow-graph/node-config/start-input-value-kind.ts';
+// Az `error_handler` kezelt hibafajtáinak zárt uniója (SPEC-004 8.2, O-5): az `apps/server`
+// `handled-error-kind-drift-protection` témája a `protocol` párjával és a motor
+// `EngineErrorKind` uniójával veti össze. A guard nem kerül ki: a futásidejű ág az
+// `isNodeConfig` guardon át megy.
+export type { HandledErrorKind } from './workflow-graph/node-config/handled-error-kind.ts';
 // A kötelező szöveg mezők táblája (SPEC-008 5.4, O-21): a `replaceGraph` írás oldali
 // ellenőrzése ebből dolgozik, és az `apps/server` `node-config-drift-protection` témája
 // ezt veti össze a `protocol` mentési sémájának táblájával.

@@ -37,6 +37,7 @@ import { MIN_SCRIPT_MEMORY_LIMIT_MB } from './min-script-memory-limit-mb.ts';
 import type { ScriptConfig } from './script-config.ts';
 import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
 import { isAgentStepConfig } from '../agent-step-config/is-agent-step-config.ts';
+import { isHandledErrorKind } from './is-handled-error-kind.ts';
 import { isStartInputValueKind } from './is-start-input-value-kind.ts';
 import { isNodeType } from '../node-type/is-node-type.ts';
 
@@ -429,12 +430,14 @@ function isHumanApprovalConfig(value: UnknownRecord): boolean {
 
 function isErrorHandlerConfig(value: UnknownRecord): boolean {
   const backoffMs = value['backoffMs'];
+  const handledErrorKinds = value['handledErrorKinds'];
   return (
     isRecordWithKnownKeys(value, ERROR_HANDLER_NODE_CONFIG_KEYS) &&
     isPositiveInteger(value.maxAttempts) &&
     Array.isArray(backoffMs) &&
     backoffMs.every((delay: unknown) => isPositiveInteger(delay)) &&
-    isStringArray(value.handledErrorKinds) &&
+    Array.isArray(handledErrorKinds) &&
+    handledErrorKinds.every((kind: unknown) => isHandledErrorKind(kind)) &&
     isNullableUnhandledErrorPolicy(value.onUnhandledError)
   );
 }
