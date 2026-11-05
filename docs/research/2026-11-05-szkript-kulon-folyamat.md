@@ -16,7 +16,7 @@ változatlanok (SPEC-014 research 3. szekció), új függőség nincs.
 
 **Mérő eszköz.** [`../../apps/server/measurement/script-process-measurement.ts`](../../apps/server/measurement/script-process-measurement.ts),
 futtatás: `node --env-file=<titkot tartalmazó próba fájl> apps/server/measurement/script-process-measurement.ts`. Csak
-`MEASUREMENT <json>` sorokat ír, képet nem. A 4. szekció számai egy 2026-11-05-i futásból valók, tíz ismétléssel.
+`MEASUREMENT <json>` sorokat ír, képet nem. A 4. szekció számai két 2026-11-05-i futásból valók (M-1 ... M-5 az elsőből, M-6 és M-7 a javítás utáni másodikból), tíz ismétléssel.
 
 **Forrásellenőrzés.** Minden állítás elsődleges forrás plusz két független megerősítés; ahol ez nincs meg, a 3.
 szekció saját mérése zárja le, vagy "nem ellenőrzött" jelölést kap.
@@ -58,9 +58,15 @@ be van állítva; enélkül a szkript a rendszer alapértelmezett időzónáját
 
 ### 3.2 A szülő halála (C4)
 
-Egy gyerek `'disconnect'` figyelője fájlba írja az időpontot és kilép. A szülőt `kill -9` állítja le: a jelölő fájl
-megjelent, és a gyerek folyamat egy másodpercen belül nem létezett. A szülő összeomlása tehát a szkript folyamatot is
-leállítja (`serve-script-child.ts`).
+Egy tétlen gyerek `'disconnect'` figyelője fájlba írja az időpontot és kilép. A szülőt `kill -9` állítja le: a jelölő
+fájl megjelent, és a gyerek folyamat egy másodpercen belül nem létezett. **Ez csak szabad eseményhurokra igaz:** a
+független átvizsgálás (6. szekció) mérte, hogy `while (true) {}` alatt a gyerek a szülő halála után a lépés határidejéig
+(ott 30 s) árván, teljes CPU terheléssel fut, mert az esemény a szinkron ciklus alatt nem sülhet el.
+
+**A `process.ppid` friss.** Egy unoka folyamat szinkron ciklusban a `process.ppid` értékét figyeli, a szülőjét `SIGKILL`
+állítja le: 286 ms után az érték `1`-re változott (a ciklus közben, eseményhurok nélkül). Egymillió olvasás 185 ms, tehát
+az interrupt kezelőbe tett olvasás költsége elhanyagolható. A javítás ezért a szkript interrupt kezelőjében a határidő
+mellett a szülő azonosítójának változását is figyeli (`serve-script-child.ts`, `run-script.ts`); a hatás az M-6.
 
 ### 3.3 A WebAssembly memória és a V8 heap korlát (C5)
 
@@ -80,15 +86,24 @@ Az `apps/server/src/script-end-to-end/script-end-to-end.spec.ts` "REGRESSZIÓ (S
 kódján (a szerver szálán futó QuickJS) 60 066 ms után bukott (a Vitest 5000 ms-os korlátja), mert a ciklus alatt sem a
 lépés állapotát lekérő `GET`, sem a megszakító `POST` nem kapott választ. Az új kódon zöld.
 
-## 4. A mérések (M-1 ... M-5)
+### 3.5 A gazda `fetch` és a `NODE_EXTRA_CA_CERTS`
 
-| #   | Mit mér                                                                         | Eredmény (10 ismétlés, min / medián / max)                                                                                                        |
-| --- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M-1 | indítási költség, `return 1;`                                                   | a szerver folyamatában 3,9 / 7,3 / 18,4 ms; külön folyamatban 138,0 / 140,2 / 143,4 ms                                                            |
-| M-2 | a kézi leállítás azonnalisága `while (true) {}` alatt, 60 000 ms-os határidővel | a jeltől az `aborted` eredményig 0,1 / 0,1 / 0,3 ms; a jeltől a folyamat kilépéséig 3,5 / 4,4 / 5,0 ms; mind a tíz `aborted`                      |
-| M-3 | a memória                                                                       | a 16 MB-os sandbox túllépése a külön folyamatban is elkapható (`out of memory`); a V8 alapértelmezett heap korlátja ezen a gépen 2049,5 MB        |
-| M-4 | a szerver túlélése: a CPU kötött szkript folyamata kívülről `SIGSEGV`-t kap     | a lépés `script_evaluation_failed` ("a szkript folyamata válasz nélkül leállt (jelzés: SIGSEGV)"), a mérő folyamat él, és a következő lépés lefut |
-| M-5 | a szkript folyamat környezete                                                   | `TZ`, `NODE_CHANNEL_FD`, `NODE_CHANNEL_SERIALIZATION_MODE` (3.1)                                                                                  |
+Saját aláírású tanúsítványú helyi HTTPS szerver, a szerver folyamat `NODE_EXTRA_CA_CERTS=<a tanúsítvány>` értékkel
+indul (a független átvizsgálás próbája, 6. szekció). A szerver folyamatában futó régi út sikeres, a külön folyamatos út
+az üres környezettel `a hálózati kérés nem sikerült (TypeError)`. A `NODE_EXTRA_CA_CERTS` átadása után mindkét út
+sikeres; a változó nélkül mindkettő hibát ad (saját mérés 2026-11-05).
+
+## 4. A mérések (M-1 ... M-7)
+
+| #   | Mit mér                                                                                   | Eredmény (10 ismétlés, min / medián / max)                                                                                                        |
+| --- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M-1 | indítási költség, `return 1;`                                                             | a szerver folyamatában 3,9 / 7,3 / 18,4 ms; külön folyamatban 138,0 / 140,2 / 143,4 ms                                                            |
+| M-2 | a kézi leállítás azonnalisága `while (true) {}` alatt, 60 000 ms-os határidővel           | a jeltől az `aborted` eredményig 0,1 / 0,1 / 0,3 ms; a jeltől a folyamat kilépéséig 3,5 / 4,4 / 5,0 ms; mind a tíz `aborted`                      |
+| M-3 | a memória                                                                                 | a 16 MB-os sandbox túllépése a külön folyamatban is elkapható (`out of memory`); a V8 alapértelmezett heap korlátja ezen a gépen 2049,5 MB        |
+| M-4 | a szerver túlélése: a CPU kötött szkript folyamata kívülről `SIGSEGV`-t kap               | a lépés `script_evaluation_failed` ("a szkript folyamata válasz nélkül leállt (jelzés: SIGSEGV)"), a mérő folyamat él, és a következő lépés lefut |
+| M-5 | a szkript folyamat környezete                                                             | `TZ`, `NODE_CHANNEL_FD`, `NODE_CHANNEL_SERIALIZATION_MODE` (3.1)                                                                                  |
+| M-6 | árva folyamat: a `while (true) {}` szkript szülője `SIGKILL`-t kap, 60 000 ms-os határidő | a szkript folyamat 11 ms alatt megszűnt (a javítás előtt a határidőig futott, 6. szekció)                                                         |
+| M-7 | tíz egyszerre várakozó szkript folyamat RSS-e                                             | folyamatonként 102,6 / 106,5 / 109,9 MB, összesen 1062 MB                                                                                         |
 
 Az M-1 különbsége (a medián szerint kb. 133 ms) a Node folyamat indítása, a TypeScript forrás betöltése és a QuickJS
 modul példányosítása a gyerekben; lépésenként egyszer jelentkezik.
@@ -113,8 +128,26 @@ modul példányosítása a gyerekben; lépésenként egyszer jelentkezik.
    védi (C10). A folyamat határ ezen nem változtat, mert a gyerek ugyanazzal a felhasználóval fut (C7, n8n). A maradék
    változatlanul a külső folyamat linkcseréje.
 
-## 6. Nyitva
+## 6. A független adverzariális átvizsgálás (2026-11-05)
+
+Egy független átvizsgálás a `fd7f2b1` fejen, saját próbákkal. Talált tételek és sorsuk:
+
+| #   | Súly     | Tétel                                                                                                                                                                    | Sors                                                                                                       |
+| --- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| 1   | magas    | CPU kötött szkript mellett a szerver `kill -9`-e után a szkript folyamat árván, teljes CPU-val a határidőig fut (próba: 30 s-os határidővel a határidőig élt)            | javítva: a `ppid` figyelés az interrupt kezelőben (3.2, M-6), unit teszt                                   |
+| 2   | magas    | az üres környezet a `fetch`-et megváltoztatja (`NODE_EXTRA_CA_CERTS`, proxy)                                                                                             | a `NODE_EXTRA_CA_CERTS` átmegy (3.5); a proxy és a tanúsítvány tár kapcsolói: SPEC-017 7. T-3, user döntés |
+| 3   | magas    | lépésenként kb. 107 MB RSS, párhuzamossági korlát nélkül (próba: 20 lépés 2156 MB; a szerver folyamatában 20 lépés 33,6 MB többlet)                                      | mérve (M-7), kimondva (SPEC-017 4.5), korlát: SPEC-017 7. T-4, user döntés                                 |
+| 4   | közepes  | a "szerver környezete elzárt" állítás hamis: a kitört kód a `/proc/<ppid>/environ` fájlt olvashatja (próba: a szülő titka olvasható, a `mem` `EACCES`, `ptrace_scope` 1) | a SPEC-017 4.8 és a SPEC-014 5.10 1. pontja javítva                                                        |
+| 5   | közepes  | a `fork` szinkron kivétele (a Node 26.7.0 forrása szerint például `ENOMEM`) elutasított ígéretet adott                                                                   | javítva: `try`, `script_evaluation_failed`, unit teszt                                                     |
+| 6   | alacsony | a végponttól végpontig T-5 teszt az új kódon a ciklus előtt szakított meg                                                                                                | javítva: a szkript jelzőfájlt ír, a teszt annak megjelenése után szakít meg                                |
+| 7   | alacsony | a valódi folyamatos T-5 unit teszt a `SIGKILL` elhagyására is zöld maradt                                                                                                | javítva: a teszt a szkript folyamat `exit` eseményét is várja                                              |
+
+Az átvizsgálás megerősítette: a T-5 végponttól végpontig teszt a régi kódon bukik (60 070 ms), a nagy IPC kimenet
+(150 futás 3 MB, 10 futás 20 MB) versenyhelyzet nélkül megy át, és a szabályos leállás a szkript folyamatokat megöli.
+
+## 7. Nyitva
 
 - A szkript folyamat heap korlátjának értéke (5. szekció 4. pont): nincs rá dokumentált szabály.
+- A proxy változók és a tanúsítvány tár kapcsolói (SPEC-017 7. T-3), a párhuzamos szkript folyamatok száma (T-4).
 - A Node `fs` `openat` hiánya (C9) nem bizonyítható, csak két issue utal rá.
 - macOS alatt a mérések nem futottak; a `/proc/<pid>/environ` mérés (M-5) Linux specifikus.

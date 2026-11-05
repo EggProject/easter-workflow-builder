@@ -16,7 +16,7 @@ interface FakeChannel {
   readonly exited: Promise<number>;
 }
 
-function fakeChannel(hasSend = true): FakeChannel {
+function fakeChannel(hasSend = true, ppidReads: readonly number[] = [100]): FakeChannel {
   const listeners = new Map<string, (message?: unknown) => void>();
   const emitter: FakeEmitter = {
     listeners,
@@ -28,7 +28,13 @@ function fakeChannel(hasSend = true): FakeChannel {
   };
   const sent: ScriptRunResult[] = [];
   const exit = Promise.withResolvers<number>();
+  let reads = 0;
   const channel: ScriptChildChannel = {
+    get ppid() {
+      const value = ppidReads[Math.min(reads, ppidReads.length - 1)] ?? 0;
+      reads += 1;
+      return value;
+    },
     send: hasSend
       ? (message, callback) => {
           sent.push(message);
@@ -65,6 +71,17 @@ describe('serveScriptChild', () => {
     fake.emitter.emit('message', REQUEST);
     await expect(fake.exited).resolves.toBe(0);
     expect(fake.sent).toStrictEqual([{ kind: 'succeeded', output: 2 }]);
+  });
+
+  it('a szülő azonosítójának változásakor a CPU kötött szkript megáll, a válasz után kilép (SPEC-017 4.1)', async () => {
+    // Az első olvasás az indításkori szülő, a későbbiek egy másik: a szülő közben meghalt.
+    const fake = fakeChannel(true, [100, 100, 1]);
+    serveScriptChild(fake.channel);
+    fake.emitter.emit('message', { ...REQUEST, source: 'while (true) {}', deadlineMs: Date.now() + 60_000 });
+    await expect(fake.exited).resolves.toBe(0);
+    expect(fake.sent).toStrictEqual([
+      { kind: 'failed', errorKind: 'script_timed_out', message: 'a szkript nem fejeződött be 5000 ms alatt' },
+    ]);
   });
 
   it('a nem a kérés alakú üzenetre script_evaluation_failed a válasz', async () => {

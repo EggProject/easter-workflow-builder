@@ -13,7 +13,7 @@ import { runScript } from './run-script.ts';
 
 // A szkript folyamatában futó `runScript` közvetlenül, a szülő kérés leképezésével (SPEC-017 4.2).
 function run(scriptRequest: ScriptRunRequest): ReturnType<typeof runScript> {
-  return runScript(buildSandboxRunRequest(scriptRequest, Date.now()));
+  return runScript(buildSandboxRunRequest(scriptRequest, Date.now()), () => false);
 }
 
 // A `fetch` és a `files` gazda függvény a valódi futtatón át (SPEC-014 5.4, 6. szekció; AC8).

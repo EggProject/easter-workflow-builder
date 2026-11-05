@@ -1,5 +1,6 @@
 /* eslint-disable unicorn/no-null -- a port `cwd` és korlát mezőinek üres értéke a tárolt `null` (SPEC-014 5.3) */
 import { fork } from 'node:child_process';
+import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { getHeapStatistics } from 'node:v8';
 import type { ScriptRunRequest, ScriptRunResult } from '@easter-workflow-builder/engine';
@@ -24,6 +25,10 @@ import { spawnScriptChild } from '../src/script-runner/spawn-script-child.ts';
  * - M-4 a szerver túlélése: a szkript folyamat kívülről `SIGSEGV`-t kap, a
  *   lépés hibát ad, a következő lépés lefut.
  * - M-5 a szkript folyamat környezete (Linux `/proc/<pid>/environ`).
+ * - M-6 árva folyamat: a CPU kötött szkript szülője `SIGKILL`-t kap, mennyi idő
+ *   alatt szűnik meg a szkript folyamat.
+ * - M-7 memória lépésenként: tíz egyszerre várakozó szkript folyamat RSS-e
+ *   (Linux `/proc/<pid>/status` `VmRSS`).
  */
 
 const REPEATS = 10;
@@ -72,7 +77,7 @@ async function measureStartupCost(): Promise<void> {
   const inProcess: number[] = [];
   const separate: number[] = [];
   for (let index = 0; index < REPEATS; index += 1) {
-    const local = await timed(() => runScript(buildSandboxRunRequest(request('return 1;'), Date.now())));
+    const local = await timed(() => runScript(buildSandboxRunRequest(request('return 1;'), Date.now()), () => false));
     inProcess.push(local.ms);
     const child = await timed(() => childRun(request('return 1;')));
     separate.push(child.ms);
@@ -173,8 +178,82 @@ function measureEnvironment(): void {
   });
 }
 
-await measureStartupCost();
-await measureAbortLatency();
-await measureMemory();
-await measureCrashSurvival();
-measureEnvironment();
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function runOrphanParent(): Promise<void> {
+  const parentRun = createChildProcessScriptRun(() => {
+    const child = spawnScriptChild();
+    if (process.send !== undefined) {
+      process.send(pidOf(child));
+    }
+    return child;
+  });
+  await parentRun(request('while (true) {}'));
+}
+
+async function measureOrphan(): Promise<void> {
+  const parent = fork(new URL(import.meta.url), ['orphan-parent'], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
+  const messages: unknown[] = await once(parent, 'message');
+  const [grandchild] = messages;
+  if (!isNumber(grandchild)) {
+    throw new Error('a köztes folyamat nem küldött pid-et');
+  }
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const killedAt = performance.now();
+  parent.kill('SIGKILL');
+  while (isAlive(grandchild) && performance.now() - killedAt < 60_000) {
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+  report('M-6', {
+    timeoutMs: 60_000,
+    parentKillToScriptExitMs: Math.round(performance.now() - killedAt),
+    alive: isAlive(grandchild),
+  });
+}
+
+async function measureResidentMemory(): Promise<void> {
+  const count = 10;
+  const pids: number[] = [];
+  const controller = new AbortController();
+  const collecting = createChildProcessScriptRun(() => {
+    const child = spawnScriptChild();
+    pids.push(pidOf(child));
+    return child;
+  });
+  const runs = Array.from({ length: count }, () =>
+    collecting(request('await new Promise(() => {}); return 1;', { signal: controller.signal })),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  const rssMb = pids.map((pid) => {
+    const line = readFileSync(`/proc/${String(pid)}/status`, 'utf8')
+      .split('\n')
+      .find((entry) => entry.startsWith('VmRSS:'));
+    return Number(line?.replaceAll(/\D/g, '') ?? 0) / 1024;
+  });
+  controller.abort();
+  await Promise.all(runs);
+  report('M-7', {
+    count,
+    rssMbPerProcess: summary(rssMb),
+    totalMb: Math.round(rssMb.reduce((sum, value) => sum + value, 0)),
+  });
+}
+
+if (process.argv[2] === 'orphan-parent') {
+  await runOrphanParent();
+} else {
+  await measureStartupCost();
+  await measureAbortLatency();
+  await measureMemory();
+  await measureCrashSurvival();
+  measureEnvironment();
+  await measureOrphan();
+  await measureResidentMemory();
+}

@@ -2,6 +2,9 @@
 import { EventEmitter, once } from 'node:events';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { access, mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import type { RunContext, ScriptRunRequest } from '@easter-workflow-builder/engine';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createChildProcessScriptRun } from './create-child-process-script-run.ts';
@@ -48,6 +51,18 @@ class FakeChild extends EventEmitter implements ScriptChildProcess {
   kill(signal: 'SIGKILL'): boolean {
     this.kills.push(signal);
     return true;
+  }
+}
+
+// A fájl megjelenéséig vár, állapot alapon (a fájlrendszer lekérdezésével), időzítő nélkül.
+async function waitForFile(file: string): Promise<void> {
+  for (;;) {
+    try {
+      await access(file);
+      return;
+    } catch {
+      // még nincs meg
+    }
   }
 }
 
@@ -105,6 +120,17 @@ describe('createChildProcessScriptRun, hamis folyamattal', () => {
       message: 'a szkript folyamata nem indult el vagy a csatornája hibát adott (RangeError)',
     });
     expect(child.kills).toStrictEqual(['SIGKILL']);
+  });
+
+  it('az indítás szinkron kivétele script_evaluation_failed, nem elutasított ígéret', async () => {
+    const run = createChildProcessScriptRun(() => {
+      throw new RangeError('spawn ENOMEM');
+    });
+    await expect(run(request('return 1;'))).resolves.toStrictEqual({
+      kind: 'failed',
+      errorKind: 'script_evaluation_failed',
+      message: 'a szkript folyamata nem indult el (RangeError)',
+    });
   });
 
   it('a már megszakított jel mellett folyamat sem indul', async () => {
@@ -170,15 +196,36 @@ describe('createChildProcessScriptRun, valódi szkript folyamattal', () => {
     await expect(run(request('return input.n * 21;'))).resolves.toStrictEqual({ kind: 'succeeded', output: 42 });
   });
 
-  it('REGRESSZIÓ (SPEC-014 7.2 T-5): a kézi leállítás CPU kötött ciklus alatt azonnal hat, nem a határidőn', async () => {
-    // A 60 000 ms-os határidő a Vitest 5000 ms-os teszt korlátján túl van: ha a jel csak a határidőn
-    // érne célba (a régi, a szerver szálán futó QuickJS viselkedése), a teszt időtúllépéssel bukna.
-    const controller = new AbortController();
-    const running = run(request('while (true) {}', { signal: controller.signal, timeoutMs: 60_000 }));
-    setTimeout(() => {
+  it('REGRESSZIÓ (SPEC-014 7.2 T-5): a kézi leállítás CPU kötött ciklus alatt azonnal hat, a folyamat is leáll', async () => {
+    // A szkript a ciklus előtt jelzőfájlt ír; a teszt a fájl megjelenése után szakít meg, tehát a
+    // folyamat a ciklusban (vagy közvetlenül előtte) van. A 60 000 ms-os határidő a Vitest 5000 ms-os
+    // korlátján túl van: ha a jel csak a határidőn érne célba, a teszt időtúllépéssel bukna. A folyamat
+    // `exit` eseménye bizonyítja, hogy nem csak a szülő döntött, a gyerek is leállt.
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'szkript-t5-'));
+    try {
+      const exited = Promise.withResolvers<NodeJS.Signals | null>();
+      const watched = createChildProcessScriptRun(() => {
+        const child = spawnScriptChild();
+        child.once('exit', (_code, signal) => {
+          exited.resolve(signal);
+        });
+        return child;
+      });
+      const controller = new AbortController();
+      const running = watched(
+        request('await files.writeText("bent.txt", "1"); while (true) {}', {
+          signal: controller.signal,
+          timeoutMs: 60_000,
+          cwd: directory,
+        }),
+      );
+      await waitForFile(path.join(directory, 'bent.txt'));
       controller.abort();
-    }, 500);
-    await expect(running).resolves.toStrictEqual({ kind: 'aborted' });
+      await expect(running).resolves.toStrictEqual({ kind: 'aborted' });
+      await expect(exited.promise).resolves.toBe('SIGKILL');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('a CPU kötött ciklus a határidőn script_timed_out', async () => {

@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                       |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | végrehajtva (PLAN-018); a 7. szekció T-1 és T-2 tétele kimondott korláttal nyitva                                                     |
+| Státusz  | végrehajtva (PLAN-018); a 7. szekció T-1 ... T-4 tétele kimondott korláttal nyitva                                                    |
 | Dátum    | 2026-11-05                                                                                                                            |
 | Előzmény | [`SPEC-014`](SPEC-014-szkript-csomopont.md) 5.4, 5.8, 5.10, 7.2 T-4 és T-5                                                            |
 | Bemenet  | [`../research/2026-11-05-szkript-kulon-folyamat.md`](../research/2026-11-05-szkript-kulon-folyamat.md) (források C1 ... C12, mérések) |
@@ -67,7 +67,11 @@ A teljes lista a research 2. szekciójában (C1 ... C12), a rések saját méré
   szerver `main.ts`-e.
 - A folyamat pontosan egy kérést szolgál ki, a válasz elküldése után kilép; a szülő minden döntés után `SIGKILL`-t küld
   (a már kilépett folyamatnak a Node nem küld jelzést).
-- A szülő halálakor a szkript folyamat a `'disconnect'` eseményre kilép (4.2), tehát árva nem marad.
+- A szülő halálakor a szkript folyamat kilép, tehát árva nem marad: szabad eseményhurokkal a `'disconnect'` eseményre,
+  CPU kötött szkript alatt (ahol az esemény nem sülhet el) az interrupt kezelőben, ami a határidő mellett a szülő
+  azonosítójának (`ppid`) változását is figyeli (a Node minden olvasáskor újra lekérdezi, research 3.2). Mérve (M-6):
+  a szülő `SIGKILL`-je után a `while (true) {}` szkript folyamata 11 ms alatt megszűnt; az interrupt ág nélkül a
+  határidőig futott tovább (a független átvizsgálás próbája, research 6. szekció).
 - A SPEC-014 5.4 "Életciklus" (friss WebAssembly modul lépésenként) változatlan, most a szkript folyamatán belül.
 
 ### 4.2 Kommunikáció
@@ -83,8 +87,14 @@ A teljes lista a research 2. szekciójában (C1 ... C12), a rések saját méré
 ### 4.3 Környezet
 
 - `execArgv: []`: a szerver kapcsolói (köztük a `start:server` `--env-file-if-exists=.env` kapcsolója) nem öröklődnek.
-- `env`: a szerver környezete nem öröklődik; egyetlen név megy át, ha a szerveren be van állítva: a `TZ`, mert a
-  sandbox `Date` értéke azt követi (research 3.1). A Node saját IPC változóit (`NODE_CHANNEL_FD`,
+- `env`: a szerver környezete nem öröklődik; két név megy át, ha a szerveren be van állítva: a `TZ`, mert a sandbox
+  `Date` értéke azt követi (research 3.1), és a `NODE_EXTRA_CA_CERTS` (egy tanúsítvány fájl útvonala, nem titok), mert
+  nélküle a szerveren elfogadott HTTPS cím a szkript folyamatban tanúsítvány hibát ad (research 3.5).
+- **Kimondott viselkedés változás:** a proxy változók (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `NODE_USE_ENV_PROXY`) és a
+  tanúsítvány tárat választó Node kapcsolók (`--use-system-ca`, `--use-openssl-ca`, akár `NODE_OPTIONS`-ban) NEM
+  mennek át, mert a proxy cím hitelesítő adatot hordozhat, és a kapcsolók a szerver `execArgv`-jével együtt maradnak
+  kint. Ha a szerver ezekre támaszkodik, a szkript `fetch`-e másként viselkedik, mint a SPEC-014 alatt (nem mérve).
+  Nyitva: 7. szekció T-3. A Node saját IPC változóit (`NODE_CHANNEL_FD`,
   `NODE_CHANNEL_SERIALIZATION_MODE`) maga a Node teszi be (mérve, M-5).
 - `stdio`: a három szabványos csatorna eldobva, csak az IPC él (a szkript nem ír naplót, SPEC-014 5.4).
 - A szkript a sandboxból `process`-t eddig sem ért el; a változás a QuickJS kitörés esetére szól (4.8): a kitört kód
@@ -104,7 +114,9 @@ A teljes lista a research 2. szekciójában (C1 ... C12), a rések saját méré
   5.10 5. pont első mondata a JavaScript útra megszűnik.
 - A válasz nélküli kilépés (összeomlás, a gazda memória kifogyása, külső jelzés) `script_evaluation_failed` a kilépési
   kóddal vagy a jelzéssel; a szerver fut tovább (M-4). Az indítás vagy a csatorna hibája szintén
-  `script_evaluation_failed`.
+  `script_evaluation_failed`, az indítás szinkron kivétele is (a Node a hibakódok egy részére, például `ENOMEM`, a
+  `fork` hívásban dob, a telepített Node 26.7.0 `ChildProcess.prototype.spawn` forrása szerint); a port hibaága nem
+  kivétel.
 
 ### 4.5 Memória a folyamat szintjén
 
@@ -115,6 +127,11 @@ A teljes lista a research 2. szekciójában (C1 ... C12), a rések saját méré
   `memoryLimitMb` értéke heap korlátként a tartomány alján (16 MB) már a folyamat indulását megbuktatja (research 3.3),
   más értékre nincs dokumentált szabály. A heap korlát így a V8 alapértelmezése (C6). A kifogyás a szkript folyamatot
   állítja le, nem a szervert (4.4 utolsó pontja). Nyitva: 7. szekció T-1.
+- **Kimondott költség:** egy szkript folyamat RSS-e mérve 102,6 ... 109,9 MB (M-7, tíz egyszerre várakozó lépés, összesen
+  1062 MB), a `memoryLimitMb` értékétől függetlenül, szemben a szerver folyamatában futó lépés néhány tíz MB-os
+  többletével (a független átvizsgálás próbája: 20 lépés 33,6 MB, research 6. szekció). A szkript lépés párhuzamossági
+  helyet nem foglal (SPEC-014 5.4), tehát sok párhuzamos JavaScript lépés (például `fan_out` alatt) a gép memóriáját
+  kimerítheti; hogy ilyenkor a kernel melyik folyamatot állítja le, nem mérve. Nyitva: 7. szekció T-4.
 
 ### 4.6 A fordítás és a CEL ág
 
@@ -139,26 +156,32 @@ A teljes lista a research 2. szekciójában (C1 ... C12), a rések saját méré
 ### 4.8 A QuickJS hibák kockázata
 
 A pinelt QuickJS motor ismert hibái (SPEC-014 7.2 T-4) a folyamat határral a szkript folyamatára szűkülnek: egy
-memória hibát kihasználó kód a szkript folyamat memóriáját és jogait kapja, nem a szerverét (C7: a Chromium
-többfolyamatos architektúrája és a Cloudflare Workers modellje ugyanezért futtatja a motort külön folyamatban). Ami a
-kitört kód elől elzárt a szerver folyamathoz képest: a szerver memóriája (adatbázis kapcsolat, futás állapot, a
-memóriában tartott titkok), a szerver környezeti változói (4.3) és a szerver eseményhurka. Ami nem: a fájlrendszer és
-a hálózat a szerver felhasználójának jogaival (C7, n8n: ugyanazzal az uid-del futó gyerek "insecure by design"), tehát
-a SPEC-014 5.10 2.-4. pontja változatlan. A T-4 tétele ezzel pontosítva marad nyitva (SPEC-014 7.2).
+memória hibát kihasználó kód a szkript folyamat memóriáját kapja, nem a szerverét (C7: a Chromium többfolyamatos
+architektúrája és a Cloudflare Workers modellje ugyanezért futtatja a motort külön folyamatban). Ami a kitört kód elől
+a szerver folyamathoz képest elzárt: a szerver memóriája közvetlenül nem címezhető (a `/proc/<ppid>/mem` olvasását a
+mérő gépen a Linux Yama `ptrace_scope=1` beállítása tiltotta, ez a gép beállítása, nem a kód garanciája, research 6.
+szekció), a szkript folyamat nem örökli a szerver környezetét (4.3), és a szerver eseményhurka szabad. Ami NEM elzárt:
+a kitört kód ugyanazzal a felhasználóval fut (C7, n8n: "insecure by design"), tehát a szerver indulási környezete a
+`/proc/<ppid>/environ` fájlból olvasható (mérve, research 6. szekció; a sandbox `files` felülete ezt a `/proc` tiltással
+zárja, a kitört kód nem), a `.env` fájl a lemezen olvasható, és a fájlrendszer és a hálózat a szerver felhasználójának
+jogaival elérhető; a SPEC-014 5.10 2.-4. pontja tehát változatlan. A T-4 tétele ezzel pontosítva marad nyitva (SPEC-014 7.2).
 
 ## 5. Tesztelés
 
 - Unit, hamis folyamattal: a kérés leképezése, a válasz, a nem várt alakú válasz, a válasz nélküli kilépés (kód és
   jelzés), az indítás hibája, a már megszakított jel (folyamat sem indul), a jel futás közben, a határidő; minden ágon
   `SIGKILL`.
-- Unit, valódi folyamattal: siker, **a T-5 regressziója** (a kézi leállítás `while (true) {}` alatt, 60 000 ms-os
-  határidővel, a Vitest 5000 ms-os korlátján belül `aborted`), a határidő CPU kötött ciklusra, a függő hálózati kérés
+- Unit, valódi folyamattal: siker, **a T-5 regressziója** (a szkript a ciklus előtt jelzőfájlt ír, a teszt a fájl
+  megjelenése után szakít meg; `while (true) {}` alatt, 60 000 ms-os határidővel, a Vitest 5000 ms-os korlátján belül
+  `aborted`, és a szkript folyamat `exit` eseménye `SIGKILL` jelzéssel), az indítás szinkron kivétele, a határidő CPU kötött ciklusra, a függő hálózati kérés
   kapcsolata a leállításkor megszakad, a kívülről megölt folyamat a lépés hibája és utána új lépés fut, a sandbox
   memória túllépése elkapható.
-- A szkript folyamat oldala hamis csatornával: kérés, nem várt alakú kérés, `'disconnect'`, IPC nélküli indítás.
+- A szkript folyamat oldala hamis csatornával: kérés, nem várt alakú kérés, `'disconnect'`, IPC nélküli indítás, a
+  szülő azonosítójának változása CPU kötött ciklus alatt; a `runScript` a szülő elvesztésének jelére a határidő előtt
+  megáll.
 - A `spawnScriptChild` a `fork` hívás opcióira (`execArgv: []`, `env` csak `TZ`, `stdio`, `serialization`).
-- Végponttól végpontig (`script-end-to-end`): a futás megszakítása a CPU kötött JavaScript lépés alatt a lépést
-  `cancelled` állapotban zárja (a régi kódon a teszt 60 066 ms után bukott, research 3.4).
+- Végponttól végpontig (`script-end-to-end`): a futás megszakítása a CPU kötött JavaScript lépés alatt (a jelzőfájl
+  megjelenése után) a lépést `cancelled` állapotban zárja (a régi kódon a teszt 60 066 ms után bukott, research 3.4).
 - A SPEC-014 `runScript` tesztjei a szkript folyamat függvényén változatlan állításokkal; a jel tesztjei a folyamat
   szintre kerültek.
 
@@ -167,14 +190,17 @@ a SPEC-014 5.10 2.-4. pontja változatlan. A T-4 tétele ezzel pontosítva marad
 A research 4. szekciója (M-1 ... M-5), a mérő eszköz `apps/server/measurement/script-process-measurement.ts`.
 Röviden: a külön folyamat lépésenként kb. 133 ms indítási többletet ad (M-1); a kézi leállítás CPU kötött ciklus alatt
 azonnali (M-2); a sandbox memória korlátja a folyamatban is hat (M-3); a kívülről megölt szkript folyamat mellett a
-szerver fut (M-4); a környezetben titok nincs (M-5).
+szerver fut (M-4); a környezetben titok nincs (M-5); a szülő halála után a CPU kötött szkript folyamata is megszűnik
+(M-6); egy szkript folyamat kb. 106 MB RSS (M-7).
 
 ## 7. Nyitott kérdések
 
-| #   | Kérdés                                                       | Mi a viselkedés addig                                                                                                                                 | Mi zárná le                                                                                                                             |
-| --- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| T-1 | A szkript folyamat V8 heap korlátja (`--max-old-space-size`) | nincs kapcsoló, a V8 alapértelmezése (C6); a kifogyás a szkript folyamatot állítja le, a lépés `script_evaluation_failed`, a szerver fut tovább (4.5) | user döntés egy értékről vagy szabályról (a lépés `memoryLimitMb` értéke heap korlátként a 16 MB-os alsó határon nem fut, research 3.3) |
-| T-2 | TOCTOU a fájl hozzáférésben                                  | a SPEC-014 5.4 ellenőrzése a feloldott útvonalon; a külső folyamat linkcseréje marad (4.7)                                                            | a Node `fs` fájlleíró relatív megnyitása (`openat`, `RESOLVE_BENEATH`) vagy a szkript folyamat más felhasználóval                       |
+| #   | Kérdés                                                                | Mi a viselkedés addig                                                                                                                                 | Mi zárná le                                                                                                                             |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| T-1 | A szkript folyamat V8 heap korlátja (`--max-old-space-size`)          | nincs kapcsoló, a V8 alapértelmezése (C6); a kifogyás a szkript folyamatot állítja le, a lépés `script_evaluation_failed`, a szerver fut tovább (4.5) | user döntés egy értékről vagy szabályról (a lépés `memoryLimitMb` értéke heap korlátként a 16 MB-os alsó határon nem fut, research 3.3) |
+| T-3 | A proxy változók és a tanúsítvány tár kapcsolói a szkript folyamatban | nem mennek át (4.3), a szkript `fetch`-e proxy nélkül és a Node alapértelmezett tanúsítvány tárával fut                                               | user döntés: melyik nem titkos hálózati beállítás menjen át (a proxy cím hitelesítő adatot hordozhat)                                   |
+| T-4 | Párhuzamos szkript folyamatok száma                                   | nincs korlát; folyamatonként kb. 106 MB RSS (M-7)                                                                                                     | user döntés egy korlátról (dokumentált szabály nincs rá)                                                                                |
+| T-2 | TOCTOU a fájl hozzáférésben                                           | a SPEC-014 5.4 ellenőrzése a feloldott útvonalon; a külső folyamat linkcseréje marad (4.7)                                                            | a Node `fs` fájlleíró relatív megnyitása (`openat`, `RESOLVE_BENEATH`) vagy a szkript folyamat más felhasználóval                       |
 
 ## 8. Elfogadási kritériumok
 
@@ -185,10 +211,11 @@ szerver fut (M-4); a környezetben titok nincs (M-5).
 3. A határidő CPU kötött ciklusra és gazda ígéretre várakozásra is `script_timed_out` (a SPEC-014 6. kritériuma
    változatlan).
 4. A szkript folyamat `execArgv`-je üres, a környezetében a szerver változói közül csak a `TZ` áll (unit teszt és M-5).
-5. A szkript folyamat válasz nélküli leállása a lépés `script_evaluation_failed` hibája, a szerver fut tovább (unit
-   teszt és M-4); a szülő halálakor a szkript folyamat kilép (research 3.2).
+5. A szkript folyamat válasz nélküli leállása és az indítás szinkron kivétele a lépés `script_evaluation_failed` hibája,
+   a szerver fut tovább (unit teszt és M-4); a szülő halálakor a szkript folyamat CPU kötött ciklus alatt is kilép
+   (unit teszt és M-6).
 6. A memória korlát (`memoryLimitMb`) a külön folyamatban is hat (unit teszt és M-3); a heap korlát sorsa kimondva
-   (4.5, T-1).
+   (4.5, T-1); a folyamatonkénti memória költség mérve és kimondva (M-7, T-4).
 7. A fordítás és a CEL ág helye indokolva (4.6); a TOCTOU maradék forrással kimondva (4.7); a QuickJS hibák
    kockázatának változása forrással kimondva (4.8).
 8. A SPEC-014 7.2 T-4 és T-5 sora, az 5.4 "Párhuzamosság", az 5.8 és az 5.10 1., 3. és 5. pontja átvezetve.

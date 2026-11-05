@@ -112,8 +112,14 @@ type SandboxCompletion =
  * hálózati kérés megszakad, a késői gazda eredmény eldobva), utána a függő
  * gazda ígéretek, a handle-ök, a kontextus és a runtime szabadul fel (Q-2 B);
  * a hibája elkapott (Q-2, Q-3).
+ *
+ * Az `isParentGone` az interrupt kezelőben fut: ha a szülő (a szerver) közben
+ * meghalt, a CPU kötött szkript is megáll, mert a szinkron ciklus alatt a
+ * folyamat `'disconnect'` eseménye nem sülhet el (SPEC-017 4.1; mérve: research
+ * `2026-11-05-szkript-kulon-folyamat.md` M-6). Az ilyenkor adott
+ * `script_timed_out` eredményt senki nem kapja meg, a folyamat kilép.
  */
-export async function runScript(request: SandboxRunRequest): Promise<ScriptRunResult> {
+export async function runScript(request: SandboxRunRequest, isParentGone: () => boolean): Promise<ScriptRunResult> {
   // A `/proc` vagy `/dev` alá mutató gyökér a szkript indítása előtt a lépés
   // megnevezett hibája (user döntés 2026-11-04, SPEC-014 5.4 "Fájl").
   if (await isForbiddenScriptRoot(request.root)) {
@@ -124,13 +130,13 @@ export async function runScript(request: SandboxRunRequest): Promise<ScriptRunRe
     };
   }
   try {
-    return await runInFreshModule(request);
+    return await runInFreshModule(request, isParentGone);
   } catch (error) {
     return hostFailure(error);
   }
 }
 
-async function runInFreshModule(request: SandboxRunRequest): Promise<ScriptRunResult> {
+async function runInFreshModule(request: SandboxRunRequest, isParentGone: () => boolean): Promise<ScriptRunResult> {
   const quickJs = await loadQuickJsModule(request.memoryLimitMb);
   const runtime = quickJs.newRuntime();
   runtime.setMaxStackSize(SCRIPT_SANDBOX_LIMITS.maxStackSizeBytes);
@@ -158,14 +164,18 @@ async function runInFreshModule(request: SandboxRunRequest): Promise<ScriptRunRe
     state: { interrupted: false },
   };
   try {
-    return await evaluateInSandbox(step, request);
+    return await evaluateInSandbox(step, request, isParentGone);
   } finally {
     stepEnd.abort();
     disposeQuietly([...step.pendingCalls, ...step.handles], context, runtime);
   }
 }
 
-async function evaluateInSandbox(step: SandboxStep, request: SandboxRunRequest): Promise<ScriptRunResult> {
+async function evaluateInSandbox(
+  step: SandboxStep,
+  request: SandboxRunRequest,
+  isParentGone: () => boolean,
+): Promise<ScriptRunResult> {
   const { context, runtime, handles } = step;
   const keep = (handle: QuickJSHandle): QuickJSHandle => {
     handles.push(handle);
@@ -198,7 +208,7 @@ async function evaluateInSandbox(step: SandboxStep, request: SandboxRunRequest):
   // (PLAN-015 T-015-12, 1 ms-os határidő).
   const isPastDeadline = shouldInterruptAfterDeadline(step.deadlineMs);
   runtime.setInterruptHandler((interruptedRuntime) => {
-    step.state.interrupted = isPastDeadline(interruptedRuntime) === true;
+    step.state.interrupted = isPastDeadline(interruptedRuntime) === true || isParentGone();
     return step.state.interrupted;
   });
 

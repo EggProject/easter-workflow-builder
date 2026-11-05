@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import { access, mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import type { Server } from 'node:http';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
@@ -65,6 +68,18 @@ function parsedOrThrow<TValue>(result: { success: true; data: TValue } | { succe
     throw new Error(`a válasz nem illeszkedik a protokoll sémára: ${result.error.message}`);
   }
   return result.data;
+}
+
+// A fájl megjelenéséig vár, állapot alapon (a fájlrendszer lekérdezésével), időzítő nélkül.
+async function waitForFile(file: string): Promise<void> {
+  for (;;) {
+    try {
+      await access(file);
+      return;
+    } catch {
+      // még nincs meg
+    }
+  }
 }
 
 function isUnknownArray(value: unknown): value is readonly unknown[] {
@@ -354,41 +369,45 @@ describe('a szkript lépés végponttól végpontig, valódi szerver és valódi
   });
 
   it('REGRESSZIÓ (SPEC-014 7.2 T-5, SPEC-017): a futás megszakítása a CPU kötött JavaScript lépés alatt azonnal hat', async () => {
-    // A lépés 60 000 ms-os határideje a Vitest 5000 ms-os teszt korlátján túl van. A szerver szálán futó
-    // QuickJS alatt a ciklus az eseményhurkot foglalta: sem a lépés állapotát lekérő GET, sem a
-    // megszakító POST nem jutott szóhoz a határidőig, és a teszt időtúllépéssel bukott volna.
+    // A szkript a ciklus előtt jelzőfájlt ír, a teszt a fájl megjelenése után szakít meg (állapot alapú
+    // jel, időzítő nélkül). A lépés 60 000 ms-os határideje a Vitest 5000 ms-os teszt korlátján túl van.
+    // A szerver szálán futó QuickJS alatt a ciklus az eseményhurkot foglalta: a megszakító POST nem
+    // jutott szóhoz a határidőig, és a teszt időtúllépéssel bukott (research
+    // `2026-11-05-szkript-kulon-folyamat.md` 3.4).
     running = await startServer();
     const { baseUrl } = running;
-    const workflowId = await createWorkflowWithGraph(
-      baseUrl,
-      'szkript-megszakitas',
-      [
-        START_NODE,
-        nodeOf('js', {
-          type: 'script',
-          ...javaScript('while (true) {}'),
-          timeoutMs: 60_000,
-          onUnhandledError: 'fail_run',
-        }),
-      ],
-      [edge('e1', 'start', 'js')],
-    );
-    const started = await requestJson(baseUrl, 'POST', `/api/workflows/${workflowId}/runs`, { input: {} });
-    const runId = parsedOrThrow(StartedRunResponseSchema.safeParse(started.body)).runId;
-    const finished = waitForRunFinished(baseUrl, runId);
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'szkript-megszakitas-'));
+    try {
+      const workflowId = await createWorkflowWithGraph(
+        baseUrl,
+        'szkript-megszakitas',
+        [
+          START_NODE,
+          nodeOf('js', {
+            type: 'script',
+            ...javaScript('await files.writeText("bent.txt", "1"); while (true) {}'),
+            timeoutMs: 60_000,
+            cwd: directory,
+            onUnhandledError: 'fail_run',
+          }),
+        ],
+        [edge('e1', 'start', 'js')],
+      );
+      const started = await requestJson(baseUrl, 'POST', `/api/workflows/${workflowId}/runs`, { input: {} });
+      const runId = parsedOrThrow(StartedRunResponseSchema.safeParse(started.body)).runId;
+      const finished = waitForRunFinished(baseUrl, runId);
 
-    let steps = await stepsOf(baseUrl, runId);
-    while (steps.find((step) => step.nodeId === 'js')?.status !== 'running') {
-      steps = await stepsOf(baseUrl, runId);
+      await waitForFile(path.join(directory, 'bent.txt'));
+      const interrupted = await requestJson(baseUrl, 'POST', `/api/runs/${runId}/interrupt`);
+      expect(interrupted.status).toBe(200);
+
+      const finishedPayload = await finished;
+      expect(isRecord(finishedPayload) ? finishedPayload['status'] : undefined).toBe('cancelled');
+      const stepsAfter = await stepsOf(baseUrl, runId);
+      expect(stepsAfter.find((candidate) => candidate.nodeId === 'js')?.status).toBe('cancelled');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
     }
-    const interrupted = await requestJson(baseUrl, 'POST', `/api/runs/${runId}/interrupt`);
-    expect(interrupted.status).toBe(200);
-
-    const finishedPayload = await finished;
-    expect(isRecord(finishedPayload) ? finishedPayload['status'] : undefined).toBe('cancelled');
-    const stepsAfter = await stepsOf(baseUrl, runId);
-    const step = stepsAfter.find((candidate) => candidate.nodeId === 'js');
-    expect(step?.status).toBe('cancelled');
   });
 
   it('a fordíthatatlan JavaScript forrás indítása 422 script_compile_failed, a csomópont és a mező nevével, futás sor nélkül', async () => {

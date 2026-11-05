@@ -1,3 +1,4 @@
+import { describeErrorType } from '@easter-workflow-builder/core';
 import type { ScriptRunRequest, ScriptRunResult } from '@easter-workflow-builder/engine';
 import { buildSandboxRunRequest } from './build-sandbox-run-request.ts';
 import { isScriptRunResult } from './is-script-run-result.ts';
@@ -31,7 +32,15 @@ export function createChildProcessScriptRun(
       return { kind: 'aborted' };
     }
     const sandboxRequest = buildSandboxRunRequest(request, Date.now());
-    const child = spawnChild();
+    let child: ScriptChildProcess;
+    try {
+      child = spawnChild();
+    } catch (error) {
+      // A Node a hibakódok egy részére (például `ENOMEM`) az indítást szinkron
+      // kivétellel bukja el (`ChildProcess.prototype.spawn`, Node 26.7.0); a
+      // port hibaága nem kivétel (SPEC-017 4.4).
+      return failure(`a szkript folyamata nem indult el (${describeErrorType(error)})`);
+    }
     return new Promise((resolve) => {
       let isDecided = false;
       const timer = setTimeout(

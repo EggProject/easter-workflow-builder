@@ -6,7 +6,7 @@ import { runScript } from './run-script.ts';
 
 // A szkript folyamatában futó `runScript` közvetlenül, a szülő kérés leképezésével (SPEC-017 4.2).
 function run(scriptRequest: ScriptRunRequest): ReturnType<typeof runScript> {
-  return runScript(buildSandboxRunRequest(scriptRequest, Date.now()));
+  return runScript(buildSandboxRunRequest(scriptRequest, Date.now()), () => false);
 }
 
 // A friss kontextus 61 globális nevéből (research `2026-11-04-szkript-csomopont.md` Q-8) a
@@ -383,6 +383,15 @@ describe('runScript', () => {
   });
 
   describe('időkorlát', () => {
+    it('a szülő elvesztésekor a CPU kötött ciklus a határidő előtt megáll (SPEC-017 4.1)', async () => {
+      const request60 = buildSandboxRunRequest(request('while (true) {}', { timeoutMs: 60_000 }), Date.now());
+      await expect(runScript(request60, () => true)).resolves.toStrictEqual({
+        kind: 'failed',
+        errorKind: 'script_timed_out',
+        message: 'a szkript nem fejeződött be 60000 ms alatt',
+      });
+    });
+
     it('a CPU kötött végtelen ciklust az interrupt kezelő állítja meg', async () => {
       await expect(run(request('while (true) {}', { timeoutMs: 50 }))).resolves.toStrictEqual({
         kind: 'failed',
