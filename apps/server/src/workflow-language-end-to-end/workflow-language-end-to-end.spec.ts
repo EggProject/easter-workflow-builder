@@ -175,6 +175,7 @@ async function startServer(agentQueryRunner: AgentQueryRunner): Promise<RunningS
       TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
     ),
     devOrigin: undefined,
+    allowedOrigin: 'http://localhost:5173',
     streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
     logger: createServerLogger({ secretValues: [] }, collectingSink().sink),
     idGenerator,

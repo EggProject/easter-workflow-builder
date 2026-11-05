@@ -68,6 +68,7 @@ beforeEach(async () => {
       TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
     ),
     devOrigin: undefined,
+    allowedOrigin: 'http://localhost:5173',
     streamDependencies: { database, registry, clock: createSystemClock(), keepAliveIntervalMs: 60_000 },
     logger: createServerLogger({ secretValues: [] }, { write: discardLogLine }),
     idGenerator: createRandomUuidIdGenerator(),

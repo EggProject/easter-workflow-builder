@@ -66,6 +66,7 @@ describe('createIdempotentShutdownHandler', () => {
         TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
       ),
       devOrigin: undefined,
+      allowedOrigin: 'http://localhost:5173',
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
       logger,
       idGenerator: createRandomUuidIdGenerator(),

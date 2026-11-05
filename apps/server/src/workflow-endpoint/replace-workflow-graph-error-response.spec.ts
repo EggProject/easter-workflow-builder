@@ -120,6 +120,7 @@ function buildOptions(database: DatabaseContext, logger: ServerLogger): HttpServ
   return {
     handlers: buildHandlers(database),
     devOrigin: undefined,
+    allowedOrigin: 'http://localhost:5173',
     streamDependencies: {
       database,
       registry: createStreamRegistry(createRandomUuidIdGenerator()),

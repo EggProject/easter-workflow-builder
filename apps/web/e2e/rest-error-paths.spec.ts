@@ -132,8 +132,9 @@ test('204-es, üres törzsű válasz a séma validáláson bukik el, a felület 
 });
 
 /**
- * A `protocolErrorMessage` hat kódjából öt eddig egyetlen e2e úton sem
- * futott le (csak az `internal`). A HTTP státusz kódonként eltér, hogy az
+ * A `protocolErrorMessage` hét kódjából hat eddig egyetlen e2e úton sem
+ * futott le (csak az `internal`); a `forbidden` a szerver kérés forrás
+ * ellenőrzésének 403 válasza (SPEC-017 5.4). A HTTP státusz kódonként eltér, hogy az
  * eset a valóságos szerver viselkedést utánozza, de a felület kizárólag a
  * törzs `code` mezőjéből választja a mondatot.
  */
@@ -146,6 +147,11 @@ const PROTOCOL_ERROR_CASES = [
     code: 'service_unavailable',
     status: 503,
     sentence: 'A szerver átmenetileg nem érhető el, például éppen leáll.',
+  },
+  {
+    code: 'forbidden',
+    status: 403,
+    sentence: 'A szerver elutasította a kérést, mert nem a beállított felület címéről érkezett.',
   },
 ] as const satisfies readonly { code: ProtocolErrorCode; status: number; sentence: string }[];
 

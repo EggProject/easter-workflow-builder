@@ -10,6 +10,7 @@ describe('protocolErrorMessage', () => {
     ['unprocessable', 'A kérés rendben volt, de a rendszer nem tudja végrehajtani.'],
     ['internal', 'Váratlan szerver hiba történt.'],
     ['service_unavailable', 'A szerver átmenetileg nem érhető el, például éppen leáll.'],
+    ['forbidden', 'A szerver elutasította a kérést, mert nem a beállított felület címéről érkezett.'],
   ];
 
   it.each(cases)('a(z) "%s" kódhoz a megfelelő magyar mondatot rendeli', (code, expected) => {

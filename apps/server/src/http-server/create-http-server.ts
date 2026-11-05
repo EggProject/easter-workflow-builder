@@ -13,6 +13,7 @@ import { matchRoute } from '../route-dispatch/match-route.ts';
 import type { RouteHandlerResult } from '../route-dispatch/route-handler.ts';
 import type { RouteHandlers } from '../route-dispatch/route-handlers.ts';
 import { buildProtocolErrorBody } from '../error-mapping/build-protocol-error-body.ts';
+import { findRequestSourceRejection } from '../request-source-check/find-request-source-rejection.ts';
 import {
   handleStreamConnection,
   type StreamConnectionDependencies,
@@ -40,10 +41,15 @@ import { wrapResponseAsStreamSink } from './wrap-response-as-stream-sink.ts';
  * ugyanaz a port, amit a `stream-registry` a `serverInstanceId`-hez használ,
  * nem közvetlen `crypto.randomUUID()` hívás, hogy a kérés azonosító
  * generálása is injektálható/determinisztikus maradjon tesztben.
+ *
+ * Az `allowedOrigin` a felület egyetlen engedett originje a kérés forrás
+ * ellenőrzéshez (SPEC-017 5.3); a `devOrigin` kizárólag a CORS fejlécé
+ * (SPEC-006 5.7), a kettő a konfigurációban áll össze (`ServerConfig`).
  */
 export interface HttpServerOptions {
   readonly handlers: RouteHandlers;
   readonly devOrigin: string | undefined;
+  readonly allowedOrigin: string;
   readonly streamDependencies: StreamConnectionDependencies;
   readonly logger: ServerLogger;
   readonly idGenerator: IdGeneratorPort;
@@ -204,6 +210,18 @@ async function handleRequest(
     requestId: options.idGenerator.nextId(),
   });
   try {
+    // A kérés forrás ellenőrzés minden kérésre, az útvonal illesztése és a
+    // törzs olvasása előtt fut, az SSE végpontra is (SPEC-017 5.1). A törzset
+    // olvasás nélkül eldobjuk, hogy a kliens a választ megkapja.
+    const rejection = findRequestSourceRejection(request.headers, request.socket.localPort, options.allowedOrigin);
+    if (rejection !== undefined) {
+      request.resume();
+      requestLogger.warn(rejection);
+      const body = { code: 'forbidden', message: rejection } satisfies ProtocolErrorBody;
+      writeJson(response, httpStatusForErrorCode(body.code), body, {});
+      return;
+    }
+
     const normalized = normalizeIncomingRequest(request.url, request.method);
     const corsHeaders = resolveCorsHeaders(normalized.pathname, options.devOrigin);
 

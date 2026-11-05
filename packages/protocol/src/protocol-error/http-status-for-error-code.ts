@@ -3,7 +3,7 @@ import type { ProtocolErrorCode } from './protocol-error-code.ts';
 /**
  * A `ProtocolErrorCode` -> HTTP státusz leképezés, tiszta függvény (SPEC-005
  * 8.2 táblázat). A `switch-exhaustiveness-check` lint szabály kikényszeríti,
- * hogy egy jövőbeli hetedik kód felvétele fordítási hibát adjon mindaddig,
+ * hogy egy jövőbeli nyolcadik kód felvétele fordítási hibát adjon mindaddig,
  * amíg ide nem kerül hozzá `case` ág.
  */
 export function httpStatusForErrorCode(code: ProtocolErrorCode): number {
@@ -25,6 +25,9 @@ export function httpStatusForErrorCode(code: ProtocolErrorCode): number {
     }
     case 'service_unavailable': {
       return 503;
+    }
+    case 'forbidden': {
+      return 403;
     }
   }
 }

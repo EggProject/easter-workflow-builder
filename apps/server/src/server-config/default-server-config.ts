@@ -18,6 +18,11 @@
  * az Anthropic Skills API korlátja, decimális olvasatban (7.1); a törzs mérete
  * ebből levezetett (7.4); a bejegyzések száma a SEI CERT IDS04-J `TOOMANY`
  * értéke (7.2).
+ *
+ * A `uiOrigin` a felület engedett originje, ha az `EASTER_STREAM_DEV_ORIGIN`
+ * nincs megadva (SPEC-017 5.3): a Vite dev szerver címe, ugyanaz a forrás,
+ * mint a web `DEFAULT_FRONTEND_CONFIG.apiOrigin` értékéé (research 10.3, a
+ * böngésző által küldött `Origin` mért értéke 14.6).
  */
 export const DEFAULT_SERVER_CONFIG = {
   port: 3001,
@@ -30,4 +35,5 @@ export const DEFAULT_SERVER_CONFIG = {
   skillMaxArchiveBytes: 30_000_000,
   skillMaxUnpackedBytes: 30_000_000,
   skillMaxEntryCount: 1024,
+  uiOrigin: 'http://localhost:5173',
 } as const;

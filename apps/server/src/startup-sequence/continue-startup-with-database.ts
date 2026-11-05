@@ -80,6 +80,7 @@ export async function continueStartupWithDatabase(
       createStructuredOutputSchemaCompiler(logger),
     ),
     devOrigin: config.devOrigin,
+    allowedOrigin: config.allowedOrigin,
     streamDependencies: {
       database,
       registry: streamRegistry,

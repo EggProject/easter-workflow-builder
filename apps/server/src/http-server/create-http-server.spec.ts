@@ -1,3 +1,4 @@
+import { request as httpRequest } from 'node:http';
 import { describe, expect, it, afterEach } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext, type WorkflowEdgeInput } from '@easter-workflow-builder/db';
@@ -123,6 +124,9 @@ function buildHandlers(overrides: Partial<RouteHandlers>): RouteHandlers {
   return { ...base, ...overrides };
 }
 
+// A felület engedett originje a tesztekben (SPEC-017 5.3, a `uiOrigin` alapértéke).
+const ALLOWED_ORIGIN = 'http://localhost:5173';
+
 function buildOptions(
   overrides: Partial<RouteHandlers>,
   developmentOrigin: string | undefined,
@@ -131,6 +135,7 @@ function buildOptions(
   return {
     handlers: buildHandlers(overrides),
     devOrigin: developmentOrigin,
+    allowedOrigin: ALLOWED_ORIGIN,
     streamDependencies: buildStreamDependencies(),
     logger,
     idGenerator: createRandomUuidIdGenerator(),
@@ -723,5 +728,211 @@ describe('readLastEventIdHeader', () => {
 
   it('hiányzó fejlécre undefined-et ad', () => {
     expect(readLastEventIdHeader(undefined)).toBeUndefined();
+  });
+});
+
+interface RawResponse {
+  readonly status: number;
+  readonly headers: Readonly<Record<string, string | readonly string[] | undefined>>;
+  readonly firstChunk: string;
+}
+
+/**
+ * Nyers `node:http` kérés tetszőleges `Host` fejléccel: a Node `fetch` a
+ * `Host` fejlécet a cél címből állítja, a megadottat figyelmen kívül hagyja
+ * (saját mérés, SPEC-017 3.), és `Origin`, `Sec-Fetch-Site` fejlécet sem küld.
+ * Az első adat darab után a kapcsolatot lezárja, így a nyitva maradó SSE
+ * válasz is olvasható.
+ */
+function sendRawRequest(
+  baseUrl: string,
+  method: string,
+  routePath: string,
+  headers: Readonly<Record<string, string>>,
+  body?: string,
+): Promise<RawResponse> {
+  return new Promise((resolve, reject) => {
+    const outgoing = httpRequest(`${baseUrl}${routePath}`, { method, headers }, (incoming) => {
+      incoming.setEncoding('utf8');
+      incoming.once('data', (chunk: string) => {
+        resolve({ status: incoming.statusCode ?? 0, headers: incoming.headers, firstChunk: chunk });
+        outgoing.destroy();
+      });
+      incoming.once('end', () => {
+        resolve({ status: incoming.statusCode ?? 0, headers: incoming.headers, firstChunk: '' });
+      });
+    });
+    outgoing.on('error', reject);
+    outgoing.end(body);
+  });
+}
+
+describe('createHttpServer: kérés forrás ellenőrzés (SPEC-017 5., CSRF és DNS rebinding)', () => {
+  let closeServer: (() => Promise<void>) | undefined;
+
+  afterEach(async () => {
+    if (closeServer === undefined) {
+      return;
+    }
+    await closeServer();
+    closeServer = undefined;
+  });
+
+  // Számolja a `createWorkflow` hívásokat: az elutasított kérés nem érhet el a kezelőig.
+  async function startCountingServer(): Promise<{ baseUrl: string; host: string; calls: () => number }> {
+    let count = 0;
+    const { baseUrl, close } = await startTestServer(
+      buildOptions(
+        {
+          createWorkflow: () => {
+            count += 1;
+            return Promise.resolve({ kind: 'ok', value: { status: 201, body: { id: 'w-1' } } });
+          },
+        },
+        ALLOWED_ORIGIN,
+      ),
+    );
+    closeServer = close;
+    return { baseUrl, host: new URL(baseUrl).host, calls: () => count };
+  }
+
+  it('a Vite proxyn át érkező saját POST átmegy (Host a szerveré, Origin a felületé, Sec-Fetch-Site same-origin)', async () => {
+    const { baseUrl, host, calls } = await startCountingServer();
+    const response = await sendRawRequest(
+      baseUrl,
+      'POST',
+      '/api/workflows',
+      { host, origin: ALLOWED_ORIGIN, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+      '{"name":"a"}',
+    );
+    expect(response.status).toBe(201);
+    expect(calls()).toBe(1);
+  });
+
+  it('a Vite proxyn át érkező saját GET Origin nélkül átmegy (Sec-Fetch-Site same-origin)', async () => {
+    const { baseUrl, host } = await startCountingServer();
+    const response = await sendRawRequest(baseUrl, 'GET', '/api/workflows', { host, 'sec-fetch-site': 'same-origin' });
+    expect(response.status).toBe(200);
+  });
+
+  it('a felület közvetlen SSE kapcsolata átmegy (Origin a felületé, Sec-Fetch-Site cross-site), CORS fejléccel', async () => {
+    const { baseUrl, host } = await startCountingServer();
+    const response = await sendRawRequest(baseUrl, 'GET', '/events?streamId=s1', {
+      host,
+      origin: ALLOWED_ORIGIN,
+      'sec-fetch-site': 'cross-site',
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers['access-control-allow-origin']).toBe(ALLOWED_ORIGIN);
+    expect(response.firstChunk).toContain('event: stream_ready');
+  });
+
+  it('a böngésző nélküli kliens (a próba eszköz Node fetch hívása) átmegy', async () => {
+    const { baseUrl, calls } = await startCountingServer();
+    const response = await fetch(`${baseUrl}/api/workflows`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"name":"a"}',
+    });
+    expect(response.status).toBe(201);
+    expect(calls()).toBe(1);
+  });
+
+  it('DNS rebinding: idegen Host fejlécre 403 forbidden, a kezelő nem fut, és a válasz nem visszhangozza a nevet', async () => {
+    const { baseUrl, host, calls } = await startCountingServer();
+    const port = new URL(baseUrl).port;
+    const response = await sendRawRequest(
+      baseUrl,
+      'POST',
+      '/api/workflows',
+      {
+        host: `evil.example:${port}`,
+        origin: `https://evil.example:${port}`,
+        'sec-fetch-site': 'same-origin',
+        'content-type': 'application/json',
+      },
+      '{"name":"a"}',
+    );
+    expect(response.status).toBe(403);
+    expect(JSON.parse(response.firstChunk)).toStrictEqual({
+      code: 'forbidden',
+      message: 'A kérés Host fejléce nem a szerver helyi neve (host_not_allowed).',
+    });
+    expect(response.firstChunk).not.toContain('evil.example');
+    expect(calls()).toBe(0);
+    expect(host).not.toContain('evil');
+  });
+
+  it('DNS rebinding az SSE végponton: idegen Host fejlécre 403, stream nem nyílik', async () => {
+    const { baseUrl } = await startCountingServer();
+    const port = new URL(baseUrl).port;
+    const response = await sendRawRequest(baseUrl, 'GET', '/events?streamId=s1', {
+      host: `evil.example:${port}`,
+      'sec-fetch-site': 'same-origin',
+    });
+    expect(response.status).toBe(403);
+    expect(response.headers['content-type']).toBe('application/json');
+    expect(response.firstChunk).not.toContain('stream_ready');
+  });
+
+  it('CSRF: idegen Origin egyszerű (text/plain) POST kérésére 403 forbidden, a kezelő nem fut', async () => {
+    const { baseUrl, host, calls } = await startCountingServer();
+    const response = await sendRawRequest(
+      baseUrl,
+      'POST',
+      '/api/workflows',
+      { host, origin: 'https://evil.example', 'sec-fetch-site': 'cross-site', 'content-type': 'text/plain' },
+      '{"name":"a"}',
+    );
+    expect(response.status).toBe(403);
+    expect(JSON.parse(response.firstChunk)).toStrictEqual({
+      code: 'forbidden',
+      message: 'A kérés nem a beállított felület originjéről érkezett (origin_not_allowed).',
+    });
+    expect(calls()).toBe(0);
+  });
+
+  it('CSRF az SSE végponton: idegen Origin kérésére 403, CORS fejléc és stream nélkül', async () => {
+    const { baseUrl, host } = await startCountingServer();
+    const response = await sendRawRequest(baseUrl, 'GET', '/events?streamId=s1', {
+      host,
+      origin: 'https://evil.example',
+      'sec-fetch-site': 'cross-site',
+    });
+    expect(response.status).toBe(403);
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+    expect(response.firstChunk).not.toContain('stream_ready');
+  });
+
+  it('Origin nélküli, idegen oldalról jövő kérés (Sec-Fetch-Site cross-site) 403', async () => {
+    const { baseUrl, host } = await startCountingServer();
+    const response = await sendRawRequest(baseUrl, 'GET', '/api/workflows', { host, 'sec-fetch-site': 'cross-site' });
+    expect(response.status).toBe(403);
+  });
+
+  it('az elutasítás warn szinten naplózódik, a hibaosztállyal', async () => {
+    const { logger, sink } = buildCapturingLogger();
+    const { baseUrl, close } = await startTestServer(buildOptions({}, undefined, logger));
+    closeServer = close;
+    const response = await sendRawRequest(baseUrl, 'GET', '/api/workflows', {
+      host: new URL(baseUrl).host,
+      origin: 'https://evil.example',
+    });
+    expect(response.status).toBe(403);
+    const [entry] = sink.lines();
+    expect(entry?.['level']).toBe(40);
+    expect(entry?.['msg']).toBe('A kérés nem a beállított felület originjéről érkezett (origin_not_allowed).');
+  });
+
+  it('az elutasított kérés nagy törzse mellett is megérkezik a 403 válasz', async () => {
+    const { baseUrl, host } = await startCountingServer();
+    const response = await sendRawRequest(
+      baseUrl,
+      'POST',
+      '/api/workflows',
+      { host, origin: 'https://evil.example', 'content-type': 'text/plain' },
+      'x'.repeat(4_000_000),
+    );
+    expect(response.status).toBe(403);
   });
 });

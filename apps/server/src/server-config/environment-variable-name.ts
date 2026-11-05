@@ -11,10 +11,13 @@ export const ENV_LOG_ROTATION_FREQUENCY = 'EASTER_LOG_ROTATION_FREQUENCY';
 export const ENV_LOG_RETAINED_FILE_COUNT = 'EASTER_LOG_RETAINED_FILE_COUNT';
 
 /**
- * A fejlesztői CORS origin (SPEC-006 5.7): NEM kötelező, és alapértéke
- * szándékosan nincs (SPEC-012 4.2): ha hiányzik, a szerver egyetlen CORS
- * fejlécet sem küld (5.7 1. pont, AC8 "nincs konfigurált origin" esete), azt
- * alapértékkel nem kapcsoljuk be.
+ * A fejlesztői CORS origin (SPEC-006 5.7): NEM kötelező, és a CORS fejlécnek
+ * alapértéke szándékosan nincs (SPEC-012 4.2): ha hiányzik, a szerver egyetlen
+ * CORS fejlécet sem küld (5.7 1. pont, AC8 "nincs konfigurált origin" esete),
+ * azt alapértékkel nem kapcsoljuk be. Ugyanez az érték a felület engedett
+ * originje a kérés forrás ellenőrzésben (SPEC-017 5.3); ott hiányában a
+ * `DEFAULT_SERVER_CONFIG.uiOrigin` érvényes. Megadott értéke pontosan egy
+ * origin, különben `invalid_env_variable`.
  */
 export const ENV_STREAM_DEV_ORIGIN = 'EASTER_STREAM_DEV_ORIGIN';
 

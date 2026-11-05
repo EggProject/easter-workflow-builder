@@ -40,7 +40,7 @@ function withoutKey(environment: EnvironmentReader, key: string): EnvironmentRea
   return Object.fromEntries(Object.entries(environment).filter(([entryKey]) => entryKey !== key));
 }
 
-const DEFAULTS_VALUE = {
+const DEFAULT_CONFIG_FIELDS = {
   port: 3001,
   streamKeepAliveIntervalMs: 15_000,
   logDirectory: '.data/logs/server',
@@ -51,6 +51,15 @@ const DEFAULTS_VALUE = {
   skillMaxArchiveBytes: 30_000_000,
   skillMaxUnpackedBytes: 30_000_000,
   skillMaxEntryCount: 1024,
+};
+
+const DEFAULTS_VALUE = { ...DEFAULT_CONFIG_FIELDS, uiOrigin: 'http://localhost:5173' };
+
+// A csak skill könyvtárral olvasott konfiguráció: minden más alapérték, az engedett origin a `uiOrigin`.
+const DEFAULT_CONFIG_WITH_SKILL_LIBRARY = {
+  ...DEFAULT_CONFIG_FIELDS,
+  skillLibraryDirectory: '/srv/skills',
+  allowedOrigin: 'http://localhost:5173',
 };
 
 describe('readServerConfig', () => {
@@ -69,18 +78,19 @@ describe('readServerConfig', () => {
         skillMaxArchiveBytes: 30_000_000,
         skillMaxUnpackedBytes: 30_000_000,
         skillMaxEntryCount: 1024,
+        allowedOrigin: 'http://localhost:5173',
       },
     });
   });
 
-  it('a SPEC-012 4.2 és a SPEC-009 5.4 6. pont alapértékei a kódban: 3001, 15000, .data/logs/server, 10m, 604800000, 4, 30000000, 30000000, 1024', () => {
+  it('a SPEC-012 4.2 és a SPEC-009 5.4 6. pont alapértékei a kódban: 3001, 15000, .data/logs/server, 10m, 604800000, 4, 30000000, 30000000, 1024, és a SPEC-017 5.3 http://localhost:5173', () => {
     expect(DEFAULT_SERVER_CONFIG).toStrictEqual(DEFAULTS_VALUE);
   });
 
   it('csak a skill könyvtárral minden más alapértéket ad, a gyakoriság szám', () => {
     expect(readServerConfig(ONLY_SKILL_LIBRARY)).toStrictEqual({
       kind: 'ok',
-      value: { ...DEFAULTS_VALUE, skillLibraryDirectory: '/srv/skills' },
+      value: DEFAULT_CONFIG_WITH_SKILL_LIBRARY,
     });
   });
 
@@ -131,7 +141,7 @@ describe('readServerConfig', () => {
       [ENV_SKILL_MAX_ENTRY_COUNT]: '',
       ...ONLY_SKILL_LIBRARY,
     });
-    expect(outcome).toStrictEqual({ kind: 'ok', value: { ...DEFAULTS_VALUE, skillLibraryDirectory: '/srv/skills' } });
+    expect(outcome).toStrictEqual({ kind: 'ok', value: DEFAULT_CONFIG_WITH_SKILL_LIBRARY });
   });
 
   it.each([
@@ -203,6 +213,41 @@ describe('readServerConfig', () => {
   it('a devOrigin megadása esetén a mező trimmelve jelenik meg', () => {
     const outcome = readServerConfig({ ...VALID_ENVIRONMENT, [ENV_STREAM_DEV_ORIGIN]: '  http://localhost:5173  ' });
     expect(outcome.kind === 'ok' && outcome.value.devOrigin).toBe('http://localhost:5173');
+  });
+
+  it('az engedett origin a devOrigin hiányában az alapérték, megadásakor a devOrigin (SPEC-017 5.3)', () => {
+    const withoutDevelopmentOrigin = readServerConfig(VALID_ENVIRONMENT);
+    expect(withoutDevelopmentOrigin.kind === 'ok' && withoutDevelopmentOrigin.value.allowedOrigin).toBe(
+      'http://localhost:5173',
+    );
+    const withDevelopmentOrigin = readServerConfig({
+      ...VALID_ENVIRONMENT,
+      [ENV_STREAM_DEV_ORIGIN]: 'http://127.0.0.1:5180',
+    });
+    expect(withDevelopmentOrigin.kind === 'ok' && withDevelopmentOrigin.value.allowedOrigin).toBe(
+      'http://127.0.0.1:5180',
+    );
+  });
+
+  it('az üres devOrigin hiányzónak számít: nincs CORS mező, az engedett origin az alapérték', () => {
+    const outcome = readServerConfig({ ...VALID_ENVIRONMENT, [ENV_STREAM_DEV_ORIGIN]: ' '.repeat(3) });
+    expect(outcome.kind === 'ok' && 'devOrigin' in outcome.value).toBe(false);
+    expect(outcome.kind === 'ok' && outcome.value.allowedOrigin).toBe('http://localhost:5173');
+  });
+
+  it.each([
+    'http://localhost:5173/',
+    'http://localhost:5173/app',
+    'localhost:5173',
+    'null',
+    '*',
+    'HTTP://LOCALHOST:5173',
+  ])('a nem origin alakú devOrigin ("%s") invalid_env_variable hibát ad, a változó nevével', (value) => {
+    const outcome = readServerConfig({ ...VALID_ENVIRONMENT, [ENV_STREAM_DEV_ORIGIN]: value });
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: `A(z) "${ENV_STREAM_DEV_ORIGIN}" env változó értéke érvénytelen (invalid_env_variable).`,
+    });
   });
 
   it('a logLevel hiányában a mező elmarad, nem hibázik', () => {

@@ -23,10 +23,16 @@ import { isValidSkillPluginName } from './is-valid-skill-plugin-name.ts';
  * (`DEFAULT_SERVER_CONFIG`, SPEC-012 4.2), kivéve a `devOrigin`-t (5.7,
  * opcionális: hiányában nincs CORS), a `logLevel`-t (7.2, hiányában a pino
  * dokumentált `'info'` alapértéke érvényesül).
+ *
+ * Az `allowedOrigin` a felület egyetlen engedett originje a kérés forrás
+ * ellenőrzéshez (SPEC-017 5.3): a `devOrigin` értéke, ha meg van adva,
+ * különben a `DEFAULT_SERVER_CONFIG.uiOrigin`. A CORS fejléc ettől
+ * függetlenül csak a megadott `devOrigin` mellett megy ki (SPEC-006 5.7).
  */
 export interface ServerConfig {
   readonly port: number;
   readonly devOrigin?: string;
+  readonly allowedOrigin: string;
   readonly logDirectory: string;
   readonly logLevel?: string;
   readonly logRotationSize: string;
@@ -41,6 +47,26 @@ export interface ServerConfig {
 
 function invalidVariableMessage(name: string): string {
   return `A(z) "${name}" env változó értéke érvénytelen (invalid_env_variable).`;
+}
+
+/**
+ * A hiányzó (nincs beállítva, vagy üres) env változó `undefined`; a megadott,
+ * trimmelt érték pontosan egy szerializált origin kell legyen (séma, név,
+ * port, útvonal és záró perjel nélkül), különben `invalid_env_variable`. A
+ * próba: a WHATWG URL `origin` mezője visszaadja-e változatlanul az értéket
+ * (https://url.spec.whatwg.org/#origin); egy záró perjel vagy útvonal mellett
+ * a kérés `Origin` fejléce soha nem egyezne vele (SPEC-017 5.3).
+ */
+function readOptionalOrigin(environment: EnvironmentReader, name: string): Outcome<string | undefined> {
+  const raw = environment[name];
+  if (raw === undefined || raw.trim().length === 0) {
+    return { kind: 'ok', value: undefined };
+  }
+  const trimmed = raw.trim();
+  if (URL.parse(trimmed)?.origin !== trimmed) {
+    return { kind: 'error', message: invalidVariableMessage(name) };
+  }
+  return { kind: 'ok', value: trimmed };
 }
 
 function invalidSkillPluginNameMessage(pluginName: string): string {
@@ -175,7 +201,10 @@ export function readServerConfig(environment: EnvironmentReader): Outcome<Server
     return skillMaxEntryCount;
   }
 
-  const developmentOrigin = environment[ENV_STREAM_DEV_ORIGIN];
+  const developmentOrigin = readOptionalOrigin(environment, ENV_STREAM_DEV_ORIGIN);
+  if (developmentOrigin.kind === 'error') {
+    return developmentOrigin;
+  }
   const logLevel = environment[ENV_LOG_LEVEL];
 
   return {
@@ -191,8 +220,8 @@ export function readServerConfig(environment: EnvironmentReader): Outcome<Server
       skillMaxArchiveBytes: skillMaxArchiveBytes.value,
       skillMaxUnpackedBytes: skillMaxUnpackedBytes.value,
       skillMaxEntryCount: skillMaxEntryCount.value,
-      ...(developmentOrigin !== undefined &&
-        developmentOrigin.trim().length > 0 && { devOrigin: developmentOrigin.trim() }),
+      allowedOrigin: developmentOrigin.value ?? DEFAULT_SERVER_CONFIG.uiOrigin,
+      ...(developmentOrigin.value !== undefined && { devOrigin: developmentOrigin.value }),
       ...(logLevel !== undefined && logLevel.trim().length > 0 && { logLevel: logLevel.trim() }),
     },
   };

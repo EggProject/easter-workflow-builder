@@ -66,6 +66,7 @@ function baseConfig(port: number): ServerConfig {
     skillMaxArchiveBytes: 30_000_000,
     skillMaxUnpackedBytes: 30_000_000,
     skillMaxEntryCount: 1024,
+    allowedOrigin: 'http://localhost:5173',
   };
 }
 
@@ -234,6 +235,7 @@ describe('continueStartupWithDatabase', () => {
         TEST_STRUCTURED_OUTPUT_SCHEMA_COMPILER,
       ),
       devOrigin: undefined,
+      allowedOrigin: 'http://localhost:5173',
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
       logger: createServerLogger({ secretValues: [] }, sink),
       idGenerator: createRandomUuidIdGenerator(),

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * A `ProtocolErrorCode` hat értékű zárt szótára (SPEC-005 8.2 szekció). Minden
+ * A `ProtocolErrorCode` hét értékű zárt szótára (SPEC-005 8.2 szekció). Minden
  * REST hibaválasz és a `protocol_error` SSE keret is ebből a szótárból veszi
  * a `code` mezőt; a hozzá tartozó HTTP státuszt a `http-status-for-error-code.ts`
  * adja.
@@ -10,6 +10,11 @@ import { z } from 'zod';
  * szerver elutasítja az új futást (SPEC-004 10.2 1. pont) és a megszakítást
  * (SPEC-004 9. szekció, user döntés 2026-09-24). Ez a 503 jelentése
  * (RFC 9110 15.6.4, https://www.rfc-editor.org/rfc/rfc9110.html#name-503-service-unavailable).
+ *
+ * A `forbidden` a kérés forrásának elutasítása: a `Host` fejléc nem a szerver
+ * helyi neve, vagy a kérés nem a beállított felület originjéről jön (SPEC-017
+ * 5.); a 403 jelentése "understood the request but refuses to fulfill it"
+ * (RFC 9110 15.5.4, https://www.rfc-editor.org/rfc/rfc9110.html#name-403-forbidden).
  */
 export const ProtocolErrorCodeSchema = z.enum([
   'invalid_request',
@@ -18,6 +23,7 @@ export const ProtocolErrorCodeSchema = z.enum([
   'unprocessable',
   'internal',
   'service_unavailable',
+  'forbidden',
 ]);
 
 export type ProtocolErrorCode = z.infer<typeof ProtocolErrorCodeSchema>;

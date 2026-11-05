@@ -145,6 +145,7 @@ const engine = createEngine({
 const server = createHttpServer({
   handlers: buildRouteHandlers(database, engine, streamRegistry, skillLibrary, structuredOutputSchemaCompiler),
   devOrigin: undefined,
+  allowedOrigin: 'http://localhost:5173',
   streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
   logger,
   idGenerator,

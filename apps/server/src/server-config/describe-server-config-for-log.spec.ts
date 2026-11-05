@@ -13,6 +13,7 @@ const BASE_CONFIG: ServerConfig = {
   skillMaxArchiveBytes: 30_000_000,
   skillMaxUnpackedBytes: 30_000_000,
   skillMaxEntryCount: 1024,
+  allowedOrigin: 'http://localhost:5173',
 };
 
 describe('describeServerConfigForLog', () => {
@@ -35,6 +36,8 @@ describe('describeServerConfigForLog', () => {
     const withoutOptional = describeServerConfigForLog(BASE_CONFIG);
     expect(withoutOptional['devOriginConfigured']).toBe(false);
     expect(withoutOptional['logLevelConfigured']).toBe(false);
+    // Az engedett origin (SPEC-017 5.3) a devOrigin értéke vagy az alapérték,
+    // tehát ugyanúgy nem kerül a naplóba.
     expect(JSON.stringify(withoutOptional)).not.toContain('localhost');
 
     const withOptional = describeServerConfigForLog({
