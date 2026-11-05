@@ -3,13 +3,15 @@ import SqliteDatabase from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq, sql } from 'drizzle-orm';
 import { describeError, type Outcome } from '@easter-workflow-builder/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { migrateDatabase } from '../migration/migrate-database.ts';
 import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
 import { workflowTable } from '../workflow-graph/workflow/workflow.ts';
 import { graphSnapshotTable } from '../graph-snapshot/stored-snapshot/graph-snapshot.ts';
 import { canonicalizeSnapshotDocument } from '../graph-snapshot/snapshot-hash/canonicalize-snapshot-document.ts';
 import { computeSnapshotHash } from '../graph-snapshot/snapshot-hash/compute-snapshot-hash.ts';
+import type { GraphSnapshotHash } from '../graph-snapshot/snapshot-hash/graph-snapshot-hash.ts';
+import { isGraphSnapshotHash } from '../graph-snapshot/snapshot-hash/is-graph-snapshot-hash.ts';
 import {
   GRAPH_DOCUMENT_VERSION,
   type GraphSnapshotDocument,
@@ -181,6 +183,24 @@ describe('createWorkflowRunRepository', () => {
       expect(run.errorMessage).toBeNull();
       expect(run.restartedFromRunId).toBeNull();
       expect(run.persistedStreamDeltas).toBe(false);
+
+      sqlite.close();
+    });
+
+    it('a visszaadott rekord lenyomata a guarddal szűkített GraphSnapshotHash, a beszúrt sor lenyomatával azonos (SPEC-003 9.4)', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+
+      const run = start(repository, 'w1', 'Doc');
+      // Típusszinten: a mező a névleges típus, nem nyers szöveg (PR #78 nyitott pontja).
+      expectTypeOf(run.graphSnapshotHash).toEqualTypeOf<GraphSnapshotHash>();
+      expect(isGraphSnapshotHash(run.graphSnapshotHash)).toBe(true);
+      const stored = database
+        .select({ graphSnapshotHash: workflowRunTable.graphSnapshotHash })
+        .from(workflowRunTable)
+        .where(eq(workflowRunTable.id, run.id))
+        .get();
+      expect(stored?.graphSnapshotHash).toBe(run.graphSnapshotHash);
 
       sqlite.close();
     });

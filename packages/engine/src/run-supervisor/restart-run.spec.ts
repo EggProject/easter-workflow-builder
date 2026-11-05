@@ -4,11 +4,12 @@ import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type {
   DatabaseContext,
   GraphSnapshotDocument,
+  GraphSnapshotHash,
   NodeConfig,
   WorkflowEdgeInput,
   WorkflowNodeInput,
 } from '@easter-workflow-builder/db';
-import { openDatabase } from '@easter-workflow-builder/db';
+import { isGraphSnapshotHash, openDatabase } from '@easter-workflow-builder/db';
 import { type AgentQueryRunner, compileStructuredOutputSchema } from '@easter-workflow-builder/agent';
 import type {
   Fact,
@@ -71,6 +72,15 @@ function seedOriginalRun(database: DatabaseContext, input: unknown): { workflowI
   return { workflowId: workflow.id, runId: run.id };
 }
 
+// Egy tetszőleges, de érvényes alakú pillanatkép lenyomat a rekord fixtúrához: a
+// `GraphSnapshotHash` névleges típus, tehát `as` nélkül csak a guard adhatja.
+function snapshotHashOf(text: string): GraphSnapshotHash {
+  if (!isGraphSnapshotHash(text)) {
+    throw new Error(`a teszt lenyomata érvénytelen alakú: ${text}`);
+  }
+  return text;
+}
+
 const SUCCEEDED_START: Outcome<StartedRun> = {
   kind: 'ok',
   value: {
@@ -83,7 +93,7 @@ const SUCCEEDED_START: Outcome<StartedRun> = {
       rootRunId: 'uj-futas',
       depth: 0,
       workflowAncestry: ['w'],
-      graphSnapshotHash: 'hash',
+      graphSnapshotHash: snapshotHashOf('a'.repeat(64)),
       persistedStreamDeltas: false,
       restartedFromRunId: null,
       createdAtMs: new Date(0),

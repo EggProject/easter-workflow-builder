@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { ErrorHandlerNodeConfig } from '@easter-workflow-builder/db';
+import type { ErrorHandlerNodeConfig, HandledErrorKind } from '@easter-workflow-builder/db';
 import { resolveRetryDecision } from './resolve-retry-decision.ts';
 
 function configOf(
   maxAttempts: number,
   backoffMs: readonly number[],
-  handledErrorKinds: readonly string[] = [],
+  handledErrorKinds: readonly HandledErrorKind[] = [],
 ): ErrorHandlerNodeConfig {
   return { type: 'error_handler', maxAttempts, backoffMs, handledErrorKinds, onUnhandledError: 'fail_run' };
 }
@@ -51,7 +51,7 @@ describe('resolveRetryDecision', () => {
       ).toStrictEqual({ kind: 'retry', backoffMs: 100, nextAttempt: 2 });
       expect(
         resolveRetryDecision({
-          config: configOf(2, [100], ['script_compile_failed']),
+          config: configOf(2, [100], ['template_render_failed']),
           failedErrorKind,
           failedAttempt: 1,
         }),

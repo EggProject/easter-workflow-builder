@@ -35,6 +35,43 @@ export const StartInputValueKindSchema = z.enum(['text', 'number', 'boolean', 'c
 export type StartInputValueKind = z.infer<typeof StartInputValueKindSchema>;
 
 /**
+ * Az `error_handler` node kezelt hibafajtái (SPEC-004 8.2, O-5, user döntés
+ * 2026-11-04, "Zárt lista"): a `db` `HandledErrorKind` uniójának szándékos
+ * duplikátuma, ami a motor `EngineErrorKind` uniójának a kezelőig eljutó része. A
+ * sodródás védelmét az `apps/server` `handled-error-kind-drift-protection` témája
+ * adja. Zárt felsorolás az olvasó és a mentési sémában is, visszafelé
+ * kompatibilitási ág nélkül.
+ */
+export const HandledErrorKindSchema = z.enum([
+  'provider_call_failed',
+  'agent_result_not_success',
+  'missing_structured_output',
+  'structured_output_schema_mismatch',
+  'no_resumable_session',
+  'missing_provider_env',
+  'mcp_server_not_found',
+  'missing_mcp_server_env',
+  'mcp_server_connection_failed',
+  'agent_skill_not_in_step',
+  'template_render_failed',
+  'expression_evaluation_failed',
+  'step_output_not_storable',
+  'branch_no_matching_edge',
+  'fan_out_items_not_a_list',
+  'loop_max_iterations_reached',
+  'approval_timed_out',
+  'sub_workflow_failed',
+  'workflow_recursion_detected',
+  'unresolvable_step_reference',
+  'script_evaluation_failed',
+  'script_timed_out',
+  'script_output_not_json',
+  'unhandled_error_kind',
+]);
+
+export type HandledErrorKind = z.infer<typeof HandledErrorKindSchema>;
+
+/**
  * A `choice` nélküli öt ág egy sémán áll, a `choice` ágnak saját, kötelező
  * `options` listája van (SPEC-016 5.3). A diszkriminált unió kulcsa a `valueKind`.
  */
@@ -243,7 +280,7 @@ export const ErrorHandlerNodeConfigSchema = z
     type: z.literal('error_handler'),
     maxAttempts: z.number(),
     backoffMs: z.array(z.number()).readonly(),
-    handledErrorKinds: z.array(z.string()).readonly(),
+    handledErrorKinds: z.array(HandledErrorKindSchema).readonly(),
     onUnhandledError: UnhandledErrorPolicySchema.nullable(),
   })
   .readonly();
