@@ -733,7 +733,7 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 
 ### Hibakezelés
 
-37. A `ProtocolErrorCode` hat értékű zárt szótár, és mindegyikhez pontosan egy HTTP státusz tartozik, tiszta függvényben. Mind a hat érték külön teszteset, és mindegyikhez tartozik előidéző eset.
+37. A `ProtocolErrorCode` hét értékű zárt szótár (a hetedik, a `forbidden`, SPEC-017 5.4), és mindegyikhez pontosan egy HTTP státusz tartozik, tiszta függvényben. Mind a hét érték külön teszteset, és mindegyikhez tartozik előidéző eset.
 38. Ugyanaz a `ProtocolErrorBody` alak áll a REST hibaválaszban és a `protocol_error` SSE keretben; két külön hiba alak nincs. A kizárólag REST oldali, elhagyható `errorClass` mező (8.1, 8.5) mellett a közös mag (`code`, `message`) típusszintű egyezését az `event-stream` téma tesztje őrzi.
 39. A 8.3 leképezési táblázat a `packages/db` mind a tíz hibaosztályát megnevezi, és kimondja a szabályt minden be nem sorolt üzenetre.
 40. A hiba boríték sémájának nincs `stack`, `sql`, `path` vagy szabad `details` mezője.

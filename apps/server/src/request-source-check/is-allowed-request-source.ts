@@ -18,8 +18,13 @@ const FOREIGN_FETCH_SITES = new Set(['same-site', 'cross-site']);
  *    https://words.filippo.io/csrf/ 2. lépés, és az OWASP "Checking the
  *    Origin Header" szakasza).
  * 2. Ha nincs `Origin`, de a `Sec-Fetch-Site` ismert értékű: a `same-origin`
- *    és a `none` átmegy, a `same-site` és a `cross-site` elutasít (a Go
- *    `net/http` `CrossOriginProtection.Check` szabálya).
+ *    és a `none` átmegy, a `same-site` és a `cross-site` elutasít. Két
+ *    kimondott eltérés a Go `net/http` `CrossOriginProtection.Check`
+ *    szabályától: a Go a `Sec-Fetch-Site` fejlécet az `Origin` előtt nézi
+ *    (itt az `Origin` egyenlősége dönt először, ez szigorúbb), és minden
+ *    ismeretlen értéket elutasít (itt az ismeretlen érték figyelmen kívül
+ *    marad, az OWASP szerint; a `Sec-` előtagú fejlécet oldal nem állíthatja,
+ *    tehát böngészőből ez nem kihasználható).
  * 3. Ha egyik sincs, de van `Referer`: az originje az engedett origin kell
  *    legyen (az OWASP "Checking the Referer Header if Origin Header Is Not
  *    Present" szakasza; a `Sec-Fetch-Site` nélküli, régi böngésző esete).

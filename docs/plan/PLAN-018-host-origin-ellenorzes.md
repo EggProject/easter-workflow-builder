@@ -58,5 +58,6 @@ A `model` és az `effort` mező soha nem hagyható üresen (gyökér `CLAUDE.md`
 - Egy eltérő címen megnyitott felület (például `http://127.0.0.1:5173`) minden böngészős kérésére `403` jön; a
   kliens ehhez saját mondatot mutat, a `README.md` és az `.env.example` megnevezi az `EASTER_STREAM_DEV_ORIGIN`
   beállítását.
-- A Vite `/api` proxy szabályának jövőbeli `changeOrigin: false` alakja a `Host` fejlécet a Vite címén hagyná,
-  és minden REST kérés `403` lenne; a research 3.2 a forrás sorát rögzíti, a mérő eszköz a változást kimutatja.
+- A Vite `/api` proxy szabályának jövőbeli, `changeOrigin` nélküli objektum alakja a `Host` fejlécet a Vite
+  címén hagyná, és minden REST kérés `403` lenne; a research 3.2 a forrás sorát rögzíti, és az
+  `apps/web/src/vite-proxy-host-invariant/` regressziós teszt a sztring alakot őrzi a `test` kapun.

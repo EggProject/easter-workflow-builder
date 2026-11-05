@@ -71,9 +71,9 @@ A források és a mérések részletesen: research 2. és 3. szekció.
 
 Az ellenőrzés **minden kérésre** lefut, az útvonal illesztése és a törzs olvasása előtt, a `GET /events` SSE
 végpontra is (`apps/server/src/request-source-check/`, a `createHttpServer` `handleRequest` függvényének első
-lépése). Ez szűkebb a "csak állapotot módosító kérés" szabálynál (Go `CrossOriginProtection`, research 2.4):
-a szerver csak a saját felületének szolgál, és a `GET` kérésekre is egyforma szabály egyetlen elágazás nélküli
-belépési pontot ad.
+lépése). Ez szigorúbb a Go `CrossOriginProtection` szabályánál, ami a `GET`, `HEAD` és `OPTIONS` kérést
+mindig átengedi (<https://go.dev/src/net/http/csrf.go>, a `Check` függvény eleje): a szerver csak a saját
+felületének szolgál, és a minden kérésre egyforma szabály egyetlen, metódustól független belépési pontot ad.
 
 ### 5.2 `Host`
 

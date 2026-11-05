@@ -23,6 +23,7 @@ import {
   createMustacheTemplateRenderer,
 } from '@easter-workflow-builder/workflow-language';
 import { buildProviderDescriptorLookup } from '../src/engine-assembly/build-provider-descriptor-lookup.ts';
+import { DEFAULT_SERVER_CONFIG } from '../src/server-config/default-server-config.ts';
 import { createProcessEnvironmentReader } from '../src/engine-assembly/create-process-environment-reader.ts';
 import { createSkillLibraryReader } from '../src/engine-assembly/create-skill-library-reader.ts';
 import { createStructuredOutputSchemaCompiler } from '../src/engine-assembly/create-structured-output-schema-compiler.ts';
@@ -145,7 +146,7 @@ const engine = createEngine({
 const server = createHttpServer({
   handlers: buildRouteHandlers(database, engine, streamRegistry, skillLibrary, structuredOutputSchemaCompiler),
   devOrigin: undefined,
-  allowedOrigin: 'http://localhost:5173',
+  allowedOrigin: DEFAULT_SERVER_CONFIG.uiOrigin,
   streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
   logger,
   idGenerator,

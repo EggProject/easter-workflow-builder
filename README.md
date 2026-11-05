@@ -38,8 +38,10 @@ bun run start:server
 bun run dev:web
 ```
 
-Utána a böngészőben: <http://localhost:5173>. A `127.0.0.1:5173` cím más origin, arra a szerver nem
-ad CORS engedélyt, ezért ne azt használd.
+Utána a böngészőben: <http://localhost:5173>. A `127.0.0.1:5173` cím más origin: a szerver csak a
+beállított felület originjéről fogad böngészős kérést (SPEC-017), arról minden kérésre `403` választ ad,
+ezért ne azt használd. Ha a Vite az `5173` port foglaltsága miatt másik portra vált, az
+`EASTER_STREAM_DEV_ORIGIN` értékét és a `VITE_API_ORIGIN` értékét is arra kell állítani.
 
 | Script                 | Mit csinál                                                                                                                                                                  |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -74,9 +76,10 @@ források a `docs/research/2026-10-26-helyi-inditas-es-valodi-proba.md` fájlban
 | `VITE_LIST_LIMIT`                      | `100`                   | a lista végpontok lapmérete; **100 fölött a lista levágódik**, lapozás nincs                |
 | `VITE_STREAM_REPLAY_LIMIT`             | `100`                   | a stream visszajátszás lapmérete, nem plafon                                                |
 
-Opcionális, alapérték nélkül: `EASTER_STREAM_DEV_ORIGIN` (hiányában a szerver nem küld CORS
-fejlécet; a minta `http://localhost:5173`; ugyanez a felület egyetlen engedett originje, hiányában
-`http://localhost:5173`, más originről jövő böngészős kérésre a szerver `403` választ ad, SPEC-017), `EASTER_DB_FILE` (hiányában
+Opcionális: `EASTER_STREAM_DEV_ORIGIN` (a CORS fejlécnek nincs alapértéke, hiányában a szerver nem küld
+CORS fejlécet; a minta `http://localhost:5173`; ugyanez az érték a felület egyetlen engedett originje,
+annak hiányában `http://localhost:5173` az alapértéke, és más originről jövő böngészős kérésre a szerver
+`403` választ ad, SPEC-017), `EASTER_DB_FILE` (hiányában
 `.data/easter-workflow-builder.sqlite`) és `EASTER_LOG_LEVEL` (hiányában a `pino` alapértéke).
 
 ## Providerek

@@ -924,8 +924,8 @@ describe('createHttpServer: kérés forrás ellenőrzés (SPEC-017 5., CSRF és 
     expect(entry?.['msg']).toBe('A kérés nem a beállított felület originjéről érkezett (origin_not_allowed).');
   });
 
-  it('az elutasított kérés nagy törzse mellett is megérkezik a 403 válasz', async () => {
-    const { baseUrl, host } = await startCountingServer();
+  it('nagy törzsű idegen kérésre is 403 jön, és a kezelő nem fut', async () => {
+    const { baseUrl, host, calls } = await startCountingServer();
     const response = await sendRawRequest(
       baseUrl,
       'POST',
@@ -934,5 +934,6 @@ describe('createHttpServer: kérés forrás ellenőrzés (SPEC-017 5., CSRF és 
       'x'.repeat(4_000_000),
     );
     expect(response.status).toBe(403);
+    expect(calls()).toBe(0);
   });
 });

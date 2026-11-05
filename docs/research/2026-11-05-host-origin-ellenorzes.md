@@ -56,8 +56,13 @@ az a 2.7 pontban "nem ellenőrzött" jelöléssel áll.
   navigációja; "If any of the headers above contain values not listed in the specification ... servers
   should ignore those headers"; a `localhost` és a `127.0.0.0/8` potenciálisan megbízható cél, tehát a
   böngésző a fejlécet ide is küldi (ugyanaz az URL, mint 2.2).
-- A Go `CrossOriginProtection.Check` ugyanígy dönt: `same-origin` és `none` átmegy, minden más
-  `Sec-Fetch-Site` érték elutasít (<https://go.dev/src/net/http/csrf.go>, a `Check` függvény).
+- A Go `CrossOriginProtection.Check` a `same-origin` és a `none` értéket átengedi, minden más
+  `Sec-Fetch-Site` értéket elutasít, és a fejlécet az `Origin` előtt nézi
+  (<https://go.dev/src/net/http/csrf.go>, a `Check` függvény). **Két kimondott eltérés a SPEC-017-ben:** az
+  `Origin` egyenlősége dönt először (szigorúbb: egy `Sec-Fetch-Site: same-origin` kérés is elbukik, ha az
+  `Origin` nem a felületé), és az ismeretlen `Sec-Fetch-Site` érték figyelmen kívül marad (az OWASP fenti
+  mondata szerint); a `Sec-` előtagú fejlécet weboldal nem állíthatja be (MDN, "Forbidden request header:
+  Yes"), tehát böngészőből ez az eltérés nem kihasználható.
 
 ### 2.4 Ha sem `Origin`, sem `Sec-Fetch-Site` nincs: a kérés nem böngészőből jön
 
@@ -97,6 +102,14 @@ az a 2.7 pontban "nem ellenőrzött" jelöléssel áll.
   megerősítés: a W3C Secure Contexts "potentially trustworthy origin" algoritmusa a `localhost` nevet és a
   `127.0.0.0/8` tartományt egyformán kezeli (<https://w3c.github.io/webappsec-secure-contexts/>), és az OWASP
   "Requirements" pontja ugyanezt írja (2.2 URL).
+
+### 2.6a Abszolút alakú kérés sor
+
+A független átvizsgálás nyers sockettel mérte: egy `GET http://evil.example/api/workflows` kérés sor
+`Host: 127.0.0.1:<port>` fejléccel átmegy, mert a szerver a `Host` fejlécet nézi. Az RFC 9112 3.2.2 szerint
+ilyenkor a kérés sor hostja számít (<https://www.rfc-editor.org/rfc/rfc9112#section-3.2.2>). Böngésző ilyen
+kérést csak proxynak küld, tehát ez nem böngészőn átjövő támadási út; a helyi folyamat, ami nyers kérést ír,
+a CSRF és DNS rebinding fenyegetésen kívül áll (2.4).
 
 ### 2.7 Nem ellenőrzött
 
@@ -163,3 +176,14 @@ A SPEC-017 5. szekciójának szabálya a fenti forrásokon áll: `Host` a helyi 
 (2.1, 2.6), utána `Origin` egyenlőség (2.2), `Sec-Fetch-Site` (2.3), `Referer` (2.5), fejléc nélkül átengedés
 (2.4), elutasításkor `403` (2.6). A 3.2 és a 3.3 mérés szerint a fejlesztői elrendezés (Vite proxy, közvetlen
 SSE) a szabály mellett változatlanul működik, és a próba eszköz kérései (3.1) átmennek.
+
+## 5. Független adverzariális átvizsgálás (2026-11-05)
+
+Böngészőből kihasználható kerülő utat nem talált (nyers socketes próbák: ismétlődő és nagybetűs `Host`,
+HTTP/1.0 `Host` nélkül, `localhost.`, vezető nullás port, `[::1]`, ismétlődő és üres `Origin`, `Origin: null`,
+ismétlődő `Referer`, `OPTIONS`; a védelem kikapcsolására a szerver tesztek közül hét bukott). A javított
+tételek: a konfiguráció és a szerver közti bekötésnek nem volt tesztje (új teszt a
+`continue-startup-with-database.spec.ts`-ben, a bekötés rontására bukik); a `request.resume()` indoklása
+forrásra cserélve; a Vite proxy sztring alakját regressziós teszt őrzi (`apps/web/src/vite-proxy-host-invariant/`);
+a Go szabálytól való két eltérés kimondva (2.3); a SPEC-005 37. kritériuma, a SPEC-017 5.1 és a `README.md`
+mondatai javítva; az abszolút alakú kérés sor besorolása a 2.6a pontban.

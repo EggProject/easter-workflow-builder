@@ -212,7 +212,9 @@ async function handleRequest(
   try {
     // A kérés forrás ellenőrzés minden kérésre, az útvonal illesztése és a
     // törzs olvasása előtt fut, az SSE végpontra is (SPEC-017 5.1). A törzset
-    // olvasás nélkül eldobjuk, hogy a kliens a választ megkapja.
+    // nem dolgozzuk fel: a `resume()` feldolgozás nélkül eldobja (Node
+    // `readable.resume()`: "fully consume the data from a stream without
+    // actually processing any of that data"), ugyanúgy, mint a 404 és 405 ág.
     const rejection = findRequestSourceRejection(request.headers, request.socket.localPort, options.allowedOrigin);
     if (rejection !== undefined) {
       request.resume();

@@ -1,3 +1,4 @@
+import { request as httpRequest } from 'node:http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
@@ -125,6 +126,35 @@ describe('continueStartupWithDatabase', () => {
     expect(response.status).toBe(200);
     await response.arrayBuffer();
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it('a konfiguráció engedett originjét köti be a kérés forrás ellenőrzésbe: az engedett Origin átmegy, más 403 (SPEC-017 5.3)', async () => {
+    const database = openMemoryDatabase();
+    const logger = createServerLogger({ secretValues: [] }, collectingSink().sink);
+    const output = captureStandardOutput();
+    try {
+      await continueStartupWithDatabase(database, { ...baseConfig(0), allowedOrigin: 'http://localhost:5180' }, logger);
+    } finally {
+      output.restore();
+    }
+    const port = reportedPort(output.written);
+
+    const statusFor = (origin: string): Promise<number> =>
+      new Promise((resolve, reject) => {
+        const outgoing = httpRequest(
+          `http://127.0.0.1:${String(port)}/api/providers`,
+          { headers: { origin } },
+          (incoming) => {
+            incoming.resume();
+            resolve(incoming.statusCode ?? 0);
+          },
+        );
+        outgoing.on('error', reject);
+        outgoing.end();
+      });
+
+    expect(await statusFor('http://localhost:5180')).toBe(200);
+    expect(await statusFor('http://localhost:5173')).toBe(403);
   });
 
   it('a kapcsolatok fogadása előtt törli a skill könyvtár gyökerének .staging-* maradékait (ZIP 8. találat)', async () => {
