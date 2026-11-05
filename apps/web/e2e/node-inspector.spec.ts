@@ -101,7 +101,7 @@ const ERROR_HANDLER_CONFIG: NodeConfig = {
   type: 'error_handler',
   maxAttempts: 3,
   backoffMs: [100, 200],
-  handledErrorKinds: ['timeout'],
+  handledErrorKinds: ['provider_call_failed'],
   onUnhandledError: null,
 };
 
@@ -519,7 +519,7 @@ test.describe('a panel dokkolt sáv alakja és a mezőnkénti hibajelzés', () =
   test('a hibaüzenet megjelenése nem tolja el a szomszédos mezőt', async ({ page }) => {
     const panel = await openNode(page, 'n-error');
     const backoffField = panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)');
-    const nextField = panel.getByLabel('Kezelt hibafajták (soronként egy)');
+    const nextField = panel.getByRole('group', { name: 'Kezelt hibafajták', exact: true });
 
     async function gapBetweenFields(): Promise<number> {
       const backoffBox = await backoffField.boundingBox();
@@ -1126,14 +1126,20 @@ test.describe('error_handler node', () => {
     await panel.getByLabel('Max. próbálkozások száma').fill('5');
     await expect(panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)')).toHaveValue('100\n200');
     await panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)').fill('50\n\n150');
-    await panel.getByLabel('Kezelt hibafajták (soronként egy)').fill('timeout\nrate_limit');
+    // A design system `Checkbox` natív bemenete vizuálisan rejtett, a látható felirat kapja a kattintást.
+    await panel.getByText('A szkript túllépte az időkorlátját.', { exact: true }).click();
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-error');
     await expect(reopened.getByLabel('Max. próbálkozások száma')).toHaveValue('5');
     // Az üres sorok kiszűrve.
     await expect(reopened.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)')).toHaveValue('50\n150');
-    await expect(reopened.getByLabel('Kezelt hibafajták (soronként egy)')).toHaveValue('timeout\nrate_limit');
+    await expect(reopened.getByRole('checkbox', { name: 'A szkript túllépte az időkorlátját.' })).toBeChecked();
+    await expect(
+      reopened.getByRole('checkbox', {
+        name: 'Az agent hívás nem indult el, vagy az üzenetfolyam eredmény nélkül megszakadt.',
+      }),
+    ).toBeChecked();
   });
 
   test('nem numerikus backoffMs sor a NodeConfigSchema szerint érvénytelen állapotot hoz létre, a hibaüzenet a mező alatt jelenik meg', async ({
@@ -1240,17 +1246,15 @@ test.describe('soronkénti lista mezők billentyűzetes gépelése', () => {
     await typeLines(kutatoTools.getByLabel('Engedélyezett eszközök'), 'Read', 'Grep');
   });
 
-  test('error_handler: a várakozás és a hibafajta listában az Enter megmarad, és a bontott lista megmarad újranyitás után', async ({
+  test('error_handler: a várakozás listában az Enter megmarad, és a bontott lista megmarad újranyitás után', async ({
     page,
   }) => {
     const panel = await openNode(page, 'n-error');
     await typeLines(panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)'), '100', '250');
-    await typeLines(panel.getByLabel('Kezelt hibafajták (soronként egy)'), 'timeout', 'rate_limit');
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-error');
     await expect(reopened.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)')).toHaveValue('100\n250');
-    await expect(reopened.getByLabel('Kezelt hibafajták (soronként egy)')).toHaveValue('timeout\nrate_limit');
   });
 
   test('sub_workflow: a leképezésben a befejezetlen sor és az Enter megmarad, és a teljes sorok megmaradnak újranyitás után', async ({

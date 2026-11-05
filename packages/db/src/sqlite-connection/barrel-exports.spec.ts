@@ -60,7 +60,7 @@ function readExportStatements(): { names: readonly string[]; moduleSpecifiers: r
 }
 
 describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritérium)', () => {
-  it('futásidőben pontosan a tizenhárom nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
+  it('futásidőben pontosan a tizennégy nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
     expect(new Set(Object.keys(barrel))).toStrictEqual(
       new Set([
         'ENV_EASTER_DB_FILE',
@@ -96,6 +96,10 @@ describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritér
         // definíció kötelező szöveg mező tábláját veti össze a `protocol`
         // mentési sémájának táblájával (SPEC-009 6.1).
         'MCP_SERVER_DEFINITION_REQUIRED_TEXT_FIELDS',
+        // A tizennegyedik a `WorkflowRunRecord.graphSnapshotHash` mező névleges
+        // típusa óta (SPEC-003 9.4): a fogyasztó csomag ezzel a guarddal állít elő
+        // `GraphSnapshotHash` értéket, `as` nélkül.
+        'isGraphSnapshotHash',
       ]),
     );
   });

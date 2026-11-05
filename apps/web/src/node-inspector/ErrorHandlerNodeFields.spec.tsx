@@ -15,11 +15,26 @@ function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string
   element.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+/**
+ * A jelölőnégyzet a felirata alapján (a `Checkbox` a szöveget `aria-labelledby`
+ * kötéssel adja a vezérlőnek).
+ */
+function checkboxByLabel(label: string): HTMLInputElement {
+  const checkbox = [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((candidate) => {
+    const labelId = candidate.getAttribute('aria-labelledby') ?? '';
+    return document.querySelector(`#${CSS.escape(labelId)}`)?.textContent === label;
+  });
+  if (checkbox === undefined) {
+    throw new Error(`a teszt nem találta a(z) "${label}" jelölőnégyzetet`);
+  }
+  return checkbox;
+}
+
 const CONFIG: ErrorHandlerNodeConfig = {
   type: 'error_handler',
   maxAttempts: 3,
   backoffMs: [100, 200],
-  handledErrorKinds: ['timeout'],
+  handledErrorKinds: ['provider_call_failed'],
   onUnhandledError: null,
 };
 
@@ -78,9 +93,9 @@ describe('ErrorHandlerNodeFields', () => {
     });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ maxAttempts: 5 }));
 
-    const [backoffTextarea, handledKindsTextarea] = [...container.querySelectorAll('textarea')];
-    if (backoffTextarea === undefined || handledKindsTextarea === undefined) {
-      throw new Error('a teszt nem találta a lista mezőket');
+    const backoffTextarea = container.querySelector('textarea');
+    if (backoffTextarea === null) {
+      throw new Error('a teszt nem találta a backoffMs mezőt');
     }
     act(() => {
       typeInto(backoffTextarea, '100\n200\n300');
@@ -88,18 +103,18 @@ describe('ErrorHandlerNodeFields', () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ backoffMs: [100, 200, 300] }));
 
     act(() => {
-      typeInto(handledKindsTextarea, 'timeout\nnetwork_error');
+      checkboxByLabel('Egy sablon nem renderelhető.').click();
     });
     expect(onChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ handledErrorKinds: ['timeout', 'network_error'] }),
+      expect.objectContaining({ handledErrorKinds: ['provider_call_failed', 'template_render_failed'] }),
     );
   });
 
-  it('gépelés közben a két lista mezőben az Enter megmarad, a configba a bontott lista kerül', () => {
+  it('gépelés közben a backoffMs lista mezőben az Enter megmarad, a configba a bontott lista kerül', () => {
     const latest = renderStatefulFields(root, { ...CONFIG, backoffMs: [], handledErrorKinds: [] });
-    const [backoffTextarea, handledKindsTextarea] = [...container.querySelectorAll('textarea')];
-    if (backoffTextarea === undefined || handledKindsTextarea === undefined) {
-      throw new Error('a teszt nem találta a lista mezőket');
+    const backoffTextarea = container.querySelector('textarea');
+    if (backoffTextarea === null) {
+      throw new Error('a teszt nem találta a backoffMs mezőt');
     }
 
     for (const partial of ['100', '100\n', '100\n200']) {
@@ -108,14 +123,53 @@ describe('ErrorHandlerNodeFields', () => {
       });
       expect(backoffTextarea.value).toBe(partial);
     }
-    for (const partial of ['timeout', 'timeout\n', 'timeout\nnetwork_error']) {
-      act(() => {
-        typeInto(handledKindsTextarea, partial);
-      });
-      expect(handledKindsTextarea.value).toBe(partial);
-    }
     expect(latest().backoffMs).toEqual([100, 200]);
-    expect(latest().handledErrorKinds).toEqual(['timeout', 'network_error']);
+  });
+
+  it('a kezelt hibafajták zárt listája jelölőnégyzet csoportokban áll, szabad szöveg mező nélkül (SPEC-004 8.2, O-5)', () => {
+    act(() => {
+      root.render(<ErrorHandlerNodeFields config={CONFIG} onChange={vi.fn()} />);
+    });
+
+    expect(container.querySelectorAll('textarea')).toHaveLength(1);
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(24);
+    const groupNames = [...container.querySelectorAll('[role="group"]')].map((group) => {
+      const labelId = group.getAttribute('aria-labelledby') ?? '';
+      return document.querySelector(`#${CSS.escape(labelId)}`)?.textContent;
+    });
+    expect(groupNames).toStrictEqual([
+      'Kezelt hibafajták',
+      'Agent lépés',
+      'Sablon, kifejezés és kimenet',
+      'Vezérlő csomópontok',
+      'Al-workflow',
+      'Szkript',
+    ]);
+    expect(
+      checkboxByLabel('Az agent hívás nem indult el, vagy az üzenetfolyam eredmény nélkül megszakadt.').checked,
+    ).toBe(true);
+    expect(checkboxByLabel('Egy sablon nem renderelhető.').checked).toBe(false);
+    expect(container.textContent).toContain('Csak a bejelölt hibafajtákat kezeli, a többit nem.');
+  });
+
+  it('a jelölés levétele kiveszi a fajtát, az üres lista mindent kezel, és ezt a mező alatti mondat kimondja', () => {
+    const latest = renderStatefulFields(root, CONFIG);
+
+    act(() => {
+      checkboxByLabel('Az agent hívás nem indult el, vagy az üzenetfolyam eredmény nélkül megszakadt.').click();
+    });
+
+    expect(latest().handledErrorKinds).toStrictEqual([]);
+    expect(container.textContent).toContain('Egyik sincs bejelölve, ezért a csomópont minden hibafajtát kezel.');
+
+    act(() => {
+      checkboxByLabel('A szkript túllépte az időkorlátját.').click();
+    });
+    act(() => {
+      checkboxByLabel('Az Elágazás egyik ága sem illeszkedett.').click();
+    });
+
+    expect(latest().handledErrorKinds).toStrictEqual(['script_timed_out', 'branch_no_matching_edge']);
   });
 
   it('REGRESSZIÓ: a kiürített maxAttempts mező üres marad, és a config NaN értéket kap, nem 0-t', () => {

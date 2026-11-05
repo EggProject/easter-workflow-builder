@@ -1,5 +1,6 @@
 import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
 import type { ExpressionScriptConfig } from './expression-script-config.ts';
+import type { HandledErrorKind } from './handled-error-kind.ts';
 import type { JavaScriptScriptConfig } from './javascript-script-config.ts';
 import type { ScriptConfig } from './script-config.ts';
 import type { StartInputValueKind } from './start-input-value-kind.ts';
@@ -154,13 +155,15 @@ export interface HumanApprovalNodeConfig {
 }
 
 /**
-A `maxAttempts` és a `backoffMs` kötelező, szállított alapérték nélkül.
+A `maxAttempts` és a `backoffMs` kötelező, szállított alapérték nélkül. A
+`handledErrorKinds` zárt felsorolás elemeiből áll; az üres lista minden hibaosztályt
+kezel (SPEC-004 8.2 1. pont, O-5).
 */
 export interface ErrorHandlerNodeConfig {
   readonly type: 'error_handler';
   readonly maxAttempts: number;
   readonly backoffMs: readonly number[];
-  readonly handledErrorKinds: readonly string[];
+  readonly handledErrorKinds: readonly HandledErrorKind[];
   readonly onUnhandledError: UnhandledErrorPolicy | null;
 }
 

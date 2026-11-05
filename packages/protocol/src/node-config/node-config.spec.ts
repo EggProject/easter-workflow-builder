@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-null -- a node config nullázható mezői a dróton ténylegesen `null` értéket hordoznak, nem helyőrző `undefined`-et */
 import { describe, expect, it } from 'vitest';
-import { NodeConfigSchema } from './node-config.ts';
+import { HandledErrorKindSchema, NodeConfigSchema } from './node-config.ts';
 
 const VALID_AGENT_STEP_SETTINGS = {
   promptTemplate: 'Foglald össze: {{input}}',
@@ -168,10 +168,27 @@ describe('NodeConfigSchema', () => {
       type: 'error_handler',
       maxAttempts: 3,
       backoffMs: [1000, 2000, 4000],
-      handledErrorKinds: ['timeout'],
+      handledErrorKinds: ['provider_call_failed', 'script_timed_out'],
       onUnhandledError: 'fail_run',
     };
     expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+  });
+
+  it('elutasítja az error_handler kezelt hibafajtái közé a zárt listán kívüli értéket (SPEC-004 8.2, O-5)', () => {
+    for (const handledErrorKind of ['timeout', '', 'graph_cycle_detected', 'retry_attempts_exhausted']) {
+      const config = {
+        type: 'error_handler',
+        maxAttempts: 3,
+        backoffMs: [1000, 2000],
+        handledErrorKinds: [handledErrorKind],
+        onUnhandledError: 'fail_run',
+      };
+      expect(NodeConfigSchema.safeParse(config).success).toBe(false);
+    }
+  });
+
+  it('a kezelt hibafajták zárt listája huszonnégy értékű', () => {
+    expect(HandledErrorKindSchema.options).toHaveLength(24);
   });
 
   it('elfogadja a sub_workflow node teljes alakját', () => {

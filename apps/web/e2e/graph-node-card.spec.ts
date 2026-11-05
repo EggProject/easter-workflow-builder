@@ -157,7 +157,7 @@ function buildTenTypeNodes(): WorkflowNode[] {
         type: 'error_handler',
         maxAttempts: 3,
         backoffMs: [1000, 2000],
-        handledErrorKinds: ['timeout'],
+        handledErrorKinds: ['provider_call_failed'],
         onUnhandledError: null,
       },
     },

@@ -85,7 +85,7 @@ const validConfigs: readonly NodeConfig[] = [
     type: 'error_handler',
     maxAttempts: 2,
     backoffMs: [1000, 5000],
-    handledErrorKinds: ['rate_limit'],
+    handledErrorKinds: ['provider_call_failed', 'template_render_failed'],
     onUnhandledError: 'fail_run',
   },
   {
@@ -377,6 +377,26 @@ describe('isNodeConfig', () => {
     [
       'error_handler: handledErrorKinds nem szövegtömb',
       { type: 'error_handler', maxAttempts: 2, backoffMs: [1000], handledErrorKinds: [7] },
+    ],
+    [
+      'error_handler: handledErrorKinds nem tömb',
+      {
+        type: 'error_handler',
+        maxAttempts: 2,
+        backoffMs: [1000],
+        handledErrorKinds: 'provider_call_failed',
+        onUnhandledError: 'fail_run',
+      },
+    ],
+    [
+      'error_handler: handledErrorKinds eleme nem kezelhető hibafajta (SPEC-004 8.2, O-5)',
+      {
+        type: 'error_handler',
+        maxAttempts: 2,
+        backoffMs: [1000],
+        handledErrorKinds: ['provider_call_failed', 'rate_limit'],
+        onUnhandledError: 'fail_run',
+      },
     ],
     [
       'error_handler: onUnhandledError érvénytelen',
