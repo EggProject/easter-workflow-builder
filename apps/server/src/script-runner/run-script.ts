@@ -1,6 +1,5 @@
-import path from 'node:path';
 import { describeErrorType } from '@easter-workflow-builder/core';
-import type { ScriptRunRequest, ScriptRunResult } from '@easter-workflow-builder/engine';
+import type { ScriptRunResult } from '@easter-workflow-builder/engine';
 import {
   shouldInterruptAfterDeadline,
   type QuickJSContext,
@@ -17,8 +16,10 @@ import { isForbiddenScriptRoot } from './is-forbidden-script-root.ts';
 import { loadQuickJsModule } from './load-quickjs-module.ts';
 import { resolveMemoryLimitMb } from './resolve-memory-limit-mb.ts';
 import { resolveReadLimitBytes } from './resolve-read-limit-bytes.ts';
+import type { SandboxRunRequest } from './sandbox-run-request.ts';
 import { SCRIPT_FILE_NAME } from './script-file-name.ts';
 import { SCRIPT_SANDBOX_LIMITS } from './script-sandbox-limits.ts';
+import { scriptTimedOutResult } from './script-timed-out-result.ts';
 import { waitForSettlement } from './wait-for-settlement.ts';
 import { wrapScriptSource } from './wrap-script-source.ts';
 
@@ -60,8 +61,7 @@ const PARSE_SOURCE = 'JSON.parse';
  * A lépés futás közbeni állapota: a lebontandó handle-ök, a még nem rendezett
  * gazda hívások, a fájl hozzáférés gyökere, a gazda olvasás két felső határa (a
  * `fetch` válasz és a `readText` fájl olvasási plafonja bájtban), a gazda
- * hívások jele (a kérés jele
- * és a lépés vége együtt) és az interrupt kezelő jelzése.
+ * hívások jele (a lépés vége) és az interrupt kezelő jelzése.
  */
 interface SandboxStep {
   readonly context: QuickJSContext;
@@ -87,40 +87,42 @@ type SandboxCompletion =
 
 /**
  * Egy JavaScript szkript lépés lefuttatása friss QuickJS modulon (SPEC-014 5.4
- * ... 5.8). A menet:
+ * ... 5.8). A szkript folyamatában fut (SPEC-017 4.1, `serve-script-child.ts`);
+ * a külső leállítás a folyamat megölése, ezért kérés jele itt nincs. A menet:
  *
- * 1. A határidő a lépés indulásától számít (`timeoutMs` vagy 60 000 ms). A
+ * 1. A határidő a kérés `deadlineMs` mezője (a szülő indulásától számítva). A
  *    `/proc` vagy `/dev` alá mutató fájl gyökér (lexikálisan vagy
  *    `fs.realpath` után) a modul betöltése előtt `script_evaluation_failed`.
  * 2. Friss modul saját memória korláttal, új runtime `setMaxStackSize`-zal, új
  *    kontextus; az interrupt kezelő (a CPU kötött kód ága, research
  *    `2026-11-04-szkript-csomopont.md` Q-1, Q-3) közvetlenül a szkript előtt.
- * 3. A futás kontextus jelen lévő nevei JSON-ként a globális objektumra; a
- *    `undefined` értékű nevet a `JSON.stringify` kihagyja, tehát a hiányzó név a
- *    sandboxban sem létezik (SPEC-010 7.3 táblázata, a port leírása szerint).
- *    Mellettük a `fetch` és a `files` gazda függvény (5.4 "Hálózat", "Fájl"), a
- *    fájl gyökér a `cwd`, üresen a szerver munkakönyvtára (O-5).
+ * 3. A futás kontextus JSON szövege a globális objektumra; mellette a `fetch`
+ *    és a `files` gazda függvény (5.4 "Hálózat", "Fájl"), a fájl gyökér a kérés
+ *    `root` mezője.
  * 4. A csomagolt törzs kiértékelése, az ígéret a `resolvePromise` úton, a függő
  *    feladatok az `executePendingJobs` hívással; a várakozás a gazda oldali
- *    határidővel és a kérés jelével versenyez (`waitForSettlement`).
+ *    határidővel versenyez (`waitForSettlement`).
  * 5. A visszatérési érték a sandboxban `JSON.stringify`, a gazdán `JSON.parse`.
  *
  * A hibák: az interrupt kezelő vagy a gazda határidő `script_timed_out`; a
  * dobott kivétel, az el nem kapott `InternalError: out of memory` (Q-5) és a
  * gazdára kijutó hiba (a mély `JSON.stringify` `RangeError`-ja, Q-6)
- * `script_evaluation_failed`; a nem JSON eredmény `script_output_not_json`; a
- * kérés jele `aborted`. A lebontás minden ágon fut: előbb a lépés jele lejár (a
- * folyamatban lévő hálózati kérés megszakad, a késői gazda eredmény eldobva),
- * utána a függő gazda ígéretek, a handle-ök, a kontextus és a runtime
- * szabadul fel (Q-2 B); a hibája elkapott (Q-2, Q-3).
+ * `script_evaluation_failed`; a nem JSON eredmény `script_output_not_json`. A
+ * lebontás minden ágon fut: előbb a lépés jele lejár (a folyamatban lévő
+ * hálózati kérés megszakad, a késői gazda eredmény eldobva), utána a függő
+ * gazda ígéretek, a handle-ök, a kontextus és a runtime szabadul fel (Q-2 B);
+ * a hibája elkapott (Q-2, Q-3).
+ *
+ * Az `isParentGone` az interrupt kezelőben fut: ha a szülő (a szerver) közben
+ * meghalt, a CPU kötött szkript is megáll, mert a szinkron ciklus alatt a
+ * folyamat `'disconnect'` eseménye nem sülhet el (SPEC-017 4.1; mérve: research
+ * `2026-11-05-szkript-kulon-folyamat.md` M-6). Az ilyenkor adott
+ * `script_timed_out` eredményt senki nem kapja meg, a folyamat kilép.
  */
-export async function runScript(request: ScriptRunRequest): Promise<ScriptRunResult> {
-  const timeoutMs = request.timeoutMs ?? SCRIPT_SANDBOX_LIMITS.defaultTimeoutMs;
-  const deadlineMs = Date.now() + timeoutMs;
-  const root = path.resolve(request.cwd ?? process.cwd());
+export async function runScript(request: SandboxRunRequest, isParentGone: () => boolean): Promise<ScriptRunResult> {
   // A `/proc` vagy `/dev` alá mutató gyökér a szkript indítása előtt a lépés
   // megnevezett hibája (user döntés 2026-11-04, SPEC-014 5.4 "Fájl").
-  if (await isForbiddenScriptRoot(root)) {
+  if (await isForbiddenScriptRoot(request.root)) {
     return {
       kind: 'failed',
       errorKind: 'script_evaluation_failed',
@@ -128,22 +130,14 @@ export async function runScript(request: ScriptRunRequest): Promise<ScriptRunRes
     };
   }
   try {
-    return await runInFreshModule(request, root, timeoutMs, deadlineMs);
+    return await runInFreshModule(request, isParentGone);
   } catch (error) {
     return hostFailure(error);
   }
 }
 
-async function runInFreshModule(
-  request: ScriptRunRequest,
-  root: string,
-  timeoutMs: number,
-  deadlineMs: number,
-): Promise<ScriptRunResult> {
+async function runInFreshModule(request: SandboxRunRequest, isParentGone: () => boolean): Promise<ScriptRunResult> {
   const quickJs = await loadQuickJsModule(request.memoryLimitMb);
-  if (request.signal.aborted) {
-    return { kind: 'aborted' };
-  }
   const runtime = quickJs.newRuntime();
   runtime.setMaxStackSize(SCRIPT_SANDBOX_LIMITS.maxStackSizeBytes);
   const context = runtime.newContext();
@@ -153,7 +147,7 @@ async function runInFreshModule(
     runtime,
     handles: [],
     pendingCalls: new Set(),
-    root,
+    root: request.root,
     maxResponseBytes: resolveReadLimitBytes(
       request.fetchResponseLimitMb,
       SCRIPT_SANDBOX_LIMITS.defaultFetchResponseLimitMb,
@@ -164,30 +158,31 @@ async function runInFreshModule(
       SCRIPT_SANDBOX_LIMITS.defaultFileReadLimitMb,
       resolveMemoryLimitMb(request.memoryLimitMb),
     ),
-    hostSignal: AbortSignal.any([request.signal, stepEnd.signal]),
-    timeoutMs,
-    deadlineMs,
+    hostSignal: stepEnd.signal,
+    timeoutMs: request.timeoutMs,
+    deadlineMs: request.deadlineMs,
     state: { interrupted: false },
   };
   try {
-    return await evaluateInSandbox(step, request);
+    return await evaluateInSandbox(step, request, isParentGone);
   } finally {
     stepEnd.abort();
     disposeQuietly([...step.pendingCalls, ...step.handles], context, runtime);
   }
 }
 
-async function evaluateInSandbox(step: SandboxStep, request: ScriptRunRequest): Promise<ScriptRunResult> {
+async function evaluateInSandbox(
+  step: SandboxStep,
+  request: SandboxRunRequest,
+  isParentGone: () => boolean,
+): Promise<ScriptRunResult> {
   const { context, runtime, handles } = step;
   const keep = (handle: QuickJSHandle): QuickJSHandle => {
     handles.push(handle);
     return handle;
   };
-  const { input, steps, item, itemIndex, iteration, joinInputs, error } = request.runContext;
   const installer = keep(context.unwrapResult(context.evalCode(PRELUDE_SOURCE, 'prelude.js')));
-  const contextText = keep(
-    context.newString(JSON.stringify({ input, steps, item, itemIndex, iteration, joinInputs, error })),
-  );
+  const contextText = keep(context.newString(request.contextJson));
   const stringify = keep(context.unwrapResult(context.callFunction(installer, context.undefined, contextText)));
   const parse = keep(context.unwrapResult(context.evalCode(PARSE_SOURCE, 'host.js')));
   const hostCrash = Promise.withResolvers<SandboxCompletion>();
@@ -213,7 +208,7 @@ async function evaluateInSandbox(step: SandboxStep, request: ScriptRunRequest): 
   // (PLAN-015 T-015-12, 1 ms-os határidő).
   const isPastDeadline = shouldInterruptAfterDeadline(step.deadlineMs);
   runtime.setInterruptHandler((interruptedRuntime) => {
-    step.state.interrupted = isPastDeadline(interruptedRuntime) === true;
+    step.state.interrupted = isPastDeadline(interruptedRuntime) === true || isParentGone();
     return step.state.interrupted;
   });
 
@@ -223,15 +218,8 @@ async function evaluateInSandbox(step: SandboxStep, request: ScriptRunRequest): 
   }
   const evaluation = evaluatedCompletion(context.resolvePromise(keep(evaluated.value)));
   runtime.executePendingJobs().dispose();
-  const settlement = await waitForSettlement(
-    Promise.race([evaluation, hostCrash.promise]),
-    step.deadlineMs,
-    request.signal,
-  );
+  const settlement = await waitForSettlement(Promise.race([evaluation, hostCrash.promise]), step.deadlineMs);
   switch (settlement.kind) {
-    case 'aborted': {
-      return { kind: 'aborted' };
-    }
     case 'timed_out': {
       return timedOut(step);
     }
@@ -288,11 +276,7 @@ function thrownFailure(
 }
 
 function timedOut(step: SandboxStep): ScriptRunResult {
-  return {
-    kind: 'failed',
-    errorKind: 'script_timed_out',
-    message: `a szkript nem fejeződött be ${String(step.timeoutMs)} ms alatt`,
-  };
+  return scriptTimedOutResult(step.timeoutMs);
 }
 
 /**
