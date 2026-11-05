@@ -1,7 +1,13 @@
 /* eslint-disable unicorn/no-null -- a port `timeoutMs`, `cwd` és `memoryLimitMb` mezőjének üres értéke a tárolt `null` (SPEC-014 5.3), és a szkript `null` kimenete is JSON érték */
 import type { RunContext, ScriptRunRequest, ScriptRunResult } from '@easter-workflow-builder/engine';
 import { describe, expect, it } from 'vitest';
+import { buildSandboxRunRequest } from './build-sandbox-run-request.ts';
 import { runScript } from './run-script.ts';
+
+// A szkript folyamatában futó `runScript` közvetlenül, a szülő kérés leképezésével (SPEC-017 4.2).
+function run(scriptRequest: ScriptRunRequest): ReturnType<typeof runScript> {
+  return runScript(buildSandboxRunRequest(scriptRequest, Date.now()));
+}
 
 // A friss kontextus 61 globális nevéből (research `2026-11-04-szkript-csomopont.md` Q-8) a
 // `FinalizationRegistry` és a `WeakRef` törlése utáni 59 név (SPEC-014 5.4 "Eltávolított nevek").
@@ -112,30 +118,30 @@ function outputOf(result: ScriptRunResult): unknown {
 describe('runScript', () => {
   describe('sikeres futás', () => {
     it('objektumot, tömböt, számot és null értéket ad vissza JSON értékként', async () => {
-      await expect(runScript(request('return { a: 1, b: [true, "x"] };'))).resolves.toStrictEqual({
+      await expect(run(request('return { a: 1, b: [true, "x"] };'))).resolves.toStrictEqual({
         kind: 'succeeded',
         output: { a: 1, b: [true, 'x'] },
       });
-      await expect(runScript(request('return [1, 2, 3];'))).resolves.toStrictEqual({
+      await expect(run(request('return [1, 2, 3];'))).resolves.toStrictEqual({
         kind: 'succeeded',
         output: [1, 2, 3],
       });
-      await expect(runScript(request('return 42.5;'))).resolves.toStrictEqual({ kind: 'succeeded', output: 42.5 });
-      await expect(runScript(request('return null;'))).resolves.toStrictEqual({ kind: 'succeeded', output: null });
+      await expect(run(request('return 42.5;'))).resolves.toStrictEqual({ kind: 'succeeded', output: 42.5 });
+      await expect(run(request('return null;'))).resolves.toStrictEqual({ kind: 'succeeded', output: null });
     });
 
     it('a törzsben await használható', async () => {
-      await expect(
-        runScript(request('const x = await Promise.resolve(input.name); return x + "!";')),
-      ).resolves.toStrictEqual({
-        kind: 'succeeded',
-        output: 'teszt!',
-      });
+      await expect(run(request('const x = await Promise.resolve(input.name); return x + "!";'))).resolves.toStrictEqual(
+        {
+          kind: 'succeeded',
+          output: 'teszt!',
+        },
+      );
     });
 
     it('a null időkorláttal és null memória korláttal is fut (az alapértékek)', async () => {
       await expect(
-        runScript(
+        run(
           request('return 1;', {
             timeoutMs: null,
             memoryLimitMb: null,
@@ -152,7 +158,7 @@ describe('runScript', () => {
 
   describe('a futás kontextus nevei', () => {
     it('a hét név JSON értékként látszik', async () => {
-      const result = await runScript(
+      const result = await run(
         request('return { input, steps, item, itemIndex, iteration, joinInputs, error };', {
           runContext: FULL_CONTEXT,
         }),
@@ -172,7 +178,7 @@ describe('runScript', () => {
     });
 
     it('a hiányzó név nem kerül a globális objektumra', async () => {
-      const result = await runScript(
+      const result = await run(
         request(
           'return [typeof item, typeof itemIndex, typeof iteration, typeof joinInputs, typeof error, "item" in globalThis];',
         ),
@@ -185,7 +191,7 @@ describe('runScript', () => {
 
     it('a kontextus értéke másolat: a szkript módosítása a gazda objektumot nem érinti', async () => {
       const runContext: RunContext = { ...MINIMAL_CONTEXT, input: { name: 'teszt' } };
-      await runScript(request('input.name = "más"; return 1;', { runContext }));
+      await run(request('input.name = "más"; return 1;', { runContext }));
       expect(runContext.input).toStrictEqual({ name: 'teszt' });
     });
 
@@ -194,16 +200,16 @@ describe('runScript', () => {
       const namesSource = 'return Object.getOwnPropertyNames(globalThis);';
       const countSource = 'return Object.getOwnPropertyNames(globalThis).length;';
       const minimalNames = [...QUICKJS_GLOBAL_NAMES, 'fetch', 'files', 'input', 'steps'];
-      const minimalOutput = outputOf(await runScript(request(namesSource)));
+      const minimalOutput = outputOf(await run(request(namesSource)));
       expect(minimalOutput).toStrictEqual(expect.arrayContaining(minimalNames));
-      await expect(runScript(request(countSource))).resolves.toStrictEqual({
+      await expect(run(request(countSource))).resolves.toStrictEqual({
         kind: 'succeeded',
         output: minimalNames.length,
       });
       const fullNames = [...minimalNames, 'item', 'itemIndex', 'iteration', 'joinInputs', 'error'];
-      const fullOutput = outputOf(await runScript(request(namesSource, { runContext: FULL_CONTEXT })));
+      const fullOutput = outputOf(await run(request(namesSource, { runContext: FULL_CONTEXT })));
       expect(fullOutput).toStrictEqual(expect.arrayContaining(fullNames));
-      await expect(runScript(request(countSource, { runContext: FULL_CONTEXT }))).resolves.toStrictEqual({
+      await expect(run(request(countSource, { runContext: FULL_CONTEXT }))).resolves.toStrictEqual({
         kind: 'succeeded',
         output: fullNames.length,
       });
@@ -223,7 +229,7 @@ describe('runScript', () => {
           typedArray: typedArrays.flatMap((C) => methods.map((name) => typeof new C(1)[name])),
           global: [typeof FinalizationRegistry, typeof WeakRef, "WeakRef" in globalThis],
         };`;
-      const result = await runScript(request(source));
+      const result = await run(request(source));
       expect(outputOf(result)).toStrictEqual({
         array: ['undefined', 'undefined', 'undefined', 'undefined'],
         typedArray: Array.from({ length: 48 }, () => 'undefined'),
@@ -253,7 +259,7 @@ describe('runScript', () => {
           }
         }
         return { found, visited: seen.size > 100 };`;
-      const result = await runScript(request(source));
+      const result = await run(request(source));
       expect(outputOf(result)).toStrictEqual({ found: [], visited: true });
     });
 
@@ -265,13 +271,13 @@ describe('runScript', () => {
         typeof Reflect.get(Object.getPrototypeOf(Uint8Array.prototype), "with"),
         Object.getOwnPropertyNames(Array.prototype).filter((name) => ${JSON.stringify(SIX_NAMES)}.includes(name)),
       ];`;
-      const result = await runScript(request(source));
+      const result = await run(request(source));
       expect(outputOf(result)).toStrictEqual(['undefined', 'undefined', 'undefined', 'undefined', []]);
     });
 
     it('a megmaradt Array és TypedArray metódusok működnek', async () => {
       await expect(
-        runScript(request('return [[3, 1, 2].slice().sort(), [...new Uint8Array([3, 1]).reverse()], [1, 2].at(-1)];')),
+        run(request('return [[3, 1, 2].slice().sort(), [...new Uint8Array([3, 1]).reverse()], [1, 2].at(-1)];')),
       ).resolves.toStrictEqual({ kind: 'succeeded', output: [[1, 2, 3], [1, 3], 2] });
     });
   });
@@ -280,7 +286,7 @@ describe('runScript', () => {
     it.each(['/dev', '/dev/../dev/shm', '/proc/self'])(
       'a(z) %s cwd a szkript indítása előtt megnevezett script_evaluation_failed',
       async (cwd) => {
-        await expect(runScript(request('return 1;', { cwd }))).resolves.toStrictEqual({
+        await expect(run(request('return 1;', { cwd }))).resolves.toStrictEqual({
           kind: 'failed',
           errorKind: 'script_evaluation_failed',
           message: 'a szkript fájl hozzáférésének gyökere (cwd) a tiltott /proc vagy /dev könyvtárba mutat',
@@ -289,7 +295,7 @@ describe('runScript', () => {
     );
 
     it('a / gyökér alatt a szkript a dev/zero olvasásakor elkapható hibát kap, a szerver folyamat környezete nem olvasható', async () => {
-      const result = await runScript(
+      const result = await run(
         request(
           'const out = []; for (const p of ["dev/zero", "proc/self/environ", "dev"]) {' +
             ' try { await (p === "dev" ? files.list(p) : files.readText(p)); out.push("olvasva"); }' +
@@ -310,13 +316,13 @@ describe('runScript', () => {
 
   describe('hibák', () => {
     it('a szintaktikai hiba script_evaluation_failed', async () => {
-      const result = await runScript(request('return {'));
+      const result = await run(request('return {'));
       expect(result).toMatchObject({ kind: 'failed', errorKind: 'script_evaluation_failed' });
       expect(result).toHaveProperty('message', expect.stringContaining('SyntaxError'));
     });
 
     it('a dobott Error neve és üzenete a hibaüzenetben áll, a verem nem', async () => {
-      const result = await runScript(request('throw new TypeError("rossz bemenet");'));
+      const result = await run(request('throw new TypeError("rossz bemenet");'));
       expect(result).toStrictEqual({
         kind: 'failed',
         errorKind: 'script_evaluation_failed',
@@ -325,7 +331,7 @@ describe('runScript', () => {
     });
 
     it('a nem Error dobott érték rögzített mondatot kap', async () => {
-      await expect(runScript(request('throw 42;'))).resolves.toStrictEqual({
+      await expect(run(request('throw 42;'))).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_evaluation_failed',
         message: 'a szkript hibát dobott: a dobott érték nem Error objektum',
@@ -337,7 +343,7 @@ describe('runScript', () => {
       ['return nélkül', 'const x = 1;'],
       ['függvény', 'return () => 1;'],
     ])('a nem JSON eredmény script_output_not_json: %s', async (_name, source) => {
-      await expect(runScript(request(source))).resolves.toMatchObject({
+      await expect(run(request(source))).resolves.toMatchObject({
         kind: 'failed',
         errorKind: 'script_output_not_json',
         message: 'a szkript visszatérési értéke nem JSON érték (például undefined vagy függvény)',
@@ -348,7 +354,7 @@ describe('runScript', () => {
       ['körkörös', 'const a = {}; a.self = a; return a;'],
       ['BigInt', 'return 10n;'],
     ])('a JSON szöveggé nem alakítható eredmény script_output_not_json: %s', async (_name, source) => {
-      const result = await runScript(request(source));
+      const result = await run(request(source));
       expect(result).toMatchObject({ kind: 'failed', errorKind: 'script_output_not_json' });
       expect(result).toHaveProperty(
         'message',
@@ -368,7 +374,7 @@ describe('runScript', () => {
         'globalThis.Promise = { resolve() { return { then() { throw new Error("y"); } }; } }; return 1;',
       ],
     ])('a(z) %s felülírása azonnal script_evaluation_failed, kezeletlen elutasítás nélkül', async (_name, source) => {
-      await expect(runScript(request(source))).resolves.toStrictEqual({
+      await expect(run(request(source))).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_evaluation_failed',
         message: 'a szkript futása a gazda oldalon megszakadt (QuickJSUnwrapError)',
@@ -376,9 +382,9 @@ describe('runScript', () => {
     });
   });
 
-  describe('időkorlát és megszakítás', () => {
+  describe('időkorlát', () => {
     it('a CPU kötött végtelen ciklust az interrupt kezelő állítja meg', async () => {
-      await expect(runScript(request('while (true) {}', { timeoutMs: 50 }))).resolves.toStrictEqual({
+      await expect(run(request('while (true) {}', { timeoutMs: 50 }))).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_timed_out',
         message: 'a szkript nem fejeződött be 50 ms alatt',
@@ -386,14 +392,14 @@ describe('runScript', () => {
     });
 
     it('a mikrofeladatokkal pörgő szkript is időkorlátba fut', async () => {
-      await expect(runScript(request('for (;;) { await null; }', { timeoutMs: 50 }))).resolves.toMatchObject({
+      await expect(run(request('for (;;) { await null; }', { timeoutMs: 50 }))).resolves.toMatchObject({
         kind: 'failed',
         errorKind: 'script_timed_out',
       });
     });
 
     it('az 1 ms-os határidő is script_timed_out: az interrupt kezelő csak a szkript előtt áll be (T-015-12)', async () => {
-      await expect(runScript(request('while (true) {}', { timeoutMs: 1 }))).resolves.toStrictEqual({
+      await expect(run(request('while (true) {}', { timeoutMs: 1 }))).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_timed_out',
         message: 'a szkript nem fejeződött be 1 ms alatt',
@@ -402,7 +408,7 @@ describe('runScript', () => {
 
     it('a dobott érték leírásában (getter) futó és megszakított kód is script_timed_out (T-015-12)', async () => {
       const source = 'throw { name: "x", get message() { for (;;) {} } };';
-      await expect(runScript(request(source, { timeoutMs: 50 }))).resolves.toStrictEqual({
+      await expect(run(request(source, { timeoutMs: 50 }))).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_timed_out',
         message: 'a szkript nem fejeződött be 50 ms alatt',
@@ -423,7 +429,7 @@ describe('runScript', () => {
       'a(z) %s argumentumában megszakított kód elkapása után a szkript nem fut tovább a határidőn túl',
       async (_name, call) => {
         const source = `const until = Date.now() + 1000; let caught = 0; const argument = { toJSON() { for (;;) {} } }; while (Date.now() < until) { try { ${call}; } catch { caught += 1; } } return caught;`;
-        await expect(runScript(request(source, { timeoutMs: 50 }))).resolves.toStrictEqual({
+        await expect(run(request(source, { timeoutMs: 50 }))).resolves.toStrictEqual({
           kind: 'failed',
           errorKind: 'script_timed_out',
           message: 'a szkript nem fejeződött be 50 ms alatt',
@@ -432,47 +438,10 @@ describe('runScript', () => {
     );
 
     it('a soha fel nem oldott ígéretre váró szkriptet a gazda határideje állítja meg', async () => {
-      await expect(
-        runScript(request('await new Promise(() => {}); return 1;', { timeoutMs: 50 })),
-      ).resolves.toStrictEqual({
+      await expect(run(request('await new Promise(() => {}); return 1;', { timeoutMs: 50 }))).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_timed_out',
         message: 'a szkript nem fejeződött be 50 ms alatt',
-      });
-    });
-
-    it('a kérés jele a várakozó szkriptet megszakítja', async () => {
-      const controller = new AbortController();
-      const running = runScript(request('await new Promise(() => {}); return 1;', { signal: controller.signal }));
-      setTimeout(() => {
-        controller.abort();
-      }, 20);
-      await expect(running).resolves.toStrictEqual({ kind: 'aborted' });
-    });
-
-    it('a CPU kötött szkript alatt a kérés jele nem ér célba, mert a gazda szála foglalt: a határidő állítja meg', async () => {
-      // A megszakítás ugyanazon a szálon fut, mint a QuickJS, tehát a szinkron ciklus alatt el sem indulhat
-      // (research `2026-11-04-szkript-csomopont.md` 9.3): az időzítő a lépés vége után sül el.
-      const controller = new AbortController();
-      const timer = setTimeout(() => {
-        controller.abort();
-      }, 20);
-      const result = await runScript(request('while (true) {}', { timeoutMs: 300, signal: controller.signal }));
-      const wasAbortedBeforeResult = controller.signal.aborted;
-      clearTimeout(timer);
-      expect(result).toStrictEqual({
-        kind: 'failed',
-        errorKind: 'script_timed_out',
-        message: 'a szkript nem fejeződött be 300 ms alatt',
-      });
-      expect(wasAbortedBeforeResult).toBe(false);
-    });
-
-    it('a már megszakított jel mellett a szkript el sem indul', async () => {
-      const controller = new AbortController();
-      controller.abort();
-      await expect(runScript(request('return 1;', { signal: controller.signal }))).resolves.toStrictEqual({
-        kind: 'aborted',
       });
     });
   });
@@ -482,7 +451,7 @@ describe('runScript', () => {
       const source =
         'const a = []; try { while (true) { a.push(new Array(1e5).fill(1)); } } catch (e) { a.length = 0; return e.name + ": " + e.message; }';
       await expect(
-        runScript(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
+        run(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
       ).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 'InternalError: out of memory',
@@ -492,7 +461,7 @@ describe('runScript', () => {
     it('az el nem kapott memória túllépés script_evaluation_failed', async () => {
       const source = 'const a = []; while (true) { a.push(new Array(1e5).fill(1)); }';
       await expect(
-        runScript(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
+        run(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
       ).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_evaluation_failed',
@@ -502,7 +471,7 @@ describe('runScript', () => {
 
     it('a mély rekurzió a sandboxban marad és elkapható', async () => {
       const source = 'function g() { return 1 + g(); } try { g(); } catch (e) { return e.name + ": " + e.message; }';
-      await expect(runScript(request(source))).resolves.toStrictEqual({
+      await expect(run(request(source))).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 'InternalError: stack overflow',
       });
@@ -510,12 +479,12 @@ describe('runScript', () => {
 
     it('a gazdára kijutó RangeError script_evaluation_failed, és utána egy új lépés hibátlanul fut', async () => {
       const source = 'let o = {}; let c = o; for (let i = 0; i < 1e5; i++) { c.x = {}; c = c.x; } return o;';
-      await expect(runScript(request(source))).resolves.toStrictEqual({
+      await expect(run(request(source))).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_evaluation_failed',
         message: 'a szkript futása a gazda oldalon megszakadt (RangeError)',
       });
-      await expect(runScript(request('return input.name;'))).resolves.toStrictEqual({
+      await expect(run(request('return input.name;'))).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 'teszt',
       });

@@ -353,6 +353,44 @@ describe('a szkript lépés végponttól végpontig, valódi szerver és valódi
     expect(step?.errorMessage).toContain('Error: eltört');
   });
 
+  it('REGRESSZIÓ (SPEC-014 7.2 T-5, SPEC-017): a futás megszakítása a CPU kötött JavaScript lépés alatt azonnal hat', async () => {
+    // A lépés 60 000 ms-os határideje a Vitest 5000 ms-os teszt korlátján túl van. A szerver szálán futó
+    // QuickJS alatt a ciklus az eseményhurkot foglalta: sem a lépés állapotát lekérő GET, sem a
+    // megszakító POST nem jutott szóhoz a határidőig, és a teszt időtúllépéssel bukott volna.
+    running = await startServer();
+    const { baseUrl } = running;
+    const workflowId = await createWorkflowWithGraph(
+      baseUrl,
+      'szkript-megszakitas',
+      [
+        START_NODE,
+        nodeOf('js', {
+          type: 'script',
+          ...javaScript('while (true) {}'),
+          timeoutMs: 60_000,
+          onUnhandledError: 'fail_run',
+        }),
+      ],
+      [edge('e1', 'start', 'js')],
+    );
+    const started = await requestJson(baseUrl, 'POST', `/api/workflows/${workflowId}/runs`, { input: {} });
+    const runId = parsedOrThrow(StartedRunResponseSchema.safeParse(started.body)).runId;
+    const finished = waitForRunFinished(baseUrl, runId);
+
+    let steps = await stepsOf(baseUrl, runId);
+    while (steps.find((step) => step.nodeId === 'js')?.status !== 'running') {
+      steps = await stepsOf(baseUrl, runId);
+    }
+    const interrupted = await requestJson(baseUrl, 'POST', `/api/runs/${runId}/interrupt`);
+    expect(interrupted.status).toBe(200);
+
+    const finishedPayload = await finished;
+    expect(isRecord(finishedPayload) ? finishedPayload['status'] : undefined).toBe('cancelled');
+    const stepsAfter = await stepsOf(baseUrl, runId);
+    const step = stepsAfter.find((candidate) => candidate.nodeId === 'js');
+    expect(step?.status).toBe('cancelled');
+  });
+
   it('a fordíthatatlan JavaScript forrás indítása 422 script_compile_failed, a csomópont és a mező nevével, futás sor nélkül', async () => {
     running = await startServer();
     const { baseUrl } = running;

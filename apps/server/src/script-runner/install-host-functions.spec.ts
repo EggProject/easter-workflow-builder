@@ -8,7 +8,13 @@ import os from 'node:os';
 import path from 'node:path';
 import type { RunContext, ScriptRunRequest } from '@easter-workflow-builder/engine';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { buildSandboxRunRequest } from './build-sandbox-run-request.ts';
 import { runScript } from './run-script.ts';
+
+// A szkript folyamatában futó `runScript` közvetlenül, a szülő kérés leképezésével (SPEC-017 4.2).
+function run(scriptRequest: ScriptRunRequest): ReturnType<typeof runScript> {
+  return runScript(buildSandboxRunRequest(scriptRequest, Date.now()));
+}
 
 // A `fetch` és a `files` gazda függvény a valódi futtatón át (SPEC-014 5.4, 6. szekció; AC8).
 // Helyi teszt szerver az operációs rendszer által kiosztott porton; valódi külső hívás nincs.
@@ -163,7 +169,7 @@ async function nextHangingRequest(): Promise<{ readonly closed: Promise<void> }>
 describe('installHostFunctions', () => {
   describe('fetch', () => {
     it('a GET kérés válasza { status, headers, body }', async () => {
-      const result = await runScript(request(`const r = await fetch("${target.origin}/hello"); return r;`));
+      const result = await run(request(`const r = await fetch("${target.origin}/hello"); return r;`));
       expect(result).toMatchObject({
         kind: 'succeeded',
         output: { status: 200, headers: { 'x-teszt': 'igen' }, body: 'szia' },
@@ -171,31 +177,29 @@ describe('installHostFunctions', () => {
     });
 
     it('az átirányítást nem követi', async () => {
-      const result = await runScript(
+      const result = await run(
         request(`const r = await fetch("${target.origin}/redirect"); return [r.status, r.headers.location];`),
       );
       expect(result).toStrictEqual({ kind: 'succeeded', output: [302, '/hello'] });
     });
 
     it('a nem HTTP séma elutasítása el nem kapva script_evaluation_failed, elkapva a szkript kezeli', async () => {
-      await expect(runScript(request('await fetch("file:///etc/passwd"); return 1;'))).resolves.toStrictEqual({
+      await expect(run(request('await fetch("file:///etc/passwd"); return 1;'))).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_evaluation_failed',
         message: 'a szkript hibát dobott: TypeError: a fetch csak http: és https: címet fogad, ez file: séma',
       });
       await expect(
-        runScript(request('try { await fetch("ftp://x/"); } catch (e) { return e instanceof Error; }')),
+        run(request('try { await fetch("ftp://x/"); } catch (e) { return e instanceof Error; }')),
       ).resolves.toStrictEqual({ kind: 'succeeded', output: true });
     });
 
     it('cím nélkül TypeError, a beállítás dobó gettere a sandboxban dob', async () => {
-      await expect(runScript(request('await fetch(); return 1;'))).resolves.toMatchObject({
+      await expect(run(request('await fetch(); return 1;'))).resolves.toMatchObject({
         message: 'a szkript hibát dobott: TypeError: a fetch címe szöveg kell legyen',
       });
       await expect(
-        runScript(
-          request(`await fetch("${target.origin}/hello", { get method() { throw new RangeError("rossz"); } });`),
-        ),
+        run(request(`await fetch("${target.origin}/hello", { get method() { throw new RangeError("rossz"); } });`)),
       ).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_evaluation_failed',
@@ -206,7 +210,7 @@ describe('installHostFunctions', () => {
     it('a lépés memória korlátjánál hosszabb válasz törzs elkapható TypeError, a gazda nem olvassa végig (T-015-12)', async () => {
       const source = `try { await fetch("${target.origin}/big"); return "olvasva"; } catch (e) { return e.name + ": " + e.message; }`;
       await expect(
-        runScript(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
+        run(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
       ).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 'TypeError: a válasz törzse nagyobb, mint a lépés olvasási plafonja (fetchResponseLimitMb)',
@@ -216,7 +220,7 @@ describe('installHostFunctions', () => {
     it('a 300 MB-os válasz az alapértelmezett olvasási plafonon (50 MB) elkapható TypeError, a gazda nem olvassa végig, és a szerver folyamat fut tovább (SPEC-014 5.4)', async () => {
       hugeResponse.writtenBytes = 0;
       const source = `try { await fetch("${target.origin}/huge"); return "olvasva"; } catch (e) { return e.name + ": " + e.message; }`;
-      const result = await runScript(
+      const result = await run(
         request(source, { memoryLimitMb: null, fetchResponseLimitMb: null, fileReadLimitMb: null }),
       );
       expect(result).toStrictEqual({
@@ -224,7 +228,7 @@ describe('installHostFunctions', () => {
         output: 'TypeError: a válasz törzse nagyobb, mint a lépés olvasási plafonja (fetchResponseLimitMb)',
       });
       expect(hugeResponse.writtenBytes).toBeLessThan(HUGE_RESPONSE_MB * 2 ** 20);
-      await expect(runScript(request('return 1;'))).resolves.toStrictEqual({ kind: 'succeeded', output: 1 });
+      await expect(run(request('return 1;'))).resolves.toStrictEqual({ kind: 'succeeded', output: 1 });
     });
 
     it('a csomópont fetchResponseLimitMb mezője felülírja az alapértéket, a fájl plafonját nem érinti', async () => {
@@ -233,12 +237,12 @@ describe('installHostFunctions', () => {
         `const out = []; try { await fetch("${target.origin}/big"); out.push("olvasva"); } catch (e) { out.push(e.name); }` +
         ' out.push((await files.readText("ket-mb.txt")).length); return out;';
       await expect(
-        runScript(request(source, { memoryLimitMb: 64, fetchResponseLimitMb: 1, fileReadLimitMb: null })),
+        run(request(source, { memoryLimitMb: 64, fetchResponseLimitMb: 1, fileReadLimitMb: null })),
       ).resolves.toStrictEqual({ kind: 'succeeded', output: ['TypeError', 2 * 2 ** 20] });
     });
 
     it('a határidőn függő válasz script_timed_out, és a kérés megszakad', async () => {
-      const running = runScript(request(`await fetch("${target.origin}/hang"); return 1;`, { timeoutMs: 300 }));
+      const running = run(request(`await fetch("${target.origin}/hang"); return 1;`, { timeoutMs: 300 }));
       const { closed } = await nextHangingRequest();
       await expect(running).resolves.toStrictEqual({
         kind: 'failed',
@@ -247,24 +251,13 @@ describe('installHostFunctions', () => {
       });
       await closed;
     });
-
-    it('a kérés külső megszakítása aborted, és a folyamatban lévő kérés megszakad', async () => {
-      const controller = new AbortController();
-      const running = runScript(
-        request(`await fetch("${target.origin}/hang"); return 1;`, { signal: controller.signal, timeoutMs: 60_000 }),
-      );
-      const { closed } = await nextHangingRequest();
-      controller.abort();
-      await expect(running).resolves.toStrictEqual({ kind: 'aborted' });
-      await closed;
-    });
   });
 
   describe('files', () => {
     it('ír, olvas és listáz a cwd gyökér alatt', async () => {
       const source =
         'await files.writeText("a.txt", "árvíztűrő"); const text = await files.readText("a.txt"); const names = await files.list("."); return { text, names };';
-      await expect(runScript(request(source))).resolves.toStrictEqual({
+      await expect(run(request(source))).resolves.toStrictEqual({
         kind: 'succeeded',
         output: { text: 'árvíztűrő', names: ['a.txt'] },
       });
@@ -276,7 +269,7 @@ describe('installHostFunctions', () => {
       const source =
         'try { await files.readText("nagy.txt"); return "olvasva"; } catch (e) { return e.name + ": " + e.message; }';
       await expect(
-        runScript(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
+        run(request(source, { memoryLimitMb: 16, fetchResponseLimitMb: null, fileReadLimitMb: null })),
       ).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 'Error: a fájl nagyobb, mint a lépés olvasási plafonja (fileReadLimitMb): nagy.txt',
@@ -290,7 +283,7 @@ describe('installHostFunctions', () => {
       const source =
         'try { await files.readText("ritka.bin"); return "olvasva"; } catch (e) { return e.name + ": " + e.message; }';
       await expect(
-        runScript(request(source, { memoryLimitMb: null, fetchResponseLimitMb: null, fileReadLimitMb: null })),
+        run(request(source, { memoryLimitMb: null, fetchResponseLimitMb: null, fileReadLimitMb: null })),
       ).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 'Error: a fájl nagyobb, mint a lépés olvasási plafonja (fileReadLimitMb): ritka.bin',
@@ -300,26 +293,26 @@ describe('installHostFunctions', () => {
     it('a csomópont fileReadLimitMb mezője felülírja az alapértéket: 1 MB-on a 2 MB-os fájl hiba, 3 MB-on olvasható', async () => {
       await writeFile(path.join(fixtureDirectory.root, 'ket-mb.txt'), Buffer.alloc(2 * 2 ** 20, 'a'));
       const source = 'try { return (await files.readText("ket-mb.txt")).length; } catch (e) { return e.name; }';
-      await expect(runScript(request(source, { fileReadLimitMb: 1 }))).resolves.toStrictEqual({
+      await expect(run(request(source, { fileReadLimitMb: 1 }))).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 'Error',
       });
-      await expect(runScript(request(source, { fileReadLimitMb: 3 }))).resolves.toStrictEqual({
+      await expect(run(request(source, { fileReadLimitMb: 3 }))).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 2 * 2 ** 20,
       });
     });
 
     it('a .. kivezetés és az abszolút útvonal elutasítva, a hibaüzenetben a gazda gyökere nincs', async () => {
-      const outside = await runScript(request('await files.readText("../kint/titok.txt");'));
+      const outside = await run(request('await files.readText("../kint/titok.txt");'));
       expect(outside).toStrictEqual({
         kind: 'failed',
         errorKind: 'script_evaluation_failed',
         message: 'a szkript hibát dobott: Error: az útvonal a hozzáférés gyökerén kívülre mutat: ../kint/titok.txt',
       });
-      const absolute = await runScript(request(`await files.list(${JSON.stringify(fixtureDirectory.base)});`));
+      const absolute = await run(request(`await files.list(${JSON.stringify(fixtureDirectory.base)});`));
       expect(absolute).toMatchObject({ kind: 'failed', errorKind: 'script_evaluation_failed' });
-      const missing = await runScript(request('await files.readText("nincs.txt");'));
+      const missing = await run(request('await files.readText("nincs.txt");'));
       expect(missing).toStrictEqual({
         kind: 'failed',
         errorKind: 'script_evaluation_failed',
@@ -334,11 +327,11 @@ describe('installHostFunctions', () => {
         path.join(fixtureDirectory.root, 'link.txt'),
       );
       await symlink(path.join(fixtureDirectory.base, 'kint'), path.join(fixtureDirectory.root, 'kint-link'));
-      await expect(runScript(request('return await files.readText("link.txt");'))).resolves.toMatchObject({
+      await expect(run(request('return await files.readText("link.txt");'))).resolves.toMatchObject({
         kind: 'failed',
         message: 'a szkript hibát dobott: Error: az útvonal a hozzáférés gyökerén kívülre mutat: link.txt',
       });
-      await expect(runScript(request('await files.writeText("kint-link/uj.txt", "x");'))).resolves.toMatchObject({
+      await expect(run(request('await files.writeText("kint-link/uj.txt", "x");'))).resolves.toMatchObject({
         kind: 'failed',
         message: 'a szkript hibát dobott: Error: az útvonal a hozzáférés gyökerén kívülre mutat: kint-link/uj.txt',
       });
@@ -349,7 +342,7 @@ describe('installHostFunctions', () => {
     });
 
     it('a null cwd gyökere a szerver folyamat munkakönyvtára (csak listázás)', async () => {
-      const result = await runScript(request('return await files.list(".");', { cwd: null }));
+      const result = await run(request('return await files.list(".");', { cwd: null }));
       expect(result).toStrictEqual({ kind: 'succeeded', output: readdirSync(process.cwd()) });
     });
   });
@@ -358,7 +351,7 @@ describe('installHostFunctions', () => {
     it('a várt gazda hívás utáni gazdára kijutó hiba script_evaluation_failed', async () => {
       const source =
         'await files.list("."); let o = {}; let c = o; for (let i = 0; i < 1e5; i++) { c.x = {}; c = c.x; } return JSON.stringify(o);';
-      await expect(runScript(request(source))).resolves.toStrictEqual({
+      await expect(run(request(source))).resolves.toStrictEqual({
         kind: 'failed',
         errorKind: 'script_evaluation_failed',
         message: 'a szkript futása a gazda oldalon megszakadt (RangeError)',
@@ -366,11 +359,11 @@ describe('installHostFunctions', () => {
     });
 
     it('a nem várt gazda hívás késői eredménye a lebontás után nem dob, és a következő lépés hibátlan', async () => {
-      await expect(runScript(request('files.list("."); return 1;'))).resolves.toStrictEqual({
+      await expect(run(request('files.list("."); return 1;'))).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 1,
       });
-      await expect(runScript(request('return (await files.list(".")).length;'))).resolves.toStrictEqual({
+      await expect(run(request('return (await files.list(".")).length;'))).resolves.toStrictEqual({
         kind: 'succeeded',
         output: 0,
       });
