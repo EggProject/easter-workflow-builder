@@ -859,7 +859,7 @@ szöveget fogad (`/^[\da-f]{64}$/`, a `$` kapcsoló nélkül a záró sortörés
 `graph-snapshot-hash.ts` névleges (brand) `GraphSnapshotHash` típusára szűkít, `as` nélkül.
 Bekötési pont: a `toWorkflowRunRecord` az `isProviderId`, `isRunStatus` és `isStringArray` mellett
 ezzel a guarddal ellenőrzi a `workflow_run.graph_snapshot_hash` oszlopot olvasáskor
-(`getRun`, `listRuns`, `listRunsForWorkflow` és a `mark*` átmenetek visszaadott rekordja). A
+(`startRun`, `getRun`, `listRuns`, `listRunsForWorkflow` és a `mark*` átmenetek visszaadott rekordja). A
 `graph_snapshot.hash` oszlopon nincs DB szintű `CHECK`, tehát egy rossz alakú lenyomat (például
 nagybetűs vagy rövidebb) korrupt sor, és `invalid_graph_snapshot_hash` hibaágat ad. A hibaág
 tesztje valós `:memory:` adatbázison, bekapcsolt idegen kulccsal fut: a rossz alakú lenyomathoz
@@ -867,18 +867,20 @@ tartozó `graph_snapshot` sor is létezik (`workflow-run-repository.spec.ts`). A
 kizárólag a `computeSnapshotHash` állítja elő, és semmilyen exportált művelet nem fogad lenyomat
 szöveget bemenetként.
 
-**NYITOTT PONT: a `WorkflowRunRecord.graphSnapshotHash` típusa nyers `string` marad.**
-
-- **Mi a viselkedés addig.** A rekord mezője `string`; a guard olvasáskor elutasítja a rossz alakú
-  értéket, de a szűkített `GraphSnapshotHash` típus nem jut ki a rekordba.
-- **Miért nem szűkíthető ma kerülő út nélkül.** A `startRun` a visszaadott rekordot a beszúrt
-  sorból építi, a lenyomata pedig a `computeSnapshotHash` `string` kimenete. A névleges típushoz ott
-  vagy `as` kellene (tilos), vagy egy guard ág, ami sosem futna (tilos, 100 százalékos kizárás
-  nélküli lefedettség), vagy a `startRun` újraolvasása a `toWorkflowRunRecord`-on át, ami
-  tervezési döntés a `startRun` szerkezetéről. A rekordot fixtúraként építő `engine`, `server` és
-  `protocol` tesztek típusa is érintett lenne.
-- **Mi zárná le.** Döntés arról, hogy a `startRun` rekordja is a `toWorkflowRunRecord`-on át
-  készüljön-e (egy újraolvasással), és ezzel a mező típusa `GraphSnapshotHash` legyen-e.
+**A `WorkflowRunRecord.graphSnapshotHash` mező típusa a `GraphSnapshotHash` névleges típus (a PR #78
+nyitott pontja lezárva, technikai döntés).** A `startRun` a beszúrt sort a `RETURNING` záradékkal
+kapja vissza (`insert(...).values(row).returning().get()`), és a visszaadott rekordot ugyanazon a
+`toWorkflowRunRecord` úton építi, mint minden olvasás, tehát a lenyomat a guard szűkítésével jut a
+rekordba, `as` nélkül. A választás indoka: a másik út (a `computeSnapshotHash` maga adjon
+`GraphSnapshotHash` értéket egy guardon át) olyan hibaágat vinne be, ami a `sha256` hexadecimális
+kimenetén sosem futna, és ezt a 100 százalékos, kizárás nélküli lefedettség tiltja; a `RETURNING`
+úton viszont nincs új ág, mert a Drizzle `.returning().get()` deklarált típusa a sor `undefined`
+nélkül, a `toWorkflowRunRecord` hibaágait pedig a meglévő olvasási tesztek fedik. Mellékhatásként
+megszűnt a `startRun` kézzel épített rekord literálja, ami a beszúrt sor mezőit ismételte. A
+`GraphSnapshotHash` típus és az `isGraphSnapshotHash` guard a barrelben is szerepel, mert a mező a
+publikus felület része: a fogyasztó csomag (az `engine` és az `apps/server` rekord fixtúrái) a
+guarddal állít elő ilyen értéket. Védelem: a `workflow-run-repository.spec.ts` `startRun` tesztje
+típusszinten (`expectTypeOf`) és futásidőben is ellenőrzi a mezőt.
 
 **A `vitest.config.ts` `coverage.exclude` listáján van egy `packages/db` specifikus bejegyzés,
 de az NEM SPEC-003 eredetű, és semmire nem illeszkedik.** A `'packages/db/**/migrations/**'` sor

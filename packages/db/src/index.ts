@@ -105,6 +105,12 @@ export type {
 // futás indításakor (SPEC-004 4.8 5. lépés), tehát a `version` mezőt nem
 // beégetett számként, hanem ebből a konstansból tölti.
 export { GRAPH_DOCUMENT_VERSION } from './graph-snapshot/snapshot-document/graph-snapshot-document.ts';
+// A pillanatkép lenyomat névleges típusa és guardja (SPEC-003 9.4): a
+// `WorkflowRunRecord.graphSnapshotHash` mező típusa, tehát a publikus felület része, és
+// a fogyasztó csomag (például egy teszt fixtúra) csak a guarddal állíthat elő ilyen
+// értéket, `as` nélkül.
+export type { GraphSnapshotHash } from './graph-snapshot/snapshot-hash/graph-snapshot-hash.ts';
+export { isGraphSnapshotHash } from './graph-snapshot/snapshot-hash/is-graph-snapshot-hash.ts';
 
 // workflow-run: a WorkflowRunRepository publikus felülete (T-003-16). A
 // factory függvényt (`createWorkflowRunRepository`) szándékosan nem
