@@ -146,7 +146,7 @@ describe('findBlankRequiredTextField', () => {
         type: 'error_handler',
         maxAttempts: 3,
         backoffMs: [1000],
-        handledErrorKinds: [''],
+        handledErrorKinds: [],
         onUnhandledError: null,
       }),
     ).toBeUndefined();

@@ -1,7 +1,7 @@
 /**
  * `string[]` mező és egy soronkénti listát hordozó `<textarea>` értéke
  * közötti oda-vissza leképezés (`allowedTools`, `disallowedTools`,
- * `additionalDirectories`, `handledErrorKinds` és hasonló listás mezők
+ * `additionalDirectories` és hasonló listás mezők
  * közös szerkesztő mintája a `node-inspector` témában).
  */
 export function toStringListFieldValue(value: readonly string[]): string {

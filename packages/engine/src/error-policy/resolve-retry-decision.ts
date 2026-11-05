@@ -40,7 +40,10 @@ export interface ResolveRetryDecisionInput {
 export function resolveRetryDecision(input: ResolveRetryDecisionInput): RetryDecision {
   const { config, failedAttempt } = input;
 
-  if (config.handledErrorKinds.length > 0 && !config.handledErrorKinds.includes(input.failedErrorKind)) {
+  // A lista elemei a `HandledErrorKind` zárt unió tagjai (O-5), a bukott lépés
+  // osztálya bármely `EngineErrorKind` lehet: a keresés ezért szöveghalmazon megy.
+  const handledErrorKinds = new Set<string>(config.handledErrorKinds);
+  if (handledErrorKinds.size > 0 && !handledErrorKinds.has(input.failedErrorKind)) {
     return { kind: 'unhandled_error_kind' };
   }
 

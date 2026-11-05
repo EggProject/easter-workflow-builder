@@ -1,7 +1,16 @@
 /* eslint-disable unicorn/no-null -- a WorkflowRunRecord mezői valódi Date | null és string | null típusúak */
 import { describe, expect, it } from 'vitest';
-import type { WorkflowRunRecord } from '@easter-workflow-builder/db';
+import { isGraphSnapshotHash, type GraphSnapshotHash, type WorkflowRunRecord } from '@easter-workflow-builder/db';
 import { toRunSummary } from './to-run-summary.ts';
+
+// Egy tetszőleges, de érvényes alakú pillanatkép lenyomat a rekord fixtúrához: a
+// `GraphSnapshotHash` névleges típus, tehát `as` nélkül csak a guard adhatja.
+function snapshotHashOf(text: string): GraphSnapshotHash {
+  if (!isGraphSnapshotHash(text)) {
+    throw new Error(`a teszt lenyomata érvénytelen alakú: ${text}`);
+  }
+  return text;
+}
 
 const BASE_RECORD: WorkflowRunRecord = {
   id: 'run-1',
@@ -12,7 +21,7 @@ const BASE_RECORD: WorkflowRunRecord = {
   rootRunId: 'run-1',
   depth: 0,
   workflowAncestry: [],
-  graphSnapshotHash: 'hash',
+  graphSnapshotHash: snapshotHashOf('a'.repeat(64)),
   persistedStreamDeltas: false,
   restartedFromRunId: null,
   createdAtMs: new Date(1000),

@@ -68,6 +68,11 @@ export type { JavaScriptScriptConfig } from './workflow-graph/node-config/javasc
 // A Start bemeneti mező értéktípusa (SPEC-016 5.1): az `apps/server` `enum-drift-protection`
 // témája a `protocol` párjával veti össze, a motor a futás indításakor ez alapján ellenőriz.
 export type { StartInputValueKind } from './workflow-graph/node-config/start-input-value-kind.ts';
+// Az `error_handler` kezelt hibafajtáinak zárt uniója (SPEC-004 8.2, O-5): az `apps/server`
+// `handled-error-kind-drift-protection` témája a `protocol` párjával és a motor
+// `EngineErrorKind` uniójával veti össze. A guard nem kerül ki: a futásidejű ág az
+// `isNodeConfig` guardon át megy.
+export type { HandledErrorKind } from './workflow-graph/node-config/handled-error-kind.ts';
 // A kötelező szöveg mezők táblája (SPEC-008 5.4, O-21): a `replaceGraph` írás oldali
 // ellenőrzése ebből dolgozik, és az `apps/server` `node-config-drift-protection` témája
 // ezt veti össze a `protocol` mentési sémájának táblájával.
@@ -100,6 +105,12 @@ export type {
 // futás indításakor (SPEC-004 4.8 5. lépés), tehát a `version` mezőt nem
 // beégetett számként, hanem ebből a konstansból tölti.
 export { GRAPH_DOCUMENT_VERSION } from './graph-snapshot/snapshot-document/graph-snapshot-document.ts';
+// A pillanatkép lenyomat névleges típusa és guardja (SPEC-003 9.4): a
+// `WorkflowRunRecord.graphSnapshotHash` mező típusa, tehát a publikus felület része, és
+// a fogyasztó csomag (például egy teszt fixtúra) csak a guarddal állíthat elő ilyen
+// értéket, `as` nélkül.
+export type { GraphSnapshotHash } from './graph-snapshot/snapshot-hash/graph-snapshot-hash.ts';
+export { isGraphSnapshotHash } from './graph-snapshot/snapshot-hash/is-graph-snapshot-hash.ts';
 
 // workflow-run: a WorkflowRunRepository publikus felülete (T-003-16). A
 // factory függvényt (`createWorkflowRunRepository`) szándékosan nem

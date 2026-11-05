@@ -10,7 +10,10 @@
  * nem hiba. Egy bővítéskor az `isEngineErrorKind` guard `ENGINE_ERROR_KIND_KEYS`
  * rekordja és a `format-engine-error-message.spec.ts` teszt listája is
  * kötelezően bővül, mert a `Record<EngineErrorKind, true>` annotáció ezt
- * fordítási hibával kikényszeríti.
+ * fordítási hibával kikényszeríti. Ha az új osztály lépés szintű hiba, ami az
+ * `on_error` élen a kezelőig eljut, a felvétele az `error_handler` zárt
+ * listájára (a `db` `HandledErrorKind` és a `protocol` `HandledErrorKindSchema`)
+ * külön döntés (SPEC-004 8.2 1. pont, O-5).
  */
 export type EngineErrorKind =
   // 4.6: a `loop` node visszaéle és a gráf alak validációja

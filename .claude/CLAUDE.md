@@ -159,6 +159,16 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   (5.7) szintén motor osztály, a részhalmaz szabály alá esik; az `unimplemented_node_type` osztály
   a szkript végrehajtásával megszűnt, a szótárból és a motor uniójából is törölve (SPEC-014 8.
   kritérium 1., PLAN-015 T-015-5).
+- **A `protocol` a `db` `HandledErrorKind` unióját is duplikálhatja, ugyanezzel a védelemmel, és az
+  unió a motor `EngineErrorKind` uniójának részhalmaza.** Az `error_handler` `handledErrorKinds` mezője zárt
+  lista: a motor azon hibaosztályai, amik egy lépés hibájaként az `on_error` élen a kezelőig eljutnak
+  (SPEC-004 8.2 1. pont, a kiválasztás indoka osztályonként ott áll). A `db` guard (az `isNodeConfig` guardon
+  át) és a `protocol` olvasó és mentési sémája a listán kívüli értéket elutasítja, visszafelé kompatibilitási
+  ág nélkül. A védelem helye az `apps/server` `handled-error-kind-drift-protection` témája: a `protocol` és a
+  `db` uniójának kétirányú típusszintű egyenlősége, a `db` uniójának részhalmaz viszonya az `EngineErrorKind`
+  unióhoz, plusz futásidejű ág a motor `isEngineErrorKind` és a `db` `isNodeConfig` guardján (user döntés
+  2026-11-04, "Zárt lista", SPEC-004 O-5). Új, lépés szintű motor hibaosztály felvétele a listára külön döntés;
+  ha felkerül, a két felsorolás, a szerkesztő felirat táblája és ez a teszt együtt változik.
 - **A `protocol` a `db` írás oldali "kötelező szöveg mező" szabályát is duplikálhatja, ugyanezzel a
   védelemmel.** A kötelező (nem nullázható, a beállítás panelen szerkesztett) szöveg mezők listája a
   `protocol` mentési sémájában és a `db` `replaceGraph` ellenőrzésében is áll, mindkét oldalon

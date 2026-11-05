@@ -1,7 +1,14 @@
 /* eslint-disable unicorn/no-null -- a `WorkflowRunRecord` és a `RunCompletion` nullázható mezői (SPEC-003 4.8, SPEC-004 8.4) valódi `null` értéket hordoznak */
 import { describe, expect, it } from 'vitest';
 import type { Outcome } from '@easter-workflow-builder/core';
-import type { NodeType, SnapshotEdge, SnapshotNode, WorkflowRunRecord } from '@easter-workflow-builder/db';
+import type {
+  GraphSnapshotHash,
+  NodeType,
+  SnapshotEdge,
+  SnapshotNode,
+  WorkflowRunRecord,
+} from '@easter-workflow-builder/db';
+import { isGraphSnapshotHash } from '@easter-workflow-builder/db';
 import type { RunCompletion } from '../error-policy/run-completion.ts';
 import type { ExecutedStepInstance } from '../run-context/executed-step-instance.ts';
 import { buildExecutableGraph } from '../run-graph/build-executable-graph.ts';
@@ -29,6 +36,15 @@ const COMPLETION: Outcome<RunCompletion> = {
   value: { status: 'succeeded', errorKind: null, errorMessage: null, failedBranchCount: 0 },
 };
 
+// Egy tetszőleges, de érvényes alakú pillanatkép lenyomat a rekord fixtúrához: a
+// `GraphSnapshotHash` névleges típus, tehát `as` nélkül csak a guard adhatja.
+function snapshotHashOf(text: string): GraphSnapshotHash {
+  if (!isGraphSnapshotHash(text)) {
+    throw new Error(`a teszt lenyomata érvénytelen alakú: ${text}`);
+  }
+  return text;
+}
+
 const RUN: Outcome<WorkflowRunRecord> = {
   kind: 'ok',
   value: {
@@ -40,7 +56,7 @@ const RUN: Outcome<WorkflowRunRecord> = {
     rootRunId: 'run-0',
     depth: 1,
     workflowAncestry: ['wf-szulo', 'wf'],
-    graphSnapshotHash: 'hash',
+    graphSnapshotHash: snapshotHashOf('a'.repeat(64)),
     persistedStreamDeltas: false,
     restartedFromRunId: null,
     createdAtMs: new Date(0),

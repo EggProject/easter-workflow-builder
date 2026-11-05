@@ -6,6 +6,7 @@ import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { isStringArray } from '@easter-workflow-builder/typeguards';
 import { canonicalizeSnapshotDocument } from '../graph-snapshot/snapshot-hash/canonicalize-snapshot-document.ts';
 import { computeSnapshotHash } from '../graph-snapshot/snapshot-hash/compute-snapshot-hash.ts';
+import type { GraphSnapshotHash } from '../graph-snapshot/snapshot-hash/graph-snapshot-hash.ts';
 import { isGraphSnapshotHash } from '../graph-snapshot/snapshot-hash/is-graph-snapshot-hash.ts';
 import { resolveSnapshotReuse } from '../graph-snapshot/stored-snapshot/resolve-snapshot-reuse.ts';
 import { readGraphSnapshot } from '../graph-snapshot/snapshot-document/read-graph-snapshot.ts';
@@ -79,7 +80,7 @@ export interface WorkflowRunRecord {
   readonly rootRunId: string;
   readonly depth: number;
   readonly workflowAncestry: readonly string[];
-  readonly graphSnapshotHash: string;
+  readonly graphSnapshotHash: GraphSnapshotHash;
   readonly persistedStreamDeltas: boolean;
   readonly restartedFromRunId: string | null;
   readonly createdAtMs: Date;
@@ -158,10 +159,11 @@ function toWorkflowRunRecord(row: typeof workflowRunTable.$inferSelect): Outcome
       message: `A(z) "${row.id}" futás workflow_ancestry mezője nem szövegtömb (corrupt_workflow_ancestry).`,
     };
   }
-  if (!isGraphSnapshotHash(row.graphSnapshotHash)) {
+  const graphSnapshotHash = row.graphSnapshotHash;
+  if (!isGraphSnapshotHash(graphSnapshotHash)) {
     return {
       kind: 'error',
-      message: `A(z) "${row.id}" futás graph_snapshot_hash mezője érvénytelen: "${row.graphSnapshotHash}" (invalid_graph_snapshot_hash).`,
+      message: `A(z) "${row.id}" futás graph_snapshot_hash mezője érvénytelen: "${graphSnapshotHash}" (invalid_graph_snapshot_hash).`,
     };
   }
   return {
@@ -175,7 +177,7 @@ function toWorkflowRunRecord(row: typeof workflowRunTable.$inferSelect): Outcome
       rootRunId: row.rootRunId,
       depth: row.depth,
       workflowAncestry,
-      graphSnapshotHash: row.graphSnapshotHash,
+      graphSnapshotHash,
       persistedStreamDeltas: row.persistedStreamDeltas,
       restartedFromRunId: row.restartedFromRunId,
       createdAtMs: row.createdAtMs,
@@ -346,7 +348,13 @@ export function createWorkflowRunRepository(
         createdAtMs: now,
       };
 
-      database.insert(workflowRunTable).values(row).run();
+      // A beszúrt sor a `RETURNING` záradékkal jön vissza, és a visszaadott rekord
+      // ugyanazon a `toWorkflowRunRecord` úton készül, mint minden olvasásnál:
+      // így a `graphSnapshotHash` mező a guarddal szűkített `GraphSnapshotHash`
+      // típust kapja, `as` és sosem futó ág nélkül (a guard ágait a meglévő
+      // olvasási tesztek fedik). A Drizzle `.returning().get()` deklarált típusa
+      // a sor, `undefined` nélkül, tehát itt nincs mit ágaztatni.
+      const inserted = database.insert(workflowRunTable).values(row).returning().get();
 
       // A `run_started` esemény írása, ugyanabban a tranzakcióban, mint a
       // fenti futás sor (SPEC-003 6.6 szekció, T-003-21 zárja le a T-003-16
@@ -390,33 +398,7 @@ export function createWorkflowRunRepository(
         },
       });
 
-      return {
-        kind: 'ok',
-        value: {
-          id: row.id,
-          workflowId: row.workflowId,
-          status: row.status,
-          input: row.input,
-          providerId: row.providerId,
-          rootRunId: row.rootRunId,
-          depth: row.depth,
-          workflowAncestry: row.workflowAncestry,
-          graphSnapshotHash: row.graphSnapshotHash,
-          persistedStreamDeltas: row.persistedStreamDeltas,
-          restartedFromRunId: row.restartedFromRunId,
-          createdAtMs: row.createdAtMs,
-          // A frissen létrehozott sor még egyik időbélyeget vagy hiba mezőt
-          // sem tölti ki (7.1 táblázat: `pending` a kezdő állapot), a `null`
-          // itt a `WorkflowRunRecord` nullázható mezőinek valódi kezdő
-          // értéke, nem helyőrző.
-          /* eslint-disable unicorn/no-null -- lásd a fenti indoklást */
-          startedAtMs: null,
-          finishedAtMs: null,
-          errorKind: null,
-          errorMessage: null,
-          /* eslint-enable unicorn/no-null */
-        },
-      };
+      return toWorkflowRunRecord(inserted);
     });
   }
 

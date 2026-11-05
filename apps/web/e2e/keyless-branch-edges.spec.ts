@@ -111,7 +111,7 @@ const ERROR_HANDLER_CONFIG: NodeConfig = {
   type: 'error_handler',
   maxAttempts: 3,
   backoffMs: [1000],
-  handledErrorKinds: ['timeout'],
+  handledErrorKinds: ['provider_call_failed'],
   onUnhandledError: null,
 };
 
