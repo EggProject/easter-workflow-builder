@@ -426,6 +426,12 @@ szkript csomópont futtatója QuickJS WebAssembly sandboxban fut (`quickjs-emscr
   használunk (SPEC-001 6.).
 - **Titok soha nem kerül adatbázisba vagy gitbe.** A DB csak env változó **nevet** tárol
   (gyökér `CLAUDE.md`, SPEC-003 9.3).
+- **A szerver minden kérése a kérés forrás ellenőrzésen megy át** (user döntés 2026-11-04, "Host és Origin
+  ellenőrzés", SPEC-017): a `Host` a helyi név és a kapcsolat portja, a böngészős kérés forrása a felület
+  egyetlen engedett originje (`EASTER_STREAM_DEV_ORIGIN`, hiányában `http://localhost:5173`). Új végpont, új
+  útvonal ág vagy a `STREAM_PATH` mellé kerülő külön kiszolgálás sem kerülheti meg: az ellenőrzés a
+  `createHttpServer` első lépése, az útvonal illesztése előtt. Bejelentkezés nincs, a CORS szabály változatlan
+  (SPEC-006 5.7, 5.8).
 
 ---
 
@@ -1566,30 +1572,31 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ## 13. Hol keresd a részleteket
 
-| Téma                                                                        | Forrás                                                                                                                                                              |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| provider drótszintű mérés, `ProviderCapabilityDescriptor` típusterv         | `docs/spec/SPEC-000-provider-wire-measurement.md`                                                                                                                   |
-| a mérések kiértékelése, tervezési következmények                            | `docs/research/2026-08-26-spec000-kiertekeles.md`, `...-meresi-jegyzokonyv.md`                                                                                      |
-| monorepo, toolchain, ESLint szabályok, CI, wrapperek                        | `docs/spec/SPEC-001-monorepo-toolchain.md`                                                                                                                          |
-| a SPEC-001 ellenőrzési pontjai (V-1 ... V-20), mérésekkel                   | `docs/research/2026-08-26-spec001-ellenorzesek.md`                                                                                                                  |
-| csomag architektúra, mappa és csomagnév konvenció                           | `docs/spec/SPEC-002-csomag-architektura.md`, 6. szekció                                                                                                             |
-| domain modell, perzisztencia, állapotgépek, repository réteg                | `docs/spec/SPEC-003-domain-perzisztencia.md`                                                                                                                        |
-| a `packages/db` belső szerkezetének bontási terve                           | `docs/plan/PLAN-004-csomag-belso-szerkezet.md`                                                                                                                      |
-| rögzített verziók és a mögöttük álló okok                                   | `docs/research/2026-08-26-toolchain.md`                                                                                                                             |
-| tároló motor kiértékelés, méretmérések                                      | `docs/research/2026-08-27-tarolo-motor-ertekeles.md`                                                                                                                |
-| SDK session log kontra `run_event` és `graph_snapshot`                      | `docs/research/2026-08-28-sdk-session-log.md`                                                                                                                       |
-| Playwright e2e teszt szabályok, a 15 tételes szabálylista                   | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                                                                                                            |
-| az SSE mockolás mérése, a hibrid döntés bizonyítéka                         | `docs/research/2026-08-30-sse-mockolas-meres.md`                                                                                                                    |
-| az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése          | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                                                                                                               |
-| a gráf éleinek kifestett vonala, a bisect és a pixel mérés                  | `docs/research/2026-09-09-graf-el-vonal-meres.md`                                                                                                                   |
-| a select chevron helyének mérése, a React kontra natív ág döntése           | `docs/research/2026-09-09-select-chevron-meres.md`                                                                                                                  |
-| a transcript panel: keret veszteség, sormagasság, cím csonkolás             | `docs/research/2026-09-23-transcript-panel-meresek.md`                                                                                                              |
-| a csomópontok élő állapota, a löketben érkező keretek mérése                | `docs/research/2026-09-23-elo-csomopont-allapot.md`                                                                                                                 |
-| a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek             | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                                                                                                         |
-| a sablon nyelv (Mustache) és a kifejezés nyelv (CEL) implementációja        | `docs/spec/SPEC-010-sablon-es-kifejezes-nyelv.md`                                                                                                                   |
-| a Beállítások képernyő, a skill könyvtár, a központi MCP lista, az izoláció | `docs/spec/SPEC-009-beallitasok-es-agent-konfiguracio.md`, `docs/research/2026-10-26-spec-009-forrasok.md`, `docs/research/2026-10-28-spec-009-blokkolo-meresek.md` |
-| a sablon és kifejezés nyelv jelöltjei, csomagjai, forrásai                  | `docs/research/2026-09-23-sablon-es-kifejezes-nyelv.md`, `...-csomagok.md`                                                                                          |
-| egy konkrét csomag felelőssége, fájljai, saját szabályai                    | az adott csomag gyökerének `CLAUDE.md` fájlja                                                                                                                       |
+| Téma                                                                          | Forrás                                                                                                                                                              |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| provider drótszintű mérés, `ProviderCapabilityDescriptor` típusterv           | `docs/spec/SPEC-000-provider-wire-measurement.md`                                                                                                                   |
+| a mérések kiértékelése, tervezési következmények                              | `docs/research/2026-08-26-spec000-kiertekeles.md`, `...-meresi-jegyzokonyv.md`                                                                                      |
+| monorepo, toolchain, ESLint szabályok, CI, wrapperek                          | `docs/spec/SPEC-001-monorepo-toolchain.md`                                                                                                                          |
+| a SPEC-001 ellenőrzési pontjai (V-1 ... V-20), mérésekkel                     | `docs/research/2026-08-26-spec001-ellenorzesek.md`                                                                                                                  |
+| csomag architektúra, mappa és csomagnév konvenció                             | `docs/spec/SPEC-002-csomag-architektura.md`, 6. szekció                                                                                                             |
+| domain modell, perzisztencia, állapotgépek, repository réteg                  | `docs/spec/SPEC-003-domain-perzisztencia.md`                                                                                                                        |
+| a `packages/db` belső szerkezetének bontási terve                             | `docs/plan/PLAN-004-csomag-belso-szerkezet.md`                                                                                                                      |
+| rögzített verziók és a mögöttük álló okok                                     | `docs/research/2026-08-26-toolchain.md`                                                                                                                             |
+| tároló motor kiértékelés, méretmérések                                        | `docs/research/2026-08-27-tarolo-motor-ertekeles.md`                                                                                                                |
+| SDK session log kontra `run_event` és `graph_snapshot`                        | `docs/research/2026-08-28-sdk-session-log.md`                                                                                                                       |
+| Playwright e2e teszt szabályok, a 15 tételes szabálylista                     | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                                                                                                            |
+| az SSE mockolás mérése, a hibrid döntés bizonyítéka                           | `docs/research/2026-08-30-sse-mockolas-meres.md`                                                                                                                    |
+| az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése            | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                                                                                                               |
+| a gráf éleinek kifestett vonala, a bisect és a pixel mérés                    | `docs/research/2026-09-09-graf-el-vonal-meres.md`                                                                                                                   |
+| a select chevron helyének mérése, a React kontra natív ág döntése             | `docs/research/2026-09-09-select-chevron-meres.md`                                                                                                                  |
+| a transcript panel: keret veszteség, sormagasság, cím csonkolás               | `docs/research/2026-09-23-transcript-panel-meresek.md`                                                                                                              |
+| a csomópontok élő állapota, a löketben érkező keretek mérése                  | `docs/research/2026-09-23-elo-csomopont-allapot.md`                                                                                                                 |
+| a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek               | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                                                                                                         |
+| a sablon nyelv (Mustache) és a kifejezés nyelv (CEL) implementációja          | `docs/spec/SPEC-010-sablon-es-kifejezes-nyelv.md`                                                                                                                   |
+| a Beállítások képernyő, a skill könyvtár, a központi MCP lista, az izoláció   | `docs/spec/SPEC-009-beallitasok-es-agent-konfiguracio.md`, `docs/research/2026-10-26-spec-009-forrasok.md`, `docs/research/2026-10-28-spec-009-blokkolo-meresek.md` |
+| a sablon és kifejezés nyelv jelöltjei, csomagjai, forrásai                    | `docs/research/2026-09-23-sablon-es-kifejezes-nyelv.md`, `...-csomagok.md`                                                                                          |
+| a szerver Host és Origin ellenőrzése (CSRF, DNS rebinding), források és mérés | `docs/spec/SPEC-017-host-origin-ellenorzes.md`, `docs/research/2026-11-05-host-origin-ellenorzes.md`                                                                |
+| egy konkrét csomag felelőssége, fájljai, saját szabályai                      | az adott csomag gyökerének `CLAUDE.md` fájlja                                                                                                                       |
 
 ---
 

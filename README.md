@@ -75,7 +75,8 @@ források a `docs/research/2026-10-26-helyi-inditas-es-valodi-proba.md` fájlban
 | `VITE_STREAM_REPLAY_LIMIT`             | `100`                   | a stream visszajátszás lapmérete, nem plafon                                                |
 
 Opcionális, alapérték nélkül: `EASTER_STREAM_DEV_ORIGIN` (hiányában a szerver nem küld CORS
-fejlécet; a minta `http://localhost:5173`), `EASTER_DB_FILE` (hiányában
+fejlécet; a minta `http://localhost:5173`; ugyanez a felület egyetlen engedett originje, hiányában
+`http://localhost:5173`, más originről jövő böngészős kérésre a szerver `403` választ ad, SPEC-017), `EASTER_DB_FILE` (hiányában
 `.data/easter-workflow-builder.sqlite`) és `EASTER_LOG_LEVEL` (hiányában a `pino` alapértéke).
 
 ## Providerek

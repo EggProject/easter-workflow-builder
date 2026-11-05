@@ -162,6 +162,9 @@ A `package.json` `dependencies` mezője **nem változik**: `core`, `protocol`, `
 2. **A cím nem konfigurálható.** Ha env változóból jönne, egy elgépelt vagy szándékosan átírt érték kinyitná a szervert a hálózatra, és a védelem egy környezeti változón múlna. A `127.0.0.1` a kódban áll, greppel ellenőrizhető kritériummal (13. szekció 6. pont), és `0.0.0.0`, `::` vagy hasonló érték a forrásban nem fordulhat elő.
 3. **Nincs hova tenni hitelesítést, és ez szándékos.** A szerver nem olvas `Authorization` fejlécet, nem állít sütit, és nem ismer tokent. Ha valaha távoli elérés kell, az új spec, hitelesítéssel.
 4. **A hibaüzenet nem visszhangozza a kapott értéket** (SPEC-005 8.4), és a napló sem (7.4).
+5. **A `127.0.0.1` kötés a böngészőn átjövő idegen kérés ellen nem véd** (CSRF, DNS rebinding; SPEC-009 11.
+   szekció kockázati sora). A szerver ezért minden kérésen ellenőrzi a `Host` fejlécet és a kérés forrását
+   (5.8, SPEC-017; user döntés 2026-11-04: "Host és Origin ellenőrzés", bejelentkezés nélkül).
 
 ### 3.6 Hogyan fut a szerver
 
@@ -336,6 +339,17 @@ A SPEC-005 8.3 táblázatának megvalósítása a szerver dolga. A leképezés t
 4. **A fejlesztői origin konkrét értéke konfiguráció, nem a spec része**, ezért sztringet nem adunk: a `EASTER_STREAM_DEV_ORIGIN` env változó **opcionális**, alapérték nélkül. Ha hiányzik, a szerver egyetlen CORS fejlécet sem küld, ami pontosan az 1. pont és a 13. szekció 8. kritériumának "nincs konfigurált origin" esete. A jelen pont korábban kötelezőnek nevezte a változót, ami ellentmondott az 1. pontnak, a 8. kritériumnak és a ténylegesen megírt kódnak (`apps/server/src/server-config/environment-variable-name.ts`); a SPEC-008 3.2 szekciója ezt a kód és az 1. pont javára oldotta fel.
 
 **A port és a fejlesztői elrendezés lezárva (2026-09-05, SPEC-008 3. szekció).** A user termékdöntése: a szerver portja `3001`, a Vite dev szerver az alapértelmezett `5173` porton marad, és a **dev REST hívás a Vite proxyn megy**. Ebből következően a fenti CORS hatókör **változatlan**: fejlesztéskor egyedül a stream jön más originről, tehát az engedélyt az `/api` előtagra nem kell kiterjeszteni. A port kötelező env változó marad, alapérték nélkül (`EASTER_SERVER_PORT`); a `3001` érték telepítési konfiguráció, nem literál a kódban.
+
+### 5.8 A kérés forrás ellenőrzés (SPEC-017)
+
+**Minden kérés, az SSE végpontot is beleértve, az útvonal illesztése és a törzs olvasása előtt a
+`request-source-check` témán megy át** (SPEC-017 5.1). A `Host` fejléc a `127.0.0.1` vagy a `localhost` név és a
+kapcsolat helyi portja kell legyen (SPEC-017 5.2); a kérés forrása az `Origin`, a `Sec-Fetch-Site` és a
+`Referer` fejléc szerint a felület engedett originje (SPEC-017 5.4). A felület engedett originje az
+`EASTER_STREAM_DEV_ORIGIN` értéke, hiányában a forrásolt `http://localhost:5173` (SPEC-017 5.3); a CORS
+szabály (5.7) ettől független és változatlan. Elutasításkor `403`, `forbidden` kód (SPEC-005 8.2), a kezelő
+nem fut. A fejlesztői Vite proxy, a közvetlen SSE kapcsolat és a próba eszköz kérései a szabály mellett
+változatlanul működnek (SPEC-017 8. szekció 4. és 5. kritérium, research `2026-11-05-host-origin-ellenorzes.md` 3. szekció).
 
 ## 6. Az SSE végpont
 

@@ -579,16 +579,17 @@ flowchart TD
 
 ### 8.4 A `ProtocolErrorCode` és a felhasználónak szánt szöveg
 
-A `protocol` csomag hat kódot ismer, és a `protocol-error-message` téma mindegyikhez egy magyar mondatot rendel. **A leképezés kimerítő `switch`**, tehát egy jövőbeli hetedik kód fordítási hibát ad (`switch-exhaustiveness-check`). A hatodik kód, a `service_unavailable`, 2026-09-23 óta létezik (SPEC-005 8.2).
+A `protocol` csomag hét kódot ismer, és a `protocol-error-message` téma mindegyikhez egy magyar mondatot rendel. **A leképezés kimerítő `switch`**, tehát egy jövőbeli nyolcadik kód fordítási hibát ad (`switch-exhaustiveness-check`). A hatodik kód, a `service_unavailable`, 2026-09-23 óta létezik, a hetedik, a `forbidden` (a szerver kérés forrás ellenőrzése, SPEC-017 5.4) 2026-11-05 óta (SPEC-005 8.2).
 
-| Kód                   | Mit lát a felhasználó                                            |
-| --------------------- | ---------------------------------------------------------------- |
-| `invalid_request`     | a kérés nem volt érvényes (a mező megnevezése nélkül, lásd lent) |
-| `not_found`           | a keresett elem nem létezik, esetleg időközben törölték          |
-| `conflict`            | az elem állapota most nem engedi a műveletet                     |
-| `unprocessable`       | a kérés rendben volt, de a rendszer nem tudja végrehajtani       |
-| `internal`            | váratlan szerver hiba                                            |
-| `service_unavailable` | a szerver átmenetileg nem érhető el, például éppen leáll         |
+| Kód                   | Mit lát a felhasználó                                                           |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `invalid_request`     | a kérés nem volt érvényes (a mező megnevezése nélkül, lásd lent)                |
+| `not_found`           | a keresett elem nem létezik, esetleg időközben törölték                         |
+| `conflict`            | az elem állapota most nem engedi a műveletet                                    |
+| `unprocessable`       | a kérés rendben volt, de a rendszer nem tudja végrehajtani                      |
+| `internal`            | váratlan szerver hiba                                                           |
+| `service_unavailable` | a szerver átmenetileg nem érhető el, például éppen leáll                        |
+| `forbidden`           | a szerver elutasította a kérést, mert nem a beállított felület címéről érkezett |
 
 **A felületen KIZÁRÓLAG a kód mondata áll, a szerver `message` mezője nem** (user döntés 2026-09-24, "Mindhárom javítás"). Korábban a `perform-route-request.ts` a mondat után fűzte a szerver szövegét (`` `${mondat}: ${message}` ``), ami két hibát adott: a mondat záró pontja után kettőspont állt (".:"), és a felületre belső szöveg került (azonosító, zárójeles hibaosztály, például `A(z) "<stepRunId>" ... (already_decided).`). A döntés három része:
 

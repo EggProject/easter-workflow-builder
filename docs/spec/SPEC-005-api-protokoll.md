@@ -497,16 +497,17 @@ Ugyanez az alak áll a REST hibaválasz törzsében és a `protocol_error` SSE k
 
 ### 8.2 A `ProtocolErrorCode` zárt szótára
 
-Hat érték, mindegyikhez pontosan egy HTTP státusz. A leképezés tiszta függvény a `protocol-error` témában, tehát a szerver nem talál ki státuszt.
+Hét érték, mindegyikhez pontosan egy HTTP státusz. A leképezés tiszta függvény a `protocol-error` témában, tehát a szerver nem talál ki státuszt.
 
-| `code`                | HTTP  | Mikor                                                                       |
-| --------------------- | ----- | --------------------------------------------------------------------------- |
-| `invalid_request`     | `400` | a bejövő alak nem illeszkedik a sémára                                      |
-| `not_found`           | `404` | a megnevezett erőforrás nem létezik                                         |
-| `conflict`            | `409` | az erőforrás létezik, de az állapota nem engedi a műveletet                 |
-| `unprocessable`       | `422` | a kérés jól formált és az erőforrás létezik, de a domain elutasítja         |
-| `internal`            | `500` | minden más, beleértve az előre nem látott hibát                             |
-| `service_unavailable` | `503` | a szerver átmenetileg nem fogad új futást és megszakítást, mert éppen leáll |
+| `code`                | HTTP  | Mikor                                                                                |
+| --------------------- | ----- | ------------------------------------------------------------------------------------ |
+| `invalid_request`     | `400` | a bejövő alak nem illeszkedik a sémára                                               |
+| `not_found`           | `404` | a megnevezett erőforrás nem létezik                                                  |
+| `conflict`            | `409` | az erőforrás létezik, de az állapota nem engedi a műveletet                          |
+| `unprocessable`       | `422` | a kérés jól formált és az erőforrás létezik, de a domain elutasítja                  |
+| `internal`            | `500` | minden más, beleértve az előre nem látott hibát                                      |
+| `service_unavailable` | `503` | a szerver átmenetileg nem fogad új futást és megszakítást, mert éppen leáll          |
+| `forbidden`           | `403` | a kérés nem a szerver helyi nevére vagy nem a felület originjéről jön (SPEC-017 5.4) |
 
 ### 8.3 A `db` és a motor hibaosztályai
 
